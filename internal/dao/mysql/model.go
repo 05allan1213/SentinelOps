@@ -368,15 +368,23 @@ type WorkflowEvent struct {
 
 func (WorkflowEvent) TableName() string { return "workflow_events" }
 
-// WorkflowCheckpoint 工作流检查点，保存可恢复的 JSON 快照
+// WorkflowCheckpoint 工作流检查点，隔离 legacy JSON 与 Eino opaque bytes。
 type WorkflowCheckpoint struct {
-	ID            string         `gorm:"column:id;primaryKey;size:64"`
-	RunID         string         `gorm:"column:run_id;size:64;not null;index"`
-	CheckpointKey string         `gorm:"column:checkpoint_key;size:128;not null;index"`
-	SnapshotJSON  string         `gorm:"column:snapshot_json;type:json;not null"`
-	CreatedAt     time.Time      `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt     time.Time      `gorm:"column:updated_at;autoUpdateTime"`
-	DeletedAt     gorm.DeletedAt `gorm:"column:deleted_at;index"`
+	ID                       string         `gorm:"column:id;primaryKey;size:64"`
+	RunID                    string         `gorm:"column:run_id;size:64;not null;index"`
+	CheckpointKey            string         `gorm:"column:checkpoint_key;size:128;not null;index"`
+	SnapshotJSON             string         `gorm:"column:snapshot_json;type:json;not null"`
+	EinoCheckpointID         *string        `gorm:"column:eino_checkpoint_id;size:128;uniqueIndex:uidx_workflow_checkpoints_eino_id"`
+	CheckpointBlob           []byte         `gorm:"column:checkpoint_blob;type:longblob"`
+	PayloadSHA256            *string        `gorm:"column:payload_sha256;type:char(64)"`
+	RuntimeVersion           *string        `gorm:"column:runtime_version;size:128"`
+	RuntimeCompatibilityHash *string        `gorm:"column:runtime_compatibility_hash;type:char(64)"`
+	LeaseGeneration          *uint64        `gorm:"column:lease_generation"`
+	CommittedAt              *time.Time     `gorm:"column:committed_at;type:datetime(3)"`
+	ExpiresAt                *time.Time     `gorm:"column:expires_at;type:datetime(3)"`
+	CreatedAt                time.Time      `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt                time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt                gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
 func (WorkflowCheckpoint) TableName() string { return "workflow_checkpoints" }

@@ -197,7 +197,7 @@ func requireCurrentSchemaSnapshot(t *testing.T, db *gorm.DB) {
 		&Event{}, &Subscription{}, &Report{}, &User{}, &Setting{}, &QueryTermMapping{},
 		&TraceRun{}, &TraceNode{}, &KnowledgeBase{}, &KnowledgeDocument{}, &KnowledgeChunk{},
 		&MessageFeedback{}, &UserPreference{}, &OpsPlaybook{}, &OpsRun{}, &OpsRunStep{},
-		&OpsProtectedAsset{}, &p03WorkflowRun{}, &p03WorkflowEvent{}, &WorkflowCheckpoint{},
+		&OpsProtectedAsset{}, &p03WorkflowRun{}, &p03WorkflowEvent{}, &p03WorkflowCheckpoint{},
 		&p03SessionStateRevision{},
 	}
 	if err := db.AutoMigrate(models...); err != nil {
@@ -246,6 +246,18 @@ type p03WorkflowEvent struct {
 }
 
 func (p03WorkflowEvent) TableName() string { return "workflow_events" }
+
+type p03WorkflowCheckpoint struct {
+	ID            string         `gorm:"column:id;primaryKey;size:64"`
+	RunID         string         `gorm:"column:run_id;size:64;not null;index"`
+	CheckpointKey string         `gorm:"column:checkpoint_key;size:128;not null;index"`
+	SnapshotJSON  string         `gorm:"column:snapshot_json;type:json;not null"`
+	CreatedAt     time.Time      `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt     time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt     gorm.DeletedAt `gorm:"column:deleted_at;index"`
+}
+
+func (p03WorkflowCheckpoint) TableName() string { return "workflow_checkpoints" }
 
 type p03SessionStateRevision struct {
 	ID        uint           `gorm:"primaryKey;autoIncrement"`
