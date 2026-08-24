@@ -104,6 +104,19 @@ services:
       timeout: 5s
       retries: 3
 
+  migrate:
+    profiles: ["migration"]
+    build:
+      context: ../..
+      dockerfile: manifest/docker/Dockerfile.migrate
+    environment:
+      GOOSE_DRIVER: mysql
+      GOOSE_DBSTRING: ${SENTINELOPS_MYSQL_DSN:-}
+    command: ["-dir", "/migrations", "up"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+
   backend:
     container_name: sentinelops-backend
     build:

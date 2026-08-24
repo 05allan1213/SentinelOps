@@ -53,15 +53,13 @@ func main() {
 		authPkg.Init(secret.String())
 	}
 
-	// 初始化 MySQL（事件/订阅/报告表），GORM 自动迁移，创建默认管理员
+	// 初始化 MySQL 并只读核对 goose Schema 版本；DDL 仅由独立 migrate Job 执行。
 	if err := dao.Init(ctx); err != nil {
-		g.Log().Warningf(ctx, "database init skipped or failed: %v", err)
+		g.Log().Fatalf(ctx, "database startup check failed: %v", err)
 	} else {
 		dao.SeedAdmin(ctx)
 		dao.SeedSettings(ctx)
 		dao.SeedTermMappings(ctx)
-		// 创建性能优化索引（幂等）
-		dao.CreateIndexes(ctx)
 		// 确保默认知识库存在
 		knowledge.EnsureDefaultBase(ctx)
 		// 注册 GORM plugin（慢查询追踪）

@@ -1,0 +1,31 @@
+name: sentinelops-test
+
+services:
+  mysql:
+    image: mysql:8.0.43
+    environment:
+      MYSQL_ROOT_PASSWORD: sentinelops-p03-only
+      MYSQL_DATABASE: sentinelops_p03
+    ports:
+      - "127.0.0.1::3306"
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-psentinelops-p03-only"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  migrate:
+    profiles: ["migration"]
+    build:
+      context: ../..
+      dockerfile: manifest/docker/Dockerfile.migrate
+    environment:
+      GOOSE_DRIVER: mysql
+      GOOSE_DBSTRING: root:sentinelops-p03-only@tcp(mysql:3306)/sentinelops_p03?parseTime=true
+    command: ["-dir", "/migrations", "up"]
+    depends_on:
+      mysql:
+        condition: service_healthy
