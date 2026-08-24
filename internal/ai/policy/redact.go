@@ -100,10 +100,7 @@ func isSensitiveKey(key string) bool {
 			return true
 		}
 	}
-	if strings.Contains(normalized, "_secret_") {
-		return true
-	}
-	return false
+	return strings.Contains(normalized, "_secret_")
 }
 
 func containsSecretMaterial(value string) bool {

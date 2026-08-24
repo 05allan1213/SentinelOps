@@ -1,0 +1,44 @@
+version: sentinelops.agent.tool-inventory/v1
+agents:
+  EventAnalysisAgent:
+    - query_events
+    - search_similar_events
+    - query_subscriptions
+    - query_reports
+    - query_internal_docs
+    - get_current_time
+    - web_search
+  RiskAgent:
+    - query_events
+    - query_reports
+    - search_similar_events
+    - query_internal_docs
+    - query_subscriptions
+    - get_current_time
+    - web_search
+  SolveAgent:
+    - search_similar_events
+    - query_internal_docs
+    - web_search
+  ReportAgent:
+    - query_events
+    - query_reports
+    - query_report_templates
+    - search_similar_events
+    - get_current_time
+    - create_report
+    - web_search
+  IntelligenceAgent:
+    - query_internal_docs
+    - get_current_time
+    - web_search
+    - save_intelligence
+  OpsAgent:
+    - query_events
+    - trigger_ops
+    - update_event_status
+    - block_ip
+    - notify_dingtalk
+    - notify_wecom
+    - notify_email
+    - get_current_time

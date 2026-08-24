@@ -11,7 +11,11 @@
 package tools
 
 import (
+	"context"
+	"fmt"
 	"sync"
+
+	"SentinelOps/internal/ai/policy"
 
 	"github.com/cloudwego/eino/components/tool"
 )
@@ -21,13 +25,16 @@ var (
 	mu sync.RWMutex
 	// registry 全局工具映射表，key 为工具名称字符串，value 为工具实例
 	registry = make(map[string]tool.BaseTool)
+	// registrations 记录名称的注册次数，使 strict durable 路径可拒绝覆盖过的重名。
+	registrations = make(map[string]int)
 )
 
 // Register 将工具注册到全局注册表（通常在 init() 中调用，线程安全）。
-// 若同名工具已存在，新注册的工具会覆盖旧的（允许测试时替换为 mock 实现）。
+// legacy 查询仍读取最后注册的实例；durable GetManyRequired 会拒绝任何重名注册。
 func Register(name string, t tool.BaseTool) {
 	mu.Lock()
 	defer mu.Unlock()
+	registrations[name]++
 	registry[name] = t
 }
 
@@ -54,6 +61,58 @@ func GetMany(names []string) []tool.BaseTool {
 		}
 	}
 	return result
+}
+
+// GetManyRequired 严格解析 durable Tool，并校验 Catalog、名称和参数 Schema。
+// 任何缺失、请求重名、注册重名、ToolInfo.Name 或 schema hash 漂移都会阻止启动。
+func GetManyRequired(names []string) ([]tool.BaseTool, error) {
+	seen := make(map[string]struct{}, len(names))
+	result := make([]tool.BaseTool, 0, len(names))
+	mu.RLock()
+	defer mu.RUnlock()
+	for _, name := range names {
+		if _, duplicate := seen[name]; duplicate {
+			return nil, fmt.Errorf("duplicate required tool %q", name)
+		}
+		seen[name] = struct{}{}
+		instance, ok := registry[name]
+		if !ok || instance == nil {
+			return nil, fmt.Errorf("required tool %q is missing", name)
+		}
+		if registrations[name] != 1 {
+			return nil, fmt.Errorf("required tool %q registered %d times", name, registrations[name])
+		}
+		entry, err := policy.LookupCatalog(name)
+		if err != nil {
+			return nil, err
+		}
+		if entry.Audience != policy.AudienceDurable {
+			return nil, fmt.Errorf("required tool %q is restricted to audience %q", name, entry.Audience)
+		}
+		info, err := instance.Info(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("required tool %q Info: %w", name, err)
+		}
+		if info == nil || info.Name != name {
+			actual := "<nil>"
+			if info != nil {
+				actual = info.Name
+			}
+			return nil, fmt.Errorf("required tool %q ToolInfo.Name = %q", name, actual)
+		}
+		hash, err := policy.ToolSchemaHash(info)
+		if err != nil {
+			return nil, fmt.Errorf("required tool %q schema hash: %w", name, err)
+		}
+		if hash != entry.SchemaHash {
+			return nil, fmt.Errorf("required tool %q schema hash = %s, want %s", name, hash, entry.SchemaHash)
+		}
+		result = append(result, instance)
+	}
+	if len(result) != len(names) {
+		return nil, fmt.Errorf("required tool count = %d, want %d", len(result), len(names))
+	}
+	return result, nil
 }
 
 // All 返回所有已注册工具的快照（调试用）。

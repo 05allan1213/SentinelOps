@@ -11,6 +11,9 @@
 package tools
 
 import (
+	"fmt"
+
+	"SentinelOps/internal/ai/policy"
 	toolsevent "SentinelOps/internal/ai/tools/event"
 	toolsintelligence "SentinelOps/internal/ai/tools/intelligence"
 	toolsops "SentinelOps/internal/ai/tools/ops"
@@ -41,8 +44,6 @@ func init() {
 	// ── 系统类工具 ──────────────────────────────────────────────────────────
 	// get_current_time: 获取当前时间（ReAct 推理中用于计算相对时间范围，如"最近7天"）
 	Register("get_current_time", toolssystem.NewGetCurrentTimeTool())
-	// query_database: 执行任意 SELECT 查询（Plan Agent 通用数据查询）
-	Register("query_database", toolssystem.NewQueryDatabaseTool())
 	// query_internal_docs: 查询 Milvus 内部文档知识库（Chat Agent 和 Risk Agent 使用）
 	Register("query_internal_docs", toolssystem.NewQueryInternalDocsTool())
 
@@ -58,6 +59,14 @@ func init() {
 	Register("notify_dingtalk", toolsops.NewNotifyDingTalkTool())
 	Register("notify_wecom", toolsops.NewNotifyWeComTool())
 	Register("notify_email", toolsops.NewNotifyEmailTool())
+	Register("webhook_out", toolsops.NewWebhookOutTool())
 	Register("block_ip", toolsops.NewBlockIPTool())
 	Register("update_event_status", toolsops.NewUpdateEventStatusTool())
+
+	if err := policy.ValidateCatalog(); err != nil {
+		panic(fmt.Errorf("validate Tool Catalog: %w", err))
+	}
+	if _, err := GetManyRequired(policy.DefaultRegistryToolNames()); err != nil {
+		panic(fmt.Errorf("validate strict Tool Registry: %w", err))
+	}
 }
