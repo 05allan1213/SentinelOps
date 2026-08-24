@@ -16,6 +16,7 @@ import (
 	v1 "SentinelOps/api/chat/v1"
 	aidoc "SentinelOps/internal/ai/document"
 	"SentinelOps/internal/ai/memory"
+	"SentinelOps/internal/ai/policy"
 	toolsintelligence "SentinelOps/internal/ai/tools/intelligence"
 	"SentinelOps/internal/ai/trace"
 	"SentinelOps/internal/ai/workflow"
@@ -100,6 +101,9 @@ func normalizeDeepThinkingTimeoutSec(sec int) int {
 // 文件解析和保存依赖 GoFrame API，必须保留在 HTTP 层；向量索引构建委托 chatsvc.BuildFileIndex。
 func (c *ControllerV1) FileUpload(ctx context.Context, req *v1.FileUploadReq) (*v1.FileUploadRes, error) {
 	const maxUploadBytes int64 = 50 << 20 // 最大上传大小为 50 MB
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return nil, err
+	}
 
 	fileDir, err := g.Cfg().Get(ctx, "file_dir")
 	if err != nil {
@@ -191,6 +195,10 @@ func (c *ControllerV1) Chat(ctx context.Context, req *v1.ChatReq) (*v1.ChatRes, 
 	if req.Query == "" {
 		g.Log().Warningf(ctx, "[Chat] 收到空查询 | session_id=%s", req.SessionId)
 		return nil, gerror.New("查询内容不能为空")
+	}
+	userID, err := policy.UserID(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	// 记录查询内容
@@ -312,7 +320,7 @@ func (c *ControllerV1) Chat(ctx context.Context, req *v1.ChatReq) (*v1.ChatRes, 
 		}
 	}()
 
-	var err error
+	err = nil
 	// Agent 执行超时
 	// 通过 context.WithTimeout 为整个 Agent 执行链路设置最长运行时间：
 	//   - 标准模式：90s（Router + SubAgent 单轮，含 RAG 检索）
@@ -328,9 +336,7 @@ func (c *ControllerV1) Chat(ctx context.Context, req *v1.ChatReq) (*v1.ChatRes, 
 	if req.WebSearch {
 		agentCtx = context.WithValue(agentCtx, toolsintelligence.WebSearchEnabledKey{}, true)
 	}
-	if req.UserID != "" {
-		agentCtx = context.WithValue(agentCtx, memory.UserIdCtxKey{}, req.UserID)
-	}
+	agentCtx = context.WithValue(agentCtx, memory.UserIdCtxKey{}, userID)
 	if req.DeepThinking {
 		err = chatsvc.ExecuteDeepThink(agentCtx, req.SessionId, req.Query, req.MessageIndex, func(intentType, chunk string) {
 			sendEvent(intentType, chunk)

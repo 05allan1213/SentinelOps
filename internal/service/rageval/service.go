@@ -38,6 +38,7 @@ import (
 
 	"SentinelOps/internal/ai/cache"
 	"SentinelOps/internal/ai/memory"
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 	redisdao "SentinelOps/internal/dao/redis"
 
@@ -93,6 +94,30 @@ type DashboardMetrics struct {
 	Trends []TrendPoint `json:"trends"`
 }
 
+func scopedTraceRuns(ctx context.Context, db *gorm.DB) (*gorm.DB, error) {
+	identity, err := policy.IdentityFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	query := db.WithContext(ctx).Model(&dao.TraceRun{})
+	if identity.Scope.All {
+		return query, nil
+	}
+	return query.Where("CASE WHEN JSON_VALID(agent_trace_runs.tags) THEN JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.server_user_id')) ELSE NULL END = ?", identity.UserID), nil
+}
+
+func scopedFeedback(ctx context.Context, db *gorm.DB) (*gorm.DB, error) {
+	identity, err := policy.IdentityFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	query := db.WithContext(ctx).Model(&dao.MessageFeedback{})
+	if !identity.Scope.All {
+		query = query.Where("user_id = ?", identity.UserID)
+	}
+	return query, nil
+}
+
 // GetDashboard 聚合指定时间窗口内的 RAG KPI。
 // window：24h / 7d / 30d，缺省 24h。
 func GetDashboard(ctx context.Context, window string) (*DashboardMetrics, error) {
@@ -105,7 +130,13 @@ func GetDashboard(ctx context.Context, window string) (*DashboardMetrics, error)
 
 	// ── 查 agent_trace_runs ──────────────────────────────────────────────────
 	var runs []dao.TraceRun
-	db.Where("start_time >= ?", since).Order("start_time asc").Find(&runs)
+	runQuery, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	if err := runQuery.Where("start_time >= ?", since).Order("start_time asc").Find(&runs).Error; err != nil {
+		return nil, err
+	}
 
 	total := int64(len(runs))
 	var successCount int64
@@ -139,7 +170,15 @@ func GetDashboard(ctx context.Context, window string) (*DashboardMetrics, error)
 
 	// ── 查 agent_trace_nodes（RETRIEVER）──────────────────────────────────
 	var retrieverNodes []dao.TraceNode
-	db.Where("start_time >= ? AND node_type = ?", since, "RETRIEVER").Find(&retrieverNodes)
+	allowedRuns, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	if err := db.WithContext(ctx).
+		Where("start_time >= ? AND node_type = ? AND trace_id IN (?)", since, "RETRIEVER", allowedRuns.Select("trace_id")).
+		Find(&retrieverNodes).Error; err != nil {
+		return nil, err
+	}
 
 	var retrieverTotal int64
 	var totalDocCount int64
@@ -207,7 +246,10 @@ func ListTraces(ctx context.Context, page, pageSize int, status string) ([]Trace
 	}
 	offset := (page - 1) * pageSize
 
-	q := db.Model(&dao.TraceRun{})
+	q, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, 0, err
+	}
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -236,7 +278,13 @@ func ListTraces(ctx context.Context, page, pageSize int, status string) ([]Trace
 
 	if len(sessionIDs) > 0 {
 		var feedbacks []dao.MessageFeedback
-		db.Where("session_id IN ?", sessionIDs).Find(&feedbacks)
+		feedbackQuery, scopeErr := scopedFeedback(ctx, db)
+		if scopeErr != nil {
+			return nil, 0, scopeErr
+		}
+		if scopeErr = feedbackQuery.Where("session_id IN ?", sessionIDs).Find(&feedbacks).Error; scopeErr != nil {
+			return nil, 0, scopeErr
+		}
 		for _, f := range feedbacks {
 			key := feedbackKey{sessionID: f.SessionID, messageIndex: f.MessageIndex}
 			feedbackMap[key] = f.Vote
@@ -261,9 +309,20 @@ func ListTraces(ctx context.Context, page, pageSize int, status string) ([]Trace
 
 // DeleteTrace 删除指定 traceID 的链路记录（TraceRun + TraceNode 硬删除）。
 func DeleteTrace(ctx context.Context, traceID string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	db, err := dao.DB(ctx)
 	if err != nil {
 		return err
+	}
+	allowedRuns, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return err
+	}
+	var run dao.TraceRun
+	if err := allowedRuns.Select("trace_id").Where("trace_id = ?", traceID).First(&run).Error; err != nil {
+		return policy.ErrForbidden
 	}
 	if err := db.Where("trace_id = ?", traceID).Delete(&dao.TraceRun{}).Error; err != nil {
 		return err
@@ -296,16 +355,26 @@ func DeleteTrace(ctx context.Context, traceID string) error {
 // 传入 vote=0 表示取消反馈（直接删除该条记录）。
 // 踩（-1）时异步触发用户偏好重新推断，形成反馈闭环。
 func SubmitFeedback(ctx context.Context, sessionID, userID string, messageIndex, vote int, reasons []string) error {
+	if err := policy.Authorize(ctx, policy.PermissionWriteOwnFeedback, policy.Resource{OwnerID: userID}); err != nil {
+		return err
+	}
 	db, err := dao.DB(ctx)
 	if err != nil {
 		return err
+	}
+	var ownedSession int64
+	if err := db.Model(&dao.WorkflowRun{}).Where("session_id = ? AND user_id = ?", sessionID, userID).Count(&ownedSession).Error; err != nil {
+		return err
+	}
+	if ownedSession == 0 {
+		return policy.ErrForbidden
 	}
 	if vote == 0 {
 		// 取消反馈：硬删除该条记录
 		// 注意：偏好字段（output_style/analysis_depth/inferred_note）不回滚，
 		// 偏好是长期画像，单次取消不足以推翻已积累的特征。
 		if err := db.Unscoped().
-			Where("session_id = ? AND message_index = ?", sessionID, messageIndex).
+			Where("session_id = ? AND message_index = ? AND user_id = ?", sessionID, messageIndex, userID).
 			Delete(&dao.MessageFeedback{}).Error; err != nil {
 			g.Log().Warningf(ctx, "[Feedback] 取消反馈失败 | session=%s | idx=%d | err=%v", sessionID, messageIndex, err)
 			return err
@@ -316,7 +385,7 @@ func SubmitFeedback(ctx context.Context, sessionID, userID string, messageIndex,
 	// Upsert：已存在则更新 vote/reason，不存在则插入
 	var existing dao.MessageFeedback
 	err = db.Session(&gorm.Session{Logger: db.Logger.LogMode(logger.Silent)}).
-		Where("session_id = ? AND message_index = ?", sessionID, messageIndex).
+		Where("session_id = ? AND message_index = ? AND user_id = ?", sessionID, messageIndex, userID).
 		First(&existing).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
@@ -447,7 +516,13 @@ func GetFeedbackStats(ctx context.Context) (*FeedbackStats, error) {
 	}
 
 	var feedbacks []dao.MessageFeedback
-	db.Order("created_at desc").Find(&feedbacks)
+	feedbackQuery, err := scopedFeedback(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	if err := feedbackQuery.Order("created_at desc").Find(&feedbacks).Error; err != nil {
+		return nil, err
+	}
 
 	var likes, dislikes int64
 	for _, f := range feedbacks {
@@ -678,7 +753,11 @@ func GetTraceDetail(ctx context.Context, traceID string) (*TraceDetail, error) {
 	}
 
 	var run dao.TraceRun
-	if err := db.Where("trace_id = ?", traceID).First(&run).Error; err != nil {
+	allowedRuns, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	if err := allowedRuns.Where("trace_id = ?", traceID).First(&run).Error; err != nil {
 		return nil, fmt.Errorf("trace not found: %w", err)
 	}
 
@@ -733,7 +812,11 @@ func GetTraceDetail(ctx context.Context, traceID string) (*TraceDetail, error) {
 	feedbackVote := 0
 	if run.SessionID != "" {
 		var fb dao.MessageFeedback
-		err := db.Where("session_id = ? AND message_index = ?", run.SessionID, run.MessageIndex).First(&fb).Error
+		feedbackQuery, scopeErr := scopedFeedback(ctx, db)
+		if scopeErr != nil {
+			return nil, scopeErr
+		}
+		err := feedbackQuery.Where("session_id = ? AND message_index = ?", run.SessionID, run.MessageIndex).First(&fb).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("query feedback: %w", err)
 		}

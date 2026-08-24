@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v1 "SentinelOps/api/trace/v1"
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 	redisdao "SentinelOps/internal/dao/redis"
 )
@@ -23,8 +24,15 @@ func NewService() *Service {
 	}
 }
 
+func requireScopedView(ctx context.Context) error {
+	return policy.Authorize(ctx, policy.PermissionViewScoped, policy.Resource{})
+}
+
 // ListRuns 分页查询链路列表
 func (s *Service) ListRuns(ctx context.Context, status, traceID, sessionID string, page, pageSize int) ([]v1.TraceRunVO, int64, error) {
+	if err := requireScopedView(ctx); err != nil {
+		return nil, 0, err
+	}
 	// 参数校验
 	if page < 1 {
 		page = 1
@@ -47,6 +55,9 @@ func (s *Service) ListRuns(ctx context.Context, status, traceID, sessionID strin
 
 // GetDetail 获取链路详情
 func (s *Service) GetDetail(ctx context.Context, traceID string) (*v1.TraceRunVO, []v1.TraceNodeVO, error) {
+	if err := requireScopedView(ctx); err != nil {
+		return nil, nil, err
+	}
 	run, err := s.dao.GetRunByTraceID(ctx, traceID)
 	if err != nil {
 		return nil, nil, err
@@ -68,6 +79,9 @@ func (s *Service) GetDetail(ctx context.Context, traceID string) (*v1.TraceRunVO
 
 // GetStats 获取统计数据
 func (s *Service) GetStats(ctx context.Context, days int) (*v1.StatsRes, error) {
+	if err := requireScopedView(ctx); err != nil {
+		return nil, err
+	}
 	if days <= 0 {
 		days = 7
 	}
@@ -76,11 +90,14 @@ func (s *Service) GetStats(ctx context.Context, days int) (*v1.StatsRes, error) 
 	// 基础统计
 	agg, err := s.dao.GetStatsAgg(ctx, since)
 	if err != nil {
-		return &v1.StatsRes{}, nil
+		return nil, err
 	}
 
 	// P95 计算
-	durations, _ := s.dao.GetSuccessDurations(ctx, since)
+	durations, err := s.dao.GetSuccessDurations(ctx, since)
+	if err != nil {
+		return nil, err
+	}
 	p95 := calcP95(durations)
 
 	var errorRate, avgCost float64
@@ -105,6 +122,9 @@ func (s *Service) GetStats(ctx context.Context, days int) (*v1.StatsRes, error) 
 
 // BatchDelete 批量删除链路
 func (s *Service) BatchDelete(ctx context.Context, traceIDs []string) (int64, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return 0, err
+	}
 	if len(traceIDs) == 0 {
 		return 0, nil
 	}
@@ -113,6 +133,9 @@ func (s *Service) BatchDelete(ctx context.Context, traceIDs []string) (int64, er
 
 // GetSessionTimeline 获取会话时间线
 func (s *Service) GetSessionTimeline(ctx context.Context, sessionID string) (*v1.SessionTimelineRes, error) {
+	if err := requireScopedView(ctx); err != nil {
+		return nil, err
+	}
 	runs, err := s.dao.ListRunsBySessionID(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -139,6 +162,9 @@ func (s *Service) GetSessionTimeline(ctx context.Context, sessionID string) (*v1
 
 // GetCostOverview 获取成本概览
 func (s *Service) GetCostOverview(ctx context.Context, startDate, endDate string, days int) (*v1.CostOverviewRes, error) {
+	if err := requireScopedView(ctx); err != nil {
+		return nil, err
+	}
 	// 计算时间范围
 	var since, until time.Time
 	if startDate != "" && endDate != "" {
@@ -155,8 +181,14 @@ func (s *Service) GetCostOverview(ctx context.Context, startDate, endDate string
 	prevSince := since.Add(-(until.Sub(since)))
 
 	// 当前周期和上一周期聚合
-	cur, _ := s.dao.GetCostAgg(ctx, since, until)
-	prev, _ := s.dao.GetCostAgg(ctx, prevSince, since)
+	cur, err := s.dao.GetCostAgg(ctx, since, until)
+	if err != nil {
+		return nil, err
+	}
+	prev, err := s.dao.GetCostAgg(ctx, prevSince, since)
+	if err != nil {
+		return nil, err
+	}
 
 	var changePct, avgCost float64
 	if prev.TotalCost > 0 {
@@ -167,7 +199,10 @@ func (s *Service) GetCostOverview(ctx context.Context, startDate, endDate string
 	}
 
 	// 每日趋势
-	dailyRows, _ := s.dao.GetDailyCostTrend(ctx, since, until)
+	dailyRows, err := s.dao.GetDailyCostTrend(ctx, since, until)
+	if err != nil {
+		return nil, err
+	}
 	dailyTrend := make([]v1.DailyCostPoint, 0, len(dailyRows))
 	for _, r := range dailyRows {
 		dailyTrend = append(dailyTrend, v1.DailyCostPoint{
@@ -180,7 +215,10 @@ func (s *Service) GetCostOverview(ctx context.Context, startDate, endDate string
 	}
 
 	// 模型分布
-	modelRows, _ := s.dao.GetModelCostBreakdown(ctx, since, until)
+	modelRows, err := s.dao.GetModelCostBreakdown(ctx, since, until)
+	if err != nil {
+		return nil, err
+	}
 	modelBreakdown := make([]v1.ModelCostItem, 0, len(modelRows))
 	for _, r := range modelRows {
 		pct := 0.0
@@ -198,7 +236,10 @@ func (s *Service) GetCostOverview(ctx context.Context, startDate, endDate string
 	}
 
 	// 意图分布
-	intentRows, _ := s.dao.GetIntentCostBreakdown(ctx, since, until, 10)
+	intentRows, err := s.dao.GetIntentCostBreakdown(ctx, since, until, 10)
+	if err != nil {
+		return nil, err
+	}
 	intentBreakdown := make([]v1.IntentCostItem, 0, len(intentRows))
 	for _, r := range intentRows {
 		pct := 0.0
@@ -234,6 +275,9 @@ func (s *Service) GetCostOverview(ctx context.Context, startDate, endDate string
 
 // GetTokenTrend 获取 Token 趋势
 func (s *Service) GetTokenTrend(ctx context.Context, hours int) (*v1.TokenTrendRes, error) {
+	if err := requireScopedView(ctx); err != nil {
+		return nil, err
+	}
 	if hours <= 0 {
 		hours = 24
 	}
@@ -241,7 +285,7 @@ func (s *Service) GetTokenTrend(ctx context.Context, hours int) (*v1.TokenTrendR
 
 	rows, err := s.dao.GetHourlyTokenTrend(ctx, since)
 	if err != nil {
-		return &v1.TokenTrendRes{}, nil
+		return nil, err
 	}
 
 	points := make([]v1.TokenTrendPoint, 0, len(rows))
@@ -324,5 +368,15 @@ func toTraceNodeVO(n *dao.TraceNode) v1.TraceNodeVO {
 
 // GetSessionSnapshot 实时从 Redis 读取会话对话快照
 func (s *Service) GetSessionSnapshot(ctx context.Context, sessionID string) (string, error) {
+	if err := requireScopedView(ctx); err != nil {
+		return "", err
+	}
+	runs, err := s.dao.ListRunsBySessionID(ctx, sessionID)
+	if err != nil {
+		return "", err
+	}
+	if len(runs) == 0 {
+		return "", policy.ErrForbidden
+	}
 	return redisdao.GetSessionSnapshot(ctx, sessionID)
 }

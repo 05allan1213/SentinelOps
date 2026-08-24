@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 	"SentinelOps/utility/auth"
 
@@ -32,6 +33,9 @@ func Login(ctx context.Context, username, password string) (token, userID, role,
 
 // Register 注册新用户，用户名唯一，密码 bcrypt 加密，成功后直接签发 JWT。
 func Register(ctx context.Context, username, password string) (token, userID, role, uname string, err error) {
+	if err = policy.Authorize(ctx, policy.PermissionManageUsersPolicyGates, policy.Resource{}); err != nil {
+		return
+	}
 	if len(password) < 6 {
 		err = fmt.Errorf("密码长度不能少于 6 位")
 		return
@@ -51,13 +55,17 @@ func Register(ctx context.Context, username, password string) (token, userID, ro
 }
 
 func issueToken(ctx context.Context, id, username, role string) (token, userID, userRole string, err error) {
+	normalizedRole, err := policy.NormalizeRole(role)
+	if err != nil {
+		return "", "", "", err
+	}
 	exp, _ := g.Cfg().Get(ctx, "auth.jwt.expire_hours")
 	expHours := exp.Int()
 	if expHours <= 0 {
 		expHours = 24
 	}
-	token, err = auth.Generate(id, username, role, time.Duration(expHours)*time.Hour)
+	token, err = auth.Generate(id, username, string(normalizedRole), time.Duration(expHours)*time.Hour)
 	userID = id
-	userRole = role
+	userRole = string(normalizedRole)
 	return
 }

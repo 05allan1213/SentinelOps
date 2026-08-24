@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -31,6 +32,9 @@ func NewTriggerOpsTool() tool.InvokableTool {
 		"trigger_ops",
 		"触发指定安全事件的 AI 智能运维，自动分析事件并执行响应动作。",
 		func(ctx context.Context, input *TriggerOpsInput, opts ...tool.Option) (string, error) {
+			if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+				return "", err
+			}
 			if input.EventID == "" {
 				return "", fmt.Errorf("event_id 不能为空")
 			}

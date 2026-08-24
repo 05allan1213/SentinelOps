@@ -38,6 +38,7 @@ func bindAPI(ctx context.Context) error {
 		group.Middleware(middleware.CORSMiddleware)
 		group.Middleware(middleware.ResponseMiddleware)
 		group.Middleware(middleware.JWTMiddleware())
+		group.Middleware(middleware.AuthorizationMiddleware())
 		group.Middleware(middleware.RateLimitMiddleware)
 		group.Bind(chat.NewV1())
 		group.Bind(auth.NewV1())
@@ -54,6 +55,7 @@ func bindAPI(ctx context.Context) error {
 	s.Group("/api", func(group *ghttp.RouterGroup) {
 		group.Middleware(middleware.CORSMiddleware)
 		group.Middleware(middleware.ResponseMiddleware)
+		group.Middleware(middleware.AuthDisabledWriteGuard())
 		group.Middleware(middleware.IngestAPIKeyMiddleware())
 		group.Bind(ingestctrl.NewV1())
 	})

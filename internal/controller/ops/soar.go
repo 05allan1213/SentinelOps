@@ -6,6 +6,7 @@ import (
 
 	soarv1 "SentinelOps/api/ops/v1"
 	"SentinelOps/internal/ai/ops/engine"
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -15,9 +16,20 @@ type ControllerV1 struct{}
 
 func NewV1() *ControllerV1 { return &ControllerV1{} }
 
+func requireBusinessWrite(ctx context.Context) error {
+	return policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{})
+}
+
+func requireAdmin(ctx context.Context) error {
+	return policy.Authorize(ctx, policy.PermissionManageUsersPolicyGates, policy.Resource{})
+}
+
 // ---- 响应剧本 ----
 
 func (c *ControllerV1) ListPlaybooks(ctx context.Context, _ *soarv1.ListPlaybooksReq) (*soarv1.ListPlaybooksRes, error) {
+	if err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
 	list, err := dao.ListPlaybooks(ctx)
 	if err != nil {
 		return nil, err
@@ -33,6 +45,9 @@ func (c *ControllerV1) ListPlaybooks(ctx context.Context, _ *soarv1.ListPlaybook
 }
 
 func (c *ControllerV1) CreatePlaybook(ctx context.Context, req *soarv1.CreatePlaybookReq) (*soarv1.CreatePlaybookRes, error) {
+	if err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
 	p := &dao.OpsPlaybook{Name: req.Name, Description: req.Description, Enabled: req.Enabled}
 	if err := dao.CreatePlaybook(ctx, p); err != nil {
 		return nil, err
@@ -41,6 +56,9 @@ func (c *ControllerV1) CreatePlaybook(ctx context.Context, req *soarv1.CreatePla
 }
 
 func (c *ControllerV1) UpdatePlaybook(ctx context.Context, req *soarv1.UpdatePlaybookReq) (*soarv1.UpdatePlaybookRes, error) {
+	if err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
 	p, err := dao.GetPlaybook(ctx, req.ID)
 	if err != nil {
 		return nil, gerror.New("策略不存在")
@@ -58,6 +76,9 @@ func (c *ControllerV1) UpdatePlaybook(ctx context.Context, req *soarv1.UpdatePla
 }
 
 func (c *ControllerV1) DeletePlaybook(ctx context.Context, req *soarv1.DeletePlaybookReq) (*soarv1.DeletePlaybookRes, error) {
+	if err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
 	return &soarv1.DeletePlaybookRes{}, dao.DeletePlaybook(ctx, req.ID)
 }
 
@@ -97,14 +118,23 @@ func (c *ControllerV1) GetStats(ctx context.Context, _ *soarv1.GetStatsReq) (*so
 }
 
 func (c *ControllerV1) ClearRuns(ctx context.Context, _ *soarv1.ClearRunsReq) (*soarv1.ClearRunsRes, error) {
+	if err := requireBusinessWrite(ctx); err != nil {
+		return nil, err
+	}
 	return &soarv1.ClearRunsRes{}, dao.ClearRuns(ctx)
 }
 
 func (c *ControllerV1) DeleteRun(ctx context.Context, req *soarv1.DeleteRunReq) (*soarv1.DeleteRunRes, error) {
+	if err := requireBusinessWrite(ctx); err != nil {
+		return nil, err
+	}
 	return &soarv1.DeleteRunRes{}, dao.DeleteRun(ctx, req.ID)
 }
 
 func (c *ControllerV1) DirectRunForEvent(ctx context.Context, req *soarv1.DirectRunForEventReq) (*soarv1.DirectRunForEventRes, error) {
+	if err := requireBusinessWrite(ctx); err != nil {
+		return nil, err
+	}
 	event, err := dao.GetEventByID(ctx, req.EventID)
 	if err != nil {
 		return nil, gerror.New("事件不存在")

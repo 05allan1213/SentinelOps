@@ -1,26 +1,35 @@
 package middleware
 
 import (
+	"context"
 	"strings"
 
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/utility/auth"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 )
 
-// JWTMiddleware JWT 认证中间件，未配置或未启用时放行。登录接口 /auth/v1/login 始终放行。
-// allowedRoles 为空时不做角色校验，非空时要求 token 携带的 role 在列表内。
+// JWTMiddleware JWT 认证中间件。认证关闭时注入只读 viewer；登录接口始终放行。
+// allowedRoles 为空时不做角色校验，非空时要求规范化后的角色在列表内。
 func JWTMiddleware(allowedRoles ...string) ghttp.HandlerFunc {
+	return jwtMiddleware(func(ctx context.Context) bool {
+		enabled, _ := g.Cfg().Get(ctx, "auth.jwt.enabled")
+		return enabled.Bool()
+	}, allowedRoles...)
+}
+
+func jwtMiddleware(authEnabled func(context.Context) bool, allowedRoles ...string) ghttp.HandlerFunc {
 	return func(r *ghttp.Request) {
 		ctx := r.Context()
-		enabled, _ := g.Cfg().Get(ctx, "auth.jwt.enabled")
-		if !enabled.Bool() {
+		if !authEnabled(ctx) {
+			setRequestIdentity(r, policy.DisabledIdentity())
 			r.Middleware.Next()
 			return
 		}
-		// 登录/注册接口不校验 JWT
-		if strings.Contains(r.URL.Path, "/auth/v1/login") || strings.Contains(r.URL.Path, "/auth/v1/register") {
+		// 登录接口是唯一无需既有身份的用户端入口；注册属于用户管理写入。
+		if strings.Contains(r.URL.Path, "/auth/v1/login") {
 			r.Middleware.Next()
 			return
 		}
@@ -42,10 +51,17 @@ func JWTMiddleware(allowedRoles ...string) ghttp.HandlerFunc {
 			r.Response.WriteJson(g.Map{"message": "invalid token"})
 			return
 		}
+		identity, err := policy.NewIdentity(claims.UserID, claims.Username, claims.Role)
+		if err != nil {
+			r.Response.WriteStatus(403)
+			r.Response.WriteJson(g.Map{"message": "invalid identity"})
+			return
+		}
 		if len(allowedRoles) > 0 {
 			allowed := false
 			for _, role := range allowedRoles {
-				if claims.Role == role {
+				normalized, normalizeErr := policy.NormalizeRole(role)
+				if normalizeErr == nil && identity.Role == normalized {
 					allowed = true
 					break
 				}
@@ -56,9 +72,14 @@ func JWTMiddleware(allowedRoles ...string) ghttp.HandlerFunc {
 				return
 			}
 		}
-		r.SetCtxVar("auth_user_id", claims.UserID)
-		r.SetCtxVar("auth_username", claims.Username)
-		r.SetCtxVar("auth_role", claims.Role)
+		setRequestIdentity(r, identity)
 		r.Middleware.Next()
 	}
+}
+
+func setRequestIdentity(r *ghttp.Request, identity policy.Identity) {
+	r.SetCtx(policy.WithIdentity(r.Context(), identity))
+	r.SetCtxVar("auth_user_id", identity.UserID)
+	r.SetCtxVar("auth_username", identity.Username)
+	r.SetCtxVar("auth_role", string(identity.Role))
 }

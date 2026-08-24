@@ -13,6 +13,7 @@ import (
 	"SentinelOps/internal/ai/cache"
 	"SentinelOps/internal/ai/intent"
 	"SentinelOps/internal/ai/intent/core"
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
 
@@ -98,9 +99,13 @@ func resolveChatWorkflowStore(ctx context.Context) workflow.Store {
 
 // findLatestRunningWorkflowRun 尽量复用 controller 已创建的运行，避免重复写入 workflow_runs。
 func findLatestRunningWorkflowRun(ctx context.Context, db *gorm.DB, sessionID, workflowKey string) (string, int64, bool) {
+	userID, err := policy.UserID(ctx)
+	if err != nil {
+		return "", 0, false
+	}
 	var run mysql.WorkflowRun
-	err := db.WithContext(ctx).
-		Where("session_id = ? AND workflow_key = ? AND status = ?", sessionID, workflowKey, workflow.RunStatusRunning).
+	err = db.WithContext(ctx).
+		Where("session_id = ? AND workflow_key = ? AND status = ? AND user_id = ?", sessionID, workflowKey, workflow.RunStatusRunning, userID).
 		Order("started_at DESC").
 		First(&run).Error
 	if err != nil {

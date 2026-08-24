@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 	"SentinelOps/utility/stringutil"
 
@@ -62,7 +63,8 @@ func StartRun(ctx context.Context, name, entryPoint, sessionID string, messageIn
 		queryText = string(runes[:2000])
 	}
 
-	// 序列化 tags 为 JSON 字符串存储（GORM text 字段，前端可展示为 key-value）
+	// 序列化 tags 为 JSON 字符串存储；服务端身份覆盖任何同名调用方标签。
+	tags = authoritativeTraceTags(ctx, tags)
 	tagsJSON := ""
 	if len(tags) > 0 {
 		if b, err := json.Marshal(tags); err == nil {
@@ -89,6 +91,19 @@ func StartRun(ctx context.Context, name, entryPoint, sessionID string, messageIn
 	})
 
 	return Inject(ctx, at)
+}
+
+func authoritativeTraceTags(ctx context.Context, tags map[string]any) map[string]any {
+	serverTags := make(map[string]any, len(tags)+1)
+	for key, value := range tags {
+		serverTags[key] = value
+	}
+	if identity, err := policy.IdentityFromContext(ctx); err == nil {
+		serverTags["server_user_id"] = identity.UserID
+	} else {
+		delete(serverTags, "server_user_id")
+	}
+	return serverTags
 }
 
 // FinishRun 将 TraceRun 更新为终态，汇总全链路 Token 消耗和估算费用。

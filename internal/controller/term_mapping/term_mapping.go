@@ -65,6 +65,9 @@ func (c *ControllerV1) Delete(ctx context.Context, req *v1.DeleteReq) (*v1.Delet
 
 // Reload 手动触发进程内规则缓存热重载
 func (c *ControllerV1) Reload(ctx context.Context, _ *v1.ReloadReq) (*v1.ReloadRes, error) {
-	n := term_mapping.ReloadTermMappings(ctx)
+	n, err := term_mapping.ReloadTermMappings(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return &v1.ReloadRes{Count: n}, nil
 }

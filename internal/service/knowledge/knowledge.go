@@ -18,6 +18,7 @@ import (
 
 	pipeline "SentinelOps/internal/ai/agent/knowledge_index_pipeline"
 	aidoc "SentinelOps/internal/ai/document"
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/retrieval"
 	milvus "SentinelOps/internal/dao/milvus"
 	dao "SentinelOps/internal/dao/mysql"
@@ -30,6 +31,9 @@ const maxUploadBytes = 50 * 1024 * 1024
 // 文件已由调用方保存到 filePath，此函数只负责 MySQL 记录和异步索引，不重复写文件。
 // 供 /api/chat/v1/upload 向后兼容调用，文件自动归入 baseID 指定的知识库。
 func RegisterExistingFile(ctx context.Context, baseID, filePath string, chunkCfg aidoc.ChunkConfig) (*dao.KnowledgeDocument, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return nil, err
+	}
 	db, err := dao.DB(ctx)
 	if err != nil {
 		return nil, err
@@ -88,6 +92,9 @@ func EnsureDefaultBase(ctx context.Context) {
 
 // CreateBase 创建新知识库。
 func CreateBase(ctx context.Context, name, description string) (*dao.KnowledgeBase, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return nil, err
+	}
 	db, err := dao.DB(ctx)
 	if err != nil {
 		return nil, err
@@ -144,6 +151,9 @@ func ListBases(ctx context.Context) ([]dao.KnowledgeBase, error) {
 
 // DeleteBase 删除知识库（软删除）及其所有文档（文档内向量、分块记录、本地文件一并清理）。
 func DeleteBase(ctx context.Context, baseID string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	db, err := dao.DB(ctx)
 	if err != nil {
 		return err
@@ -165,6 +175,9 @@ func DeleteBase(ctx context.Context, baseID string) error {
 // 文件保存路径：manifest/upload/knowledge/<base_id>/<doc_id>.<ext>
 // 同知识库内相同内容（SHA256 哈希相同）的文件会被拒绝，避免重复向量浪费。
 func UploadDoc(ctx context.Context, baseID, fileName string, fileData []byte, chunkCfg aidoc.ChunkConfig) (*dao.KnowledgeDocument, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return nil, err
+	}
 	// P1：服务端文件大小校验
 	if int64(len(fileData)) > maxUploadBytes {
 		return nil, fmt.Errorf("文件超过大小限制（最大 %d MB）", maxUploadBytes/1024/1024)
@@ -301,6 +314,9 @@ func deleteMilvusVectors(ctx context.Context, docID string) {
 //  5. 更新知识库 doc_count / chunk_count 计数（使用 GREATEST 避免负数）
 //  6. 删除本地文件（最后执行，前序步骤失败不影响文件保留）
 func DeleteDoc(ctx context.Context, docID string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	db, err := dao.DB(ctx)
 	if err != nil {
 		return err
@@ -364,6 +380,9 @@ func BatchRebuildDoc(ctx context.Context, docIDs []string, newStrategy ...string
 //  4. 重置文档状态为 pending
 //  5. 重新投入 Worker Pool
 func RebuildDoc(ctx context.Context, docID string, newStrategy ...string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	db, err := dao.DB(ctx)
 	if err != nil {
 		return err
@@ -445,6 +464,9 @@ func ListChunk(ctx context.Context, params ListChunkParams) ([]dao.KnowledgeChun
 
 // EnableDoc 启用或禁用文档。
 func EnableDoc(ctx context.Context, docID string, enabled bool) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	db, err := dao.DB(ctx)
 	if err != nil {
 		return err
@@ -455,6 +477,9 @@ func EnableDoc(ctx context.Context, docID string, enabled bool) error {
 // EnableChunks 批量启用或禁用分块。
 // ids 非空时按指定 ID 列表操作；ids 为空但 docID 非空时全量操作该文档所有分块。
 func EnableChunks(ctx context.Context, docID string, ids []string, enabled bool) (int, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return 0, err
+	}
 	db, err := dao.DB(ctx)
 	if err != nil {
 		return 0, err

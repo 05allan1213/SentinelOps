@@ -3,9 +3,11 @@ package workflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/dao/mysql"
 
 	"github.com/google/uuid"
@@ -77,6 +79,13 @@ func UnmarshalCheckpointSnapshot(payload string) (CheckpointSnapshot, error) {
 
 // CreateRun 创建一条工作流运行记录。
 func (s *GORMStore) CreateRun(ctx context.Context, input WorkflowRunInput) (*mysql.WorkflowRun, error) {
+	if err := policy.Authorize(ctx, policy.PermissionCreateReadOnlyRun, policy.Resource{}); err != nil {
+		return nil, err
+	}
+	userID, err := policy.UserID(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if input.ID == "" {
 		input.ID = uuid.NewString()
 	}
@@ -90,6 +99,7 @@ func (s *GORMStore) CreateRun(ctx context.Context, input WorkflowRunInput) (*mys
 	run := &mysql.WorkflowRun{
 		ID:           input.ID,
 		WorkflowKey:  input.WorkflowKey,
+		UserID:       userID,
 		SessionID:    input.SessionID,
 		Status:       input.Status,
 		InputPayload: input.InputPayload,
@@ -103,6 +113,9 @@ func (s *GORMStore) CreateRun(ctx context.Context, input WorkflowRunInput) (*mys
 
 // AppendEvent 追加工作流事件；run_id + seq 重复时视为成功，避免断线重放重复报错。
 func (s *GORMStore) AppendEvent(ctx context.Context, event StreamEvent) error {
+	if err := s.authorizeRunScope(ctx, event.RunID); err != nil {
+		return err
+	}
 	payload, err := marshalEventPayload(event.Payload)
 	if err != nil {
 		return err
@@ -132,6 +145,9 @@ func (s *GORMStore) AppendEvent(ctx context.Context, event StreamEvent) error {
 
 // ListEventsAfter 查询指定运行中大于游标序号的事件，按 seq 升序返回。
 func (s *GORMStore) ListEventsAfter(ctx context.Context, runID string, afterSeq int64) ([]StreamEvent, error) {
+	if err := s.authorizeRunScope(ctx, runID); err != nil {
+		return nil, err
+	}
 	var rows []mysql.WorkflowEvent
 	if err := s.db.WithContext(ctx).
 		Where("run_id = ? AND seq > ?", runID, afterSeq).
@@ -155,6 +171,9 @@ func (s *GORMStore) ListEventsAfter(ctx context.Context, runID string, afterSeq 
 
 // SaveCheckpoint 保存工作流可恢复检查点快照。
 func (s *GORMStore) SaveCheckpoint(ctx context.Context, snapshot CheckpointSnapshot) error {
+	if err := s.authorizeRunScope(ctx, snapshot.RunID); err != nil {
+		return err
+	}
 	payload, err := MarshalCheckpointSnapshot(snapshot)
 	if err != nil {
 		return err
@@ -183,6 +202,9 @@ func (s *GORMStore) SaveCheckpoint(ctx context.Context, snapshot CheckpointSnaps
 
 // LatestCheckpoint 查询指定运行最新的检查点；checkpointKey 为空时返回该运行任意 key 的最新快照。
 func (s *GORMStore) LatestCheckpoint(ctx context.Context, runID, checkpointKey string) (CheckpointSnapshot, error) {
+	if err := s.authorizeRunScope(ctx, runID); err != nil {
+		return CheckpointSnapshot{}, err
+	}
 	query := s.db.WithContext(ctx).Where("run_id = ?", runID)
 	if checkpointKey != "" {
 		query = query.Where("checkpoint_key = ?", checkpointKey)
@@ -202,6 +224,9 @@ func (s *GORMStore) LatestCheckpoint(ctx context.Context, runID, checkpointKey s
 
 // FinishRun 更新工作流运行结束状态、输出、错误信息与结束时间。
 func (s *GORMStore) FinishRun(ctx context.Context, runID, status, outputPayload, errorMessage string) error {
+	if err := s.authorizeRunScope(ctx, runID); err != nil {
+		return err
+	}
 	now := time.Now()
 	updates := map[string]any{
 		"status":         status,
@@ -219,6 +244,23 @@ func (s *GORMStore) FinishRun(ctx context.Context, runID, status, outputPayload,
 		return fmt.Errorf("完成工作流运行记录: %w", err)
 	}
 	return nil
+}
+
+func (s *GORMStore) authorizeRunScope(ctx context.Context, runID string) error {
+	if _, err := policy.IdentityFromContext(ctx); err != nil {
+		return err
+	}
+	var run mysql.WorkflowRun
+	if err := s.db.WithContext(ctx).Select("user_id").Where("id = ?", runID).First(&run).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return policy.ErrForbidden
+		}
+		return fmt.Errorf("查询工作流运行身份: %w", err)
+	}
+	if run.UserID == "" {
+		return policy.ErrForbidden
+	}
+	return policy.Authorize(ctx, policy.PermissionViewScoped, policy.Resource{OwnerID: run.UserID})
 }
 
 func marshalEventPayload(payload any) (string, error) {

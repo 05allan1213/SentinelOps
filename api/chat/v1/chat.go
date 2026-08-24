@@ -23,7 +23,7 @@ type FileUploadRes struct {
 type ChatReq struct {
 	g.Meta       `path:"/chat/v1/chat" method:"post" summary:"多 Agent 对话"`
 	Query        string `json:"query" v:"required"`
-	UserID       string `json:"user_id"`       // 用户唯一标识，用于偏好记忆注入
+	UserID       string `json:"user_id"`       // 兼容旧客户端；服务端忽略此字段并只使用 JWT Identity
 	SessionId    string `json:"session_id"`    // 会话唯一标识，前端生成并持久化，用于跨轮次上下文隔离
 	MessageIndex int    `json:"message_index"` // 消息在会话中的序号，用于关联用户反馈
 	DeepThinking bool   `json:"deep_thinking"` // 深度思考模式：true 时直接进入 Plan Agent，跳过意图识别路由

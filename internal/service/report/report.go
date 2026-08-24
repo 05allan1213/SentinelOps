@@ -5,6 +5,7 @@ package reportsvc
 import (
 	"context"
 
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 
 	"github.com/google/uuid"
@@ -24,6 +25,9 @@ func ListReports(ctx context.Context, limit, offset int, reportType string) ([]d
 // CreateReport 创建报告，type 为空时默认 "custom"。
 // 返回新报告的 ID。
 func CreateReport(ctx context.Context, title, content, reportType string) (string, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return "", err
+	}
 	if reportType == "" {
 		reportType = "custom"
 	}
@@ -132,5 +136,8 @@ func GetReport(ctx context.Context, id string) (*dao.Report, error) {
 
 // DeleteReport 软删除安全报告（保留历史数据）。
 func DeleteReport(ctx context.Context, id string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	return dao.DeleteReport(ctx, id)
 }

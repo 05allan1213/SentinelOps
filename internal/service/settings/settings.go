@@ -5,6 +5,7 @@ package settingssvc
 import (
 	"context"
 
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 )
 
@@ -38,6 +39,9 @@ func GetGeneral(ctx context.Context) (*GeneralSettings, error) {
 
 // SaveGeneral 持久化通用设置到数据库。
 func SaveGeneral(ctx context.Context, siteName string, autoMarkRead bool) error {
+	if err := policy.Authorize(ctx, policy.PermissionManageUsersPolicyGates, policy.Resource{}); err != nil {
+		return err
+	}
 	autoMarkReadStr := "true"
 	if !autoMarkRead {
 		autoMarkReadStr = "false"

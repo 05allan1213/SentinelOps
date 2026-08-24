@@ -5,7 +5,7 @@ import (
 	"context"
 
 	v1 "SentinelOps/api/rageval/v1"
-	"SentinelOps/internal/ai/memory"
+	"SentinelOps/internal/ai/policy"
 	rageval "SentinelOps/internal/service/rageval"
 )
 
@@ -75,9 +75,9 @@ func (c *controllerV1) DeleteTrace(ctx context.Context, req *v1.DeleteTraceReq) 
 
 // Feedback 提交消息反馈。
 func (c *controllerV1) Feedback(ctx context.Context, req *v1.FeedbackReq) (res *v1.FeedbackRes, err error) {
-	userID := req.UserID
-	if id, _ := ctx.Value(memory.UserIdCtxKey{}).(string); id != "" {
-		userID = id
+	userID, err := policy.UserID(ctx)
+	if err != nil {
+		return nil, err
 	}
 	return &v1.FeedbackRes{}, rageval.SubmitFeedback(ctx, req.SessionID, userID, req.MessageIndex, req.Vote, req.Reasons)
 }

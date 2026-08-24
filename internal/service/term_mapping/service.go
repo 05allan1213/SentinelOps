@@ -4,6 +4,7 @@ package term_mapping
 import (
 	"context"
 
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/rule"
 	dao "SentinelOps/internal/dao/mysql"
 )
@@ -42,6 +43,9 @@ func ListTermMappings(ctx context.Context) ([]TermMappingItem, error) {
 
 // CreateTermMapping 创建规则，写入后自动热重载
 func CreateTermMapping(ctx context.Context, sourceTerm, targetTerm string, priority int, enabled bool) (uint, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return 0, err
+	}
 	m := &dao.QueryTermMapping{
 		SourceTerm: sourceTerm,
 		TargetTerm: targetTerm,
@@ -57,6 +61,9 @@ func CreateTermMapping(ctx context.Context, sourceTerm, targetTerm string, prior
 
 // UpdateTermMapping 更新规则，写入后自动热重载
 func UpdateTermMapping(ctx context.Context, id uint, targetTerm string, priority int, enabled bool) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	updates := map[string]any{
 		"target_term": targetTerm,
 		"priority":    priority,
@@ -71,6 +78,9 @@ func UpdateTermMapping(ctx context.Context, id uint, targetTerm string, priority
 
 // DeleteTermMapping 删除规则，写入后自动热重载
 func DeleteTermMapping(ctx context.Context, id uint) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	if err := dao.DeleteTermMapping(ctx, id); err != nil {
 		return err
 	}
@@ -79,6 +89,9 @@ func DeleteTermMapping(ctx context.Context, id uint) error {
 }
 
 // ReloadTermMappings 手动触发进程内规则缓存热重载
-func ReloadTermMappings(ctx context.Context) int {
-	return rule.ReloadTermMappings(ctx)
+func ReloadTermMappings(ctx context.Context) (int, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return 0, err
+	}
+	return rule.ReloadTermMappings(ctx), nil
 }

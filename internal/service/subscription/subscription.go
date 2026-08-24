@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"SentinelOps/internal/ai/policy"
 	milvus "SentinelOps/internal/dao/milvus"
 	dao "SentinelOps/internal/dao/mysql"
 	"SentinelOps/internal/service/pipeline"
@@ -37,6 +38,9 @@ func List(ctx context.Context, enabled *bool) ([]dao.Subscription, []int64, erro
 // 新订阅默认 enabled=true，CronExpr 为空时调度器使用全局默认间隔。
 // 返回新订阅的 ID。
 func Create(ctx context.Context, name, url, subType, cronExpr string) (string, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return "", err
+	}
 	normalizedType, err := normalizeType(subType)
 	if err != nil {
 		return "", err
@@ -59,6 +63,9 @@ func Create(ctx context.Context, name, url, subType, cronExpr string) (string, e
 
 // Update 局部更新订阅，仅更新非空字段，已暂停的订阅不自动恢复调度。
 func Update(ctx context.Context, id, name, url, subType, cronExpr string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	updates := make(map[string]interface{})
 	if name != "" {
 		updates["name"] = name
@@ -95,6 +102,9 @@ func Update(ctx context.Context, id, name, url, subType, cronExpr string) error 
 // 4. 注销调度任务
 // Milvus/事件清理失败不阻断订阅删除，记录 warning 后继续执行。
 func Delete(ctx context.Context, id string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	// 先查出订阅信息（需要 Name 作为事件来源标识）
 	sub, err := dao.FindByID(ctx, id)
 	if err != nil {
@@ -130,6 +140,9 @@ func Delete(ctx context.Context, id string) error {
 
 // Pause 暂停订阅：先将 enabled 置 false，再注销调度器，防止竞态。
 func Pause(ctx context.Context, id string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	if err := dao.SetEnabled(ctx, id, false); err != nil {
 		return err
 	}
@@ -139,6 +152,9 @@ func Pause(ctx context.Context, id string) error {
 
 // Resume 恢复订阅：先将 enabled 置 true，再注册调度器，确保 doFetch 中的 enabled 检查通过。
 func Resume(ctx context.Context, id string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	if err := dao.SetEnabled(ctx, id, true); err != nil {
 		return err
 	}
@@ -153,6 +169,9 @@ func Resume(ctx context.Context, id string) error {
 
 // FetchNow 手动立即触发单次抓取，同步返回统计结果。支持对已暂停订阅手动触发。
 func FetchNow(ctx context.Context, id string) (fetchedCount, inserted int, totalEvents int64, durationMs int64, err error) {
+	if err = policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return
+	}
 	start := time.Now()
 	sub, err := dao.FindByID(ctx, id)
 	if err != nil {

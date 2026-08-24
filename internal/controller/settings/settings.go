@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 
 	v1 "SentinelOps/api/settings/v1"
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 	settingssvc "SentinelOps/internal/service/settings"
 )
@@ -41,6 +42,9 @@ func (c *ControllerV1) SaveGeneral(ctx context.Context, req *v1.SaveGeneralReq) 
 
 // GetIngestKey 获取告警接入 API Key。
 func (c *ControllerV1) GetIngestKey(ctx context.Context, _ *v1.GetIngestKeyReq) (*v1.GetIngestKeyRes, error) {
+	if err := policy.Authorize(ctx, policy.PermissionManageUsersPolicyGates, policy.Resource{}); err != nil {
+		return nil, err
+	}
 	key, err := dao.GetSetting(ctx, "ingest.api_key")
 	if err != nil {
 		return nil, err
@@ -50,6 +54,9 @@ func (c *ControllerV1) GetIngestKey(ctx context.Context, _ *v1.GetIngestKeyReq) 
 
 // ResetIngestKey 重新生成告警接入 API Key。
 func (c *ControllerV1) ResetIngestKey(ctx context.Context, _ *v1.ResetIngestKeyReq) (*v1.ResetIngestKeyRes, error) {
+	if err := policy.Authorize(ctx, policy.PermissionManageUsersPolicyGates, policy.Resource{}); err != nil {
+		return nil, err
+	}
 	b := make([]byte, 24)
 	if _, err := rand.Read(b); err != nil {
 		return nil, err

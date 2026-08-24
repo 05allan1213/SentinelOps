@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/service/pipeline"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -39,6 +40,9 @@ func NewSaveIntelligenceTool() tool.InvokableTool {
 		"save_intelligence",
 		"Save analyzed threat intelligence to the local knowledge base (MySQL). The data will be automatically vectorized and indexed into Milvus, making it available for future semantic searches. If a record with the same CVE ID already exists, it will be updated with the latest analysis instead of creating a duplicate.",
 		func(ctx context.Context, input *SaveIntelligenceInput, opts ...tool.Option) (string, error) {
+			if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+				return "", err
+			}
 			// 参数验证
 			if strings.TrimSpace(input.Title) == "" {
 				return "", fmt.Errorf("title 不能为空")

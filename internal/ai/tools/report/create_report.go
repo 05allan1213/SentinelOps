@@ -1,9 +1,11 @@
 package report
 
 import (
-	dao "SentinelOps/internal/dao/mysql"
 	"context"
 	"fmt"
+
+	"SentinelOps/internal/ai/policy"
+	dao "SentinelOps/internal/dao/mysql"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
@@ -23,6 +25,9 @@ func NewCreateReportTool() tool.InvokableTool {
 		"create_report",
 		"Create and save an analysis report to the dao. Use after generating report content. Required: title, content. Optional: type (weekly/monthly/custom), period.",
 		func(ctx context.Context, input *CreateReportInput, opts ...tool.Option) (output string, err error) {
+			if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+				return "", err
+			}
 			db, err := dao.DB(ctx)
 			if err != nil {
 				return "", fmt.Errorf("database not available: %w", err)

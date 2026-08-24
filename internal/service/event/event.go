@@ -5,6 +5,7 @@ package eventsvc
 import (
 	"context"
 
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 	"SentinelOps/internal/service/pipeline"
 
@@ -34,21 +35,33 @@ func Trend(ctx context.Context, days int) ([]dao.EventTrendItem, error) {
 
 // UpdateStatus 更新单条事件状态。
 func UpdateStatus(ctx context.Context, id, status string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	return dao.UpdateEventStatus(ctx, id, status)
 }
 
 // BatchDelete 批量软删除安全事件。
 func BatchDelete(ctx context.Context, ids []string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	return dao.BatchDeleteEvents(ctx, ids)
 }
 
 // BatchUpdateStatus 批量更新事件状态。
 func BatchUpdateStatus(ctx context.Context, ids []string, status string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	return dao.BatchUpdateEventStatus(ctx, ids, status)
 }
 
 // Delete 软删除安全事件（保留历史数据）。
 func Delete(ctx context.Context, id string) error {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return err
+	}
 	return dao.DeleteEvent(ctx, id)
 }
 
@@ -56,6 +69,9 @@ func Delete(ctx context.Context, id string) error {
 // riskScore 为 0 时根据 severity 自动推算，避免调用方重复实现映射逻辑。
 // 返回新事件的 ID。
 func Create(ctx context.Context, title, content, severity, source, cveID string, riskScore float64) (string, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return "", err
+	}
 	if severity == "" {
 		severity = "medium"
 	}

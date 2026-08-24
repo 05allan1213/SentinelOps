@@ -5,6 +5,8 @@ import (
 	"context"
 	"time"
 
+	"SentinelOps/internal/ai/policy"
+
 	"gorm.io/gorm"
 )
 
@@ -16,6 +18,18 @@ func NewTraceDAO() *TraceDAO {
 	return &TraceDAO{}
 }
 
+func scopedTraceRuns(ctx context.Context, db *gorm.DB) (*gorm.DB, error) {
+	identity, err := policy.IdentityFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	query := db.WithContext(ctx).Model(&TraceRun{})
+	if identity.Scope.All {
+		return query, nil
+	}
+	return query.Where("CASE WHEN JSON_VALID(agent_trace_runs.tags) THEN JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.server_user_id')) ELSE NULL END = ?", identity.UserID), nil
+}
+
 // ListRuns 分页查询链路运行记录
 func (d *TraceDAO) ListRuns(ctx context.Context, status, traceID, sessionID string, page, pageSize int) ([]TraceRun, int64, error) {
 	db, err := DB(ctx)
@@ -23,7 +37,10 @@ func (d *TraceDAO) ListRuns(ctx context.Context, status, traceID, sessionID stri
 		return nil, 0, err
 	}
 
-	query := db.Model(&TraceRun{})
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, 0, err
+	}
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -57,7 +74,11 @@ func (d *TraceDAO) GetRunByTraceID(ctx context.Context, traceID string) (*TraceR
 	}
 
 	var run TraceRun
-	if result := db.Where("trace_id = ?", traceID).First(&run); result.Error != nil {
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	if result := query.Where("trace_id = ?", traceID).First(&run); result.Error != nil {
 		return nil, result.Error
 	}
 	return &run, nil
@@ -71,7 +92,13 @@ func (d *TraceDAO) ListNodesByTraceID(ctx context.Context, traceID string) ([]Tr
 	}
 
 	var nodes []TraceNode
-	db.Where("trace_id = ?", traceID).Order("start_time ASC").Find(&nodes)
+	allowedRuns, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	if err := db.WithContext(ctx).Where("trace_id = ? AND trace_id IN (?)", traceID, allowedRuns.Select("trace_id")).Order("start_time ASC").Find(&nodes).Error; err != nil {
+		return nil, err
+	}
 	return nodes, nil
 }
 
@@ -83,7 +110,11 @@ func (d *TraceDAO) GetStatsAgg(ctx context.Context, since time.Time) (*StatsAggR
 	}
 
 	var result StatsAggResult
-	db.Model(&TraceRun{}).
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	query.
 		Where("created_at >= ?", since).
 		Select("COUNT(*) as total, " +
 			"SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) as success, " +
@@ -105,7 +136,11 @@ func (d *TraceDAO) GetSuccessDurations(ctx context.Context, since time.Time) ([]
 	}
 
 	var durations []int64
-	db.Model(&TraceRun{}).
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	query.
 		Where("created_at >= ? AND status = 'success'", since).
 		Pluck("duration_ms", &durations)
 
@@ -121,10 +156,27 @@ func (d *TraceDAO) BatchDeleteByTraceIDs(ctx context.Context, traceIDs []string)
 
 	var deleted int64
 	err = db.Transaction(func(tx *gorm.DB) error {
+		allowedRuns, scopeErr := scopedTraceRuns(ctx, tx)
+		if scopeErr != nil {
+			return scopeErr
+		}
+		var allowedIDs []string
+		if scopeErr = allowedRuns.Where("trace_id IN ?", traceIDs).Pluck("trace_id", &allowedIDs).Error; scopeErr != nil {
+			return scopeErr
+		}
+		requestedIDs := make(map[string]struct{}, len(traceIDs))
+		for _, traceID := range traceIDs {
+			requestedIDs[traceID] = struct{}{}
+		}
+		if len(allowedIDs) != len(requestedIDs) {
+			return policy.ErrForbidden
+		}
 		// 先删除节点
-		tx.Where("trace_id IN ?", traceIDs).Delete(&TraceNode{})
+		if scopeErr = tx.Where("trace_id IN ?", allowedIDs).Delete(&TraceNode{}).Error; scopeErr != nil {
+			return scopeErr
+		}
 		// 再删除 run
-		result := tx.Where("trace_id IN ?", traceIDs).Delete(&TraceRun{})
+		result := tx.Where("trace_id IN ?", allowedIDs).Delete(&TraceRun{})
 		deleted = result.RowsAffected
 		return result.Error
 	})
@@ -139,7 +191,11 @@ func (d *TraceDAO) ListRunsBySessionID(ctx context.Context, sessionID string) ([
 	}
 
 	var runs []TraceRun
-	db.Model(&TraceRun{}).
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	query.
 		Where("session_id = ?", sessionID).
 		Select("id, trace_id, query_text, status, duration_ms, start_time, error_code").
 		Order("start_time ASC").
@@ -156,7 +212,11 @@ func (d *TraceDAO) GetCostAgg(ctx context.Context, since, until time.Time) (*Cos
 	}
 
 	var result CostAggResult
-	db.Model(&TraceRun{}).
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	query.
 		Where("created_at >= ? AND created_at < ? AND status != 'running'", since, until).
 		Select("SUM(estimated_cost_cny) as total_cost, SUM(total_input_tokens) as total_in, " +
 			"SUM(total_output_tokens) as total_out, COUNT(*) as total_reqs").
@@ -173,7 +233,11 @@ func (d *TraceDAO) GetDailyCostTrend(ctx context.Context, since, until time.Time
 	}
 
 	var rows []DailyCostRow
-	db.Model(&TraceRun{}).
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	query.
 		Where("created_at >= ? AND created_at < ? AND status != 'running'", since, until).
 		Select("DATE(created_at) as day, SUM(estimated_cost_cny) as day_cost, " +
 			"SUM(total_input_tokens) as day_in, SUM(total_output_tokens) as day_out, " +
@@ -191,8 +255,13 @@ func (d *TraceDAO) GetModelCostBreakdown(ctx context.Context, since, until time.
 	}
 
 	var rows []ModelCostRow
+	allowedRuns, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
 	db.Model(&TraceNode{}).
 		Joins("JOIN agent_trace_runs r ON r.trace_id = agent_trace_nodes.trace_id").
+		Where("r.trace_id IN (?)", allowedRuns.Select("trace_id")).
 		Where("r.created_at >= ? AND r.created_at < ? AND agent_trace_nodes.node_type IN ('LLM', 'RERANK', 'EMBEDDING') AND agent_trace_nodes.model_name != ''", since, until).
 		Select("agent_trace_nodes.model_name, SUM(agent_trace_nodes.cost_cny) as node_cost, " +
 			"SUM(agent_trace_nodes.input_tokens) as node_in, SUM(agent_trace_nodes.output_tokens) as node_out, " +
@@ -210,7 +279,11 @@ func (d *TraceDAO) GetIntentCostBreakdown(ctx context.Context, since, until time
 	}
 
 	var rows []IntentCostRow
-	db.Model(&TraceRun{}).
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	query.
 		Where("created_at >= ? AND created_at < ? AND status != 'running'", since, until).
 		Select("trace_name, SUM(estimated_cost_cny) as intent_cost, COUNT(*) as intent_reqs").
 		Group("trace_name").Order("intent_cost DESC").Limit(limit).Scan(&rows)
@@ -226,7 +299,11 @@ func (d *TraceDAO) GetHourlyTokenTrend(ctx context.Context, since time.Time) ([]
 	}
 
 	var rows []HourlyTokenRow
-	db.Model(&TraceRun{}).
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	query.
 		Where("created_at >= ? AND status != 'running'", since).
 		Select("DATE_FORMAT(created_at, '%Y-%m-%d %H') as hour_str, " +
 			"SUM(total_input_tokens) as hour_in, SUM(total_output_tokens) as hour_out, " +

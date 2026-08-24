@@ -318,6 +318,7 @@ func (OpsProtectedAsset) TableName() string { return "ops_protected_assets" }
 type WorkflowRun struct {
 	ID            string         `gorm:"column:id;primaryKey;size:64"`
 	WorkflowKey   string         `gorm:"column:workflow_key;size:128;not null;index"`
+	UserID        string         `gorm:"column:user_id;size:64;index"`
 	SessionID     string         `gorm:"column:session_id;size:64;index"`
 	Status        string         `gorm:"column:status;size:32;default:running;index"`
 	InputPayload  string         `gorm:"column:input_payload;type:text"`

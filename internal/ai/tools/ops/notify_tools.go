@@ -8,6 +8,7 @@ import (
 
 	"SentinelOps/internal/ai/ops/actions"
 	"SentinelOps/internal/ai/ops/ctxkey"
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -61,6 +62,9 @@ var stepOrder = map[string]int{
 }
 
 func execAndRecord(ctx context.Context, name string, params map[string]string) (string, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return "", err
+	}
 	start := time.Now()
 	out, err := execAction(ctx, name, params)
 	errMsg := ""

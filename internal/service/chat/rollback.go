@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"SentinelOps/internal/ai/cache"
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
 	redisdao "SentinelOps/internal/dao/redis"
@@ -48,6 +49,26 @@ func RollbackWorkflowToCheckpoint(ctx context.Context, runID string) error {
 }
 
 func RollbackSession(ctx context.Context, sessionID string, targetIndex int) (int, error) {
+	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+		return 0, err
+	}
+	identity, err := policy.IdentityFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if !identity.Scope.All {
+		db, dbErr := mysql.DB(ctx)
+		if dbErr != nil {
+			return 0, dbErr
+		}
+		var owned int64
+		if dbErr = db.Model(&mysql.WorkflowRun{}).Where("session_id = ? AND user_id = ?", sessionID, identity.UserID).Count(&owned).Error; dbErr != nil {
+			return 0, dbErr
+		}
+		if owned == 0 {
+			return 0, policy.ErrForbidden
+		}
+	}
 	recent, summary, err := redisdao.LoadSession(ctx, sessionID)
 	if err != nil {
 		return 0, fmt.Errorf("load session: %w", err)
