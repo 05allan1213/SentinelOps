@@ -17,6 +17,7 @@ import (
 const (
 	runtimeSnapshotSchema = "sentinelops/runtime-snapshot/v1"
 	runtimeSnapshotDomain = "sentinelops/runtime-compatibility/v1\x00"
+	modelSnapshotDomain   = "sentinelops/model-snapshot/v1\x00"
 )
 
 var requiredFeatureGates = []string{
@@ -67,9 +68,13 @@ type ModelSnapshot struct {
 	Pricing        PricingSnapshot      `json:"pricing"`
 }
 
-// Identity 返回不会因厂商 Model ID 碰撞而合并的模型身份。
+// Identity 返回覆盖完整候选配置、不会因厂商 Model ID 碰撞而合并的模型快照身份。
 func (m ModelSnapshot) Identity() string {
-	return m.CatalogRef + "\x00" + m.Provider + "\x00" + m.Driver + "\x00" + m.ModelID
+	canonical, _ := policy.CanonicalJSON(m)
+	digest := sha256.New()
+	_, _ = digest.Write([]byte(modelSnapshotDomain))
+	_, _ = digest.Write(canonical)
+	return hex.EncodeToString(digest.Sum(nil))
 }
 
 // ToolSnapshot 保存 Tool revision 与规范化 Schema hash。
@@ -138,6 +143,16 @@ func (s FrozenRuntimeSnapshot) CanonicalJSON() []byte {
 
 // CompatibilityHash 返回 v1 runtime compatibility identity。
 func (s FrozenRuntimeSnapshot) CompatibilityHash() string { return s.hash }
+
+// Models 返回不可修改内部状态的 provider-qualified Model Snapshot 副本。
+func (s FrozenRuntimeSnapshot) Models() []ModelSnapshot {
+	return cloneModels(s.document.Models)
+}
+
+// Tools 返回不可修改内部状态的 Tool Snapshot 副本。
+func (s FrozenRuntimeSnapshot) Tools() []ToolSnapshot {
+	return append([]ToolSnapshot(nil), s.document.Tools...)
+}
 
 // WorkflowFields 将同一个 Frozen Snapshot 拆为 P03 已有列，不重复计算身份。
 func (s FrozenRuntimeSnapshot) WorkflowFields() workflow.RuntimeSnapshotFields {
@@ -342,6 +357,15 @@ func cloneRuntimeSnapshotInput(input RuntimeSnapshotInput) RuntimeSnapshotInput 
 		cloned.FeatureGates[key] = value
 	}
 	return cloned
+}
+
+func cloneModels(models []ModelSnapshot) []ModelSnapshot {
+	result := make([]ModelSnapshot, len(models))
+	copy(result, models)
+	for index := range result {
+		result[index].RouteOptions.EnableThinking = cloneBool(result[index].RouteOptions.EnableThinking)
+	}
+	return result
 }
 
 func cloneBool(value *bool) *bool {
