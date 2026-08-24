@@ -18,6 +18,7 @@ temp.yaml
 bin
 
 .runtime/
+.artifacts/implementation/
 manifest/config/config.local.yaml
 
 # vendor（Docker 构建前本地执行 go mod vendor 生成）
