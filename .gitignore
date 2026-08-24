@@ -27,4 +27,9 @@ vendor/
 # 前端
 node_modules/
 dist/
+web/*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
+web/test-results/
+web/playwright-report/
 .worktrees/

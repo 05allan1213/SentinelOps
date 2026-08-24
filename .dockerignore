@@ -1,0 +1,10 @@
+.git/
+.runtime/
+.artifacts/
+.worktrees/
+manifest/config/config.local.yaml
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+web/*.tsbuildinfo

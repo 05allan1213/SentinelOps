@@ -115,7 +115,6 @@ export default function EventTrendChart({ refreshKey }: { refreshKey?: number })
       borderWidth: 1,
       textStyle: { color: '#f1f5f9', fontSize: 13 },
       extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.4); border-radius: 8px;',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       formatter: (params: any[]) => {
         if (!params.length) return ''
         let html = `<div style="font-weight:600;margin-bottom:6px;color:#94a3b8">${String(params[0].name).substring(0, 10)}</div>`

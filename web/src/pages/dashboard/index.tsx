@@ -290,7 +290,6 @@ function EventFlowSection({ loading }: { loading?: boolean }) {
         textStyle: { color: '#f1f5f9', fontSize: 12 },
         extraCssText:
           'box-shadow: 0 4px 16px rgba(0,0,0,0.3); border-radius: 8px;',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         formatter: (params: any[]) => {
           if (!params.length) return ''
           const p = params[0]
