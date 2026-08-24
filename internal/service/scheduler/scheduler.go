@@ -6,7 +6,7 @@
 //
 // 数据流：
 //
-//	Subscription（MySQL）
+//	订阅数据（MySQL）
 //	  → pipeline.Fetch（RSS/GitHub 抓取）
 //	  → pipeline.Extract（提取 + 严重程度推断）
 //	  → pipeline.DedupAndInsert（去重入库 MySQL，content 不写 DB）

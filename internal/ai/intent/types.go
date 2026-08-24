@@ -1,6 +1,6 @@
 // Package intent 实现基于 LLM 意图识别的多 Agent 调度系统。
 //
-// 架构原理：用户查询先经 Router 节点（调用 Qwen 做意图识别），识别出目标 IntentType，
+// 架构原理：用户查询先经 Router 节点（调用默认 Chat Profile 做意图识别），识别出目标 IntentType，
 // 再由 Executor 节点按 IntentType 从 registry 取出对应 SubAgent 执行，最终结果经 StreamCallback
 // 流式回传给调用方。整体以 Eino Graph 编排为 DAG：START → Router → Executor → END。
 //

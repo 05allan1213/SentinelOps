@@ -111,7 +111,7 @@ func SaveSessionWithRetry(ctx context.Context, sessionID string, recent []*schem
 
 		lastErr = err
 		if i < maxRetries-1 {
-			backoff := time.Duration(1<<uint(i)) * time.Second // 1s, 2s, 4s
+			backoff := time.Duration(1<<uint(i)) * time.Second // 退避间隔：1s、2s、4s
 			g.Log().Warningf(ctx, "[Session] 保存失败，%v 后重试 | session=%s | retry=%d/%d | err=%v",
 				backoff, sessionID, i+1, maxRetries, err)
 			time.Sleep(backoff)

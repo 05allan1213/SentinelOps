@@ -8,16 +8,21 @@ import (
 	appconfig "SentinelOps/internal/config"
 )
 
-func TestBailianEmbeddingOnline(t *testing.T) {
+func TestProviderEmbeddingOnline(t *testing.T) {
 	if os.Getenv("SENTINELOPS_ONLINE_TEST") != "1" {
-		t.Skip("set SENTINELOPS_ONLINE_TEST=1 to run Bailian online tests")
+		t.Skip("set SENTINELOPS_ONLINE_TEST=1 to run configured provider online tests")
 	}
 	cfg, _, err := appconfig.LoadDirectory("../../../manifest/config")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Providers["aliyun_bailian"].APIKey == "" {
-		t.Fatal("providers.aliyun_bailian.api_key is empty in config.local.yaml")
+	route := cfg.Routing.Embedding["default"]
+	provider, _, err := cfg.Resolve(route)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.APIKey == "" {
+		t.Fatalf("provider referenced by %s has an empty api_key in config.local.yaml", route.Model)
 	}
 	model, err := NewDenseEmbedder(context.Background())
 	if err != nil {

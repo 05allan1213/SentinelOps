@@ -62,7 +62,7 @@ func Ingest(ctx context.Context, alert *NormalizedAlert) (id string, isNew bool,
 		ID:         uuid.New().String(),
 		Title:      alert.Title,
 		Content:    alert.Content,
-		EventType:  alert.IngestSource, // webhook / cef / leef / api_push
+		EventType:  alert.IngestSource, // 接入来源：webhook / cef / leef / api_push
 		DedupKey:   dedupKey,
 		Severity:   severity,
 		Source:     alert.Source,

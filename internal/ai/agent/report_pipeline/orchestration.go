@@ -12,7 +12,7 @@ import (
 //
 //	START → [InputToRag, InputToChat] → MilvusRetriever → Template → ReactAgent → END
 //
-// 模型：Qwen3.7 Max reasoning profile（深度推理版，适合生成结构完整、内容丰富的长篇报告）
+// 模型：reasoning Profile，适合生成结构完整、内容丰富的长篇报告。
 // 工具集：query_events / query_reports / query_report_templates /
 //
 //	search_similar_events / get_current_time / create_report

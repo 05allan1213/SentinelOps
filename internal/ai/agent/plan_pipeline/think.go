@@ -30,13 +30,13 @@ func MarshalThinkChunk(content string) string {
 	return string(b)
 }
 
-// StreamThinkChunks 调用 Qwen3.7 Max reasoning profile 模型对用户查询进行预思考，
+// StreamThinkChunks 调用 reasoning Profile 对用户查询进行预思考，
 // 实时流式推送推理内容，每个文本片段触发一次 onChunk 回调。
 //
 // 支持三种模式（自动检测）：
 //   - reasoning 模式：模型通过 ReasoningContent 字段输出推理（如 reasoning-capable model API）
 //   - think 模式：模型在文本中输出 <think>...</think> 标签
-//   - plain 模式：普通文本输出（如 Qwen3.7 Max），直接实时流式推送
+//   - plain 模式：普通文本输出，直接实时流式推送
 //
 // 错误不中断主流程：调用方应忽略返回值，继续执行 Plan Agent。
 func StreamThinkChunks(ctx context.Context, query string, onChunk func(string)) error {

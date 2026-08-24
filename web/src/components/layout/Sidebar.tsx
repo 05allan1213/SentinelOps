@@ -147,7 +147,7 @@ export default function Sidebar() {
         borderRight: '1px solid rgba(255,255,255,0.06)',
       }}
     >
-      {/* Brand 区域 */}
+      {/* 品牌区域 */}
       <div
         className={cn(
           'flex-shrink-0 pt-5 pb-3',

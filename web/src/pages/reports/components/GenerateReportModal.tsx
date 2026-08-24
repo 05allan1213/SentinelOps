@@ -107,7 +107,7 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
   return (
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
+        {/* 弹窗标题 */}
         <div className="modal-header">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-primary-500/20 flex items-center justify-center">
@@ -131,7 +131,7 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
         </div>
 
         <div className="modal-body">
-          {/* Step 1: Select Type */}
+          {/* 第一步：选择报告类型 */}
           {step === 1 && (
             <div className="grid grid-cols-2 gap-3">
               {reportTypes.map((type) => (
@@ -150,7 +150,7 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
             </div>
           )}
 
-          {/* Step 2: Configure */}
+          {/* 第二步：填写生成配置 */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="form-item">
@@ -173,7 +173,7 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
             </div>
           )}
 
-          {/* Step 3: Generate */}
+          {/* 第三步：生成报告 */}
           {step === 3 && (
             <div className="space-y-4">
               {!isGenerating ? (
@@ -227,7 +227,7 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
           )}
         </div>
 
-        {/* Footer */}
+        {/* 底部操作区 */}
         {step > 1 && !isGenerating && (
           <div className="modal-footer">
             <button onClick={() => setStep(step - 1)} className="btn-default">

@@ -20,7 +20,7 @@
 // 节点以树形组织（parent_node_id），深度由 SpanStack 在请求生命周期内动态维护。
 //
 //	TraceRun  ── 链路根：记录请求入口、sessionId、总耗时、总 Token、总费用
-//	  └─ TraceNode[LLM]            Router 意图识别（Qwen3.7 Max）
+//	  └─ TraceNode[LLM]            Router 意图识别（当前 Chat Profile）
 //	       └─ TraceNode[TOOL]      event_analysis_agent（Executor 调用 Worker 工具）
 //	            └─ TraceNode[AGENT] EventAnalysisAgent（手动 span，包裹整个 Worker 执行）
 //	                 ├─ TraceNode[LLM]       ReAct 推理步骤
@@ -45,10 +45,10 @@ const (
 // 对齐 OpenInference / OpenTelemetry GenAI 语义约定，同时扩展了两种手动埋点类型：
 //
 //	Eino 自动捕获的组件（callback.go 通过 RunInfo.Component 自动映射）：
-//	  LLM       — ChatModel 节点（Qwen3.7 Max 推理调用）
+//	  LLM       — ChatModel 节点（当前 Routing 选择的模型调用）
 //	  TOOL      — 工具节点（query_events / search_similar_events 等工具）
 //	  RETRIEVER — Milvus 向量检索节点
-//	  EMBEDDING — DashScope 文本嵌入节点
+//	  EMBEDDING — 文本嵌入节点
 //	  LAMBDA    — 自定义 Lambda 节点（显示具体名称：InputToRag、InputToChat、RetrievalNode 等）
 //
 //	手动埋点类型（Eino 感知不到，通过 span.go 的 StartSpan/FinishSpan 埋点）：
@@ -64,7 +64,7 @@ const (
 	NodeTypeAgent     = "AGENT"  // 被 Executor 调度的子 Agent（手动埋点）
 	NodeTypeCache     = "CACHE"  // Redis 操作（session/semantic cache 手动埋点）
 	NodeTypeDB        = "DB"     // MySQL 慢查询（>100ms，GORM plugin 埋点）
-	NodeTypeRerank    = "RERANK" // Rerank 模型调用（qwen3-rerank，手动埋点）
+	NodeTypeRerank    = "RERANK" // Rerank 模型调用（手动埋点）
 )
 
 // ── 标准化错误码 ───────────────────────────────────────────────────────────────

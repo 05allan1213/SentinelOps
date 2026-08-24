@@ -7,8 +7,49 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	appconfig "SentinelOps/internal/config"
+
 	"github.com/cloudwego/eino/schema"
 )
+
+func TestClientUsesProviderSelectedByRouting(t *testing.T) {
+	cfg, err := appconfig.Parse([]byte(`
+providers:
+  provider_a:
+    api_key: key-a
+    endpoints: {dashscope_rerank: https://provider-a.example/v1}
+  provider_b:
+    api_key: key-b
+    endpoints: {dashscope_rerank: https://provider-b.example/v1}
+model_catalog:
+  provider_a/rerank:
+    model_id: model-a
+    driver: dashscope_rerank
+    capabilities: [rerank]
+  provider_b/rerank:
+    model_id: model-b
+    driver: dashscope_rerank
+    capabilities: [rerank]
+routing:
+  rerank:
+    default:
+      model: provider_b/rerank
+      options: {instruct: configured instruction}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := clientFromConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.apiKey != "key-b" || client.baseURL != "https://provider-b.example/v1" || client.model != "model-b" {
+		t.Fatalf("resolved client = %#v, want provider_b configuration", client)
+	}
+	if client.instruct != "configured instruction" {
+		t.Fatalf("instruct = %q, want configured instruction", client.instruct)
+	}
+}
 
 func TestRerankUsesFlatCompatibleRequestAndBearerAuth(t *testing.T) {
 	var body map[string]any

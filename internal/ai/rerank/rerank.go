@@ -1,4 +1,4 @@
-// Package rerank qwen3-rerank 文档重排序客户端
+// Package rerank 提供由 Routing 配置驱动的文档重排序客户端。
 //
 // 向量检索基于余弦相似度，擅长模糊语义匹配但不擅长精确相关性排序。
 // Rerank 模型专为「查询-文档相关性」任务训练，从候选池中精选最相关文档，
@@ -7,9 +7,6 @@
 // 架构位置：
 //
 //	MultiRetrieve → [候选文档池，~10个] → Rerank → [精选文档，3个] → LLM Prompt
-//
-// API 文档：https://www.alibabacloud.com/help/zh/model-studio/text-rerank-api
-// 端点：POST https://dashscope.aliyuncs.com/compatible-api/v1/reranks
 package rerank
 
 import (
@@ -32,7 +29,7 @@ import (
 // RerankResult 重排结果，携带文档和相关性分数。
 type RerankResult struct {
 	Doc   *schema.Document
-	Score float64 // relevance_score，来自 qwen3-rerank API
+	Score float64 // relevance_score，由当前 Rerank Provider 返回
 }
 
 var (
@@ -41,7 +38,7 @@ var (
 	rerankInitErr      error
 )
 
-// Client qwen3-rerank 文档重排序客户端（单例）。
+// Client 文档重排序客户端（单例）。
 type Client struct {
 	apiKey   string
 	baseURL  string
@@ -49,7 +46,28 @@ type Client struct {
 	instruct string
 }
 
-// GetClient returns the catalog-backed global client.
+func clientFromConfig(cfg *appconfig.Config) (*Client, error) {
+	route, ok := cfg.Routing.Rerank["default"]
+	if !ok {
+		return nil, fmt.Errorf("routing.rerank.default is not configured")
+	}
+	provider, model, err := cfg.Resolve(route)
+	if err != nil {
+		return nil, err
+	}
+	if model.Driver != "dashscope_rerank" {
+		return nil, fmt.Errorf("routing.rerank.default uses driver %s, want dashscope_rerank", model.Driver)
+	}
+	// Provider、端点和厂商模型 ID 均由当前路由解析，客户端不保存固定供应商名称。
+	return &Client{
+		apiKey:   provider.APIKey,
+		baseURL:  provider.Endpoints.DashScopeRerank,
+		model:    model.ModelID,
+		instruct: route.Options.Instruct,
+	}, nil
+}
+
+// GetClient 根据 routing.rerank.default 延迟初始化全局客户端。
 func GetClient(ctx context.Context) (*Client, error) {
 	rerankOnce.Do(func() {
 		cfg, err := appconfig.Current()
@@ -57,23 +75,13 @@ func GetClient(ctx context.Context) (*Client, error) {
 			rerankInitErr = err
 			return
 		}
-		route := cfg.Routing.Rerank["default"]
-		provider, model, err := cfg.Resolve(route)
+		client, err := clientFromConfig(cfg)
 		if err != nil {
 			rerankInitErr = err
 			return
 		}
-		if model.Driver != "dashscope_rerank" {
-			rerankInitErr = fmt.Errorf("routing.rerank.default uses driver %s, want dashscope_rerank", model.Driver)
-			return
-		}
-		globalRerankClient = &Client{
-			apiKey:   provider.APIKey,
-			baseURL:  provider.Endpoints.DashScopeRerank,
-			model:    model.ModelID,
-			instruct: route.Options.Instruct,
-		}
-		g.Log().Infof(ctx, "[Rerank] client initialized | model=%s | baseURL=%s", model.ModelID, provider.Endpoints.DashScopeRerank)
+		globalRerankClient = client
+		g.Log().Infof(ctx, "[Rerank] client initialized | model=%s | baseURL=%s", client.model, client.baseURL)
 	})
 	return globalRerankClient, rerankInitErr
 }
@@ -124,7 +132,7 @@ const (
 	rerankCharsPerToken = 2       // 保守估算：2 字符 ≈ 1 token（中英混合场景）
 )
 
-// Rerank 调用 qwen3-rerank API 对文档按相关性重排序，返回 topN 个最相关文档。
+// Rerank 调用当前路由选择的模型对文档按相关性重排序，返回 topN 个最相关文档。
 // 任意环节失败时降级返回原始列表前 topN 个，保证主流程不中断。
 func (r *Client) Rerank(ctx context.Context, query string, docs []*schema.Document, topN int) []RerankResult {
 	if len(docs) == 0 {

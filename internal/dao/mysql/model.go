@@ -11,11 +11,11 @@ type Event struct {
 	ID         string         `gorm:"column:id;primaryKey;size:64"`
 	Title      string         `gorm:"column:title;size:256;not null"`
 	Content    string         `gorm:"-"`                                       // 仅内存，不写库；入库前传给 IndexDocumentsAsync
-	EventType  string         `gorm:"column:event_type;size:32;index"`         // rss / github / web / manual
+	EventType  string         `gorm:"column:event_type;size:32;index"`         // 事件来源：rss / github / web / manual
 	DedupKey   string         `gorm:"column:dedup_key;size:64;index"`          // SHA256(title|source|content[:500])，用于去重
-	Severity   string         `gorm:"column:severity;size:32;index"`           // critical / high / medium / low
+	Severity   string         `gorm:"column:severity;size:32;index"`           // 严重等级：critical / high / medium / low
 	Source     string         `gorm:"column:source;size:128;index"`            // 订阅源名称 或 web_search
-	Status     string         `gorm:"column:status;size:32;default:new;index"` // new / processing / resolved / ignored
+	Status     string         `gorm:"column:status;size:32;default:new;index"` // 事件状态：new / processing / resolved / ignored
 	CVEID      string         `gorm:"column:cve_id;size:64;index"`             // CVE-YYYY-NNNNN，web 类情报去重更新依据
 	RiskScore  float64        `gorm:"column:risk_score"`                       // 0-10，由 severity 映射，0 表示未评估
 	Metadata   string         `gorm:"column:metadata;type:json"`               // 扩展字段，如 {"link":"...","pub_date":"..."}
@@ -42,7 +42,7 @@ type Subscription struct {
 	ID          string         `gorm:"column:id;primaryKey;size:64"`
 	Name        string         `gorm:"column:name;size:128;not null"`
 	URL         string         `gorm:"column:url;size:512;not null"`
-	Type        string         `gorm:"column:type;size:32;index"` // rss / github
+	Type        string         `gorm:"column:type;size:32;index"` // 订阅类型：rss / github
 	CronExpr    string         `gorm:"column:cron_expr;size:64"`  // 抓取间隔，空时使用全局默认
 	Enabled     bool           `gorm:"column:enabled;default:true"`
 	LastFetchAt *time.Time     `gorm:"column:last_fetch_at;type:datetime"`
@@ -58,7 +58,7 @@ type Report struct {
 	ID        string         `gorm:"column:id;primaryKey;size:64"`
 	Title     string         `gorm:"column:title;size:256;not null"`
 	Content   string         `gorm:"column:content;type:longtext"`
-	Type      string         `gorm:"column:type;size:32;index"` // weekly / monthly / custom
+	Type      string         `gorm:"column:type;size:32;index"` // 报告周期：weekly / monthly / custom
 	CreatedAt time.Time      `gorm:"column:created_at;type:datetime;autoCreateTime"`
 	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime;autoUpdateTime"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index"`
@@ -71,7 +71,7 @@ type User struct {
 	ID        string         `gorm:"column:id;primaryKey;size:64"`
 	Username  string         `gorm:"column:username;size:64;uniqueIndex;not null"`
 	Password  string         `gorm:"column:password;size:256;not null"`
-	Role      string         `gorm:"column:role;size:32;default:user"` // admin / user
+	Role      string         `gorm:"column:role;size:32;default:user"` // 用户角色：admin / user
 	CreatedAt time.Time      `gorm:"column:created_at;type:datetime;autoCreateTime"`
 	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime;autoUpdateTime"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index"`
@@ -195,7 +195,7 @@ type KnowledgeDocument struct {
 	IndexedChunks   int            `gorm:"column:indexed_chunks;default:0"`                   // 已写入 MySQL knowledge_chunks 的分块数（进度追踪，随批次递增）
 	IndexedAt       *time.Time     `gorm:"column:indexed_at;type:datetime"`                   // nil = 未索引，非 nil = 最近一次索引完成时间
 	IndexDurationMs int64          `gorm:"column:index_duration_ms;default:0"`                // 最近一次索引耗时（毫秒），0 = 未记录
-	IndexStatus     string         `gorm:"column:index_status;size:32;default:pending;index"` // pending / indexing / completed / failed
+	IndexStatus     string         `gorm:"column:index_status;size:32;default:pending;index"` // 索引状态：pending / indexing / completed / failed
 	IndexError      string         `gorm:"column:index_error;type:text"`                      // 索引失败时的错误信息（completed 时清空）
 	Enabled         bool           `gorm:"column:enabled;default:true"`                       // 是否启用，禁用时不参与 RAG 检索
 	CreatedAt       time.Time      `gorm:"column:created_at;type:datetime;autoCreateTime"`
@@ -239,8 +239,8 @@ func (MessageFeedback) TableName() string { return "message_feedbacks" }
 type UserPreference struct {
 	ID            uint      `gorm:"primaryKey;autoIncrement"`
 	UserID        string    `gorm:"column:user_id;size:64;uniqueIndex;not null"`
-	OutputStyle   string    `gorm:"column:output_style;size:32;default:detailed"`   // detailed / concise
-	AnalysisDepth string    `gorm:"column:analysis_depth;size:32;default:standard"` // quick / standard / deep
+	OutputStyle   string    `gorm:"column:output_style;size:32;default:detailed"`   // 输出风格：detailed / concise
+	AnalysisDepth string    `gorm:"column:analysis_depth;size:32;default:standard"` // 分析深度：quick / standard / deep
 	FocusAreas    string    `gorm:"column:focus_areas;type:json"`                   // JSON 数组，如 ["web","supply_chain"]
 	InferredNote  string    `gorm:"column:inferred_note;type:text"`                 // LLM 从对话中提取的偏好摘要
 	UpdatedAt     time.Time `gorm:"column:updated_at;autoUpdateTime"`

@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 
 const ACCEPT = '.pdf,.md,.docx,.go,.py,.java'
 const ALLOWED_EXTS = ['pdf', 'md', 'docx', 'go', 'py', 'java']
-const MAX_FILE_SIZE = 50 * 1024 * 1024  // 50 MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024  // 最大文件大小为 50 MB
 const MAX_FILES = 3  // 最多上传3个文件
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error'

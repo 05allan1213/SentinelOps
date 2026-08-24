@@ -74,7 +74,7 @@ export default function ThinkingConsole({ logs, isProcessing }: Props) {
 
   return (
     <div className={`flex flex-col border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${collapsed ? 'h-[44px]' : 'min-h-[370px] max-h-[395px]'} bg-white dark:bg-[#0D1117]`}>
-      {/* Header */}
+      {/* 控制台标题 */}
       <div
         className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-[#21262D] bg-gray-50 dark:bg-[#161B22] cursor-pointer select-none shrink-0"
         onClick={() => setCollapsed(c => !c)}
@@ -101,7 +101,7 @@ export default function ThinkingConsole({ logs, isProcessing }: Props) {
         </div>
       </div>
 
-      {/* Log stream */}
+      {/* 实时日志流 */}
       {!collapsed && (
         <div ref={scrollRef} className="flex-1 overflow-auto px-2 py-1.5 space-y-px scrollbar-thin">
           {logs.length === 0 ? (

@@ -30,7 +30,7 @@ import (
 //     结果树形结构：
 //       TOOL(event_analysis_agent)            ← Eino 自动创建
 //         AGENT(EventAnalysisAgent)           ← StartSpan 手动创建
-//           LLM(Qwen ReAct step1)         ← Eino 回调自动归属到 AGENT
+//           LLM(ReAct step1)              ← Eino 回调自动归属到 AGENT
 //           TOOL(query_events)                ← Eino 回调自动归属到 AGENT
 //           RETRIEVER(Milvus)                 ← Eino 回调自动归属到 AGENT
 //

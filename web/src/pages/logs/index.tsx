@@ -108,7 +108,7 @@ export default function Logs() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+      {/* 页面标题 */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">抓取日志</h1>
@@ -118,7 +118,7 @@ export default function Logs() {
         </div>
       </div>
 
-      {/* Subscription Selector */}
+      {/* 订阅源选择器 */}
       <div className="card card-body">
         <div className="flex items-center gap-4">
           <label className="text-sm text-gray-600">选择订阅：</label>
@@ -157,7 +157,7 @@ export default function Logs() {
         </div>
       ) : (
         <>
-          {/* Stats */}
+          {/* 日志统计 */}
           <div className="grid grid-cols-4 gap-4">
             <div className="card card-body">
               <div className="flex items-center justify-between">
@@ -205,10 +205,10 @@ export default function Logs() {
             </div>
           </div>
 
-          {/* Filters */}
+          {/* 筛选条件 */}
           <div className="card card-body">
             <div className="flex flex-col lg:flex-row gap-4">
-              {/* Search */}
+              {/* 关键词搜索 */}
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input
@@ -220,7 +220,7 @@ export default function Logs() {
                 />
               </div>
 
-              {/* Status Filter */}
+              {/* 状态筛选 */}
               <CustomSelect
                 value={statusFilter}
                 onChange={v => setStatusFilter(v)}
@@ -235,7 +235,7 @@ export default function Logs() {
             </div>
           </div>
 
-          {/* Logs Table */}
+          {/* 日志列表 */}
           <div className="card">
             {logsLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -321,7 +321,7 @@ export default function Logs() {
               </div>
             )}
 
-            {/* Pagination */}
+            {/* 分页控件 */}
             {!logsLoading && filteredLogs.length > 0 && (
               <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
                 <span className="text-sm text-gray-600">

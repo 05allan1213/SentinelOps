@@ -15,7 +15,7 @@ type ControllerV1 struct{}
 
 func NewV1() *ControllerV1 { return &ControllerV1{} }
 
-// ---- Playbook ----
+// ---- 响应剧本 ----
 
 func (c *ControllerV1) ListPlaybooks(ctx context.Context, _ *soarv1.ListPlaybooksReq) (*soarv1.ListPlaybooksRes, error) {
 	list, err := dao.ListPlaybooks(ctx)

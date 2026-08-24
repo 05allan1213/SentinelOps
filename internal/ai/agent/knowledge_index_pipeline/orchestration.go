@@ -122,7 +122,7 @@ func BuildAndIndex(ctx context.Context, input IndexInput) ([]aidoc.ChunkResult, 
 		return chunks, nil
 	}
 
-	// 获取 documents 分区索引器并串行分批写入（DashScope Embedding API 每批上限 10 条）
+	// 获取 documents 分区索引器并串行分批写入（批次上限由当前 Embedding 配置约束）
 	idx, err := newIndexer(ctx)
 	if err != nil {
 		return nil, err

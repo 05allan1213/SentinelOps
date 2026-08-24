@@ -14,7 +14,7 @@ const eventAnalysisMaxStep = 25
 //
 //	START → [InputToRag, InputToChat] → MilvusRetriever → Template → ReactAgent → END
 //
-// 模型：Qwen3.7 Max default profile（低延迟，适合实时事件分析的多步工具调用）
+// 模型：default Profile，适合实时事件分析的多步工具调用。
 // 工具集：query_events / search_similar_events / query_subscriptions /
 //
 //	query_reports / query_internal_docs / get_current_time /

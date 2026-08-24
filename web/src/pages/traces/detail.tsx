@@ -217,7 +217,7 @@ function NodeRow({ node, traceStartMs, totalMs, isTopSlowest, isCritical, selfTi
           <TimelineBar node={node} traceStartMs={traceStartMs} totalMs={totalMs} />
         </div>
 
-        {/* Token（LLM/Embedding/Rerank） */}
+        {/* Token 用量（LLM/Embedding/Rerank） */}
         <span className="text-xs text-gray-400 w-36 text-right flex-shrink-0 tabular-nums">
           {(node.nodeType === 'LLM' || node.nodeType === 'EMBEDDING' || node.nodeType === 'RERANK') && (
             <>
@@ -537,7 +537,7 @@ export default function TraceDetail() {
           onClick={async () => {
             if (exportLoading || !traceId) return
             setExportLoading(true)
-            try { await traceService.export(traceId) } catch { /* silent */ }
+            try { await traceService.export(traceId) } catch { /* 忽略导出失败 */ }
             finally { setExportLoading(false) }
           }}
           className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors ml-auto"

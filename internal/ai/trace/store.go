@@ -25,7 +25,7 @@ import (
 //	  max_error_length: 1000     # 错误消息截断长度（防止超长错误撑大 DB 行）
 //	  record_prompt: false       # 是否记录 LLM completion 文本（含 PII 风险，默认关）
 //	  model_pricing:             # 各模型单价（¥/1M tokens，直接填人民币）
-//	    qwen-v3:
+//	    vendor-model:
 //	      input: 2.0
 //	      output: 8.0
 
@@ -336,7 +336,7 @@ func estimateCostWithBreakdown(ctx context.Context, modelName string, inputToken
 		cost = c
 		matched = true
 	} else {
-		// 前缀匹配：qwen-v3-1-terminus 匹配 qwen-v3
+		// 前缀匹配：vendor-model-latest 匹配 vendor-model。
 		for prefix, c := range pricing {
 			if strings.HasPrefix(key, prefix) {
 				cost = c
@@ -371,8 +371,7 @@ func estimateTokenCost(cost costConfig, inputTokens, cachedInputTokens, outputTo
 	if cachedInputTokens > inputTokens {
 		cachedInputTokens = inputTokens
 	}
-	// reasoningTokens is already included in outputTokens and is intentionally
-	// not added again.
+	// reasoningTokens 已包含在 outputTokens 中，禁止再次累加。
 	_ = reasoningTokens
 	uncachedInput := inputTokens - cachedInputTokens
 	return (float64(uncachedInput)*cost.Input +

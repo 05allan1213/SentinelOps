@@ -25,6 +25,7 @@ func usageFromModel(tokenUsage *model.TokenUsage, extras ...map[string]any) usag
 		ReasoningTokens:   tokenUsage.CompletionTokensDetails.ReasoningTokens,
 	}
 	for _, extra := range extras {
+		// 兼容供应商扩展字段，但总量仍以标准 TokenUsage 为基础。
 		usage = mergeUsage(usage, parseUsageBreakdown(extra))
 	}
 	return sanitizeUsage(usage)
@@ -45,6 +46,7 @@ func parseUsageBreakdown(raw map[string]any) usageBreakdown {
 }
 
 func sanitizeUsage(usage usageBreakdown) usageBreakdown {
+	// 缓存 Token 属于输入、推理 Token 属于输出；钳制明细避免重复计费或负数污染。
 	if usage.InputTokens < 0 {
 		usage.InputTokens = 0
 	}

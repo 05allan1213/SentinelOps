@@ -154,7 +154,7 @@ function EventDetail({ event, solutionEntry, isStreaming, onClose }: {
   )
 }
 
-// Compact event card
+// 紧凑事件卡片
 function CompactCard({ event, onClick }: { event: EventData; onClick: () => void }) {
   const cfg = severityConfig[event.severity] || severityConfig.low
   const isCritical = event.severity === 'critical'
@@ -258,7 +258,7 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
                 solutionCache.current.set(event_id, { content: accumulated, complete: false })
                 setCacheVersion(v => v + 1)
               }
-            } catch { /* ignore */ }
+            } catch { /* 忽略无法解析的事件 */ }
           }
         }
       })
@@ -325,7 +325,7 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
     setSelectedEventId(event.event_id)
   }
 
-  // Skeleton loading
+  // 骨架屏加载状态
   if (isProcessing && !data?.events?.length) {
     return (
       <div className="h-full flex flex-col bg-white dark:bg-[#080C13]/95">
@@ -341,7 +341,7 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
     )
   }
 
-  // Empty state
+  // 空数据状态
   if (!data?.events?.length) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500 dark:text-[#8B949E] bg-white dark:bg-[#080C13]/95">

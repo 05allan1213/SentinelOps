@@ -9,14 +9,14 @@ import (
 
 const validConfig = `
 providers:
-  aliyun_bailian:
+  provider_a:
     api_key: ""
     endpoints:
       openai_compatible: https://chat.example/v1
       dashscope: https://embedding.example/v1
       dashscope_rerank: https://rerank.example/v1
 model_catalog:
-  aliyun_bailian/chat-model:
+  provider_a/chat-model:
     model_id: chat-model
     driver: openai_compatible
     capabilities: [chat, tool_calling]
@@ -26,13 +26,13 @@ model_catalog:
       input: 12
       cached_input: 2.4
       output: 36
-  aliyun_bailian/embedding-model:
+  provider_a/embedding-model:
     model_id: embedding-model
     driver: dashscope
     capabilities: [embedding]
     dimension: 2048
     pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
-  aliyun_bailian/rerank-model:
+  provider_a/rerank-model:
     model_id: rerank-model
     driver: dashscope_rerank
     capabilities: [rerank]
@@ -40,16 +40,16 @@ model_catalog:
 routing:
   chat:
     default:
-      model: aliyun_bailian/chat-model
+      model: provider_a/chat-model
       options: {enable_thinking: false}
     reasoning:
-      model: aliyun_bailian/chat-model
+      model: provider_a/chat-model
       options: {enable_thinking: true}
   embedding:
-    default: {model: aliyun_bailian/embedding-model}
+    default: {model: provider_a/embedding-model}
   rerank:
     default:
-      model: aliyun_bailian/rerank-model
+      model: provider_a/rerank-model
       options: {instruct: rank these documents}
 `
 
@@ -71,10 +71,10 @@ func TestLoadDirectoryPrefersCompleteLocalConfigWithoutMerging(t *testing.T) {
 	if filepath.Base(selected) != "config.local.yaml" {
 		t.Fatalf("selected = %q, want config.local.yaml", selected)
 	}
-	if _, ok := cfg.ModelCatalog["aliyun_bailian/local-chat"]; !ok {
+	if _, ok := cfg.ModelCatalog["provider_a/local-chat"]; !ok {
 		t.Fatal("local catalog was not loaded")
 	}
-	if _, ok := cfg.ModelCatalog["aliyun_bailian/base-chat"]; ok {
+	if _, ok := cfg.ModelCatalog["provider_a/base-chat"]; ok {
 		t.Fatal("base config was merged into complete local config")
 	}
 }
@@ -99,32 +99,42 @@ func TestValidateRejectsInvalidModelContracts(t *testing.T) {
 		edit func(*Config)
 		want string
 	}{
-		{"missing provider", func(c *Config) { delete(c.Providers, "aliyun_bailian") }, "provider"},
+		{"missing provider", func(c *Config) { delete(c.Providers, "provider_a") }, "provider"},
 		{"unknown driver", func(c *Config) {
-			m := c.ModelCatalog["aliyun_bailian/chat-model"]
+			m := c.ModelCatalog["provider_a/chat-model"]
 			m.Driver = "mystery"
-			c.ModelCatalog["aliyun_bailian/chat-model"] = m
+			c.ModelCatalog["provider_a/chat-model"] = m
 		}, "driver"},
 		{"missing capability", func(c *Config) {
-			m := c.ModelCatalog["aliyun_bailian/chat-model"]
+			m := c.ModelCatalog["provider_a/chat-model"]
 			m.Capabilities = []string{"chat"}
-			c.ModelCatalog["aliyun_bailian/chat-model"] = m
+			c.ModelCatalog["provider_a/chat-model"] = m
 		}, "tool_calling"},
 		{"wrong embedding dimension", func(c *Config) {
-			m := c.ModelCatalog["aliyun_bailian/embedding-model"]
+			m := c.ModelCatalog["provider_a/embedding-model"]
 			m.Dimension = 1024
-			c.ModelCatalog["aliyun_bailian/embedding-model"] = m
+			c.ModelCatalog["provider_a/embedding-model"] = m
 		}, "2048"},
 		{"bad route", func(c *Config) {
 			r := c.Routing.Chat["default"]
-			r.Model = "aliyun_bailian/missing"
+			r.Model = "provider_a/missing"
 			c.Routing.Chat["default"] = r
 		}, "routing"},
-		{"missing endpoint", func(c *Config) {
-			p := c.Providers["aliyun_bailian"]
+		{"missing chat endpoint", func(c *Config) {
+			p := c.Providers["provider_a"]
 			p.Endpoints.OpenAICompatible = ""
-			c.Providers["aliyun_bailian"] = p
-		}, "endpoint"},
+			c.Providers["provider_a"] = p
+		}, "openai_compatible"},
+		{"missing embedding endpoint", func(c *Config) {
+			p := c.Providers["provider_a"]
+			p.Endpoints.DashScope = ""
+			c.Providers["provider_a"] = p
+		}, "dashscope"},
+		{"missing rerank endpoint", func(c *Config) {
+			p := c.Providers["provider_a"]
+			p.Endpoints.DashScopeRerank = ""
+			c.Providers["provider_a"] = p
+		}, "dashscope_rerank"},
 	}
 
 	for _, tt := range tests {
@@ -139,6 +149,68 @@ func TestValidateRejectsInvalidModelContracts(t *testing.T) {
 				t.Fatalf("Validate() error = %v, want containing %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestResolveUsesProviderNamedByModelReference(t *testing.T) {
+	cfg, err := Parse([]byte(validConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Providers["provider_b"] = Provider{
+		APIKey: "provider-b-key",
+		Endpoints: Endpoints{
+			OpenAICompatible: "https://provider-b.example/v1",
+		},
+	}
+	cfg.ModelCatalog["provider_b/chat-model"] = Model{
+		ModelID:      "provider-b-chat",
+		Driver:       "openai_compatible",
+		Capabilities: []string{"chat", "tool_calling"},
+		Pricing:      Pricing{Currency: "CNY", Unit: "per_million_tokens", Input: 1, Output: 2},
+	}
+	route := cfg.Routing.Chat["default"]
+	route.Model = "provider_b/chat-model"
+	cfg.Routing.Chat["default"] = route
+
+	provider, model, err := cfg.Resolve(route)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.APIKey != "provider-b-key" || provider.Endpoints.OpenAICompatible != "https://provider-b.example/v1" {
+		t.Fatalf("resolved provider = %#v, want provider_b configuration", provider)
+	}
+	if model.ModelID != "provider-b-chat" {
+		t.Fatalf("resolved model = %q, want provider-b-chat", model.ModelID)
+	}
+}
+
+func TestValidateRequiresOnlyEndpointsUsedByEachProvider(t *testing.T) {
+	cfg, err := Parse([]byte(validConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Providers["chat_only"] = Provider{
+		Endpoints: Endpoints{OpenAICompatible: "https://chat-only.example/v1"},
+	}
+	cfg.ModelCatalog["chat_only/chat-model"] = Model{
+		ModelID:      "chat-only-model",
+		Driver:       "openai_compatible",
+		Capabilities: []string{"chat", "tool_calling"},
+		Pricing:      Pricing{Currency: "CNY", Unit: "per_million_tokens"},
+	}
+	route := cfg.Routing.Chat["default"]
+	route.Model = "chat_only/chat-model"
+	cfg.Routing.Chat["default"] = route
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("chat-only provider rejected: %v", err)
+	}
+	provider := cfg.Providers["chat_only"]
+	provider.Endpoints.OpenAICompatible = ""
+	cfg.Providers["chat_only"] = provider
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "openai_compatible") {
+		t.Fatalf("Validate() error = %v, want missing openai_compatible endpoint", err)
 	}
 }
 

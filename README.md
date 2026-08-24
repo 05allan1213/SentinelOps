@@ -902,9 +902,10 @@ cp manifest/config/config.yaml manifest/config/config.local.yaml
 ```
 
 `config.local.yaml` 是完整配置替代文件，不会与 `config.yaml` 合并。只在本地文件中填写
-`providers.aliyun_bailian.api_key`；该文件已被 Git 忽略，禁止打印、回传或提交密钥。
+当前 Routing 所引用 Provider 的 `api_key`；该文件已被 Git 忽略，禁止打印、回传或提交密钥。
 
-模型配置采用 Provider → Model Catalog → Routing 三层结构：
+模型配置采用 Provider → Model Catalog → Routing 三层结构。仓库内的
+`aliyun_bailian` 是当前开发示例，并非代码固定值：
 
 - `routing.chat.default`：`qwen3.7-max-2026-06-08`，`enable_thinking=false`
 - `routing.chat.reasoning`：同一模型，`enable_thinking=true`
@@ -926,8 +927,9 @@ cp manifest/config/config.yaml manifest/config/config.local.yaml
 SENTINELOPS_ONLINE_TEST=1 GOTOOLCHAIN=go1.24.4 go test ./internal/ai/models ./internal/ai/embedder ./internal/ai/rerank
 ```
 
-未来新增供应商时，在 `providers` 增加端点，在 `model_catalog` 增加带供应商前缀的模型引用，
-再调整 `routing`；业务代码仍只使用 Profile，不把 Profile 当作模型名称。
+未来新增供应商时，在 `providers` 增加该供应商实际使用的协议端点，在 `model_catalog` 增加
+`provider/model` 形式的模型引用，再调整 `routing`。配置校验只要求该 Provider 的模型 Driver
+实际使用的端点；业务代码只使用 Profile，并从模型引用动态解析 API Key、端点和厂商模型 ID。
 
 ### 3. 启动后端
 

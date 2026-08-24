@@ -435,7 +435,7 @@ function buildIntentBarOption(items: CostOverview['intentBreakdown']) {
   }
 }
 
-// ── CopyButton ─────────────────────────────────────────────────────────────────
+// ── 复制按钮 CopyButton ───────────────────────────────────────────────────────
 
 function CopyButton({ text, className }: { text: string; className?: string }) {
   const [copied, setCopied] = useState(false)
@@ -543,7 +543,7 @@ export default function Traces() {
     const cfg = COST_RANGES.find(x => x.value === r)!
     setCostLoading(true)
     try { setOverview(await traceService.costOverview({ days: cfg.days })) }
-    catch { /* silent */ }
+    catch { /* 忽略筛选项加载失败 */ }
     finally { setCostLoading(false) }
   }, [])
 
@@ -554,7 +554,7 @@ export default function Traces() {
     try {
       const data = await traceService.tokenTrend(Math.min(hours, 72))
       setTrendPoints(data.points || [])
-    } catch { /* silent */ }
+    } catch { /* 忽略 Token 趋势加载失败 */ }
     finally { setTrendLoading(false) }
   }, [])
 

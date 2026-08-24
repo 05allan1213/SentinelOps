@@ -32,7 +32,7 @@
     @apply bg-gray-300 rounded-full hover:bg-gray-400;
   }
 
-  /* Dark mode scrollbar */
+  /* 深色模式滚动条 */
   .dark ::-webkit-scrollbar-thumb {
     @apply bg-gray-700 rounded-full hover:bg-gray-600;
   }
@@ -590,7 +590,7 @@
     @apply translate-x-0.5;
   }
 
-  /* Premium Glassmorphism Effects */
+  /* 高级玻璃拟态效果 */
   .glass-panel {
     @apply backdrop-blur-xl bg-white/[0.02] border border-white/[0.05];
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
@@ -625,7 +625,7 @@
   }
 }
 
-/* ===== Cyber Theme: Agent Analysis Page ===== */
+/* ===== 赛博主题：Agent 分析页面 ===== */
 :root {
   --cyber-teal: #00F0E0;
   --cyber-cyan: #00D9FF;
@@ -638,49 +638,49 @@
   --cyber-border: #30363D;
 }
 
-/* Scanning line sweep */
+/* 扫描线扫过动画 */
 @keyframes cyber-scan {
   0% { transform: translateY(-100%); }
   100% { transform: translateY(100%); }
 }
 
-/* Breathing glow pulse */
+/* 呼吸发光脉冲 */
 @keyframes cyber-breathe {
   0%, 100% { opacity: 0.3; transform: scale(1); }
   50% { opacity: 0.7; transform: scale(1.05); }
 }
 
-/* Ring expand */
+/* 圆环扩散动画 */
 @keyframes cyber-ring {
   0% { transform: scale(0.8); opacity: 0.8; }
   100% { transform: scale(2.5); opacity: 0; }
 }
 
-/* Typing cursor blink */
+/* 输入光标闪烁 */
 @keyframes cyber-cursor {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
 
-/* Count up shimmer */
+/* 数值增长流光 */
 @keyframes cyber-shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
-/* Scanline overlay */
+/* 扫描线覆盖层 */
 @keyframes cyber-scanline {
   0% { transform: translateY(0); }
   100% { transform: translateY(4px); }
 }
 
-/* Data flow dash */
+/* 数据流虚线动画 */
 @keyframes cyber-dash {
   0% { stroke-dashoffset: 20; }
   100% { stroke-dashoffset: 0; }
 }
 
-/* Skeleton loading */
+/* 骨架屏加载动画 */
 @keyframes cyber-skeleton {
   0% { background-position: -200px 0; }
   100% { background-position: calc(200px + 100%) 0; }
@@ -705,38 +705,38 @@
   box-shadow: 0 0 20px rgba(0, 240, 224, 0.05);
 }
 
-/* Rotating progress arc for running nodes */
+/* 运行中节点的旋转进度弧 */
 @keyframes cyber-rotate {
   0% { transform: translate(-50%, -50%) rotate(0deg); }
   100% { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
-/* Drawer slide up */
+/* 抽屉上滑动画 */
 @keyframes cyber-drawer-up {
   0% { transform: translateY(100%); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
 
-/* Drawer slide down */
+/* 抽屉下滑动画 */
 @keyframes cyber-drawer-down {
   0% { transform: translateY(0); opacity: 1; }
   100% { transform: translateY(100%); opacity: 0; }
 }
 
-/* Slide panel from right */
+/* 面板从右侧滑入 */
 @keyframes cyber-slide-in {
   0% { transform: translateX(100%); opacity: 0; }
   100% { transform: translateX(0); opacity: 1; }
 }
 
-/* Conclusion card pop in */
+/* 结论卡片弹入动画 */
 @keyframes cyber-pop-in {
   0% { transform: scale(0.8) translateY(20px); opacity: 0; }
   60% { transform: scale(1.02) translateY(-2px); opacity: 1; }
   100% { transform: scale(1) translateY(0); opacity: 1; }
 }
 
-/* Glow border pulse for event cards */
+/* 事件卡片发光边框脉冲 */
 @keyframes cyber-glow-pulse {
   0%, 100% { box-shadow: 0 0 0 rgba(0,0,0,0); }
   50% { box-shadow: 0 0 20px var(--glow-color, rgba(239,68,68,0.12)); }

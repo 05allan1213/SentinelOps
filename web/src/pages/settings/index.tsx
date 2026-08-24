@@ -53,7 +53,7 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+      {/* 页面标题 */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">系统设置</h1>
@@ -69,7 +69,7 @@ export default function Settings() {
       </div>
 
       <div className="flex gap-6">
-        {/* Sidebar */}
+        {/* 侧边导航 */}
         <div className="w-48 flex-shrink-0">
           <nav className="card p-2">
             <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-primary-50 text-primary-600 shadow-sm text-left text-sm font-medium">
@@ -79,9 +79,9 @@ export default function Settings() {
           </nav>
         </div>
 
-        {/* Content */}
+        {/* 设置内容 */}
         <div className="flex-1 space-y-6">
-          {/* Admin User Info Card */}
+          {/* 管理员信息卡片 */}
           <div className="card">
             <div className="card-body">
               <div className="flex items-center justify-between">

@@ -317,7 +317,7 @@ export default function Knowledge() {
 
   useEffect(() => {
     const poll = async () => {
-      try { setQueueLen(await knowledgeService.queueStatus()) } catch { /* ignore */ }
+      try { setQueueLen(await knowledgeService.queueStatus()) } catch { /* 忽略队列状态读取失败 */ }
     }
     poll()
     const t = setInterval(poll, 5000)
@@ -383,7 +383,7 @@ export default function Knowledge() {
     const ids = [...baseSelected].filter(id => id !== 'default')
     let ok = 0
     for (const id of ids) {
-      try { await knowledgeService.deleteBase(id); ok++ } catch { /* ignore */ }
+      try { await knowledgeService.deleteBase(id); ok++ } catch { /* 忽略单条删除失败并继续批处理 */ }
     }
     toast.success(`已删除 ${ok} 个知识库`)
     setBases(prev => prev.filter(b => !ids.includes(b.id)))

@@ -99,7 +99,7 @@ func normalizeDeepThinkingTimeoutSec(sec int) int {
 // 支持格式：.txt .md .markdown .pdf .docx .pptx
 // 文件解析和保存依赖 GoFrame API，必须保留在 HTTP 层；向量索引构建委托 chatsvc.BuildFileIndex。
 func (c *ControllerV1) FileUpload(ctx context.Context, req *v1.FileUploadReq) (*v1.FileUploadRes, error) {
-	const maxUploadBytes int64 = 50 << 20 // 50 MB
+	const maxUploadBytes int64 = 50 << 20 // 最大上传大小为 50 MB
 
 	fileDir, err := g.Cfg().Get(ctx, "file_dir")
 	if err != nil {

@@ -106,7 +106,7 @@ ${displayMarkdown.replace(/\n/g, '<br>')}
         className="modal w-full max-w-4xl max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* 弹窗标题 */}
         <div className="modal-header">
           <div className="flex-1 pr-4">
             <h2 className="text-lg font-medium text-gray-900">{report.title}</h2>
@@ -135,7 +135,7 @@ ${displayMarkdown.replace(/\n/g, '<br>')}
           </button>
         </div>
 
-        {/* Content */}
+        {/* 报告内容 */}
         <div className="modal-body flex-1 overflow-y-auto">
           {/* 一句话风险概括 */}
           {report.summary && (
@@ -154,7 +154,7 @@ ${displayMarkdown.replace(/\n/g, '<br>')}
           }
         </div>
 
-        {/* Footer */}
+        {/* 底部操作区 */}
         <div className="modal-footer">
           <button onClick={handleCopy} className="btn-default">
             {copied ? (

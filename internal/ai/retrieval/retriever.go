@@ -44,10 +44,10 @@ func New(cli milvuscli.Client, eb embedding.Embedder, redisCli *goredis.Client, 
 func (r *Retriever) Retrieve(ctx context.Context, query string, opts ...einoretriever.Option) ([]*schema.Document, error) {
 	// ── 阶段1：向量嵌入 ──
 	// 追踪节点：记录 Embedding API 调用耗时和成本
-	embSpanCtx, embSpanID := aitrace.StartSpan(ctx, aitrace.NodeTypeEmbedding, "qwen3.7-text-embedding")
+	embSpanCtx, embSpanID := aitrace.StartSpan(ctx, aitrace.NodeTypeEmbedding, r.cfg.EmbeddingModel)
 	vecs, err := r.embedder.EmbedStrings(embSpanCtx, []string{query})
 	estimatedTokens := int(float64(len([]rune(query))) / 1.5) // 估算 Token：1.5 字符/token
-	aitrace.FinishSpanWithCost(embSpanCtx, embSpanID, "qwen3.7-text-embedding", estimatedTokens, 0, err)
+	aitrace.FinishSpanWithCost(embSpanCtx, embSpanID, r.cfg.EmbeddingModel, estimatedTokens, 0, err)
 
 	if err != nil {
 		return nil, fmt.Errorf("embed query: %w", err)

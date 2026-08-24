@@ -13,7 +13,7 @@ import (
 //
 //	START → [InputToRag, InputToChat] → MilvusRetriever → Template → ReactAgent → END
 //
-// 模型：Qwen3.7 Max reasoning profile（深度推理版，适合深度分析 CVE、评估攻击路径和影响范围）
+// 模型：reasoning Profile，适合深度分析 CVE、评估攻击路径和影响范围。
 // 工具集：query_events / query_reports / search_similar_events /
 //
 //	query_internal_docs / query_subscriptions / get_current_time

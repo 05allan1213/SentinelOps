@@ -91,8 +91,8 @@ export default function AgentStatusBar({ logs, isProcessing }: Props) {
         } else {
           // pending：用各自的色调（低透明度），而非统一灰色
           boxStyle = {
-            backgroundColor: step.colorHex + '12',  // ~7% opacity
-            border: `1.5px solid ${step.colorHex}35`, // ~21% opacity
+            backgroundColor: step.colorHex + '12',  // 约 7% 不透明度
+            border: `1.5px solid ${step.colorHex}35`, // 约 21% 不透明度
           }
           iconNode = <Circle className="w-5 h-5" style={{ color: step.colorHex + '80' }} />
         }

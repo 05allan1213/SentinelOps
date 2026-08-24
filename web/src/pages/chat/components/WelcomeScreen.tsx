@@ -54,7 +54,7 @@ const DEEP_CARD: PresetCard = {
   deepThinking: true,
 }
 
-// ── WelcomeScreen ─────────────────────────────────────────────────────────────
+// ── 欢迎页 WelcomeScreen ─────────────────────────────────────────────────────
 
 interface WelcomeScreenProps {
   onPresetSelect: (text: string, forceDeepThinking?: boolean, forceWebSearch?: boolean) => void

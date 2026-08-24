@@ -1,4 +1,4 @@
-// router.go 意图路由节点：调用 LLM（QwenV3 Quick）对用户查询进行意图识别与置信度评估。
+// router.go 意图路由节点：调用默认 Chat Profile 对用户查询进行意图识别与置信度评估。
 //
 // 本文件仅用于【标准模式（deep_thinking=false）】。深度思考模式下调用方直接调用 plan_pipeline，
 // 不经过此路由节点。

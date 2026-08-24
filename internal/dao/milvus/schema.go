@@ -15,7 +15,7 @@ const (
 	// PartitionDocuments 知识文档向量分区
 	PartitionDocuments = "documents"
 
-	// EmbeddingDim 是 qwen3.7-text-embedding 的向量维度，embedder 与 Milvus Schema 共用此常量保证一致。
+	// EmbeddingDim 是当前向量库契约维度，Embedder 与 Milvus Schema 共用此常量保证一致。
 	EmbeddingDim = 2048
 )
 

@@ -14,6 +14,9 @@ import (
 
 // Config 检索系统统一配置
 type Config struct {
+	// 当前 Routing 解析出的厂商模型 ID，仅用于追踪和成本归集。
+	EmbeddingModel string
+
 	// 缓存配置：Redis 语义缓存，相似查询跳过 Embedding + Milvus
 	CacheTTL       time.Duration // 缓存有效期
 	CacheThreshold float64       // 余弦相似度命中阈值 [0,1]

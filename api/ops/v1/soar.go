@@ -3,7 +3,7 @@ package v1
 
 import "github.com/gogf/gf/v2/frame/g"
 
-// ---- Playbook ----
+// ---- 响应剧本 ----
 
 type PlaybookItem struct {
 	ID          string `json:"id"`
@@ -88,7 +88,7 @@ type GetRunRes struct {
 	Item RunItem `json:"item"`
 }
 
-// ---- Stats ----
+// ---- 运行统计 ----
 
 type GetStatsReq struct {
 	g.Meta `path:"/ops/v1/stats" method:"get"`
@@ -99,14 +99,14 @@ type GetStatsRes struct {
 	FailedRuns  int64 `json:"failed_runs"`
 }
 
-// ---- ClearRuns ----
+// ---- 清空运行记录 ----
 
 type ClearRunsReq struct {
 	g.Meta `path:"/ops/v1/runs" method:"delete"`
 }
 type ClearRunsRes struct{}
 
-// ---- DeleteRun ----
+// ---- 删除运行记录 ----
 
 type DeleteRunReq struct {
 	g.Meta `path:"/ops/v1/runs/{id}" method:"delete"`

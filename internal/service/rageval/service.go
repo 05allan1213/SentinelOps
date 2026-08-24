@@ -71,7 +71,7 @@ import (
 // TrendPoint 单个时间点的趋势数据。
 type TrendPoint struct {
 	Timestamp    string  `json:"timestamp"`      // 格式：2006-01-02 15（小时）或 2006-01-02（天）
-	SuccessRate  float64 `json:"success_rate"`   // 0-1
+	SuccessRate  float64 `json:"success_rate"`   // 成功率范围：0-1
 	AvgLatencyMs int64   `json:"avg_latency_ms"` // 平均延迟（毫秒）
 }
 
@@ -423,8 +423,8 @@ func marshalReasons(reasons []string) string {
 
 // FeedbackStats 反馈统计结果。
 type FeedbackStats struct {
-	LikeRate    float64          `json:"like_rate"`    // 0-1
-	DislikeRate float64          `json:"dislike_rate"` // 0-1
+	LikeRate    float64          `json:"like_rate"`    // 点赞率范围：0-1
+	DislikeRate float64          `json:"dislike_rate"` // 点踩率范围：0-1
 	NoVoteRate  float64          `json:"no_vote_rate"` // 0-1（仅基于有反馈数据计算）
 	Total       int64            `json:"total"`
 	Recent      []RecentFeedback `json:"recent"`
@@ -533,7 +533,7 @@ func parseWindow(window string) (since time.Time, byHour bool) {
 		return now.Add(-7 * 24 * time.Hour), false
 	case "30d":
 		return now.Add(-30 * 24 * time.Hour), false
-	default: // 24h
+	default: // 默认使用 24h
 		return now.Add(-24 * time.Hour), true
 	}
 }

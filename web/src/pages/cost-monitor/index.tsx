@@ -173,7 +173,7 @@ function buildDailyTrendOption(data: CostOverview['dailyTrend']) {
 }
 
 function buildTokenTrendOption(points: TokenTrendPoint[]) {
-  const hours   = points.map(p => p.hour.slice(11)) // "HH"
+  const hours   = points.map(p => p.hour.slice(11)) // 小时格式："HH"
   const inputs  = points.map(p => p.inputTokens)
   const outputs = points.map(p => p.outputTokens)
   const cached  = points.map(p => p.inputTokens)
@@ -335,7 +335,7 @@ export default function CostMonitor() {
       const data = await traceService.costOverview({ days: cfg.days })
       setOverview(data)
     } catch {
-      /* silent */
+      /* 忽略缓存读取失败 */
     } finally {
       setLoading(false)
     }
@@ -349,7 +349,7 @@ export default function CostMonitor() {
       const data = await traceService.tokenTrend(Math.min(hours, 72))
       setTrendPoints(data.points || [])
     } catch {
-      /* silent */
+      /* 忽略缓存写入失败 */
     } finally {
       setTrendLoading(false)
     }

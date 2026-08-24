@@ -159,11 +159,11 @@ export default function AddSubscriptionModal({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* 遮罩层 */}
       <div className="modal-overlay" onClick={handleClose}>
-        {/* Modal */}
+        {/* 弹窗主体 */}
         <div className="modal w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-          {/* Header */}
+          {/* 弹窗标题 */}
           <div className="modal-header">
             <div>
               <h2 className="modal-title">{editMode ? '编辑订阅' : '添加订阅'}</h2>
@@ -180,7 +180,7 @@ export default function AddSubscriptionModal({
           </div>
 
           <div className="modal-body max-h-[60vh]">
-            {/* Step 1: Select Source Type */}
+            {/* 第一步：选择数据源类型 */}
             {step === 1 && (
               <div className="flex flex-col gap-3">
                 {sourceTypes.map((source) => (
@@ -205,10 +205,10 @@ export default function AddSubscriptionModal({
               </div>
             )}
 
-            {/* Step 2: Configure */}
+            {/* 第二步：填写配置 */}
             {step === 2 && selectedSource && (
               <div className="space-y-4">
-                {/* Source Type Badge */}
+                {/* 数据源类型标识 */}
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
                   <selectedSource.icon className="w-5 h-5 text-primary-500" />
                   <span className="text-sm font-medium text-gray-700">{selectedSource.label}</span>
@@ -222,7 +222,7 @@ export default function AddSubscriptionModal({
                   )}
                 </div>
 
-                {/* Name */}
+                {/* 订阅名称 */}
                 <div className="form-item">
                   <label className="label">订阅名称 <span className="text-danger-500">*</span></label>
                   <input
@@ -234,7 +234,7 @@ export default function AddSubscriptionModal({
                   />
                 </div>
 
-                {/* URL */}
+                {/* 数据源地址 */}
                 <div className="form-item">
                   <label className="label">
                     订阅地址 <span className="text-danger-500">*</span>
@@ -248,7 +248,7 @@ export default function AddSubscriptionModal({
                   />
                 </div>
 
-                {/* Fetch Interval */}
+                {/* 拉取间隔 */}
                 <div className="form-item">
                   <label className="label">抓取间隔</label>
                   <CustomSelect
@@ -266,7 +266,7 @@ export default function AddSubscriptionModal({
                   />
                 </div>
 
-                {/* Fetch Immediately */}
+                {/* 是否立即拉取 */}
                 <button
                     type="button"
                     onClick={() => setFormData({ ...formData, fetch_immediately: !formData.fetch_immediately })}
@@ -295,7 +295,7 @@ export default function AddSubscriptionModal({
             )}
           </div>
 
-          {/* Footer */}
+          {/* 底部操作区 */}
           {step === 2 && (
             <div className="modal-footer">
               <button onClick={handleClose} className="btn-default">

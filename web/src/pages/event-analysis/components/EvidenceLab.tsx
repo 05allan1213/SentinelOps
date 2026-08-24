@@ -27,7 +27,7 @@ export default function EvidenceLab({ logs, selected }: Props) {
 
   return (
     <div className="flex-1 flex flex-col bg-[#010409] overflow-hidden">
-      {/* Tabs */}
+      {/* 标签页导航 */}
       <div className="flex border-b border-[#30363D] px-3">
         {(['overview', 'ioc', 'cvss'] as Tab[]).map(t => (
           <button
@@ -43,7 +43,7 @@ export default function EvidenceLab({ logs, selected }: Props) {
         ))}
       </div>
 
-      {/* Content */}
+      {/* 标签页内容 */}
       <div className="flex-1 p-3 overflow-auto">
         {tab === 'overview' && <OverviewTab agent={selected} data={data} />}
         {tab === 'ioc' && <IOCTab data={data} />}

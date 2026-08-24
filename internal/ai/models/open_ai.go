@@ -1,4 +1,4 @@
-// Package models builds the chat profiles configured by SentinelOps routing.
+// Package models 根据 SentinelOps Routing 创建对话模型。
 package models
 
 import (
@@ -30,13 +30,16 @@ func resolveChatProfile(cfg *appconfig.Config, profile string) (chatProfile, err
 	if catalogModel.Driver != "openai_compatible" {
 		return chatProfile{}, fmt.Errorf("routing.chat.%s model uses driver %s, want openai_compatible", profile, catalogModel.Driver)
 	}
+	extraFields := make(map[string]any, 1)
+	if route.Options.EnableThinking != nil {
+		// enable_thinking 是可选的 Provider 扩展字段，未配置时不能擅自下发。
+		extraFields["enable_thinking"] = *route.Options.EnableThinking
+	}
 	return chatProfile{
-		APIKey:  provider.APIKey,
-		BaseURL: provider.Endpoints.OpenAICompatible,
-		Model:   catalogModel.ModelID,
-		ExtraFields: map[string]any{
-			"enable_thinking": route.Options.EnableThinking,
-		},
+		APIKey:      provider.APIKey,
+		BaseURL:     provider.Endpoints.OpenAICompatible,
+		Model:       catalogModel.ModelID,
+		ExtraFields: extraFields,
 	}, nil
 }
 
@@ -57,12 +60,12 @@ func buildChatProfile(ctx context.Context, profile string) (einomodel.ToolCallin
 	})
 }
 
-// ChatDefault creates the standard profile with thinking disabled.
+// ChatDefault 创建默认对话 Profile。
 func ChatDefault(ctx context.Context) (einomodel.ToolCallingChatModel, error) {
 	return buildChatProfile(ctx, "default")
 }
 
-// ChatReasoning creates the reasoning profile with thinking enabled.
+// ChatReasoning 创建推理对话 Profile。
 func ChatReasoning(ctx context.Context) (einomodel.ToolCallingChatModel, error) {
 	return buildChatProfile(ctx, "reasoning")
 }

@@ -27,7 +27,7 @@ type traceCtxKey struct{}
 // 与 SpanStack 分离：Stack 维护父子关系，nodeIDKey 只标识"当前正在执行的节点"。
 type nodeIDKey struct{}
 
-// ── SpanStack ─────────────────────────────────────────────────────────────────
+// ── 节点调用栈 SpanStack ──────────────────────────────────────────────────────
 //
 // SpanStack 维护当前请求内"正在执行的节点 ID"调用栈，栈顶即为最近启动、尚未结束的节点。
 //
@@ -78,7 +78,7 @@ func (s *SpanStack) Depth() int {
 	return len(s.items)
 }
 
-// ── ActiveTrace ───────────────────────────────────────────────────────────────
+// ── 活跃追踪上下文 ActiveTrace ────────────────────────────────────────────────
 //
 // ActiveTrace 是一次 HTTP 请求的完整追踪上下文，通过 context.Value 在整个调用链中传播。
 // 设计为 goroutine 安全：多个并行节点（LLM streaming、工具并行调用）可以同时读写。
@@ -141,7 +141,7 @@ func (t *ActiveTrace) AddTokensWithModel(in, out int, modelName string) {
 	t.AddUsageWithModel(in, 0, out, 0, modelName)
 }
 
-// AddUsageWithModel accumulates totals and non-additive usage breakdowns.
+// AddUsageWithModel 累加 Token 总量，并记录不重复累计的用量明细。
 func (t *ActiveTrace) AddUsageWithModel(in, cachedIn, out, reasoning int, modelName string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()

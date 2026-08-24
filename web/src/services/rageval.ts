@@ -12,8 +12,8 @@ export interface DashboardMetrics {
   avg_latency_ms: number
   p95_latency_ms: number
   total_runs: number
-  avg_retrieved_docs: number  // P1
-  avg_top_score: number       // P1
+  avg_retrieved_docs: number  // P1 阶段指标
+  avg_top_score: number       // P1 阶段指标
   success_rate_status: 'good' | 'warning' | 'bad'
   latency_status: 'good' | 'warning' | 'bad'
   trends: TrendPoint[]

@@ -28,7 +28,7 @@ import (
 type NormalizedAlert struct {
 	Title        string            // 告警标题/名称
 	Content      string            // 详细描述
-	Severity     string            // critical / high / medium / low / info
+	Severity     string            // 严重等级：critical / high / medium / low / info
 	Source       string            // 来源系统名称（如 "Splunk", "QRadar"）
 	IngestSource string            // 接入渠道：webhook / cef / leef / api_push
 	CVEID        string            // CVE 编号（可选）

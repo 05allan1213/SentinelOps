@@ -72,7 +72,7 @@ export interface OpsStats {
 }
 
 export const opsService = {
-  // Playbook
+  // 响应剧本
   async listPlaybooks(): Promise<Playbook[]> {
     const res = await api.get<ApiResponse<{ items: Playbook[] }>>('/ops/v1/playbooks')
     return res.data.data?.items || []
@@ -96,7 +96,7 @@ export const opsService = {
     return res.data.data?.run_id || ''
   },
 
-  // Runs
+  // 运行记录
   async listRuns(limit = 20): Promise<OpsRun[]> {
     const res = await api.get<ApiResponse<{ items: OpsRun[] }>>('/ops/v1/runs', { params: { limit } })
     return res.data.data?.items || []
@@ -106,7 +106,7 @@ export const opsService = {
     return res.data.data!.item
   },
 
-  // Protected Assets
+  // 受保护资产
   async listProtectedAssets(): Promise<ProtectedAsset[]> {
     const res = await api.get<ApiResponse<{ items: ProtectedAsset[] }>>('/ops/v1/protected_assets')
     return res.data.data?.items || []
@@ -118,13 +118,13 @@ export const opsService = {
     await api.delete(`/ops/v1/protected_assets/${id}`)
   },
 
-  // Stats
+  // 运行统计
   async getStats(): Promise<OpsStats> {
     const res = await api.get<ApiResponse<OpsStats>>('/ops/v1/stats')
     return res.data.data || { total_runs: 0, success_runs: 0, failed_runs: 0 }
   },
 
-  // TriggerForEvent
+  // 按事件触发
   async triggerForEvent(eventId: string): Promise<void> {
     await api.post<ApiResponse<void>>('/ops/v1/playbooks/trigger_for_event', { event_id: eventId })
   },
@@ -135,12 +135,12 @@ export const opsService = {
     return res.data.data?.run_id || ''
   },
 
-  // ClearRuns
+  // 清空运行记录
   async clearRuns(): Promise<void> {
     await api.delete('/ops/v1/runs')
   },
 
-  // DeleteRun
+  // 删除运行记录
   async deleteRun(id: string): Promise<void> {
     await api.delete(`/ops/v1/runs/${id}`)
   },

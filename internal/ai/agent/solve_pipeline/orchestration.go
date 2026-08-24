@@ -19,7 +19,7 @@ type UserMessage = base.UserMessage
 //
 //	START → [InputToRag, InputToChat] → MilvusRetriever → Template → ReactAgent → END
 //
-// 模型：Qwen3.7 Max reasoning profile（深度推理，单事件方案需充分推导攻击路径和修复措施）
+// 模型：reasoning Profile，单事件方案需充分推导攻击路径和修复措施。
 // 工具集（最小化，专注于单事件）：
 //   - search_similar_events：检索相似历史事件和处置记录
 //   - query_internal_docs：查询内部安全知识库

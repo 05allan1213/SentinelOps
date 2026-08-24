@@ -660,7 +660,7 @@ export default function RagEvalDashboard() {
         )}
       </div>
 
-      {/* P0: Trace 详情 Modal */}
+      {/* P0：链路详情弹窗 */}
       {(detailLoading || detailTrace) && (
         <TraceDetailModal
           detail={detailTrace}

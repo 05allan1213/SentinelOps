@@ -12,7 +12,7 @@ import (
 //
 //	START → [InputToRag, InputToChat] → MilvusRetriever → Template → ReactAgent → END
 //
-// 模型：Qwen3.7 Max default profile（低延迟，适合实时情报检索的多步工具调用）
+// 模型：default Profile，适合实时情报检索的多步工具调用。
 // 工具集：query_internal_docs / get_current_time /
 //
 //	web_search / save_intelligence

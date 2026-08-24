@@ -35,7 +35,7 @@ func newInputToChatLambda(ctx context.Context, input *UserMessage, opts ...any) 
 
 	// Token 感知窗口：当历史超过阈值时，将旧对话压缩为摘要（保留最近 2 条维持当前对话连贯性）
 	// 阈值 3000：systemPrompt(~500) + RAG文档(~1000) + 当前提问(~500) + 历史(3000) = 约 5000 tokens，
-	// 对 Qwen 128K 上下文完全安全，同时给工具调用结果预留足够空间
+	// 对当前模型上下文保留较大余量，同时给工具调用结果预留足够空间。
 	if token.EstimateMessages(history) > 3000 && len(history) >= 4 {
 		// 摘要压缩：将最旧的 N-2 条消息压缩为一段简短摘要，保留最新 2 条（当前轮上下文）
 		summarized, err := summarizeOldHistory(ctx, history[:len(history)-2])
@@ -65,7 +65,7 @@ func newInputToChatLambda(ctx context.Context, input *UserMessage, opts ...any) 
 //   - error：LLM 调用错误（网络超时、模型拒绝等）
 //
 // 设计原理：
-//   - 使用与 ReAct 相同的 Qwen3_7MaxDefault 模型（快速响应，单次调用无工具）
+//   - 使用与 ReAct 相同的 default Profile（快速响应，单次调用无工具）
 //   - 摘要 Prompt 引导模型提炼关键信息（不超过 200 字），丢弃无关细节
 //   - 摘要失败时返回空字符串（调用方静默回退到原始历史，不影响主链路）
 func summarizeOldHistory(ctx context.Context, oldMessages []*schema.Message) (string, error) {
@@ -73,7 +73,7 @@ func summarizeOldHistory(ctx context.Context, oldMessages []*schema.Message) (st
 		return "", nil
 	}
 
-	// 复用 Chat Pipeline 的 LLM 实例（Qwen3_7MaxDefault，快速响应）
+	// 复用 Chat Pipeline 的 default Profile 模型实例。
 	model, err := newChatModel(ctx)
 	if err != nil {
 		return "", err

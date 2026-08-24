@@ -3,7 +3,7 @@ name: sentinelops-dev
 # 开发模式：仅启动基础设施（Milvus/Redis/MySQL），前后端本地直接运行
 # 用法：docker-compose -f docker-compose.dev.yml up -d
 # 然后本地启动：go run main.go  /  cd web && npm run dev
-# 访问：http://localhost:3001
+# 访问：http://localhost:5173
 
 services:
   etcd:

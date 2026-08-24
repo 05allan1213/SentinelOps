@@ -373,7 +373,7 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 
 	case components.ComponentOfEmbedding:
 		// Embedding 组件：提取 TokenUsage + 模型名，计算节点成本
-		// qwen3.7-text-embedding 等嵌入模型只有输入 token 成本，无输出 token
+		// 嵌入模型只有输入 Token 成本，无输出 Token。
 		modelOut := model.ConvCallbackOutput(output)
 		if modelOut == nil {
 			g.Log().Warningf(ctx, "[Embedding] modelOut 为 nil")

@@ -28,37 +28,82 @@ func TestChatProfilesPassThinkingOption(t *testing.T) {
 	}
 }
 
+func TestChatProfileUsesProviderSelectedByRouting(t *testing.T) {
+	cfg, err := appconfig.Parse([]byte(appconfigTestConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := cfg.Routing.Chat["default"]
+	route.Model = "provider_b/chat"
+	cfg.Routing.Chat["default"] = route
+
+	profile, err := resolveChatProfile(cfg, "default")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.APIKey != "provider-b-key" || profile.BaseURL != "https://provider-b.example/v1" || profile.Model != "provider-b-chat" {
+		t.Fatalf("resolved profile = %#v, want provider_b configuration", profile)
+	}
+}
+
+func TestChatProfileOmitsUnconfiguredThinkingOption(t *testing.T) {
+	cfg, err := appconfig.Parse([]byte(appconfigTestConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := cfg.Routing.Chat["default"]
+	route.Options = appconfig.RouteOptions{}
+	cfg.Routing.Chat["default"] = route
+
+	profile, err := resolveChatProfile(cfg, "default")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := profile.ExtraFields["enable_thinking"]; ok {
+		t.Fatalf("unconfigured provider option was sent: %#v", profile.ExtraFields)
+	}
+}
+
 const appconfigTestConfig = `
 providers:
-  aliyun_bailian:
+  provider_a:
     api_key: test-key
     endpoints:
       openai_compatible: https://example.com/v1
       dashscope: https://example.com/v1
       dashscope_rerank: https://example.com/v1
+  provider_b:
+    api_key: provider-b-key
+    endpoints:
+      openai_compatible: https://provider-b.example/v1
 model_catalog:
-  aliyun_bailian/chat:
+  provider_a/chat:
     model_id: vendor-chat
     driver: openai_compatible
     capabilities: [chat, tool_calling]
     pricing: {currency: CNY, unit: per_million_tokens, input: 12, cached_input: 2.4, output: 36}
-  aliyun_bailian/embed:
+  provider_b/chat:
+    model_id: provider-b-chat
+    driver: openai_compatible
+    capabilities: [chat, tool_calling]
+    pricing: {currency: CNY, unit: per_million_tokens, input: 1, output: 2}
+  provider_a/embed:
     model_id: vendor-embed
     driver: dashscope
     capabilities: [embedding]
     dimension: 2048
     pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
-  aliyun_bailian/rerank:
+  provider_a/rerank:
     model_id: vendor-rerank
     driver: dashscope_rerank
     capabilities: [rerank]
     pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
 routing:
   chat:
-    default: {model: aliyun_bailian/chat, options: {enable_thinking: false}}
-    reasoning: {model: aliyun_bailian/chat, options: {enable_thinking: true}}
+    default: {model: provider_a/chat, options: {enable_thinking: false}}
+    reasoning: {model: provider_a/chat, options: {enable_thinking: true}}
   embedding:
-    default: {model: aliyun_bailian/embed}
+    default: {model: provider_a/embed}
   rerank:
-    default: {model: aliyun_bailian/rerank}
+    default: {model: provider_a/rerank}
 `

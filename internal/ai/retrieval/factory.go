@@ -1,4 +1,4 @@
-// Package retrieval owns the explicitly warmed retrieval singletons.
+// Package retrieval 管理需要显式预热的检索单例。
 package retrieval
 
 import (
@@ -8,6 +8,7 @@ import (
 
 	"SentinelOps/internal/ai/embedder"
 	"SentinelOps/internal/ai/rerank"
+	appconfig "SentinelOps/internal/config"
 	"SentinelOps/internal/dao/milvus"
 	clientutil "SentinelOps/utility/client"
 
@@ -28,6 +29,19 @@ var (
 )
 
 func initialize(ctx context.Context) error {
+	// 配置必须先由主程序加载；随后按依赖顺序初始化模型、存储和重排客户端。
+	applicationConfig, err := appconfig.Current()
+	if err != nil {
+		return fmt.Errorf("read application configuration: %w", err)
+	}
+	embeddingRoute, ok := applicationConfig.Routing.Embedding["default"]
+	if !ok {
+		return fmt.Errorf("routing.embedding.default is not configured")
+	}
+	_, embeddingModel, err := applicationConfig.Resolve(embeddingRoute)
+	if err != nil {
+		return fmt.Errorf("resolve embedding model: %w", err)
+	}
 	eb, err := embedder.NewDenseEmbedder(ctx)
 	if err != nil {
 		return fmt.Errorf("initialize embedder: %w", err)
@@ -48,11 +62,11 @@ func initialize(ctx context.Context) error {
 	globalMilvus = cli
 	globalRedis = redisClient
 	globalConfig = LoadConfig(ctx)
+	globalConfig.EmbeddingModel = embeddingModel.ModelID
 	return nil
 }
 
-// WarmUp explicitly initializes all retrieval dependencies after application
-// configuration has been selected and validated.
+// WarmUp 在应用配置完成选择和校验后，显式初始化全部检索依赖。
 func WarmUp(ctx context.Context) error {
 	once.Do(func() {
 		initErr = initialize(ctx)

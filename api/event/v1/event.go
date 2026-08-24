@@ -10,8 +10,8 @@ type ListReq struct {
 	Severity string `json:"severity" v:""`
 	Status   string `json:"status" v:""`
 	Keyword  string `json:"keyword" v:""`
-	OrderBy  string `json:"order_by" v:""`  // severity, status, source, created_at
-	OrderDir string `json:"order_dir" v:""` // asc, desc
+	OrderBy  string `json:"order_by" v:""`  // 排序字段：severity、status、source、created_at
+	OrderDir string `json:"order_dir" v:""` // 排序方向：asc、desc
 	Limit    int    `json:"limit" d:"20"`
 	Offset   int    `json:"offset" d:"0"`
 }

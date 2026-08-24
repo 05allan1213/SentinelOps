@@ -53,7 +53,7 @@ type SimilarEventResult struct {
 //
 // 工具通过以下流程识别语义相似事件：
 //
-//  1. 向量化：调用 DashScope qwen3.7-text-embedding 将查询文本嵌入为 2048 维 float32 向量。
+//  1. 向量化：调用 routing.embedding.default 指向的模型，将查询文本嵌入为 2048 维 float32 向量。
 //
 //  2. 语义缓存比对（Redis）：将查询向量与 Redis 中已缓存的历史查询向量逐一计算余弦相似度，
 //     相似度 ≥ 0.85（可配置）则缓存命中，直接返回上次 Milvus 检索结果，跳过 ANN 搜索。

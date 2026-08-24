@@ -807,7 +807,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-      {/* 页面 Header */}
+      {/* 页面标题 */}
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold tracking-tight text-slate-900">安全态势总览与实时监控</h1>

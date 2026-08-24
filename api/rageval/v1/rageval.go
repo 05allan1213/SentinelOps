@@ -6,7 +6,7 @@ import "github.com/gogf/gf/v2/frame/g"
 // DashboardReq KPI 汇总请求
 type DashboardReq struct {
 	g.Meta `path:"/rageval/v1/dashboard" method:"GET" tags:"RagEval" summary:"RAG质量KPI汇总"`
-	Window string `json:"window" p:"window" d:"24h"` // 24h / 7d / 30d
+	Window string `json:"window" p:"window" d:"24h"` // 可选时间窗口：24h / 7d / 30d
 }
 
 // DashboardRes KPI 汇总响应

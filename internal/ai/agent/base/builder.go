@@ -180,10 +180,10 @@ func BuildReactAgentGraph(ctx context.Context, cfg BuildConfig) (compose.Runnabl
 	agentCfg := &react.AgentConfig{MaxStep: maxStep}
 	agentCfg.ToolCallingModel = cfg.Model
 	agentCfg.ToolsConfig.Tools = cfg.Tools
-	// Qwen3.7 Max 流式输出顺序：先文字内容 → 后 tool calls
+	// 部分模型的流式输出顺序是先文字内容、后 Tool Calls。
 	// 默认 firstChunkStreamToolCallChecker 只检查第一个 chunk：遇到文字内容就返回 false（无工具调用），
 	// 导致 agent 提前路由到 END，工具永远不会被执行，只有规划文字出现在输出中。
-	// 此处读取完整流来检测，确保正确识别 Qwen3.7 Max 的 tool calls。
+	// 此处读取完整流来检测，确保不同 Provider 的 Tool Calls 都能被正确识别。
 	agentCfg.StreamToolCallChecker = func(ctx context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
 		defer sr.Close()
 		for {

@@ -89,7 +89,7 @@ func buildChatAgent(ctx context.Context) (r compose.Runnable[*UserMessage, *sche
 	//   1. 用豆包 Embedding 模型将查询字符串转为高维向量（float32 数组）
 	//   2. 在 Milvus 集合的 "vector" 字段上执行 ANN（近似最近邻）搜索，TopK=1
 	//   3. 返回余弦相似度最高的 1 条文档（含 id、content、metadata 字段）
-	// WithOutputKey("documents")：
+	// WithOutputKey("documents") 的作用：
 	//   Eino 在 fan-in（多条并行支路的数据汇聚到同一个后继节点）时将各前驱节点的输出按 key 合并为一个 map 传给后继节点。
 	//   此处命名为 "documents"，ChatTemplate 渲染时即可通过 {documents} 占位符读取检索结果。
 	milvusRetrieverKeyOfRetriever, err := newRetriever(ctx)
@@ -128,7 +128,7 @@ func buildChatAgent(ctx context.Context) (r compose.Runnable[*UserMessage, *sche
 	//   1. 拓扑排序校验：检测环路、孤立节点、类型不匹配等问题，在启动时而非运行时暴露错误。
 	//   2. 生成执行计划：根据边的依赖关系确定节点调度顺序，并行节点用 goroutine 并发驱动。
 	//
-	// WithNodeTriggerMode(AllPredecessor)：
+	// WithNodeTriggerMode(AllPredecessor) 的作用：
 	//   节点触发策略。ChatTemplate 有两个前驱（MilvusRetriever 和 InputToChat），
 	//   AllPredecessor 要求所有前驱都输出后才触发该节点，相当于 fan-in 屏障（barrier，即多路汇聚点，等所有支路都到齐再继续）。
 	//   若使用默认的 AnyPredecessor，任意一个前驱完成就会触发，另一路数据将被丢弃，

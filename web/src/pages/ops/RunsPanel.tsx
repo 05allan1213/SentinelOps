@@ -40,7 +40,7 @@ export default function RunsPanel() {
 
   const load = async () => {
     setLoading(true)
-    try { setRuns(await opsService.listRuns(50)) } catch { /* ignore */ }
+    try { setRuns(await opsService.listRuns(50)) } catch { /* 忽略轮询失败 */ }
     finally { setLoading(false) }
   }
 

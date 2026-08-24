@@ -20,7 +20,7 @@ import (
 //	每一步 LLM 会输出结构化的 Tool Call（而非直接回答），框架捕获后执行对应工具，
 //	将工具返回结果作为 Observation 追加进 Messages，再交还给 LLM 继续推理，循环往复：
 //
-//	 Prompt → [Thought] → Tool Call → Observation → [Thought] → ... → Final Answer
+//	提示词 → [思考] → 工具调用 → 观察结果 → [思考] → ... → 最终答案
 //
 //	整个过程对用户透明，用户只看到最终回答。
 func newReactAgentLambda(ctx context.Context) (lba *compose.Lambda, err error) {

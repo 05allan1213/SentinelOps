@@ -15,7 +15,7 @@ import (
 
 // DenseSearcher 稠密向量检索器：基于语义相似度的 ANN 检索
 //
-// 原理：使用 qwen3.7-text-embedding 生成 2048 维稠密向量。
+// 原理：使用 routing.embedding.default 指向的模型生成 2048 维稠密向量。
 // 通过 COSINE 相似度在 Milvus 中执行近似最近邻（ANN）搜索
 // 适用场景：语义理解、模糊匹配、跨语言检索
 type DenseSearcher struct {

@@ -98,7 +98,7 @@ type StatsRes struct {
 	TotalOutputTokens int64   `json:"totalOutputTokens"`
 	TotalCostCNY      float64 `json:"totalCostCny"`
 	AvgCostCNY        float64 `json:"avgCostCny"`
-	ErrorRate         float64 `json:"errorRate"` // 0~1
+	ErrorRate         float64 `json:"errorRate"` // 错误率范围：0~1
 }
 
 // BatchDeleteReq 批量删除链路请求
@@ -209,7 +209,7 @@ type TokenTrendReq struct {
 
 // TokenTrendPoint 小时粒度数据点
 type TokenTrendPoint struct {
-	Hour         string `json:"hour"` // "YYYY-MM-DD HH"
+	Hour         string `json:"hour"` // 小时格式："YYYY-MM-DD HH"
 	InputTokens  int64  `json:"inputTokens"`
 	OutputTokens int64  `json:"outputTokens"`
 	RequestCount int64  `json:"requestCount"`

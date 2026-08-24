@@ -157,7 +157,7 @@ export const chatService = {
             if (meta.runId) {
               sessionStorage.setItem(`chat_run_id_${sid}`, meta.runId)
             }
-          } catch { /* ignore */ }
+          } catch { /* 忽略无法解析的事件 */ }
         }
         if (id) {
           sessionStorage.setItem(`chat_last_seq_${sid}`, id)

@@ -9,8 +9,9 @@ logger:
   level: "all"
   stdout: true
 
-# Model access is split into Provider -> Model Catalog -> Routing. Keep the
-# API key empty in this tracked file; copy it to config.local.yaml locally.
+# 模型访问分为 Provider -> Model Catalog -> Routing 三层。下方百炼配置只是当前
+# 开发示例；业务代码按 provider/model 引用动态解析，不绑定固定供应商。
+# 本文件必须保留空 Key，请复制为 config.local.yaml 后仅在本地填写。
 providers:
   aliyun_bailian:
     api_key: ""
@@ -19,9 +20,9 @@ providers:
       dashscope: "https://dashscope.aliyuncs.com/compatible-mode/v1"
       dashscope_rerank: "https://dashscope.aliyuncs.com/compatible-api/v1"
 
-# Prices: mainland China (Beijing), CNY per million tokens, paid tier only.
-# Source: https://help.aliyun.com/zh/model-studio/model-pricing
-# Checked: 2026-08-24. Free quotas are intentionally ignored.
+# 价格：中国内地（北京）地域，人民币/百万 Token，仅按付费价估算。
+# 来源：https://help.aliyun.com/zh/model-studio/model-pricing
+# 核对日期：2026-08-24；不计入免费额度。
 model_catalog:
   aliyun_bailian/qwen3.7-max-2026-06-08:
     model_id: "qwen3.7-max-2026-06-08"

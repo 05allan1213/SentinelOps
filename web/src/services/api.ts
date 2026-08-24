@@ -48,7 +48,7 @@ api.interceptors.response.use(
     if (status === 429) {
       config._retryCount = (config._retryCount ?? 0) + 1
       if (config._retryCount <= 3) {
-        const delay = Math.min(1000 * 2 ** (config._retryCount - 1), 8000) // 1s, 2s, 4s
+        const delay = Math.min(1000 * 2 ** (config._retryCount - 1), 8000) // 重试间隔：1s、2s、4s
         await new Promise(r => setTimeout(r, delay))
         return api(config)
       }

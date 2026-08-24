@@ -61,7 +61,7 @@ export default function Chat() {
 
   // ── 组件卸载时不 abort（让 stream 在后台跑完，onDone 会写入 localStorage）
   useEffect(() => {
-    return () => { /* no abort: background stream saves result on completion */ }
+    return () => { /* 不主动中止：后台流完成后仍需保存结果 */ }
   }, [])
 
   // ── 初始化 ───────────────────────────────────────────────────────────────
@@ -337,7 +337,7 @@ export default function Chat() {
             try {
               const parsed = JSON.parse(content) as { type?: string }
               eventType = parsed.type ?? ''
-            } catch { /* ignore */ }
+            } catch { /* 忽略无法解析的事件 */ }
 
             if (eventType === 'think') {
               // 思考片段：追加到 thinking 字段，标记思考中
@@ -396,7 +396,7 @@ export default function Chat() {
                   )
                 )
               }
-            } catch { /* ignore */ }
+            } catch { /* 忽略无法解析的事件 */ }
           } else {
             // 内容到达时，结束规划阶段（如有），计算用时
             setMessages((prev) =>
@@ -449,7 +449,7 @@ export default function Chat() {
               )
               localStorage.setItem(`chat_messages_${capturedSessionId}`, JSON.stringify(updated))
             }
-          } catch { /* ignore */ }
+          } catch { /* 忽略无法解析的事件 */ }
         },
     // ── 问题三：流式中断恢复能力（前端重连逻辑）──────────────────────────────
     // 设计思路：
@@ -634,7 +634,7 @@ export default function Chat() {
             {/* 底部输入区 */}
             <div className="relative border-t border-white/60 bg-white/60 backdrop-blur-sm px-4 py-4">
               <div className="max-w-[760px] ml-[max(32px,calc(50vw-660px))] space-y-2">
-                {/* ChatInput */}
+                {/* 对话输入框 ChatInput */}
                 <div className="relative">
                   <ChatInput
                     value={input}
@@ -658,7 +658,7 @@ export default function Chat() {
   )
 }
 
-// ── MessageBubble ─────────────────────────────────────────────────────────────
+// ── 消息气泡 MessageBubble ───────────────────────────────────────────────────
 
 interface MessageBubbleProps {
   message: Message
@@ -802,7 +802,7 @@ function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing,
     )
   }
 
-  // assistant
+  // 助手消息
   return (
     <div className="flex items-start gap-3 mb-1">
       {/* AI 头像 */}
@@ -962,7 +962,7 @@ function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing,
   )
 }
 
-// ── PlanningBlock ─────────────────────────────────────────────────────────────
+// ── 规划过程 PlanningBlock ───────────────────────────────────────────────────
 
 // 结构化步骤事件：后端推送的 JSON 格式，前端按 type 分类渲染
 interface PlanStepEvent {
@@ -1300,7 +1300,7 @@ function ExecUnitCard({ unit, isLast, isRunning }: { unit: ExecUnit; isLast: boo
   )
 }
 
-// ── ThinkingBlock ─────────────────────────────────────────────────────────────
+// ── 思考过程 ThinkingBlock ───────────────────────────────────────────────────
 
 interface ThinkingBlockProps {
   thinking: string
@@ -1370,4 +1370,3 @@ function ThinkingBlock({ thinking, isThinking, isDone, thinkDuration }: Thinking
     </div>
   )
 }
-

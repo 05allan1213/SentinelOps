@@ -38,7 +38,7 @@ func workflowRecorderFromContext(ctx context.Context) WorkflowRecorder {
 // PlanStepMsg 是推送给前端的结构化步骤事件，JSON 序列化后通过 SSE plan_step 事件发送。
 // 前端按 type 字段分类渲染：规划步骤清单、执行推理摘要、Worker 结果摘要。
 type PlanStepMsg struct {
-	Type    string   `json:"type"`              // "plan_steps" | "exec" | "tool_result"
+	Type    string   `json:"type"`              // 事件类型："plan_steps" | "exec" | "tool_result"
 	Steps   []string `json:"steps,omitempty"`   // plan_steps：Planner 生成的步骤列表
 	Content string   `json:"content,omitempty"` // exec/tool_result：内容或摘要
 	Name    string   `json:"name,omitempty"`    // tool_result：工具友好名称

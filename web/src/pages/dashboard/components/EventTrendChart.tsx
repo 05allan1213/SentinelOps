@@ -163,7 +163,7 @@ export default function EventTrendChart({ refreshKey }: { refreshKey?: number })
         alignMinLabel: 'left',
         alignMaxLabel: 'right',
         interval: dates.length > 20 ? Math.floor(dates.length / 10) : dates.length > 10 ? 1 : 0,
-        formatter: (val: string) => val.slice(5).replace('-', '/'), // show MM/DD
+        formatter: (val: string) => val.slice(5).replace('-', '/'), // 显示为 MM/DD
       },
       splitLine: { show: false },
     },
@@ -255,4 +255,3 @@ export default function EventTrendChart({ refreshKey }: { refreshKey?: number })
     </div>
   )
 }
-

@@ -37,7 +37,7 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
     try {
       const res = await eventService.list({ page: 1, size: 50, keyword: kw })
       setEvents(res.list)
-    } catch { /* ignore */ }
+    } catch { /* 忽略事件列表加载失败 */ }
     setLoading(false)
   }
 
@@ -59,7 +59,7 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
         className="w-[700px] max-h-[70vh] rounded-2xl border border-gray-200 dark:border-[#30363D] bg-white dark:bg-[#0D1117] flex flex-col overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* 弹窗标题 */}
         <div className="px-5 py-4 border-b border-gray-200 dark:border-[#30363D]/50 flex items-center justify-between">
           <span className="text-base font-semibold text-gray-900 dark:text-[#E6EDF3]">选择要分析的事件</span>
           <button onClick={onClose} className="text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] transition-colors">
@@ -67,7 +67,7 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
           </button>
         </div>
 
-        {/* Search */}
+        {/* 事件搜索 */}
         <div className="px-5 py-3 border-b border-gray-200 dark:border-[#30363D]/30">
           <div className="flex items-center gap-2">
             <div className="flex-1 flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-50 dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D]">
@@ -89,7 +89,7 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
           </div>
         </div>
 
-        {/* Event List */}
+        {/* 事件列表 */}
         <div className="flex-1 overflow-y-auto min-h-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -137,7 +137,7 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
           )}
         </div>
 
-        {/* Footer */}
+        {/* 底部操作区 */}
         <div className="px-5 py-4 border-t border-gray-200 dark:border-[#30363D]/50 flex items-center justify-between">
           <span className="text-sm text-gray-500 dark:text-[#8B949E]">
             已选择 <span className="text-[#00F0E0] font-mono">{selected.size}</span> 个事件

@@ -55,7 +55,7 @@ type AlertPushReq struct {
 	g.Meta      `path:"/ingest/v1/push" method:"post" summary:"标准化告警推送接入"`
 	Title       string            `json:"title"       v:"required"` // 告警标题
 	Content     string            `json:"content"`                  // 详细描述
-	Severity    string            `json:"severity"    d:"medium"`   // critical/high/medium/low/info
+	Severity    string            `json:"severity"    d:"medium"`   // 可选值：critical/high/medium/low/info
 	Source      string            `json:"source"      v:"required"` // 来源系统名称
 	CVEID       string            `json:"cve_id"`                   // CVE 编号（可选）
 	ExtraFields map[string]string `json:"extra_fields"`             // 扩展字段（src_ip/dst_ip/host 等）

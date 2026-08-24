@@ -60,7 +60,7 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
         className="modal w-full max-w-2xl max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* 弹窗标题 */}
         <div className="modal-header">
           <div className="flex-1 pr-4">
             <div className="flex items-center gap-2 mb-2">
@@ -81,9 +81,9 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
           </button>
         </div>
 
-        {/* Content */}
+        {/* 事件详情 */}
         <div className="modal-body flex-1 overflow-y-auto space-y-4">
-          {/* Meta Info */}
+          {/* 事件元信息 */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
               <div className="flex items-center gap-2 text-gray-500 text-xs mb-1">
@@ -119,7 +119,7 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
             )}
           </div>
 
-          {/* Severity Alert */}
+          {/* 严重等级提示 */}
           <div className={cn(
             'alert',
             event.severity === 'critical' && 'alert-danger',
@@ -132,7 +132,7 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
             <p className="text-sm">{severity.desc}</p>
           </div>
 
-          {/* Source Link */}
+          {/* 事件来源链接 */}
           {event.source_url && (
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2">原始链接</h3>
@@ -148,7 +148,7 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
             </div>
           )}
 
-          {/* Risk Score */}
+          {/* 风险评分 */}
           {event.risk_score != null && event.risk_score > 0 && (
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2">风险评分</h3>
@@ -168,7 +168,7 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
             </div>
           )}
 
-          {/* Recommendation */}
+          {/* 处置建议 */}
           {event.recommendation && (
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2">处置建议</h3>
@@ -181,7 +181,7 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
           )}
         </div>
 
-        {/* Footer Actions */}
+        {/* 底部操作区 */}
         <div className={cn('modal-footer', updatingStatus && 'opacity-60 pointer-events-none')}>
           <CustomSelect
             value={currentStatus}

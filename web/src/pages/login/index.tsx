@@ -139,7 +139,7 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Tab */}
+          {/* 登录方式标签页 */}
           <div className="flex gap-1 mb-8 border-b border-zinc-800">
             {(['login', 'register'] as const).map((t) => (
               <button

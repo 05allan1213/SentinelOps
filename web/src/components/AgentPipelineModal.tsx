@@ -65,7 +65,7 @@ export default function AgentPipelineModal({ onClose, onComplete }: Props) {
               setRunning(false)
               return
             }
-          } catch { /* ignore */ }
+          } catch { /* 忽略无法解析的事件 */ }
         }
       }
       setSteps([{ agent: '分析Agent', status: 'completed', message: '分析完成', count: 0 }])

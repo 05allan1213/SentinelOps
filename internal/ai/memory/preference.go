@@ -63,8 +63,8 @@ type UserIdCtxKey struct{}
 // 字段来源全为隐式推断：OutputStyle/AnalysisDepth/FocusAreas 由点踩标签直接写入，
 // InferredNote 由 LLM 从对话中提取。
 type Preference struct {
-	OutputStyle   string   // detailed / concise
-	AnalysisDepth string   // quick / standard / deep
+	OutputStyle   string   // 输出风格：detailed / concise
+	AnalysisDepth string   // 分析深度：quick / standard / deep
 	FocusAreas    []string // 关注领域，如 ["web","supply_chain"]
 	InferredNote  string   // LLM 从对话中提取的用户背景摘要（≤50字）
 }

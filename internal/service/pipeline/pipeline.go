@@ -406,7 +406,7 @@ func IndexDocuments(ctx context.Context, events []dao.Event) error {
 	if len(events) == 0 {
 		return nil
 	}
-	// 从配置读取批次大小，兜底为 10（DashScope qwen3.7-text-embedding 单批上限）
+	// 从配置读取批次大小，兜底为当前 Embedding 模型兼容的 10 条。
 	batchSize := 10
 	if v, e := g.Cfg().Get(ctx, "scheduler.index_batch_size"); e == nil && v.Int() > 0 {
 		batchSize = v.Int()

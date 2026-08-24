@@ -1,4 +1,4 @@
-// Package config loads and validates SentinelOps application configuration.
+// Package config 负责加载并校验 SentinelOps 应用配置。
 package config
 
 import (
@@ -63,7 +63,7 @@ type Route struct {
 }
 
 type RouteOptions struct {
-	EnableThinking bool   `yaml:"enable_thinking,omitempty" json:"enable_thinking,omitempty"`
+	EnableThinking *bool  `yaml:"enable_thinking,omitempty" json:"enable_thinking,omitempty"`
 	Instruct       string `yaml:"instruct,omitempty" json:"instruct,omitempty"`
 }
 
@@ -72,6 +72,7 @@ var (
 	current   *Config
 )
 
+// Parse 将一份完整 YAML 配置解析为结构体，不执行跨字段校验。
 func Parse(data []byte) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
@@ -80,8 +81,8 @@ func Parse(data []byte) (*Config, error) {
 	return &cfg, nil
 }
 
-// LoadDirectory treats config.local.yaml as a complete replacement when it
-// exists and otherwise loads config.yaml. It intentionally performs no merge.
+// LoadDirectory 优先加载完整的 config.local.yaml；本地配置不存在时才回退到
+// config.yaml。两份配置不会合并，避免半覆盖导致实际生效值难以判断。
 func LoadDirectory(dir string) (*Config, string, error) {
 	selected := filepath.Join(dir, baseFileName)
 	local := filepath.Join(dir, localFileName)
@@ -115,12 +116,14 @@ func LoadDirectory(dir string) (*Config, string, error) {
 	return cfg, selected, nil
 }
 
+// SetCurrent 保存已经完成选择与校验的全局配置，供模型工厂显式读取。
 func SetCurrent(cfg *Config) {
 	currentMu.Lock()
 	defer currentMu.Unlock()
 	current = cfg
 }
 
+// Current 返回主程序加载后的全局配置；未加载时直接失败，禁止静默使用默认供应商。
 func Current() (*Config, error) {
 	currentMu.RLock()
 	defer currentMu.RUnlock()
@@ -130,16 +133,14 @@ func Current() (*Config, error) {
 	return current, nil
 }
 
+// Validate 校验 Provider、Model Catalog 和 Routing 之间的完整引用关系。
 func (c *Config) Validate() error {
 	if len(c.Providers) == 0 {
 		return fmt.Errorf("at least one provider is required")
 	}
-	for name, provider := range c.Providers {
+	for name := range c.Providers {
 		if strings.TrimSpace(name) == "" {
 			return fmt.Errorf("provider name is required")
-		}
-		if provider.Endpoints.OpenAICompatible == "" || provider.Endpoints.DashScope == "" || provider.Endpoints.DashScopeRerank == "" {
-			return fmt.Errorf("provider %s requires openai_compatible, dashscope, and dashscope_rerank endpoints", name)
 		}
 	}
 	if len(c.ModelCatalog) == 0 {
@@ -150,7 +151,8 @@ func (c *Config) Validate() error {
 		if err != nil {
 			return err
 		}
-		if _, ok := c.Providers[providerName]; !ok {
+		provider, ok := c.Providers[providerName]
+		if !ok {
 			return fmt.Errorf("model %s references missing provider %s", ref, providerName)
 		}
 		if model.ModelID == "" {
@@ -158,10 +160,16 @@ func (c *Config) Validate() error {
 		}
 		switch model.Driver {
 		case "openai_compatible":
+			if strings.TrimSpace(provider.Endpoints.OpenAICompatible) == "" {
+				return fmt.Errorf("model %s driver openai_compatible requires provider %s endpoint openai_compatible", ref, providerName)
+			}
 			if !hasCapability(model, "chat") || !hasCapability(model, "tool_calling") {
 				return fmt.Errorf("model %s openai_compatible driver requires chat and tool_calling capabilities", ref)
 			}
 		case "dashscope":
+			if strings.TrimSpace(provider.Endpoints.DashScope) == "" {
+				return fmt.Errorf("model %s driver dashscope requires provider %s endpoint dashscope", ref, providerName)
+			}
 			if !hasCapability(model, "embedding") {
 				return fmt.Errorf("model %s dashscope driver requires embedding capability", ref)
 			}
@@ -169,6 +177,9 @@ func (c *Config) Validate() error {
 				return fmt.Errorf("model %s embedding dimension must be 2048", ref)
 			}
 		case "dashscope_rerank":
+			if strings.TrimSpace(provider.Endpoints.DashScopeRerank) == "" {
+				return fmt.Errorf("model %s driver dashscope_rerank requires provider %s endpoint dashscope_rerank", ref, providerName)
+			}
 			if !hasCapability(model, "rerank") {
 				return fmt.Errorf("model %s dashscope_rerank driver requires rerank capability", ref)
 			}
@@ -227,7 +238,9 @@ func hasCapability(model Model, want string) bool {
 	return false
 }
 
+// Resolve 根据路由中的 provider/model 引用解析供应商和模型配置。
 func (c *Config) Resolve(route Route) (Provider, Model, error) {
+	// Provider 名称只取自 provider/model 引用，业务代码不依赖任何固定供应商。
 	model, ok := c.ModelCatalog[route.Model]
 	if !ok {
 		return Provider{}, Model{}, fmt.Errorf("routing references missing model %s", route.Model)

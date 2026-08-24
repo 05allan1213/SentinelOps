@@ -58,7 +58,7 @@ func tokenize(text string) []string {
 func hashToken(token string) uint32 {
 	h := fnv.New32a()
 	h.Write([]byte(token))
-	return h.Sum32() & 0xFFFFFF // 24-bit
+	return h.Sum32() & 0xFFFFFF // 仅保留低 24 位
 }
 
 // BM25Embed 将文本编码为 BM25 稀疏向量。

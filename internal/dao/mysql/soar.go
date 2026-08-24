@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// ---- Playbook ----
+// ---- 响应剧本 ----
 
 func ListPlaybooks(ctx context.Context) ([]OpsPlaybook, error) {
 	db, err := DB(ctx)
@@ -56,7 +56,7 @@ func GetPlaybook(ctx context.Context, id string) (*OpsPlaybook, error) {
 	return &p, db.First(&p, "id = ?", id).Error
 }
 
-// ---- Run ----
+// ---- 运行记录 ----
 
 func CreateRun(ctx context.Context, r *OpsRun) error {
 	if r.ID == "" {
@@ -122,7 +122,7 @@ func GetRun(ctx context.Context, id string) (*OpsRun, error) {
 	return &r, db.First(&r, "id = ?", id).Error
 }
 
-// ---- RunStep ----
+// ---- 运行步骤 ----
 
 func CreateRunStep(ctx context.Context, s *OpsRunStep) error {
 	if s.ID == "" {
@@ -152,7 +152,7 @@ func GetRunSteps(ctx context.Context, runID string) ([]OpsRunStep, error) {
 	return list, db.Where("run_id = ?", runID).Order("step_order asc").Find(&list).Error
 }
 
-// ---- ProtectedAsset ----
+// ---- 受保护资产 ----
 
 func IsProtectedAsset(ctx context.Context, assetType, value string) (bool, error) {
 	db, err := DB(ctx)
@@ -172,7 +172,7 @@ func CreateProtectedAsset(ctx context.Context, a *OpsProtectedAsset) error {
 	return db.Create(a).Error
 }
 
-// ---- Stats ----
+// ---- 运行统计 ----
 
 type OpsStats struct {
 	TotalRuns   int64
