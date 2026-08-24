@@ -1,0 +1,32 @@
+{
+  "simple": {
+    "stages": [
+      "normalize:CVE 修复",
+      "rewrite:normalized:CVE 修复"
+    ],
+    "queries": [
+      "rewritten:normalized:CVE 修复"
+    ],
+    "documents": [
+      "rewritten:normalized:CVE 修复:b",
+      "shared",
+      "rewritten:normalized:CVE 修复:a"
+    ]
+  },
+  "split": {
+    "stages": [
+      "normalize:CVE 修复",
+      "rewrite_split:normalized:CVE 修复",
+      "rerank:CVE 修复"
+    ],
+    "queries": [
+      "part-a:normalized:CVE 修复",
+      "part-b:normalized:CVE 修复"
+    ],
+    "documents": [
+      "part-a:normalized:CVE 修复:a",
+      "part-a:normalized:CVE 修复:b",
+      "part-b:normalized:CVE 修复:a"
+    ]
+  }
+}
