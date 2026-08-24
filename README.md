@@ -881,7 +881,7 @@ Controller 接收请求
 
 ### 前置条件
 
-- Go 1.24.0（工具链 `go1.24.4`）
+- Go 1.27.0
 - Node.js 18+ / npm
 - MySQL 8.0+
 - Redis 7.x
@@ -924,7 +924,7 @@ cp manifest/config/config.yaml manifest/config/config.local.yaml
 在线测试默认跳过。填写本地 Key 后显式运行：
 
 ```bash
-SENTINELOPS_ONLINE_TEST=1 GOTOOLCHAIN=go1.24.4 go test ./internal/ai/models ./internal/ai/embedder ./internal/ai/rerank
+SENTINELOPS_ONLINE_TEST=1 GOTOOLCHAIN=go1.27.0 go test ./internal/ai/models ./internal/ai/embedder ./internal/ai/rerank
 ```
 
 未来新增供应商时，在 `providers` 增加该供应商实际使用的协议端点，在 `model_catalog` 增加
@@ -934,7 +934,7 @@ SENTINELOPS_ONLINE_TEST=1 GOTOOLCHAIN=go1.24.4 go test ./internal/ai/models ./in
 ### 3. 启动后端
 
 ```bash
-GOTOOLCHAIN=go1.24.4 go run .
+GOTOOLCHAIN=go1.27.0 go run .
 # 服务运行在 http://localhost:8001
 ```
 

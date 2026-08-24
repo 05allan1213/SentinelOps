@@ -1,16 +1,17 @@
 # P01 后端与 Eino 精确升级
 
-- Status: `BLOCKED`
+- Status: `PASS`
 - Started from: `main` / `2d6c0e44c1c07dc8f287d7032151eb9b9d66744a`，起始工作树干净
+- Resumed from: `main` / `f943832bab474e5fb6060571001e10e6bae3f7d2`；用户明确授权两项 ADR 后恢复执行，恢复时工作树干净
 - Spec references: 上位 Spec `4.1`、`4.2`、`Task 1A`；执行 Plan `P01`
-- Actual files: `docs/implementation/evidence/P01-backend-upgrade.md`；临时 contract test 与半升级依赖已撤回，业务源码零变化
-- Red test and expected failure: 临时新增 Eino v0.9.15 公共 API 编译契约；旧 Eino v0.7.13 因缺少 `adk/middlewares/dynamictool/toolsearch` 按预期编译失败
-- Local commands: 见“执行与停止证据”
-- Results: Red contract `FAIL`（预期）；锁定版本解析 `PASS`；P01 局部门禁 `BLOCKED`
-- Key assertions: GoFrame v2.10.2 直接依赖唯一可解析的 `github.com/emirpasic/gods/v2 v2.0.0-alpha`，与“完整依赖图无 alpha / beta / rc”冲突；Go 1.27.0 的 `go mod tidy` 会删除同版本冗余 `toolchain go1.27.0`，与“go 与 toolchain 都精确锁为 1.27.0”冲突
-- Deviations from recommended route: 命中锁定依赖与版本门禁的关键前提不一致停止条件，未进入兼容适配、Docker/README 同步或局部门禁
-- Raw artifact references: 无；关键短输出已内联，未产生或保留包含 Secret 的原始文件
-- Unfinished items: 需要先通过 ADR 修订互斥门禁；P01 功能改动、验证和完成提交均未执行，P02 未开始
+- Actual files: `go.mod`、`go.sum`、`manifest/docker/Dockerfile.backend`、`README.md`、`internal/ai/compat/eino_contract_test.go`、`docs/implementation/evidence/P01-backend-upgrade.md`
+- Red test and expected failure: 新增 Eino v0.9.15 公共 API 编译契约；旧 Eino v0.7.13 因缺少 `adk/middlewares/dynamictool/toolsearch` 按预期编译失败
+- Local commands: 见“恢复执行与局部门禁”
+- Results: Red contract `FAIL`（预期）；P01 必需局部门禁 `PASS`；在线供应商测试与 P43 全量门禁 `NOT RUN`
+- Key assertions: canonical `go 1.27.0`、Eino v0.9.15、Sonic v1.15.2 及当前实际使用依赖均精确；无 `replace`、DashScope Embedder、Eino v0.10 alpha 或未授权预发布依赖；Chat/Embedding/Rerank/Routing 既有离线行为通过；后端 throwaway 镜像内为 Go 1.27.0
+- Deviations from recommended route: 首次执行命中两个互斥门禁，用户授权 ADR 后恢复且不改写既有证据提交；`internal/ai/embedder/dense.go` 无需 API 适配；直接从含现有 `.runtime` 的工作目录发送 Docker context 被权限拒绝，改用只含 Git 跟踪文件与本单元显式覆盖的 throwaway context 验证镜像
+- Raw artifact references: 无；关键短输出已内联；throwaway context 与本地测试镜像验证后已清理，未读取或保留 Secret
+- Unfinished items: P01 无未完成项；P02 及后续单元未开始
 
 ## Boundary Audit
 
@@ -91,9 +92,115 @@ go get toolchain@go1.27.0
 - 已用补丁恢复 `go.mod`、`go.sum` 和临时 contract test；现有依赖与业务源码保持 P00 基线。
 - 未修改 Dockerfile、README、模型 Routing、Agent 或任何后续单元文件；未运行全仓测试、在线供应商测试、完整 Eval、Compose 或 P02。
 
-## ADR 建议（待确认）
+## ADR 决议
 
-需要同时明确两个决策后才能重新执行 P01：
+用户已明确授权继续 P01，以下两项自恢复执行起成为 P01 的验收口径，并已同步上位 Spec 与执行 Plan：
 
 1. Go 声明采用 Go 1.27 的 canonical 形式 `go 1.27.0`，允许省略被 `go mod tidy` 判定为冗余的同版本 `toolchain` 行；Docker 仍精确使用 Go 1.27.0。
-2. 在以下方案中选择其一：明确允许 GoFrame v2.10.2 自身唯一锁定的 `gods/v2 v2.0.0-alpha` 作为受控传递依赖例外；或调整 GoFrame 目标版本/“依赖图无预发布版”门禁。当前证据不支持在不改变 Spec 的情况下自行选择。
+2. 允许 GoFrame v2.10.2 自身唯一锁定的 `gods/v2 v2.0.0-alpha` 作为受控传递依赖例外；其他 alpha / beta / rc 和 Eino v0.10 alpha 仍禁止。
+
+## 恢复执行与局部门禁
+
+### 精确版本与 MVS
+
+`go mod tidy` 后 `go mod edit -json` 返回 `Go: 1.27.0`、`Toolchain: null`、`Replace: null`，符合已授权 canonical 形式。实际 MVS：
+
+| 模块 | 版本 | 状态 |
+| --- | --- | --- |
+| `github.com/cloudwego/eino` | `v0.9.15` | `PASS` |
+| `github.com/cloudwego/eino-ext/components/indexer/milvus` | `v0.0.0-20260820123736-6752ff8da9b1` | `PASS` |
+| `github.com/cloudwego/eino-ext/components/document/loader/file` | `v0.0.0-20260820123736-6752ff8da9b1` | `PASS` |
+| `github.com/cloudwego/eino-ext/components/tool/duckduckgo/v2` | `v2.0.0-20260820123736-6752ff8da9b1` | `PASS` |
+| `github.com/cloudwego/eino-ext/components/model/openai` | `v0.1.13` | `PASS` |
+| `github.com/cloudwego/eino-ext/libs/acl/openai` | `v0.1.17` | `PASS` |
+| `github.com/gogf/gf/v2` | `v2.10.2` | `PASS` |
+| `gorm.io/gorm` / `gorm.io/driver/mysql` | `v1.31.2` / `v1.6.0` | `PASS` |
+| `github.com/redis/go-redis/v9` | `v9.22.0` | `PASS` |
+| `github.com/milvus-io/milvus-sdk-go/v2` | `v2.4.2` | `PASS` |
+| `github.com/golang-jwt/jwt/v5` | `v5.3.1` | `PASS` |
+| `github.com/bytedance/sonic` | `v1.15.2` | `PASS` |
+| `golang.org/x/crypto` / `golang.org/x/time` | `v0.55.0` / `v0.15.0` | `PASS` |
+
+结构化预发布扫描只返回已授权的 `github.com/emirpasic/gods/v2 v2.0.0-alpha`。`go list -m all` 和 Go 源码 / `go.mod` 扫描均未发现 `components/embedding/dashscope`；`go.mod` 没有 `replace`，生产 Go 源码没有 Eino blank import。
+
+未被真实源码使用的未来独立模块没有写入 `go.mod`。只读解析验证 `officialmcp@v0.1.1` 与 `adk/backend/local@v0.2.6` 均可下载并有 module checksum，状态 `PASS`。
+
+### Eino 与既有行为
+
+恢复后重新运行 Red：
+
+```text
+$ go test ./internal/ai/compat -run '^TestEinoPublicContracts$' -count=1
+FAIL SentinelOps/internal/ai/compat [setup failed]
+... no required module provides package github.com/cloudwego/eino/adk/middlewares/dynamictool/toolsearch
+```
+
+升级后同一 Case 实际执行并 `PASS`。contract 固定 ADK Runner、CheckPointStore / Deleter、ChatModelAgent middleware、AgentTool、Retry / Failover、Skill、Tool Search 和 ToolCallMiddlewares 的公共编译边界。
+
+计划指定命令：
+
+```bash
+go test ./internal/ai/compat ./internal/ai/agent/plan_pipeline ./internal/ai/tools/... -count=1
+go vet ./internal/ai/compat/... ./internal/ai/agent/plan_pipeline/...
+```
+
+均退出 0，状态 `PASS`。`internal/ai/compat` 的目标 Case 实际执行；`plan_pipeline` 和各 `tools` 包没有测试文件，只记编译 `PASS`，不冒充测试 Case。
+
+直接行为回归：
+
+```bash
+go test -v ./internal/ai/models ./internal/ai/embedder -count=1
+go test -v ./internal/config ./internal/ai/rerank ./internal/ai/trace ./internal/controller/chat ./internal/ai/agent/ops_pipeline -count=1
+go test ./internal/ai/indexer -run '^$' -count=1
+```
+
+离线 Case 全部 `PASS`，覆盖 Provider -> Catalog -> Routing、Thinking Options、OpenAI-compatible Chat、OpenAI ACL Embedding 与 2048 维检查、Rerank、Usage/Cost、DeepThinking timeout 和 Ops 状态转换。`indexer` 在 Go 1.27.0 下编译 `PASS`，P00 的 `undefined: GoMapIterator` 已消失。Sonic v1.15.2 在 Go 1.27 上提示 AST fast path 回退到 `encoding/json`，不影响编译或 Case 结果，已如实记录。
+
+文本生成、Tool Calling、Embedding、Rerank 在线 Case 因未设置 `SENTINELOPS_ONLINE_TEST=1` 而跳过，状态 `NOT RUN`，不作为本单元通过证据。
+
+### 依赖图与版本残留
+
+以下命令均退出 0：
+
+```bash
+go list -m all
+go mod graph
+go mod why -m github.com/bytedance/sonic
+go mod why -m github.com/cloudwego/eino
+go mod why -m github.com/cloudwego/eino-ext/libs/acl/openai
+go mod why -m go.opentelemetry.io/otel
+go mod tidy -diff
+```
+
+依赖图共 1583 条边；`why` 分别追溯到 `internal/ai/indexer`、`internal/ai/agent/plan_pipeline`、`internal/ai/embedder` 和 GoFrame HTTP。`go mod tidy -diff` 无输出。旧 Go 版本扫描只命中不可改写的 `P00-baseline.md` 历史事实；当前 `go.mod`、Dockerfile 和 README 均已同步到 1.27.0。
+
+### 后端镜像
+
+两段 `FROM` 均精确为 `golang:1.27.0-alpine`。直接从当前工作目录构建时，Docker 在发送 context 阶段因现有 `.runtime/etcd/member` 权限拒绝而退出，尚未执行 Dockerfile；本单元没有读取该路径，也没有扩张到 `.dockerignore` 或 Compose 改造。
+
+随后用 `git archive HEAD` 建立只含跟踪文件的 throwaway context，显式覆盖本单元 `go.mod`、`go.sum`、Dockerfile 和 contract test，在临时目录执行 `go mod vendor` 后构建：
+
+```text
+$ docker build --file <throwaway>/manifest/docker/Dockerfile.backend --tag sentinelops-p01-backend:local <throwaway>
+... naming to docker.io/library/sentinelops-p01-backend:local done
+$ docker run --rm sentinelops-p01-backend:local go version
+go version go1.27.0 linux/amd64
+```
+
+构建与镜像内工具链检查均为 `PASS`。未启动项目服务或 Compose；测试容器由 `--rm` 删除，throwaway context 与本地测试镜像已清理。
+
+### 最终局部门禁复跑
+
+提交前将测试、vet、tidy、上述全部精确版本、canonical Go 声明、唯一预发布例外、无 DashScope / replace / blank import、当前 Go 旧版本残留和 `web/` 负向扫描组合为 fail-fast 命令重新执行，最终输出：
+
+```text
+P01_FINAL_LOCAL_GATE=PASS
+AUTHORIZED_PRERELEASE=github.com/emirpasic/gods/v2 v2.0.0-alpha
+```
+
+退出码为 0，状态 `PASS`。
+
+## 未运行范围
+
+- 完整 `go test ./...`、完整 `go vet ./...`、race、完整前端 E2E、40+ Case 三轮 Eval、故障矩阵和在线供应商测试：`NOT RUN`，按执行 Plan `2.3` 留给对应单元或 P43。
+- P02 及任何专业 Agent 迁移、Runtime、MCP、Skill、Approval、Effect、发布动作：`NOT RUN`。
