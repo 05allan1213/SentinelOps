@@ -6,16 +6,37 @@ import "time"
 //
 // pending：运行已创建，等待调度执行
 // running：运行正在执行
-// success：运行已正常完成
+// success：旧 Runtime 已正常完成（兼容读取；新 Runtime 使用 succeeded）
+// waiting_approval：运行等待人工审批，继续占用 Session
+// retryable_failed：运行可重试失败，继续占用 Session
+// parked：运行因恢复依赖或安全原因暂停，继续占用 Session
+// reconciling：运行正在核对未知 Effect，继续占用 Session
+// succeeded：新 Runtime 已正常完成
 // failed：运行执行失败
 // canceled：运行被用户或系统取消
 const (
-	RunStatusPending  = "pending"
-	RunStatusRunning  = "running"
-	RunStatusSuccess  = "success"
-	RunStatusFailed   = "failed"
-	RunStatusCanceled = "canceled"
+	RunStatusPending         = "pending"
+	RunStatusRunning         = "running"
+	RunStatusWaitingApproval = "waiting_approval"
+	RunStatusRetryableFailed = "retryable_failed"
+	RunStatusParked          = "parked"
+	RunStatusReconciling     = "reconciling"
+	RunStatusSuccess         = "success"
+	RunStatusSucceeded       = "succeeded"
+	RunStatusFailed          = "failed"
+	RunStatusCanceled        = "canceled"
 )
+
+// RunOccupiesSession 返回给定状态是否必须继续持有 active_session_key。
+// 未知状态按非终态处理，避免未来状态在未审计时意外释放 Session。
+func RunOccupiesSession(status string) bool {
+	switch status {
+	case RunStatusSuccess, RunStatusSucceeded, RunStatusFailed, RunStatusCanceled:
+		return false
+	default:
+		return true
+	}
+}
 
 // BranchDelta 表示一个并行分支对工作流状态产生的增量变更。
 type BranchDelta struct {

@@ -316,32 +316,40 @@ func (OpsProtectedAsset) TableName() string { return "ops_protected_assets" }
 
 // WorkflowRun 工作流运行记录，保存一次运行的整体状态
 type WorkflowRun struct {
-	ID            string         `gorm:"column:id;primaryKey;size:64"`
-	WorkflowKey   string         `gorm:"column:workflow_key;size:128;not null;index"`
-	UserID        string         `gorm:"column:user_id;size:64;index"`
-	SessionID     string         `gorm:"column:session_id;size:64;index"`
-	Status        string         `gorm:"column:status;size:32;default:running;index"`
-	InputPayload  string         `gorm:"column:input_payload;type:text"`
-	OutputPayload string         `gorm:"column:output_payload;type:text"`
-	ErrorMessage  string         `gorm:"column:error_message;type:text"`
-	StartedAt     time.Time      `gorm:"column:started_at;type:datetime(3);not null"`
-	FinishedAt    *time.Time     `gorm:"column:finished_at;type:datetime(3)"`
-	DurationMs    int64          `gorm:"column:duration_ms;default:0"`
-	CreatedAt     time.Time      `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt     time.Time      `gorm:"column:updated_at;autoUpdateTime"`
-	DeletedAt     gorm.DeletedAt `gorm:"column:deleted_at;index"`
+	ID                       string         `gorm:"column:id;primaryKey;size:64"`
+	WorkflowKey              string         `gorm:"column:workflow_key;size:128;not null;index"`
+	UserID                   string         `gorm:"column:user_id;size:64;index"`
+	SessionID                string         `gorm:"column:session_id;size:64;index"`
+	ActiveSessionKey         *string        `gorm:"column:active_session_key;size:64;uniqueIndex:uidx_workflow_runs_active_session"`
+	Status                   string         `gorm:"column:status;size:32;default:running;index"`
+	RuntimeMode              string         `gorm:"column:runtime_mode;size:32;not null;default:legacy"`
+	ImmutableInputJSON       *string        `gorm:"column:immutable_input_json;type:json"`
+	RuntimeVersion           *string        `gorm:"column:runtime_version;size:128"`
+	RuntimeCompatibilityHash *string        `gorm:"column:runtime_compatibility_hash;type:char(64)"`
+	LastEventSeq             uint64         `gorm:"column:last_event_seq;not null;default:0"`
+	ParkReason               *string        `gorm:"column:park_reason;size:128"`
+	InputPayload             string         `gorm:"column:input_payload;type:text"`
+	OutputPayload            string         `gorm:"column:output_payload;type:text"`
+	ErrorMessage             string         `gorm:"column:error_message;type:text"`
+	StartedAt                time.Time      `gorm:"column:started_at;type:datetime(3);not null"`
+	FinishedAt               *time.Time     `gorm:"column:finished_at;type:datetime(3)"`
+	DurationMs               int64          `gorm:"column:duration_ms;default:0"`
+	CreatedAt                time.Time      `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt                time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt                gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
 func (WorkflowRun) TableName() string { return "workflow_runs" }
 
 // WorkflowEvent 工作流事件明细，按运行和序号保持唯一
 type WorkflowEvent struct {
-	ID        uint      `gorm:"primaryKey;autoIncrement"`
-	RunID     string    `gorm:"column:run_id;size:64;not null;uniqueIndex:idx_workflow_events_run_seq,priority:1"`
-	Seq       int       `gorm:"column:seq;not null;uniqueIndex:idx_workflow_events_run_seq,priority:2"`
-	EventType string    `gorm:"column:event_type;size:64;not null;index"`
-	Payload   string    `gorm:"column:payload;type:text"`
-	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
+	ID             uint      `gorm:"primaryKey;autoIncrement"`
+	RunID          string    `gorm:"column:run_id;size:64;not null;uniqueIndex:idx_workflow_events_run_seq,priority:1"`
+	Seq            uint64    `gorm:"column:seq;not null;uniqueIndex:idx_workflow_events_run_seq,priority:2"`
+	EventType      string    `gorm:"column:event_type;size:64;not null;index"`
+	Payload        string    `gorm:"column:payload;type:text"`
+	PayloadVersion uint      `gorm:"column:payload_version;not null;default:1"`
+	CreatedAt      time.Time `gorm:"column:created_at;autoCreateTime"`
 }
 
 func (WorkflowEvent) TableName() string { return "workflow_events" }
@@ -363,7 +371,7 @@ func (WorkflowCheckpoint) TableName() string { return "workflow_checkpoints" }
 type SessionStateRevision struct {
 	ID        uint           `gorm:"primaryKey;autoIncrement"`
 	SessionID string         `gorm:"column:session_id;size:64;not null;uniqueIndex:idx_session_state_revisions_session_revision,priority:1"`
-	Revision  int            `gorm:"column:revision;not null;uniqueIndex:idx_session_state_revisions_session_revision,priority:2"`
+	Revision  uint64         `gorm:"column:revision;not null;uniqueIndex:idx_session_state_revisions_session_revision,priority:2"`
 	StateJSON string         `gorm:"column:state_json;type:json;not null"`
 	CreatedAt time.Time      `gorm:"column:created_at;autoCreateTime"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index"`

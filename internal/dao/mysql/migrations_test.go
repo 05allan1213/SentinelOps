@@ -30,7 +30,7 @@ func TestMigrationsUpFromCurrentSchemaSnapshot(t *testing.T) {
 	_, gormDB, dsn := newDisposableDatabase(t, "current")
 	requireCurrentSchemaSnapshot(t, gormDB)
 
-	legacy := WorkflowRun{
+	legacy := p03WorkflowRun{
 		ID: "legacy-run", WorkflowKey: "legacy", SessionID: "legacy-session",
 		Status: "running", StartedAt: time.Now(),
 	}
@@ -197,8 +197,8 @@ func requireCurrentSchemaSnapshot(t *testing.T, db *gorm.DB) {
 		&Event{}, &Subscription{}, &Report{}, &User{}, &Setting{}, &QueryTermMapping{},
 		&TraceRun{}, &TraceNode{}, &KnowledgeBase{}, &KnowledgeDocument{}, &KnowledgeChunk{},
 		&MessageFeedback{}, &UserPreference{}, &OpsPlaybook{}, &OpsRun{}, &OpsRunStep{},
-		&OpsProtectedAsset{}, &WorkflowRun{}, &WorkflowEvent{}, &WorkflowCheckpoint{},
-		&SessionStateRevision{},
+		&OpsProtectedAsset{}, &p03WorkflowRun{}, &p03WorkflowEvent{}, &WorkflowCheckpoint{},
+		&p03SessionStateRevision{},
 	}
 	if err := db.AutoMigrate(models...); err != nil {
 		t.Fatalf("create current schema snapshot: %v", err)
@@ -215,6 +215,48 @@ func requireCurrentSchemaSnapshot(t *testing.T, db *gorm.DB) {
 		}
 	}
 }
+
+// 下列冻结模型只用于重建 P03 开始前的旧 Schema。生产 GORM 模型会随
+// 后续单元映射 Expand 列，不能反向改变“从旧 Schema Up”的 contract test。
+type p03WorkflowRun struct {
+	ID            string         `gorm:"column:id;primaryKey;size:64"`
+	WorkflowKey   string         `gorm:"column:workflow_key;size:128;not null;index"`
+	SessionID     string         `gorm:"column:session_id;size:64;index"`
+	Status        string         `gorm:"column:status;size:32;default:running;index"`
+	InputPayload  string         `gorm:"column:input_payload;type:text"`
+	OutputPayload string         `gorm:"column:output_payload;type:text"`
+	ErrorMessage  string         `gorm:"column:error_message;type:text"`
+	StartedAt     time.Time      `gorm:"column:started_at;type:datetime(3);not null"`
+	FinishedAt    *time.Time     `gorm:"column:finished_at;type:datetime(3)"`
+	DurationMs    int64          `gorm:"column:duration_ms;default:0"`
+	CreatedAt     time.Time      `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt     time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt     gorm.DeletedAt `gorm:"column:deleted_at;index"`
+}
+
+func (p03WorkflowRun) TableName() string { return "workflow_runs" }
+
+type p03WorkflowEvent struct {
+	ID        uint      `gorm:"primaryKey;autoIncrement"`
+	RunID     string    `gorm:"column:run_id;size:64;not null;uniqueIndex:idx_workflow_events_run_seq,priority:1"`
+	Seq       int       `gorm:"column:seq;not null;uniqueIndex:idx_workflow_events_run_seq,priority:2"`
+	EventType string    `gorm:"column:event_type;size:64;not null;index"`
+	Payload   string    `gorm:"column:payload;type:text"`
+	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
+}
+
+func (p03WorkflowEvent) TableName() string { return "workflow_events" }
+
+type p03SessionStateRevision struct {
+	ID        uint           `gorm:"primaryKey;autoIncrement"`
+	SessionID string         `gorm:"column:session_id;size:64;not null;uniqueIndex:idx_session_state_revisions_session_revision,priority:1"`
+	Revision  int            `gorm:"column:revision;not null;uniqueIndex:idx_session_state_revisions_session_revision,priority:2"`
+	StateJSON string         `gorm:"column:state_json;type:json;not null"`
+	CreatedAt time.Time      `gorm:"column:created_at;autoCreateTime"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index"`
+}
+
+func (p03SessionStateRevision) TableName() string { return "session_state_revisions" }
 
 func newDisposableDatabase(t *testing.T, suffix string) (*sql.DB, *gorm.DB, string) {
 	t.Helper()

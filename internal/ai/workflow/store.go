@@ -123,7 +123,7 @@ func (s *GORMStore) AppendEvent(ctx context.Context, event StreamEvent) error {
 
 	model := mysql.WorkflowEvent{
 		RunID:     event.RunID,
-		Seq:       int(event.ID),
+		Seq:       uint64(event.ID),
 		EventType: event.Type,
 		Payload:   payload,
 	}
