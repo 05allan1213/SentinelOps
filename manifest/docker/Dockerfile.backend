@@ -1,0 +1,19 @@
+FROM golang:1.24-alpine AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+COPY vendor/ ./vendor/
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -o /app/server main.go
+
+FROM golang:1.24-alpine
+ENV TZ=Asia/Shanghai
+RUN apk add --no-cache docker-cli
+WORKDIR /app
+COPY --from=builder /app/server ./server
+COPY docs/ ./docs/
+COPY manifest/config/config.docker.yaml ./manifest/config/config.yaml
+RUN mkdir -p ./manifest/upload/knowledge && \
+    mkdir -p ./nginx_blocklist && \
+    echo "# AI 运维动态 IP 黑名单（由 block_ip 工具自动写入）" > ./nginx_blocklist/blocked_ips.conf
+EXPOSE 8001
+CMD ["./server"]

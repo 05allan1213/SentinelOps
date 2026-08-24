@@ -1,0 +1,29 @@
+.buildpath
+.hgignore.swp
+.project
+.orig
+.swp
+.idea/
+.settings/
+.vscode/
+bin/
+**/.DS_Store
+gf
+main
+main.exe
+output/
+manifest/output/
+temp/
+temp.yaml
+bin
+
+.runtime/
+manifest/config/config.local.yaml
+
+# vendor（Docker 构建前本地执行 go mod vendor 生成）
+vendor/
+
+# 前端
+node_modules/
+dist/
+.worktrees/

@@ -1,0 +1,49 @@
+// Package settingssvc 提供系统通用设置业务逻辑。
+// 职责：读取/写入 key-value 配置，封装默认值处理和类型转换，不含 HTTP 层细节。
+package settingssvc
+
+import (
+	"context"
+
+	dao "SentinelOps/internal/dao/mysql"
+)
+
+// GeneralSettings 通用设置的业务模型（与 HTTP DTO 解耦）。
+type GeneralSettings struct {
+	SiteName     string
+	AutoMarkRead bool
+}
+
+var generalKeys = []string{
+	"general.site_name",
+	"general.auto_mark_read",
+}
+
+// GetGeneral 读取通用设置，数据库无值时返回合理默认值。
+func GetGeneral(ctx context.Context) (*GeneralSettings, error) {
+	cfg, _ := dao.GetSettings(ctx, generalKeys)
+
+	siteName := cfg["general.site_name"]
+	if siteName == "" {
+		siteName = "安全事件智能研判多智能体协同平台"
+	}
+	// 默认 true；仅当明确存储 "false" 时才关闭
+	autoMarkRead := cfg["general.auto_mark_read"] != "false"
+
+	return &GeneralSettings{
+		SiteName:     siteName,
+		AutoMarkRead: autoMarkRead,
+	}, nil
+}
+
+// SaveGeneral 持久化通用设置到数据库。
+func SaveGeneral(ctx context.Context, siteName string, autoMarkRead bool) error {
+	autoMarkReadStr := "true"
+	if !autoMarkRead {
+		autoMarkReadStr = "false"
+	}
+	if err := dao.SetSetting(ctx, "general.site_name", siteName); err != nil {
+		return err
+	}
+	return dao.SetSetting(ctx, "general.auto_mark_read", autoMarkReadStr)
+}

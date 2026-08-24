@@ -1,0 +1,211 @@
+server:
+  address: ":8001"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+  clientMaxBodySize: 52428800  # 50 MB，防止超大文件上传打爆内存
+  enable_frontend_hosting: false
+
+logger:
+  level: "all"
+  stdout: true
+
+# Model access is split into Provider -> Model Catalog -> Routing. Keep the
+# API key empty in this tracked file; copy it to config.local.yaml locally.
+providers:
+  aliyun_bailian:
+    api_key: ""
+    endpoints:
+      openai_compatible: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      dashscope: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      dashscope_rerank: "https://dashscope.aliyuncs.com/compatible-api/v1"
+
+# Prices: mainland China (Beijing), CNY per million tokens, paid tier only.
+# Source: https://help.aliyun.com/zh/model-studio/model-pricing
+# Checked: 2026-08-24. Free quotas are intentionally ignored.
+model_catalog:
+  aliyun_bailian/qwen3.7-max-2026-06-08:
+    model_id: "qwen3.7-max-2026-06-08"
+    driver: "openai_compatible"
+    capabilities: ["chat", "tool_calling"]
+    pricing:
+      currency: "CNY"
+      unit: "per_million_tokens"
+      input: 12
+      cached_input: 2.4
+      output: 36
+  aliyun_bailian/qwen3.7-text-embedding:
+    model_id: "qwen3.7-text-embedding"
+    driver: "dashscope"
+    capabilities: ["embedding"]
+    dimension: 2048
+    pricing:
+      currency: "CNY"
+      unit: "per_million_tokens"
+      input: 0.5
+  aliyun_bailian/qwen3-rerank:
+    model_id: "qwen3-rerank"
+    driver: "dashscope_rerank"
+    capabilities: ["rerank"]
+    pricing:
+      currency: "CNY"
+      unit: "per_million_tokens"
+      input: 0.5
+
+routing:
+  chat:
+    default:
+      model: "aliyun_bailian/qwen3.7-max-2026-06-08"
+      options:
+        enable_thinking: false
+    reasoning:
+      model: "aliyun_bailian/qwen3.7-max-2026-06-08"
+      options:
+        enable_thinking: true
+  embedding:
+    default:
+      model: "aliyun_bailian/qwen3.7-text-embedding"
+  rerank:
+    default:
+      model: "aliyun_bailian/qwen3-rerank"
+      options:
+        instruct: "Given a web search query, retrieve relevant passages that answer the query."
+
+# 内部文档知识库根目录（query_internal_docs 工具扫描此路径）
+file_dir: "docs"
+
+milvus:
+  addr: "localhost:19530"
+
+redis:
+  addr: "localhost:16379"
+  password: ""
+  db: 0
+
+  # 对话历史缓存：多轮对话上下文持久化到 Redis，服务重启后可恢复
+  chat_cache:
+    ttl: 720            # 缓存有效期（小时），720h = 30 天
+    key_prefix: "session"
+
+  # 语义缓存：对 RAG 检索结果缓存，相似度命中时跳过 Embedding + Milvus 调用
+  semantic_cache:
+    ttl: 24             # 缓存有效期（小时）
+    threshold: 0.85     # 余弦相似度命中阈值，高于此值视为缓存命中
+    key_prefix: "rag:cache"
+    topk: 5             # Milvus 初始召回候选文档数（扩大候选池，提升召回率）
+    final_topk: 3       # 返回给 LLM 的最终文档数（从候选池截取，topk >= final_topk）
+    min_score: 0.30     # 向量检索结果最低相似度阈值，低于此值的文档丢弃
+
+# 检索增强（RAG）
+retriever:
+  # 查询重写：消除多轮对话中的代词歧义、补全上下文，增加约 200ms 延迟
+  rewrite_enabled: true
+  # 子问题拆分：将复杂查询拆分为多个子查询并行检索，增加约 300ms 延迟
+  split_enabled: true
+  # 意图置信度阈值：低于此值时返回歧义引导提示，而非强制路由
+  confidence_threshold: 0.70
+
+  # 混合检索：Sparse-Dense 混合检索（BM25 + 语义向量，RRF 融合）
+  hybrid:
+    enabled: true         # 是否启用混合检索（events/documents 分区默认启用）
+    rrf_k: 60             # RRF 融合参数 k（Reciprocal Rank Fusion）
+
+database:
+  mysql:
+    dsn: "root:sentinel123@tcp(127.0.0.1:3307)/sentinelops?charset=utf8mb4&parseTime=True"
+
+# 认证
+auth:
+  jwt:
+    enabled: true                     # 生产环境建议设为 true
+    secret: "change-me-in-production" # 生产环境务必替换为强随机字符串
+    expire_hours: 24
+  seed:
+    admin_password: "admin123"        # 首次初始化的管理员密码，生产环境务必修改
+
+# 后台调度器
+scheduler:
+  fetch_interval_minutes: 15  # 订阅源抓取间隔（分钟）
+  index_interval_minutes: 20  # 向量索引间隔（分钟）
+  index_batch_size: 10        # 单批向量化文档数，受 DashScope Embedding API 上限约束（≤ 10）
+
+# 对话记忆管理
+memory:
+  summaryTrigger: 30    # 消息数辅助触发阈值：超过此条数触发摘要压缩
+  summaryBatchSize: 10  # 每次摘要压缩的消息条数
+  tokenTrigger: 3000    # Token 主触发阈值：累计 Token 超出时触发摘要压缩
+  minRecentMessages: 4  # 摘要后最少保留的近期消息数（保证对话连贯性）
+  inferDebounceMinutes: 5 # 用户偏好推断防抖间隔（分钟）
+
+# 工具
+tools:
+  web_search:
+    # Tavily Search API，专为 AI Agent 设计，申请地址：https://tavily.com
+    tavily_api_key: ""
+    tavily_base_url: "https://api.tavily.com/search"
+    tavily_search_depth: "advanced"   # basic（快速）| advanced（深度，结果更全）
+  github:
+    token: ""   # GitHub Personal Access Token，用于提高 API 限流额度
+
+# 全链路追踪
+trace:
+  enabled: true
+  max_error_length: 1000
+  record_prompt: false        # 是否记录 Prompt/Completion 原文（开启将显著增加写入量）
+  record_sql: true           # 是否记录 SQL 语句（开启将记录慢查询 SQL 原文）
+  db_slow_threshold_ms: 100   # 慢查询阈值（毫秒），超过此值的查询才会被追踪
+  # 模型单价（¥/1M tokens，直接填写人民币，无需汇率换算）
+  # 键名与 TraceNode.model_name 字段值匹配（大小写不敏感前缀匹配）
+
+# 限流
+limiter:
+  # 全局 QPS 上限（所有用户共享，防接口被整体打爆）
+  rate_global_qps: 100
+  # 单用户 QPS 上限（按模块隔离）
+  rate_chat_qps: 2           # AI 对话（消耗 LLM，严格限制）
+  rate_event_qps: 5          # 事件分析（中等成本）
+  rate_knowledge_qps: 10     # 知识库写操作
+  rate_query_qps: 30         # 只读查询（trace/rageval/dashboard）
+  rate_user_qps: 20          # 默认
+  # Agent 执行超时（秒）
+  agent_timeout_sec: 90
+  agent_deep_timeout_sec: 600
+
+knowledge:
+  upload_dir: "manifest/upload/knowledge"  # 上传文件本地保存根目录
+  index_workers: 3                          # 索引 Worker Pool 并发数
+  queue_capacity: 1000                      # 索引任务队列容量
+  default_kb_name: "默认知识库"
+  parent_chunk_size: 1024                   # 父块大小（rune 数，hierarchical 策略）
+  child_chunk_size: 256                     # 子块大小（rune 数）
+  child_overlap_size: 40                    # 子块重叠窗口（rune 数）
+
+# SOAR 集成配置
+soar:
+  integrations:
+    dingtalk:
+      webhook_url: ""       # 钉钉机器人 Webhook URL
+    wecom:
+      webhook_url: ""       # 企微机器人 Webhook URL
+    email:
+      smtp_host: ""         # SMTP 服务器地址
+      smtp_port: ""                 # SMTP 端口
+      smtp_user: ""    # 发件人邮箱
+      smtp_pass: ""    # QQ邮箱授权码
+
+  # AI 运维配置：控制 AI 规划时可使用的动作和通知渠道
+  ai_ops:
+    # 通知渠道偏好（AI 规划时优先使用已配置的渠道）
+    # 可选值：dingtalk / wecom / email / none
+    notify_channel: "email"
+    # 通知收件人（email 渠道时使用）
+    notify_email_to: ""
+    # 是否允许 AI 封禁 IP（高危场景）
+    allow_block_ip: true
+    # IP 封禁后端：none（仅记录）/ nginx（写黑名单文件+reload）
+    block_ip_backend: "none"
+    # nginx 黑名单文件路径
+    nginx_blocklist_path: ""
+    # nginx 容器名
+    nginx_container: ""
+    # 是否允许 AI 调用深度分析
+    allow_ai_analyze: true

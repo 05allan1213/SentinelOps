@@ -1,0 +1,156 @@
+name: sentinelops
+
+# 生产部署：一键启动所有服务
+# 用法：docker-compose up -d --build
+# 访问：http://localhost
+
+services:
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.18
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ../../.runtime/etcd:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio:
+    container_name: milvus-minio
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ../../.runtime/minio:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  standalone:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.5.10
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - ../../.runtime/milvus:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - etcd
+      - minio
+
+  attu:
+    container_name: milvus-attu
+    image: zilliz/attu:v2.6
+    ports:
+      - "8000:3000"
+    environment:
+      MILVUS_URL: standalone:19530
+    depends_on:
+      - standalone
+
+  redis:
+    container_name: redis
+    image: redis:7.4-alpine
+    ports:
+      - "16379:6379"
+    volumes:
+      - ../../.runtime/redis:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mysql:
+    container_name: mysql
+    image: mysql:8.0
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=sentinel123
+      - MYSQL_DATABASE=sentinelops
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    container_name: sentinelops-backend
+    build:
+      context: ../..
+      dockerfile: manifest/docker/Dockerfile.backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      standalone:
+        condition: service_healthy
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    volumes:
+      # 与 nginx 共享同一宿主机目录：后端写 deny 规则文件，nginx 直接读取并应用
+      - ../../.runtime/nginx_blocklist:/app/nginx_blocklist
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  frontend:
+    container_name: sentinelops-frontend
+    build:
+      context: ../..
+      dockerfile: manifest/docker/Dockerfile.frontend
+    restart: unless-stopped
+
+  nginx:
+    container_name: nginx
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/docker-entrypoint.sh:/custom-entrypoint.sh:ro
+      - ../../.runtime/nginx_blocklist:/app/nginx_blocklist
+    entrypoint: ["/custom-entrypoint.sh"]
+    command: ["nginx", "-g", "daemon off;"]
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+networks:
+  default:
+    name: milvus
+
+volumes:
+  mysql_data:

@@ -1,0 +1,108 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        // 参考 Ant Design 配色
+        primary: {
+          50: '#e6f4ff',
+          100: '#bae0ff',
+          200: '#91caff',
+          300: '#69b1ff',
+          400: '#4096ff',
+          500: '#1677ff',  // 主色
+          600: '#0958d9',
+          700: '#003eb3',
+          800: '#002c8c',
+          900: '#001d66',
+        },
+        success: {
+          50: '#f6ffed',
+          100: '#d9f7be',
+          200: '#b7eb8f',
+          300: '#95de64',
+          400: '#73d13d',
+          500: '#52c41a',
+          600: '#389e0d',
+          700: '#237804',
+          800: '#135200',
+          900: '#092b00',
+        },
+        warning: {
+          50: '#fffbe6',
+          100: '#fff1b8',
+          200: '#ffe58f',
+          300: '#ffd666',
+          400: '#ffc53d',
+          500: '#faad14',
+          600: '#d48806',
+          700: '#ad6800',
+          800: '#874d00',
+          900: '#613400',
+        },
+        danger: {
+          50: '#fff1f0',
+          100: '#ffccc7',
+          200: '#ffa39e',
+          300: '#ff7875',
+          400: '#ff4d4f',
+          500: '#f5222d',
+          600: '#cf1322',
+          700: '#a8071a',
+          800: '#820014',
+          900: '#5c0011',
+        },
+        // 中性色 - 深色主题
+        gray: {
+          50: '#fafafa',
+          100: '#f5f5f5',
+          200: '#e8e8e8',
+          300: '#d9d9d9',
+          400: '#bfbfbf',
+          500: '#8c8c8c',
+          600: '#595959',
+          700: '#434343',
+          800: '#303030',
+          900: '#1f1f1f',
+          950: '#141414',
+        },
+      },
+      fontFamily: {
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        mono: ['SFMono-Regular', 'Consolas', 'Liberation Mono', 'Menlo', 'monospace'],
+      },
+      fontSize: {
+        'xs': ['12px', { lineHeight: '20px' }],
+        'sm': ['14px', { lineHeight: '22px' }],
+        'base': ['14px', { lineHeight: '22px' }],
+        'lg': ['16px', { lineHeight: '24px' }],
+        'xl': ['20px', { lineHeight: '28px' }],
+        '2xl': ['24px', { lineHeight: '32px' }],
+        '3xl': ['30px', { lineHeight: '38px' }],
+      },
+      borderRadius: {
+        'sm': '2px',
+        'DEFAULT': '6px',
+        'md': '6px',
+        'lg': '8px',
+      },
+      boxShadow: {
+        'sm': '0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02)',
+        'DEFAULT': '0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02)',
+        'md': '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+        'lg': '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+      },
+      spacing: {
+        '4.5': '18px',
+        '13': '52px',
+        '15': '60px',
+      },
+    },
+  },
+  plugins: [],
+}

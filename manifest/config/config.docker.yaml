@@ -1,0 +1,174 @@
+server:
+  address: ":8001"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+  clientMaxBodySize: 52428800  # 50 MB，防止超大文件上传打爆内存
+  enable_frontend_hosting: false
+
+logger:
+  level: "all"
+  stdout: true
+
+providers:
+  aliyun_bailian:
+    api_key: ""
+    endpoints:
+      openai_compatible: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      dashscope: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      dashscope_rerank: "https://dashscope.aliyuncs.com/compatible-api/v1"
+
+# Mainland China (Beijing) paid prices, CNY per million tokens.
+# Source: https://help.aliyun.com/zh/model-studio/model-pricing (checked 2026-08-24).
+model_catalog:
+  aliyun_bailian/qwen3.7-max-2026-06-08:
+    model_id: "qwen3.7-max-2026-06-08"
+    driver: "openai_compatible"
+    capabilities: ["chat", "tool_calling"]
+    pricing: {currency: "CNY", unit: "per_million_tokens", input: 12, cached_input: 2.4, output: 36}
+  aliyun_bailian/qwen3.7-text-embedding:
+    model_id: "qwen3.7-text-embedding"
+    driver: "dashscope"
+    capabilities: ["embedding"]
+    dimension: 2048
+    pricing: {currency: "CNY", unit: "per_million_tokens", input: 0.5}
+  aliyun_bailian/qwen3-rerank:
+    model_id: "qwen3-rerank"
+    driver: "dashscope_rerank"
+    capabilities: ["rerank"]
+    pricing: {currency: "CNY", unit: "per_million_tokens", input: 0.5}
+
+routing:
+  chat:
+    default:
+      model: "aliyun_bailian/qwen3.7-max-2026-06-08"
+      options: {enable_thinking: false}
+    reasoning:
+      model: "aliyun_bailian/qwen3.7-max-2026-06-08"
+      options: {enable_thinking: true}
+  embedding:
+    default: {model: "aliyun_bailian/qwen3.7-text-embedding"}
+  rerank:
+    default:
+      model: "aliyun_bailian/qwen3-rerank"
+      options:
+        instruct: "Given a web search query, retrieve relevant passages that answer the query."
+
+# 内部文档知识库根目录（query_internal_docs 工具扫描此路径）
+file_dir: "docs"
+
+milvus:
+  addr: "standalone:19530"
+
+redis:
+  addr: "redis:6379"
+  password: ""
+  db: 0
+
+  # 对话历史缓存：多轮对话上下文持久化到 Redis，服务重启后可恢复
+  chat_cache:
+    ttl: 720
+    key_prefix: "session"
+
+  # 语义缓存：对 RAG 检索结果缓存，相似度命中时跳过 Embedding + Milvus 调用
+  semantic_cache:
+    ttl: 24
+    threshold: 0.85
+    key_prefix: "rag:cache"
+    topk: 5
+    final_topk: 3
+    min_score: 0.30
+
+# 检索增强（RAG）
+retriever:
+  rewrite_enabled: true
+  split_enabled: true
+  confidence_threshold: 0.70
+
+  hybrid:
+    enabled: true
+    rrf_k: 60
+
+database:
+  mysql:
+    dsn: "root:sentinel123@tcp(mysql:3306)/sentinelops?charset=utf8mb4&parseTime=True"
+
+# 认证
+auth:
+  jwt:
+    enabled: true
+    secret: "change-me-in-production"
+    expire_hours: 24
+  seed:
+    admin_password: "admin123"
+
+# 后台调度器
+scheduler:
+  fetch_interval_minutes: 15
+  index_interval_minutes: 20
+  index_batch_size: 10
+
+# 对话记忆管理
+memory:
+  summaryTrigger: 30
+  summaryBatchSize: 10
+  tokenTrigger: 3000
+  minRecentMessages: 4
+
+# 工具
+tools:
+  web_search:
+    tavily_api_key: ""
+    tavily_base_url: "https://api.tavily.com/search"
+    tavily_search_depth: "advanced"
+  github:
+    token: ""
+
+# 全链路追踪
+trace:
+  enabled: true
+  max_error_length: 1000
+  record_prompt: false
+  record_sql: true
+  db_slow_threshold_ms: 100
+
+# 限流
+limiter:
+  rate_global_qps: 100
+  rate_chat_qps: 2
+  rate_event_qps: 5
+  rate_knowledge_qps: 10
+  rate_query_qps: 30
+  rate_user_qps: 20
+  agent_timeout_sec: 90
+  agent_deep_timeout_sec: 300
+
+knowledge:
+  upload_dir: "manifest/upload/knowledge"
+  index_workers: 3
+  queue_capacity: 1000
+  default_kb_name: "默认知识库"
+  parent_chunk_size: 1024
+  child_chunk_size: 256
+  child_overlap_size: 40
+
+# SOAR 集成配置
+soar:
+  integrations:
+    dingtalk:
+      webhook_url: ""
+    wecom:
+      webhook_url: ""
+    email:
+      smtp_host: ""
+      smtp_port: ""
+      smtp_user: ""
+      smtp_pass: ""
+
+  ai_ops:
+    notify_channel: "email"
+    notify_email_to: ""
+    allow_block_ip: true
+    block_ip_backend: "nginx"
+    nginx_blocklist_path: "/app/nginx_blocklist/blocked_ips.conf"
+    nginx_container: "nginx"
+    allow_ai_analyze: true
