@@ -12,7 +12,7 @@ import (
 )
 
 type chatProfile struct {
-	APIKey      string
+	SecretRef   appconfig.SecretRef
 	BaseURL     string
 	Model       string
 	ExtraFields map[string]any
@@ -27,8 +27,8 @@ func resolveChatProfile(cfg *appconfig.Config, profile string) (chatProfile, err
 	if err != nil {
 		return chatProfile{}, err
 	}
-	if catalogModel.Driver != "openai_compatible" {
-		return chatProfile{}, fmt.Errorf("routing.chat.%s model uses driver %s, want openai_compatible", profile, catalogModel.Driver)
+	if catalogModel.Driver != appconfig.DriverOpenAICompatibleChat {
+		return chatProfile{}, fmt.Errorf("routing.chat.%s model uses driver %s, want %s", profile, catalogModel.Driver, appconfig.DriverOpenAICompatibleChat)
 	}
 	extraFields := make(map[string]any, 1)
 	if route.Options.EnableThinking != nil {
@@ -36,8 +36,8 @@ func resolveChatProfile(cfg *appconfig.Config, profile string) (chatProfile, err
 		extraFields["enable_thinking"] = *route.Options.EnableThinking
 	}
 	return chatProfile{
-		APIKey:      provider.APIKey,
-		BaseURL:     provider.Endpoints.OpenAICompatible,
+		SecretRef:   provider.SecretRef,
+		BaseURL:     provider.Endpoints[catalogModel.Driver],
 		Model:       catalogModel.ModelID,
 		ExtraFields: extraFields,
 	}, nil
@@ -52,12 +52,18 @@ func buildChatProfile(ctx context.Context, profile string) (einomodel.ToolCallin
 	if err != nil {
 		return nil, err
 	}
-	return openai.NewChatModel(ctx, &openai.ChatModelConfig{
-		APIKey:      resolved.APIKey,
-		BaseURL:     resolved.BaseURL,
-		Model:       resolved.Model,
-		ExtraFields: resolved.ExtraFields,
+	var model einomodel.ToolCallingChatModel
+	err = appconfig.UseSecret(ctx, resolved.SecretRef, func(secret []byte) error {
+		created, createErr := openai.NewChatModel(ctx, &openai.ChatModelConfig{
+			APIKey:      string(secret),
+			BaseURL:     resolved.BaseURL,
+			Model:       resolved.Model,
+			ExtraFields: resolved.ExtraFields,
+		})
+		model = created
+		return createErr
 	})
+	return model, err
 }
 
 // ChatDefault 创建默认对话 Profile。

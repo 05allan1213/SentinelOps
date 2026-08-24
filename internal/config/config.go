@@ -16,23 +16,98 @@ import (
 const (
 	baseFileName  = "config.yaml"
 	localFileName = "config.local.yaml"
+
+	// DriverOpenAICompatibleChat 使用 OpenAI-compatible Chat/Tool Calling 协议。
+	DriverOpenAICompatibleChat = "openai_compatible_chat"
+	// DriverOpenAICompatibleEmbedding 使用 OpenAI-compatible Embedding 协议。
+	DriverOpenAICompatibleEmbedding = "openai_compatible_embedding"
+	// DriverDashScopeCompatibleRerank 使用 DashScope-compatible Rerank 协议。
+	DriverDashScopeCompatibleRerank = "dashscope_compatible_rerank"
 )
 
+// Config 是完整替代加载后的应用配置真值。
 type Config struct {
+	App          App                 `yaml:"app" json:"app"`
+	Database     Database            `yaml:"database" json:"database"`
+	Auth         Auth                `yaml:"auth" json:"auth"`
+	SOAR         SOAR                `yaml:"soar" json:"soar"`
+	Secrets      SecretReferences    `yaml:"secret_refs" json:"secret_refs"`
+	AgentRuntime AgentRuntime        `yaml:"agent_runtime" json:"agent_runtime"`
 	Providers    map[string]Provider `yaml:"providers" json:"providers"`
 	ModelCatalog map[string]Model    `yaml:"model_catalog" json:"model_catalog"`
 	Routing      Routing             `yaml:"routing" json:"routing"`
 }
 
-type Provider struct {
-	APIKey    string    `yaml:"api_key" json:"api_key"`
-	Endpoints Endpoints `yaml:"endpoints" json:"endpoints"`
+// App 描述不含 Secret 的进程环境元数据。
+type App struct {
+	Environment string `yaml:"environment" json:"environment"`
 }
 
-type Endpoints struct {
-	OpenAICompatible string `yaml:"openai_compatible" json:"openai_compatible"`
-	DashScope        string `yaml:"dashscope" json:"dashscope"`
-	DashScopeRerank  string `yaml:"dashscope_rerank" json:"dashscope_rerank"`
+// Database 保存数据库 Secret 引用，不保存完整 DSN。
+type Database struct {
+	MySQL MySQL `yaml:"mysql" json:"mysql"`
+}
+
+// MySQL 保存数据库连接 Secret 引用。
+type MySQL struct {
+	DSNRef    SecretRef `yaml:"dsn_ref" json:"dsn_ref"`
+	LegacyDSN *string   `yaml:"dsn,omitempty" json:"-"`
+}
+
+// Auth 保存 JWT 与初始管理员 Secret 引用。
+type Auth struct {
+	JWT  JWT  `yaml:"jwt" json:"jwt"`
+	Seed Seed `yaml:"seed" json:"seed"`
+}
+
+// JWT 描述 JWT 开关及签名 Secret 引用。
+type JWT struct {
+	Enabled      bool      `yaml:"enabled" json:"enabled"`
+	SecretRef    SecretRef `yaml:"secret_ref" json:"secret_ref"`
+	LegacySecret *string   `yaml:"secret,omitempty" json:"-"`
+}
+
+// Seed 保存初始管理员 Secret 引用。
+type Seed struct {
+	AdminPasswordRef    SecretRef `yaml:"admin_password_ref" json:"admin_password_ref"`
+	LegacyAdminPassword *string   `yaml:"admin_password,omitempty" json:"-"`
+}
+
+// SecretReferences 为后续 MCP 与 Effect 调用预留同一 Resolver 的引用。
+type SecretReferences struct {
+	MCPHeader SecretRef `yaml:"mcp_header" json:"mcp_header"`
+	Effect    SecretRef `yaml:"effect" json:"effect"`
+}
+
+// SOAR 保存现有集成配置，其中 SMTP 密码只能是引用。
+type SOAR struct {
+	Integrations Integrations `yaml:"integrations" json:"integrations"`
+}
+
+// Integrations 保存现有通知集成配置。
+type Integrations struct {
+	Email Email `yaml:"email" json:"email"`
+}
+
+// Email 保存 SMTP 元数据和密码引用。
+type Email struct {
+	SMTPHost           string    `yaml:"smtp_host" json:"smtp_host"`
+	SMTPPort           string    `yaml:"smtp_port" json:"smtp_port"`
+	SMTPUser           string    `yaml:"smtp_user" json:"smtp_user"`
+	SMTPPasswordRef    SecretRef `yaml:"smtp_password_ref" json:"smtp_password_ref"`
+	LegacySMTPPassword *string   `yaml:"smtp_pass,omitempty" json:"-"`
+}
+
+// AgentRuntime 保存 durable Agent 的静态 Gate；P04 必须保持关闭。
+type AgentRuntime struct {
+	Enabled bool `yaml:"enabled" json:"enabled"`
+}
+
+// Provider 描述供应商实例的 Secret 引用与有限 Driver Endpoint。
+type Provider struct {
+	SecretRef    SecretRef         `yaml:"secret_ref" json:"secret_ref"`
+	Endpoints    map[string]string `yaml:"endpoints" json:"endpoints"`
+	LegacyAPIKey *string           `yaml:"api_key,omitempty" json:"-"`
 }
 
 type Model struct {
@@ -135,12 +210,57 @@ func Current() (*Config, error) {
 
 // Validate 校验 Provider、Model Catalog 和 Routing 之间的完整引用关系。
 func (c *Config) Validate() error {
+	environment := strings.TrimSpace(c.App.Environment)
+	if environment == "" {
+		return fmt.Errorf("app.environment is required")
+	} else if environment != "development" && environment != "production" && environment != "test" {
+		return fmt.Errorf("app.environment must be development, production, or test")
+	}
+	if c.Database.MySQL.LegacyDSN != nil {
+		return fmt.Errorf("database.mysql.dsn plaintext is forbidden; use dsn_ref")
+	}
+	if c.Auth.JWT.LegacySecret != nil {
+		return fmt.Errorf("auth.jwt.secret plaintext is forbidden; use secret_ref")
+	}
+	if c.Auth.Seed.LegacyAdminPassword != nil {
+		return fmt.Errorf("auth.seed.admin_password plaintext is forbidden; use admin_password_ref")
+	}
+	if c.SOAR.Integrations.Email.LegacySMTPPassword != nil {
+		return fmt.Errorf("soar.integrations.email.smtp_pass plaintext is forbidden; use smtp_password_ref")
+	}
+	for name, ref := range map[string]SecretRef{
+		"database.mysql.dsn_ref":                    c.Database.MySQL.DSNRef,
+		"auth.jwt.secret_ref":                       c.Auth.JWT.SecretRef,
+		"auth.seed.admin_password_ref":              c.Auth.Seed.AdminPasswordRef,
+		"soar.integrations.email.smtp_password_ref": c.SOAR.Integrations.Email.SMTPPasswordRef,
+		"secret_refs.mcp_header":                    c.Secrets.MCPHeader,
+		"secret_refs.effect":                        c.Secrets.Effect,
+	} {
+		if ref != "" {
+			if err := ref.Validate(); err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
+		}
+	}
 	if len(c.Providers) == 0 {
 		return fmt.Errorf("at least one provider is required")
 	}
-	for name := range c.Providers {
+	for name, provider := range c.Providers {
 		if strings.TrimSpace(name) == "" {
 			return fmt.Errorf("provider name is required")
+		}
+		if provider.LegacyAPIKey != nil {
+			return fmt.Errorf("provider %s api_key plaintext is forbidden; use secret_ref", name)
+		}
+		if err := provider.SecretRef.Validate(); err != nil {
+			return fmt.Errorf("provider %s secret_ref: %w", name, err)
+		}
+		for driver := range provider.Endpoints {
+			switch driver {
+			case DriverOpenAICompatibleChat, DriverOpenAICompatibleEmbedding, DriverDashScopeCompatibleRerank:
+			default:
+				return fmt.Errorf("provider %s uses unsupported endpoint driver %q", name, driver)
+			}
 		}
 	}
 	if len(c.ModelCatalog) == 0 {
@@ -158,30 +278,31 @@ func (c *Config) Validate() error {
 		if model.ModelID == "" {
 			return fmt.Errorf("model %s requires model_id", ref)
 		}
+		endpoint := strings.TrimSpace(provider.Endpoints[model.Driver])
 		switch model.Driver {
-		case "openai_compatible":
-			if strings.TrimSpace(provider.Endpoints.OpenAICompatible) == "" {
-				return fmt.Errorf("model %s driver openai_compatible requires provider %s endpoint openai_compatible", ref, providerName)
+		case DriverOpenAICompatibleChat:
+			if endpoint == "" {
+				return fmt.Errorf("model %s driver %s requires provider %s endpoint %s", ref, model.Driver, providerName, model.Driver)
 			}
 			if !hasCapability(model, "chat") || !hasCapability(model, "tool_calling") {
-				return fmt.Errorf("model %s openai_compatible driver requires chat and tool_calling capabilities", ref)
+				return fmt.Errorf("model %s %s driver requires chat and tool_calling capabilities", ref, model.Driver)
 			}
-		case "dashscope":
-			if strings.TrimSpace(provider.Endpoints.DashScope) == "" {
-				return fmt.Errorf("model %s driver dashscope requires provider %s endpoint dashscope", ref, providerName)
+		case DriverOpenAICompatibleEmbedding:
+			if endpoint == "" {
+				return fmt.Errorf("model %s driver %s requires provider %s endpoint %s", ref, model.Driver, providerName, model.Driver)
 			}
 			if !hasCapability(model, "embedding") {
-				return fmt.Errorf("model %s dashscope driver requires embedding capability", ref)
+				return fmt.Errorf("model %s %s driver requires embedding capability", ref, model.Driver)
 			}
 			if model.Dimension != 2048 {
 				return fmt.Errorf("model %s embedding dimension must be 2048", ref)
 			}
-		case "dashscope_rerank":
-			if strings.TrimSpace(provider.Endpoints.DashScopeRerank) == "" {
-				return fmt.Errorf("model %s driver dashscope_rerank requires provider %s endpoint dashscope_rerank", ref, providerName)
+		case DriverDashScopeCompatibleRerank:
+			if endpoint == "" {
+				return fmt.Errorf("model %s driver %s requires provider %s endpoint %s", ref, model.Driver, providerName, model.Driver)
 			}
 			if !hasCapability(model, "rerank") {
-				return fmt.Errorf("model %s dashscope_rerank driver requires rerank capability", ref)
+				return fmt.Errorf("model %s %s driver requires rerank capability", ref, model.Driver)
 			}
 		default:
 			return fmt.Errorf("model %s uses unsupported driver %q", ref, model.Driver)
@@ -222,8 +343,8 @@ func (c *Config) validateRoute(name string, route Route, capabilities ...string)
 }
 
 func providerFromRef(ref string) (string, error) {
-	provider, _, ok := strings.Cut(ref, "/")
-	if !ok || provider == "" {
+	provider, model, ok := strings.Cut(ref, "/")
+	if !ok || provider == "" || model == "" {
 		return "", fmt.Errorf("model reference %q must use provider/model format", ref)
 	}
 	return provider, nil

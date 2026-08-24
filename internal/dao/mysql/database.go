@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gogf/gf/v2/frame/g"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -21,14 +20,15 @@ var (
 	initErr  error
 )
 
-// Init 初始化 MySQL 连接并核对 goose Schema 版本；dsn 未配置时跳过。
-func Init(ctx context.Context) error {
+// InitWithDSN 初始化 MySQL 连接并核对 goose Schema 版本；调用方只在
+// Secret Resolver 的显式生命周期内提供 DSN。
+func InitWithDSN(ctx context.Context, dsn []byte) error {
 	dbOnce.Do(func() {
-		dsn, err := g.Cfg().Get(ctx, "database.mysql.dsn")
-		if err != nil || dsn.String() == "" {
-			return // 未配置则跳过，不阻塞启动
+		if len(dsn) == 0 {
+			initErr = fmt.Errorf("database DSN is empty")
+			return
 		}
-		db, err := openAndCheckSchema(ctx, dsn.String())
+		db, err := openAndCheckSchema(ctx, string(dsn))
 		if err != nil {
 			initErr = err
 			return
@@ -80,6 +80,9 @@ func openAndCheckSchema(ctx context.Context, rawDSN string) (*gorm.DB, error) {
 func DB(ctx context.Context) (*gorm.DB, error) {
 	if initErr != nil {
 		return nil, initErr
+	}
+	if globalDB == nil {
+		return nil, fmt.Errorf("database not initialized")
 	}
 	return globalDB.WithContext(ctx), nil
 }

@@ -24,8 +24,8 @@ func requireOnlineConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if provider.APIKey == "" {
-		t.Fatalf("provider referenced by %s has an empty api_key in config.local.yaml", route.Model)
+	if err := appconfig.UseSecret(context.Background(), provider.SecretRef, func([]byte) error { return nil }); err != nil {
+		t.Fatalf("provider referenced by %s has an unavailable secret reference", route.Model)
 	}
 }
 

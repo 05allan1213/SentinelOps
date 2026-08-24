@@ -41,7 +41,7 @@ func TestChatProfileUsesProviderSelectedByRouting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profile.APIKey != "provider-b-key" || profile.BaseURL != "https://provider-b.example/v1" || profile.Model != "provider-b-chat" {
+	if profile.SecretRef != "env:PROVIDER_B_KEY" || profile.BaseURL != "https://provider-b.example/v1" || profile.Model != "provider-b-chat" {
 		t.Fatalf("resolved profile = %#v, want provider_b configuration", profile)
 	}
 }
@@ -67,35 +67,35 @@ func TestChatProfileOmitsUnconfiguredThinkingOption(t *testing.T) {
 const appconfigTestConfig = `
 providers:
   provider_a:
-    api_key: test-key
+    secret_ref: env:PROVIDER_A_KEY
     endpoints:
-      openai_compatible: https://example.com/v1
-      dashscope: https://example.com/v1
-      dashscope_rerank: https://example.com/v1
+      openai_compatible_chat: https://example.com/v1
+      openai_compatible_embedding: https://example.com/v1
+      dashscope_compatible_rerank: https://example.com/v1
   provider_b:
-    api_key: provider-b-key
+    secret_ref: env:PROVIDER_B_KEY
     endpoints:
-      openai_compatible: https://provider-b.example/v1
+      openai_compatible_chat: https://provider-b.example/v1
 model_catalog:
   provider_a/chat:
     model_id: vendor-chat
-    driver: openai_compatible
+    driver: openai_compatible_chat
     capabilities: [chat, tool_calling]
     pricing: {currency: CNY, unit: per_million_tokens, input: 12, cached_input: 2.4, output: 36}
   provider_b/chat:
     model_id: provider-b-chat
-    driver: openai_compatible
+    driver: openai_compatible_chat
     capabilities: [chat, tool_calling]
     pricing: {currency: CNY, unit: per_million_tokens, input: 1, output: 2}
   provider_a/embed:
     model_id: vendor-embed
-    driver: dashscope
+    driver: openai_compatible_embedding
     capabilities: [embedding]
     dimension: 2048
     pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
   provider_a/rerank:
     model_id: vendor-rerank
-    driver: dashscope_rerank
+    driver: dashscope_compatible_rerank
     capabilities: [rerank]
     pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
 routing:

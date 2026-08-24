@@ -20,6 +20,7 @@ bin
 .runtime/
 .artifacts/implementation/
 manifest/config/config.local.yaml
+manifest/config/.secrets/
 
 # vendor（Docker 构建前本地执行 go mod vendor 生成）
 vendor/

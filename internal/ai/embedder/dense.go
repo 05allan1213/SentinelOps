@@ -43,20 +43,25 @@ func NewDenseEmbedder(ctx context.Context) (embedding.Embedder, error) {
 	if err != nil {
 		return nil, err
 	}
-	if model.Driver != "dashscope" {
-		return nil, fmt.Errorf("routing.embedding.default uses driver %s, want dashscope", model.Driver)
+	if model.Driver != appconfig.DriverOpenAICompatibleEmbedding {
+		return nil, fmt.Errorf("routing.embedding.default uses driver %s, want %s", model.Driver, appconfig.DriverOpenAICompatibleEmbedding)
 	}
 	if model.Dimension != milvus.EmbeddingDim {
 		return nil, fmt.Errorf("embedding dimension %d does not match Milvus dimension %d", model.Dimension, milvus.EmbeddingDim)
 	}
 	// 当前 Driver 使用 OpenAI-compatible Embedding 协议；供应商、端点和模型均由
 	// provider/model 路由决定，适配层不绑定某个云厂商。
-	inner, err := openaiacl.NewEmbeddingClient(ctx, &openaiacl.EmbeddingConfig{
-		BaseURL:    provider.Endpoints.DashScope,
-		APIKey:     provider.APIKey,
-		HTTPClient: http.DefaultClient,
-		Model:      model.ModelID,
-		Dimensions: &model.Dimension,
+	var inner embedding.Embedder
+	err = appconfig.UseSecret(ctx, provider.SecretRef, func(secret []byte) error {
+		created, createErr := openaiacl.NewEmbeddingClient(ctx, &openaiacl.EmbeddingConfig{
+			BaseURL:    provider.Endpoints[model.Driver],
+			APIKey:     string(secret),
+			HTTPClient: http.DefaultClient,
+			Model:      model.ModelID,
+			Dimensions: &model.Dimension,
+		})
+		inner = created
+		return createErr
 	})
 	if err != nil {
 		return nil, err

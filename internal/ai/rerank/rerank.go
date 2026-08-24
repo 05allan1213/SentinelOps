@@ -46,7 +46,7 @@ type Client struct {
 	instruct string
 }
 
-func clientFromConfig(cfg *appconfig.Config) (*Client, error) {
+func clientFromConfig(ctx context.Context, cfg *appconfig.Config) (*Client, error) {
 	route, ok := cfg.Routing.Rerank["default"]
 	if !ok {
 		return nil, fmt.Errorf("routing.rerank.default is not configured")
@@ -55,16 +55,21 @@ func clientFromConfig(cfg *appconfig.Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	if model.Driver != "dashscope_rerank" {
-		return nil, fmt.Errorf("routing.rerank.default uses driver %s, want dashscope_rerank", model.Driver)
+	if model.Driver != appconfig.DriverDashScopeCompatibleRerank {
+		return nil, fmt.Errorf("routing.rerank.default uses driver %s, want %s", model.Driver, appconfig.DriverDashScopeCompatibleRerank)
 	}
 	// Provider、端点和厂商模型 ID 均由当前路由解析，客户端不保存固定供应商名称。
-	return &Client{
-		apiKey:   provider.APIKey,
-		baseURL:  provider.Endpoints.DashScopeRerank,
-		model:    model.ModelID,
-		instruct: route.Options.Instruct,
-	}, nil
+	var client *Client
+	err = appconfig.UseSecret(ctx, provider.SecretRef, func(secret []byte) error {
+		client = &Client{
+			apiKey:   string(secret),
+			baseURL:  provider.Endpoints[model.Driver],
+			model:    model.ModelID,
+			instruct: route.Options.Instruct,
+		}
+		return nil
+	})
+	return client, err
 }
 
 // GetClient 根据 routing.rerank.default 延迟初始化全局客户端。
@@ -75,7 +80,7 @@ func GetClient(ctx context.Context) (*Client, error) {
 			rerankInitErr = err
 			return
 		}
-		client, err := clientFromConfig(cfg)
+		client, err := clientFromConfig(ctx, cfg)
 		if err != nil {
 			rerankInitErr = err
 			return

@@ -1,3 +1,6 @@
+app:
+  environment: "production"
+
 server:
   address: ":8001"
   openapiPath: "/api.json"
@@ -11,14 +14,14 @@ logger:
 
 # 模型访问分为 Provider -> Model Catalog -> Routing 三层。下方百炼配置只是当前
 # 开发示例；业务代码按 provider/model 引用动态解析，不绑定固定供应商。
-# 本文件必须保留空 Key，容器部署时通过私有完整配置提供凭据。
+# 本文件只保存 Secret 引用，容器通过环境变量即时注入解析值。
 providers:
   aliyun_bailian:
-    api_key: ""
+    secret_ref: "env:SENTINELOPS_MODEL_API_KEY"
     endpoints:
-      openai_compatible: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      dashscope: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      dashscope_rerank: "https://dashscope.aliyuncs.com/compatible-api/v1"
+      openai_compatible_chat: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      openai_compatible_embedding: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      dashscope_compatible_rerank: "https://dashscope.aliyuncs.com/compatible-api/v1"
 
 # 价格：中国内地（北京）地域，人民币/百万 Token，仅按付费价估算。
 # 来源：https://help.aliyun.com/zh/model-studio/model-pricing
@@ -26,18 +29,18 @@ providers:
 model_catalog:
   aliyun_bailian/qwen3.7-max-2026-06-08:
     model_id: "qwen3.7-max-2026-06-08"
-    driver: "openai_compatible"
+    driver: "openai_compatible_chat"
     capabilities: ["chat", "tool_calling"]
     pricing: {currency: "CNY", unit: "per_million_tokens", input: 12, cached_input: 2.4, output: 36}
   aliyun_bailian/qwen3.7-text-embedding:
     model_id: "qwen3.7-text-embedding"
-    driver: "dashscope"
+    driver: "openai_compatible_embedding"
     capabilities: ["embedding"]
     dimension: 2048
     pricing: {currency: "CNY", unit: "per_million_tokens", input: 0.5}
   aliyun_bailian/qwen3-rerank:
     model_id: "qwen3-rerank"
-    driver: "dashscope_rerank"
+    driver: "dashscope_compatible_rerank"
     capabilities: ["rerank"]
     pricing: {currency: "CNY", unit: "per_million_tokens", input: 0.5}
 
@@ -94,16 +97,23 @@ retriever:
 
 database:
   mysql:
-    dsn: "root:sentinel123@tcp(mysql:3306)/sentinelops?charset=utf8mb4&parseTime=True"
+    dsn_ref: "env:SENTINELOPS_MYSQL_DSN"
 
 # 认证
 auth:
   jwt:
     enabled: true
-    secret: "change-me-in-production"
+    secret_ref: "env:SENTINELOPS_JWT_SECRET"
     expire_hours: 24
   seed:
-    admin_password: "admin123"
+    admin_password_ref: "env:SENTINELOPS_ADMIN_PASSWORD"
+
+secret_refs:
+  mcp_header: ""
+  effect: ""
+
+agent_runtime:
+  enabled: false
 
 # 后台调度器
 scheduler:
@@ -166,7 +176,7 @@ soar:
       smtp_host: ""
       smtp_port: ""
       smtp_user: ""
-      smtp_pass: ""
+      smtp_password_ref: "env:SENTINELOPS_SMTP_PASSWORD"
 
   ai_ops:
     notify_channel: "email"

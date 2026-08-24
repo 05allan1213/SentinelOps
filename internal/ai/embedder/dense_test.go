@@ -18,6 +18,7 @@ type fakeEmbedder struct {
 }
 
 func TestDenseEmbedderUsesEndpointSelectedByRouting(t *testing.T) {
+	t.Setenv("TEST_EMBEDDING_KEY", "provider-key")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/embeddings" {
 			t.Errorf("request path = %q, want /embeddings", r.URL.Path)
@@ -40,13 +41,13 @@ func TestDenseEmbedderUsesEndpointSelectedByRouting(t *testing.T) {
 	cfg, err := appconfig.Parse([]byte(`
 providers:
   provider_custom:
-    api_key: provider-key
+    secret_ref: env:TEST_EMBEDDING_KEY
     endpoints:
-      dashscope: ` + server.URL + `
+      openai_compatible_embedding: ` + server.URL + `
 model_catalog:
   provider_custom/embedding:
     model_id: configured-embedding
-    driver: dashscope
+    driver: openai_compatible_embedding
     capabilities: [embedding]
     dimension: 2048
     pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}

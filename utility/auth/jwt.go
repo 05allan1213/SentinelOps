@@ -21,11 +21,13 @@ type Claims struct {
 }
 
 // Init 初始化 JWT 密钥
-func Init(secret string) {
-	if secret == "" {
-		secret = "sentinelops-default-secret-change-in-prod"
+func Init(secret []byte) error {
+	if len(secret) == 0 {
+		return errors.New("JWT secret is empty")
 	}
-	jwtSecret = []byte(secret)
+	clear(jwtSecret)
+	jwtSecret = append(jwtSecret[:0], secret...)
+	return nil
 }
 
 // Generate 生成 JWT

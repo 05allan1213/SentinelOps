@@ -103,9 +103,9 @@ SentinelOps 是面向企业安全运营的智能研判平台，基于多 Agent �
 │ Nginx 网关 (:80)                                                    │
 │ 路由分发:                                                            │
 │         /      -> frontend:80                                       │
-│         /api   -> backend:8001                                      │
-│         /swagger -> backend:8001/swagger                            │
-│         /api/chat -> backend:8001（SSE 直通）                        │ 
+│         /api   -> api:8001                                          │
+│         /swagger -> api:8001/swagger                                │
+│         /api/chat -> api:8001（SSE 直通）                            │
 │ 安全能力: include 黑名单文件 · deny IP · reload 热更新                │
 └────────────────────────────────┬────────────────────────────────────┘
                                  ▼
@@ -901,8 +901,12 @@ docker compose -f manifest/docker/docker-compose.dev.yml up -d
 cp manifest/config/config.yaml manifest/config/config.local.yaml
 ```
 
-`config.local.yaml` 是完整配置替代文件，不会与 `config.yaml` 合并。只在本地文件中填写
-当前 Routing 所引用 Provider 的 `api_key`；该文件已被 Git 忽略，禁止打印、回传或提交密钥。
+`config.local.yaml` 是完整配置替代文件，不会与 `config.yaml` 合并。配置只保存
+`env:` / `file:` Secret 引用；解析后的值不得写入配置、日志或持久化对象。该文件和
+`manifest/config/.secrets/` 均被 Git 忽略，禁止打印、回传或提交 Secret。
+
+开发环境默认运行 `all`；也可显式运行 `go run . api` 或 `go run . worker`。生产配置只允许
+`api` / `worker`，并要求数据库、JWT、初始管理员和当前 Provider 的环境 Secret 非空且不是默认值。
 
 模型配置采用 Provider → Model Catalog → Routing 三层结构。仓库内的
 `aliyun_bailian` 是当前开发示例，并非代码固定值：

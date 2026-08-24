@@ -4,34 +4,38 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 
-	"github.com/gogf/gf/v2/frame/g"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// SeedAdmin 若用户表为空，创建默认 admin 用户。密码从 auth.seed.admin_password 读取，缺省为 admin123
-func SeedAdmin(ctx context.Context) {
+// SeedAdmin 若用户表为空，使用 Resolver 临时提供的密码创建初始 admin。
+func SeedAdmin(ctx context.Context, password []byte) error {
 	db, err := DB(ctx)
 	if err != nil {
-		return
+		return err
 	}
 	var count int64
-	if db.Model(&User{}).Count(&count).Error != nil || count > 0 {
-		return
+	if err := db.Model(&User{}).Count(&count).Error; err != nil {
+		return err
 	}
-	pass, _ := g.Cfg().Get(ctx, "auth.seed.admin_password")
-	password := "admin123"
-	if pass != nil && pass.String() != "" {
-		password = pass.String()
+	if count > 0 {
+		return nil
 	}
-	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	db.Create(&User{
+	if len(password) == 0 {
+		return fmt.Errorf("admin password is empty")
+	}
+	hash, err := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return db.Create(&User{
 		ID:       uuid.New().String(),
 		Username: "admin",
 		Password: string(hash),
 		Role:     "admin",
-	})
+	}).Error
 }
 
 // SeedSettings 初始化默认设置项，仅在 key 不存在（值为空）时写入，不覆盖用户已修改的值。

@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	appconfig "SentinelOps/internal/config"
+
 	"github.com/gogf/gf/v2/frame/g"
 )
 
@@ -100,9 +102,8 @@ func (a *EmailAction) Execute(ctx context.Context, params map[string]string) (Ac
 	if user == "" {
 		user = g.Cfg().MustGet(ctx, "soar.integrations.email.smtp_user").String()
 	}
-	pass := params["smtp_pass"]
-	if pass == "" {
-		pass = g.Cfg().MustGet(ctx, "soar.integrations.email.smtp_pass").String()
+	if params["smtp_pass"] != "" {
+		return ActionResult{}, fmt.Errorf("notify_email: smtp_pass 明文参数被拒绝，请使用系统 Secret 引用")
 	}
 	// 收件人强制使用系统配置，忽略 Agent 传入的值（防止 Agent 编造地址）
 	to := g.Cfg().MustGet(ctx, "soar.ai_ops.notify_email_to").String()
@@ -212,8 +213,18 @@ func (a *EmailAction) Execute(ctx context.Context, params map[string]string) (Ac
 		htmlBody,
 	}, "\r\n")
 
-	auth := smtp.PlainAuth("", user, pass, host)
-	if err := smtp.SendMail(host+":"+port, auth, user, toList, []byte(msg)); err != nil {
+	cfg, err := appconfig.Current()
+	if err != nil {
+		return ActionResult{}, fmt.Errorf("notify_email: %w", err)
+	}
+	passwordRef := cfg.SOAR.Integrations.Email.SMTPPasswordRef
+	if passwordRef == "" {
+		return ActionResult{}, fmt.Errorf("notify_email: SMTP password Secret 引用未配置")
+	}
+	if err := appconfig.UseSecret(ctx, passwordRef, func(password []byte) error {
+		auth := smtp.PlainAuth("", user, string(password), host)
+		return smtp.SendMail(host+":"+port, auth, user, toList, []byte(msg))
+	}); err != nil {
 		return ActionResult{}, fmt.Errorf("notify_email: %w", err)
 	}
 	return ActionResult{Success: true, Message: "邮件已发送至 " + to, Output: map[string]string{"sent": "true", "to": to}}, nil

@@ -8,17 +8,19 @@ import (
 )
 
 const validConfig = `
+app:
+  environment: test
 providers:
   provider_a:
-    api_key: ""
+    secret_ref: env:PROVIDER_A_KEY
     endpoints:
-      openai_compatible: https://chat.example/v1
-      dashscope: https://embedding.example/v1
-      dashscope_rerank: https://rerank.example/v1
+      openai_compatible_chat: https://chat.example/v1
+      openai_compatible_embedding: https://embedding.example/v1
+      dashscope_compatible_rerank: https://rerank.example/v1
 model_catalog:
   provider_a/chat-model:
     model_id: chat-model
-    driver: openai_compatible
+    driver: openai_compatible_chat
     capabilities: [chat, tool_calling]
     pricing:
       currency: CNY
@@ -28,13 +30,13 @@ model_catalog:
       output: 36
   provider_a/embedding-model:
     model_id: embedding-model
-    driver: dashscope
+    driver: openai_compatible_embedding
     capabilities: [embedding]
     dimension: 2048
     pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
   provider_a/rerank-model:
     model_id: rerank-model
-    driver: dashscope_rerank
+    driver: dashscope_compatible_rerank
     capabilities: [rerank]
     pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
 routing:
@@ -105,6 +107,11 @@ func TestValidateRejectsInvalidModelContracts(t *testing.T) {
 			m.Driver = "mystery"
 			c.ModelCatalog["provider_a/chat-model"] = m
 		}, "driver"},
+		{"unknown endpoint driver", func(c *Config) {
+			p := c.Providers["provider_a"]
+			p.Endpoints["provider_specific"] = "https://provider.example/v1"
+			c.Providers["provider_a"] = p
+		}, "endpoint driver"},
 		{"missing capability", func(c *Config) {
 			m := c.ModelCatalog["provider_a/chat-model"]
 			m.Capabilities = []string{"chat"}
@@ -122,19 +129,19 @@ func TestValidateRejectsInvalidModelContracts(t *testing.T) {
 		}, "routing"},
 		{"missing chat endpoint", func(c *Config) {
 			p := c.Providers["provider_a"]
-			p.Endpoints.OpenAICompatible = ""
+			p.Endpoints[DriverOpenAICompatibleChat] = ""
 			c.Providers["provider_a"] = p
-		}, "openai_compatible"},
+		}, DriverOpenAICompatibleChat},
 		{"missing embedding endpoint", func(c *Config) {
 			p := c.Providers["provider_a"]
-			p.Endpoints.DashScope = ""
+			p.Endpoints[DriverOpenAICompatibleEmbedding] = ""
 			c.Providers["provider_a"] = p
-		}, "dashscope"},
+		}, DriverOpenAICompatibleEmbedding},
 		{"missing rerank endpoint", func(c *Config) {
 			p := c.Providers["provider_a"]
-			p.Endpoints.DashScopeRerank = ""
+			p.Endpoints[DriverDashScopeCompatibleRerank] = ""
 			c.Providers["provider_a"] = p
-		}, "dashscope_rerank"},
+		}, DriverDashScopeCompatibleRerank},
 	}
 
 	for _, tt := range tests {
@@ -158,14 +165,12 @@ func TestResolveUsesProviderNamedByModelReference(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.Providers["provider_b"] = Provider{
-		APIKey: "provider-b-key",
-		Endpoints: Endpoints{
-			OpenAICompatible: "https://provider-b.example/v1",
-		},
+		SecretRef: "env:PROVIDER_B_KEY",
+		Endpoints: map[string]string{DriverOpenAICompatibleChat: "https://provider-b.example/v1"},
 	}
 	cfg.ModelCatalog["provider_b/chat-model"] = Model{
 		ModelID:      "provider-b-chat",
-		Driver:       "openai_compatible",
+		Driver:       DriverOpenAICompatibleChat,
 		Capabilities: []string{"chat", "tool_calling"},
 		Pricing:      Pricing{Currency: "CNY", Unit: "per_million_tokens", Input: 1, Output: 2},
 	}
@@ -177,7 +182,7 @@ func TestResolveUsesProviderNamedByModelReference(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if provider.APIKey != "provider-b-key" || provider.Endpoints.OpenAICompatible != "https://provider-b.example/v1" {
+	if provider.SecretRef != "env:PROVIDER_B_KEY" || provider.Endpoints[DriverOpenAICompatibleChat] != "https://provider-b.example/v1" {
 		t.Fatalf("resolved provider = %#v, want provider_b configuration", provider)
 	}
 	if model.ModelID != "provider-b-chat" {
@@ -191,11 +196,12 @@ func TestValidateRequiresOnlyEndpointsUsedByEachProvider(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.Providers["chat_only"] = Provider{
-		Endpoints: Endpoints{OpenAICompatible: "https://chat-only.example/v1"},
+		SecretRef: "env:CHAT_ONLY_KEY",
+		Endpoints: map[string]string{DriverOpenAICompatibleChat: "https://chat-only.example/v1"},
 	}
 	cfg.ModelCatalog["chat_only/chat-model"] = Model{
 		ModelID:      "chat-only-model",
-		Driver:       "openai_compatible",
+		Driver:       DriverOpenAICompatibleChat,
 		Capabilities: []string{"chat", "tool_calling"},
 		Pricing:      Pricing{Currency: "CNY", Unit: "per_million_tokens"},
 	}
@@ -207,10 +213,10 @@ func TestValidateRequiresOnlyEndpointsUsedByEachProvider(t *testing.T) {
 		t.Fatalf("chat-only provider rejected: %v", err)
 	}
 	provider := cfg.Providers["chat_only"]
-	provider.Endpoints.OpenAICompatible = ""
+	provider.Endpoints[DriverOpenAICompatibleChat] = ""
 	cfg.Providers["chat_only"] = provider
-	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "openai_compatible") {
-		t.Fatalf("Validate() error = %v, want missing openai_compatible endpoint", err)
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), DriverOpenAICompatibleChat) {
+		t.Fatalf("Validate() error = %v, want missing chat endpoint", err)
 	}
 }
 
@@ -227,6 +233,9 @@ func TestTrackedConfigurationsAreCompleteAndValid(t *testing.T) {
 			}
 			if err := cfg.Validate(); err != nil {
 				t.Fatal(err)
+			}
+			if cfg.AgentRuntime.Enabled {
+				t.Fatal("durable Agent gate must remain disabled in tracked configurations")
 			}
 		})
 	}

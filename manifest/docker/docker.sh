@@ -4,8 +4,9 @@ set -e
 
 cd "$(dirname "$0")"
 
-BACKEND_CONTAINER="sentinelops-backend"
-BACKEND_SERVICE="backend"
+API_CONTAINER="sentinelops-api"
+API_SERVICE="api"
+WORKER_SERVICE="worker"
 FRONTEND_SERVICE="frontend"
 NGINX_SERVICE="nginx"
 HEALTH_URL="http://localhost:8001/api.json"
@@ -27,22 +28,24 @@ echo "==> 构建最新前端代码..."
 echo "==> 启动基础设施容器..."
 docker compose up -d etcd minio standalone attu redis mysql
 
-echo "==> 构建最新 backend/frontend 镜像..."
-docker compose build backend frontend
+echo "==> 构建最新 api/worker/frontend 镜像..."
+docker compose build api worker frontend
 
-echo "==> 更新 backend/frontend 容器..."
-docker compose up -d backend frontend
+echo "==> 更新 api/worker/frontend 容器..."
+docker compose up -d api worker frontend
 
 echo "==> 更新 nginx 容器..."
 docker compose up -d nginx
 
-echo "==> 等待 backend 就绪（最长 ${MAX_WAIT_SECONDS} 秒）..."
-while ! docker exec "$BACKEND_CONTAINER" wget -qO- "$HEALTH_URL" > /dev/null 2>&1; do
+echo "==> 等待 API 就绪（最长 ${MAX_WAIT_SECONDS} 秒）..."
+while ! docker exec "$API_CONTAINER" wget -qO- "$HEALTH_URL" > /dev/null 2>&1; do
   if [ "$ELAPSED" -ge "$MAX_WAIT_SECONDS" ]; then
-    echo "==> backend 启动超时，输出诊断信息..."
+    echo "==> API 启动超时，输出诊断信息..."
     docker compose ps || true
-    echo "\n==> backend 服务日志："
-    docker compose logs "$BACKEND_SERVICE" || true
+    echo "\n==> API 服务日志："
+    docker compose logs "$API_SERVICE" || true
+    echo "\n==> Worker 服务日志："
+    docker compose logs "$WORKER_SERVICE" || true
     echo "\n==> frontend 服务日志："
     docker compose logs "$FRONTEND_SERVICE" || true
     echo "\n==> nginx 服务日志："

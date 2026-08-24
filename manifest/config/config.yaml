@@ -1,3 +1,6 @@
+app:
+  environment: "development"
+
 server:
   address: ":8001"
   openapiPath: "/api.json"
@@ -11,14 +14,14 @@ logger:
 
 # 模型访问分为 Provider -> Model Catalog -> Routing 三层。下方百炼配置只是当前
 # 开发示例；业务代码按 provider/model 引用动态解析，不绑定固定供应商。
-# 本文件必须保留空 Key，请复制为 config.local.yaml 后仅在本地填写。
+# 本文件只保存 Secret 引用；开发环境可在被忽略的完整 local 配置中改用 file 引用。
 providers:
   aliyun_bailian:
-    api_key: ""
+    secret_ref: "env:SENTINELOPS_MODEL_API_KEY"
     endpoints:
-      openai_compatible: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      dashscope: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      dashscope_rerank: "https://dashscope.aliyuncs.com/compatible-api/v1"
+      openai_compatible_chat: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      openai_compatible_embedding: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      dashscope_compatible_rerank: "https://dashscope.aliyuncs.com/compatible-api/v1"
 
 # 价格：中国内地（北京）地域，人民币/百万 Token，仅按付费价估算。
 # 来源：https://help.aliyun.com/zh/model-studio/model-pricing
@@ -26,7 +29,7 @@ providers:
 model_catalog:
   aliyun_bailian/qwen3.7-max-2026-06-08:
     model_id: "qwen3.7-max-2026-06-08"
-    driver: "openai_compatible"
+    driver: "openai_compatible_chat"
     capabilities: ["chat", "tool_calling"]
     pricing:
       currency: "CNY"
@@ -36,7 +39,7 @@ model_catalog:
       output: 36
   aliyun_bailian/qwen3.7-text-embedding:
     model_id: "qwen3.7-text-embedding"
-    driver: "dashscope"
+    driver: "openai_compatible_embedding"
     capabilities: ["embedding"]
     dimension: 2048
     pricing:
@@ -45,7 +48,7 @@ model_catalog:
       input: 0.5
   aliyun_bailian/qwen3-rerank:
     model_id: "qwen3-rerank"
-    driver: "dashscope_rerank"
+    driver: "dashscope_compatible_rerank"
     capabilities: ["rerank"]
     pricing:
       currency: "CNY"
@@ -112,16 +115,24 @@ retriever:
 
 database:
   mysql:
-    dsn: "root:sentinel123@tcp(127.0.0.1:3307)/sentinelops?charset=utf8mb4&parseTime=True"
+    dsn_ref: "env:SENTINELOPS_MYSQL_DSN"
 
 # 认证
 auth:
   jwt:
     enabled: true                     # 生产环境建议设为 true
-    secret: "change-me-in-production" # 生产环境务必替换为强随机字符串
+    secret_ref: "env:SENTINELOPS_JWT_SECRET"
     expire_hours: 24
   seed:
-    admin_password: "admin123"        # 首次初始化的管理员密码，生产环境务必修改
+    admin_password_ref: "env:SENTINELOPS_ADMIN_PASSWORD"
+
+# 后续 MCP、SMTP 与 Effect 调用只消费同一 Resolver 的引用。
+secret_refs:
+  mcp_header: ""
+  effect: ""
+
+agent_runtime:
+  enabled: false
 
 # 后台调度器
 scheduler:
@@ -191,7 +202,7 @@ soar:
       smtp_host: ""         # SMTP 服务器地址
       smtp_port: ""                 # SMTP 端口
       smtp_user: ""    # 发件人邮箱
-      smtp_pass: ""    # QQ邮箱授权码
+      smtp_password_ref: "env:SENTINELOPS_SMTP_PASSWORD"
 
   # AI 运维配置：控制 AI 规划时可使用的动作和通知渠道
   ai_ops:

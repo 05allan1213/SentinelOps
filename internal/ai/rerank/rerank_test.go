@@ -13,22 +13,24 @@ import (
 )
 
 func TestClientUsesProviderSelectedByRouting(t *testing.T) {
+	t.Setenv("TEST_RERANK_A", "key-a")
+	t.Setenv("TEST_RERANK_B", "key-b")
 	cfg, err := appconfig.Parse([]byte(`
 providers:
   provider_a:
-    api_key: key-a
-    endpoints: {dashscope_rerank: https://provider-a.example/v1}
+    secret_ref: env:TEST_RERANK_A
+    endpoints: {dashscope_compatible_rerank: https://provider-a.example/v1}
   provider_b:
-    api_key: key-b
-    endpoints: {dashscope_rerank: https://provider-b.example/v1}
+    secret_ref: env:TEST_RERANK_B
+    endpoints: {dashscope_compatible_rerank: https://provider-b.example/v1}
 model_catalog:
   provider_a/rerank:
     model_id: model-a
-    driver: dashscope_rerank
+    driver: dashscope_compatible_rerank
     capabilities: [rerank]
   provider_b/rerank:
     model_id: model-b
-    driver: dashscope_rerank
+    driver: dashscope_compatible_rerank
     capabilities: [rerank]
 routing:
   rerank:
@@ -39,7 +41,7 @@ routing:
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, err := clientFromConfig(cfg)
+	client, err := clientFromConfig(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
