@@ -25,7 +25,8 @@ type WorkflowRunInput struct {
 	StartedAt    time.Time
 }
 
-// Store 定义工作流运行、事件流和检查点的持久化能力。
+// Store 定义旧 Runtime 兼容路径的工作流持久化能力。
+// durable_v1 必须调用 GORMStore 上的原子 primitive，不能经此接口完成 Run。
 type Store interface {
 	CreateRun(ctx context.Context, input WorkflowRunInput) (*mysql.WorkflowRun, error)
 	AppendEvent(ctx context.Context, event StreamEvent) error
@@ -77,7 +78,7 @@ func UnmarshalCheckpointSnapshot(payload string) (CheckpointSnapshot, error) {
 	return snapshot, nil
 }
 
-// CreateRun 创建一条工作流运行记录。
+// CreateRun 创建一条 legacy 工作流运行记录；durable_v1 使用 CreateRunWithSessionLock。
 func (s *GORMStore) CreateRun(ctx context.Context, input WorkflowRunInput) (*mysql.WorkflowRun, error) {
 	if err := policy.Authorize(ctx, policy.PermissionCreateReadOnlyRun, policy.Resource{}); err != nil {
 		return nil, err
@@ -111,9 +112,12 @@ func (s *GORMStore) CreateRun(ctx context.Context, input WorkflowRunInput) (*mys
 	return run, nil
 }
 
-// AppendEvent 追加工作流事件；run_id + seq 重复时视为成功，避免断线重放重复报错。
+// AppendEvent 追加 legacy 工作流事件；durable_v1 的 Event 必须与 Run CAS 同事务。
 func (s *GORMStore) AppendEvent(ctx context.Context, event StreamEvent) error {
 	if err := s.authorizeRunScope(ctx, event.RunID); err != nil {
+		return err
+	}
+	if err := s.rejectDurableLegacyWrite(ctx, event.RunID); err != nil {
 		return err
 	}
 	payload, err := marshalEventPayload(event.Payload)
@@ -222,9 +226,12 @@ func (s *GORMStore) LatestCheckpoint(ctx context.Context, runID, checkpointKey s
 	return snapshot, nil
 }
 
-// FinishRun 更新工作流运行结束状态、输出、错误信息与结束时间。
+// FinishRun 更新 legacy 工作流结束状态；durable_v1 只能经 CompleteRunAndCommitSession。
 func (s *GORMStore) FinishRun(ctx context.Context, runID, status, outputPayload, errorMessage string) error {
 	if err := s.authorizeRunScope(ctx, runID); err != nil {
+		return err
+	}
+	if err := s.rejectDurableLegacyWrite(ctx, runID); err != nil {
 		return err
 	}
 	now := time.Now()
@@ -240,8 +247,22 @@ func (s *GORMStore) FinishRun(ctx context.Context, runID, status, outputPayload,
 		updates["duration_ms"] = now.Sub(run.StartedAt).Milliseconds()
 	}
 
-	if err := s.db.WithContext(ctx).Model(&mysql.WorkflowRun{}).Where("id = ?", runID).Updates(updates).Error; err != nil {
+	if err := s.db.WithContext(ctx).Model(&mysql.WorkflowRun{}).
+		Where("id = ? AND runtime_mode <> ?", runID, RuntimeModeDurableV1).
+		Updates(updates).Error; err != nil {
 		return fmt.Errorf("完成工作流运行记录: %w", err)
+	}
+	return nil
+}
+
+func (s *GORMStore) rejectDurableLegacyWrite(ctx context.Context, runID string) error {
+	var runtimeMode string
+	if err := s.db.WithContext(ctx).Model(&mysql.WorkflowRun{}).
+		Where("id = ?", runID).Pluck("runtime_mode", &runtimeMode).Error; err != nil {
+		return fmt.Errorf("查询 workflow Run runtime mode: %w", err)
+	}
+	if runtimeMode == RuntimeModeDurableV1 {
+		return ErrDurablePrimitiveRequired
 	}
 	return nil
 }

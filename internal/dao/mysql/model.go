@@ -320,12 +320,17 @@ type WorkflowRun struct {
 	WorkflowKey              string         `gorm:"column:workflow_key;size:128;not null;index"`
 	UserID                   string         `gorm:"column:user_id;size:64;index"`
 	SessionID                string         `gorm:"column:session_id;size:64;index"`
+	ParentRunID              string         `gorm:"column:parent_run_id;size:64"`
 	ActiveSessionKey         *string        `gorm:"column:active_session_key;size:64;uniqueIndex:uidx_workflow_runs_active_session"`
 	Status                   string         `gorm:"column:status;size:32;default:running;index"`
 	RuntimeMode              string         `gorm:"column:runtime_mode;size:32;not null;default:legacy"`
 	ImmutableInputJSON       *string        `gorm:"column:immutable_input_json;type:json"`
+	QueryText                string         `gorm:"column:query_text;type:longtext"`
+	ContextSnapshotJSON      *string        `gorm:"column:context_snapshot_json;type:json"`
+	SessionRevision          *uint64        `gorm:"column:session_revision"`
 	RuntimeVersion           *string        `gorm:"column:runtime_version;size:128"`
 	RuntimeCompatibilityHash *string        `gorm:"column:runtime_compatibility_hash;type:char(64)"`
+	TraceQuality             string         `gorm:"column:trace_quality;size:32;not null;default:unknown"`
 	LastEventSeq             uint64         `gorm:"column:last_event_seq;not null;default:0"`
 	ParkReason               *string        `gorm:"column:park_reason;size:128"`
 	InputPayload             string         `gorm:"column:input_payload;type:text"`
@@ -349,6 +354,7 @@ type WorkflowEvent struct {
 	EventType      string    `gorm:"column:event_type;size:64;not null;index"`
 	Payload        string    `gorm:"column:payload;type:text"`
 	PayloadVersion uint      `gorm:"column:payload_version;not null;default:1"`
+	TraceID        string    `gorm:"column:trace_id;size:64"`
 	CreatedAt      time.Time `gorm:"column:created_at;autoCreateTime"`
 }
 
