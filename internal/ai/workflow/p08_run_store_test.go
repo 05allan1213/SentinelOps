@@ -149,6 +149,7 @@ func TestTransitionRunWithEventIsAtomic(t *testing.T) {
 		RunID:          run.ID,
 		ExpectedStatus: RunStatusPending,
 		TargetStatus:   RunStatusRunning,
+		Lease:          p08CurrentLease(t, db, run.ID),
 		Event: WorkflowEventInput{
 			Type:    EventRunClaimed,
 			Payload: EventPayload{Attributes: map[string]any{"source": "test"}},
@@ -170,10 +171,11 @@ func TestTransitionRunWithEventIsAtomic(t *testing.T) {
 func TestEventSequenceAllocatedByDatabase(t *testing.T) {
 	db := newP07Database(t, "p08_event_sequence")
 	store, ctx, run := p08CreateRun(t, db, "sequence")
+	lease := p08CurrentLease(t, db, run.ID)
 	transitions := []RunTransition{
-		{RunID: run.ID, ExpectedStatus: RunStatusPending, TargetStatus: RunStatusRunning, Event: WorkflowEventInput{Type: EventRunClaimed}},
-		{RunID: run.ID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusWaitingApproval, Event: WorkflowEventInput{Type: EventApprovalRequested}},
-		{RunID: run.ID, ExpectedStatus: RunStatusWaitingApproval, TargetStatus: RunStatusPending, Intent: TransitionIntentApprovalDecided, Event: WorkflowEventInput{Type: EventApprovalDecided}},
+		{RunID: run.ID, ExpectedStatus: RunStatusPending, TargetStatus: RunStatusRunning, Lease: lease, Event: WorkflowEventInput{Type: EventRunClaimed}},
+		{RunID: run.ID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusWaitingApproval, Lease: lease, Event: WorkflowEventInput{Type: EventApprovalRequested}},
+		{RunID: run.ID, ExpectedStatus: RunStatusWaitingApproval, TargetStatus: RunStatusPending, Intent: TransitionIntentApprovalDecided, Lease: lease, Event: WorkflowEventInput{Type: EventApprovalDecided}},
 	}
 	for _, transition := range transitions {
 		if err := store.TransitionRunWithEvent(ctx, transition); err != nil {
@@ -298,6 +300,7 @@ func TestTransitionRunEventPayloadIsRedactedAndBounded(t *testing.T) {
 	secret := "sk-1234567890abcdefghijklmnop"
 	err := store.TransitionRunWithEvent(ctx, RunTransition{
 		RunID: run.ID, ExpectedStatus: RunStatusPending, TargetStatus: RunStatusRunning,
+		Lease: p08CurrentLease(t, db, run.ID),
 		Event: WorkflowEventInput{Type: EventRunClaimed, TraceID: "trace-p08", Payload: EventPayload{Attributes: map[string]any{
 			"api_key": secret,
 			"note":    "safe",
@@ -317,6 +320,7 @@ func TestTransitionRunEventPayloadIsRedactedAndBounded(t *testing.T) {
 	large := strings.Repeat("prompt body ", MaxEventTextBytes)
 	err = store.TransitionRunWithEvent(ctx, RunTransition{
 		RunID: run.ID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusWaitingApproval,
+		Lease: p08CurrentLease(t, db, run.ID),
 		Event: WorkflowEventInput{Type: EventApprovalRequested, Payload: EventPayload{Attributes: map[string]any{"prompt": large}}},
 	})
 	if !errors.Is(err, ErrEventPayloadTooLarge) {
@@ -324,6 +328,7 @@ func TestTransitionRunEventPayloadIsRedactedAndBounded(t *testing.T) {
 	}
 	err = store.TransitionRunWithEvent(ctx, RunTransition{
 		RunID: run.ID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusWaitingApproval,
+		Lease: p08CurrentLease(t, db, run.ID),
 		Event: WorkflowEventInput{Type: EventApprovalRequested, TraceID: secret},
 	})
 	if err == nil {
@@ -340,6 +345,7 @@ func TestCompleteRunAndCommitSessionSucceededAtomic(t *testing.T) {
 
 	if err := store.CompleteRunAndCommitSession(ctx, CompleteRunInput{
 		RunID: run.ID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusSucceeded,
+		Lease:         p08CurrentLease(t, db, run.ID),
 		OutputPayload: `{"answer_ref":"trace-p08","api_key":"` + secret + `"}`, TraceQuality: "complete", RevisionStateJSON: revisionJSON,
 	}); err != nil {
 		t.Fatalf("complete successful run: %v", err)
@@ -381,6 +387,7 @@ func TestCompleteRunFailureDoesNotCreateRevision(t *testing.T) {
 
 				err := store.CompleteRunAndCommitSession(ctx, CompleteRunInput{
 					RunID: run.ID, ExpectedStatus: source, TargetStatus: target,
+					Lease:        p08CurrentLease(t, db, run.ID),
 					ErrorMessage: "redacted failure",
 				})
 				if err != nil {
@@ -423,6 +430,7 @@ func TestCompleteRunTransactionFailureRollsBackEverything(t *testing.T) {
 
 	err := store.CompleteRunAndCommitSession(ctx, CompleteRunInput{
 		RunID: run.ID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusSucceeded,
+		Lease:             p08CurrentLease(t, db, run.ID),
 		RevisionStateJSON: json.RawMessage(`{"schema":"fo/session-state/v1"}`),
 	})
 	if err == nil {
@@ -468,6 +476,7 @@ func TestTransitionRunCannotCompleteDurableRun(t *testing.T) {
 	p08MoveToRunning(t, store, ctx, run.ID)
 	err := store.TransitionRunWithEvent(ctx, RunTransition{
 		RunID: run.ID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusSucceeded,
+		Lease: p08CurrentLease(t, db, run.ID),
 		Event: WorkflowEventInput{Type: EventRunCompleted},
 	})
 	if !errors.Is(err, ErrDurablePrimitiveRequired) {
@@ -521,10 +530,30 @@ func p08MoveToRunning(t *testing.T, store *GORMStore, ctx context.Context, runID
 	t.Helper()
 	if err := store.TransitionRunWithEvent(ctx, RunTransition{
 		RunID: runID, ExpectedStatus: RunStatusPending, TargetStatus: RunStatusRunning,
+		Lease: p08CurrentLease(t, store.db, runID),
 		Event: WorkflowEventInput{Type: EventRunClaimed},
 	}); err != nil {
 		t.Fatalf("move run to running: %v", err)
 	}
+}
+
+func p08CurrentLease(t *testing.T, db *gorm.DB, runID string) LeaseToken {
+	t.Helper()
+	var run mysql.WorkflowRun
+	if err := db.Select("id", "lease_owner", "lease_generation", "lease_until").First(&run, "id = ?", runID).Error; err != nil {
+		t.Fatalf("read P08 test lease: %v", err)
+	}
+	if run.LeaseOwner == nil || run.LeaseGeneration == 0 || run.LeaseUntil == nil || !run.LeaseUntil.After(time.Now()) {
+		now := time.Now()
+		owner := "p08-test-worker"
+		if err := db.Model(&mysql.WorkflowRun{}).Where("id = ?", runID).Updates(map[string]any{
+			"lease_owner": owner, "lease_generation": 1, "lease_until": now.Add(time.Hour), "heartbeat_at": now,
+		}).Error; err != nil {
+			t.Fatalf("seed P08 test lease: %v", err)
+		}
+		return LeaseToken{RunID: runID, Owner: owner, Generation: 1}
+	}
+	return LeaseToken{RunID: runID, Owner: *run.LeaseOwner, Generation: run.LeaseGeneration}
 }
 
 func p08SetRunState(t *testing.T, db *gorm.DB, runID, status, parkReason string) {
@@ -550,6 +579,7 @@ func TestCompleteRunRejectsSuccessfulRevisionForFailure(t *testing.T) {
 	store, ctx, run := p08CreateRun(t, db, "failure_revision_reject")
 	err := store.CompleteRunAndCommitSession(ctx, CompleteRunInput{
 		RunID: run.ID, ExpectedStatus: RunStatusPending, TargetStatus: RunStatusFailed,
+		Lease:             p08CurrentLease(t, db, run.ID),
 		RevisionStateJSON: json.RawMessage(`{"must_not":"persist"}`),
 	})
 	if err == nil {
@@ -572,6 +602,7 @@ func TestTransitionRunCASRejectsStaleExpectedState(t *testing.T) {
 	store, ctx, run := p08CreateRun(t, db, "stale_cas")
 	err := store.TransitionRunWithEvent(ctx, RunTransition{
 		RunID: run.ID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusWaitingApproval,
+		Lease: p08CurrentLease(t, db, run.ID),
 		Event: WorkflowEventInput{Type: EventApprovalRequested},
 	})
 	if !errors.Is(err, ErrRunCASConflict) {
@@ -591,6 +622,7 @@ func TestCompleteRunCASRejectsStaleExpectedState(t *testing.T) {
 	store, ctx, run := p08CreateRun(t, db, "complete_stale")
 	err := store.CompleteRunAndCommitSession(ctx, CompleteRunInput{
 		RunID: run.ID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusFailed,
+		Lease: p08CurrentLease(t, db, run.ID),
 	})
 	if !errors.Is(err, ErrRunCASConflict) {
 		t.Fatalf("stale completion error = %v, want ErrRunCASConflict", err)
@@ -651,6 +683,7 @@ func TestCompleteRunFinishedTimestampIsNotBeforeStart(t *testing.T) {
 	p08MoveToRunning(t, store, ctx, run.ID)
 	if err := store.CompleteRunAndCommitSession(ctx, CompleteRunInput{
 		RunID: run.ID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusFailed,
+		Lease: p08CurrentLease(t, db, run.ID),
 	}); err != nil {
 		t.Fatalf("complete failed run: %v", err)
 	}

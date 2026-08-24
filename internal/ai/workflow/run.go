@@ -67,6 +67,7 @@ type RunTransition struct {
 	TargetStatus   string
 	Intent         string
 	ParkReason     string
+	Lease          LeaseToken
 	Event          WorkflowEventInput
 }
 
@@ -75,6 +76,7 @@ type CompleteRunInput struct {
 	RunID             string
 	ExpectedStatus    string
 	TargetStatus      string
+	Lease             LeaseToken
 	OutputPayload     string
 	ErrorMessage      string
 	TraceQuality      string
@@ -181,6 +183,9 @@ func (s *GORMStore) TransitionRunWithEvent(ctx context.Context, transition RunTr
 	if err := s.authorizeRunScope(ctx, transition.RunID); err != nil {
 		return err
 	}
+	if transition.Lease.RunID != transition.RunID {
+		return ErrLeaseLost
+	}
 	if !RunOccupiesSession(transition.TargetStatus) {
 		return fmt.Errorf("terminal transition %q: %w", transition.TargetStatus, ErrDurablePrimitiveRequired)
 	}
@@ -192,14 +197,7 @@ func (s *GORMStore) TransitionRunWithEvent(ctx context.Context, transition RunTr
 		return err
 	}
 
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		run, err := lockDurableRun(tx, transition.RunID)
-		if err != nil {
-			return err
-		}
-		if run.Status != transition.ExpectedStatus {
-			return fmt.Errorf("%w: expected=%s actual=%s", ErrRunCASConflict, transition.ExpectedStatus, run.Status)
-		}
+	return s.withFencedRunTransaction(ctx, transition.Lease, transition.ExpectedStatus, func(tx *gorm.DB, run *mysql.WorkflowRun) error {
 		parkReason := transition.ParkReason
 		if parkReason == "" && run.ParkReason != nil {
 			parkReason = *run.ParkReason
@@ -215,7 +213,7 @@ func (s *GORMStore) TransitionRunWithEvent(ctx context.Context, transition RunTr
 		case transition.TargetStatus == RunStatusPending && run.Status == RunStatusParked:
 			updates["park_reason"] = nil
 		}
-		seq, err := updateDurableRunAndAllocateSeq(tx, run.ID, run.Status, updates)
+		seq, err := updateFencedDurableRunAndAllocateSeq(tx, run.ID, run.Status, transition.Lease, updates)
 		if err != nil {
 			return err
 		}
@@ -227,6 +225,9 @@ func (s *GORMStore) TransitionRunWithEvent(ctx context.Context, transition RunTr
 func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input CompleteRunInput) error {
 	if err := s.authorizeRunScope(ctx, input.RunID); err != nil {
 		return err
+	}
+	if input.Lease.RunID != input.RunID {
+		return ErrLeaseLost
 	}
 	if input.TargetStatus != RunStatusSucceeded && input.TargetStatus != RunStatusFailed && input.TargetStatus != RunStatusCanceled {
 		return fmt.Errorf("completion target %q: %w", input.TargetStatus, ErrRunTransitionDenied)
@@ -247,14 +248,7 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 	}
 	errorMessage := policy.NewRedactor().RedactText(input.ErrorMessage)
 
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		run, err := lockDurableRun(tx, input.RunID)
-		if err != nil {
-			return err
-		}
-		if run.Status != input.ExpectedStatus {
-			return fmt.Errorf("%w: expected=%s actual=%s", ErrRunCASConflict, input.ExpectedStatus, run.Status)
-		}
+	return s.withFencedRunTransaction(ctx, input.Lease, input.ExpectedStatus, func(tx *gorm.DB, run *mysql.WorkflowRun) error {
 		parkReason := ""
 		if run.ParkReason != nil {
 			parkReason = *run.ParkReason
@@ -295,7 +289,7 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 			"trace_quality":      input.TraceQuality,
 			"park_reason":        nil,
 		}
-		seq, err := updateDurableRunAndAllocateSeq(tx, run.ID, run.Status, updates)
+		seq, err := updateFencedDurableRunAndAllocateSeq(tx, run.ID, run.Status, input.Lease, updates)
 		if err != nil {
 			return err
 		}
@@ -379,37 +373,6 @@ func authorizeDurableCreate(ctx context.Context, input CreateRunInput) (string, 
 		return "", fmt.Errorf("runtime compatibility hash is not hexadecimal: %w", err)
 	}
 	return userID, nil
-}
-
-func lockDurableRun(tx *gorm.DB, runID string) (*mysql.WorkflowRun, error) {
-	var run mysql.WorkflowRun
-	result := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("id = ? AND runtime_mode = ?", runID, RuntimeModeDurableV1).First(&run)
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return nil, ErrDurablePrimitiveRequired
-	}
-	if result.Error != nil {
-		return nil, fmt.Errorf("锁定 durable workflow Run: %w", result.Error)
-	}
-	return &run, nil
-}
-
-func updateDurableRunAndAllocateSeq(tx *gorm.DB, runID, expectedStatus string, updates map[string]any) (uint64, error) {
-	updates["last_event_seq"] = gorm.Expr("last_event_seq + 1")
-	result := tx.Model(&mysql.WorkflowRun{}).
-		Where("id = ? AND runtime_mode = ? AND status = ?", runID, RuntimeModeDurableV1, expectedStatus).
-		Updates(updates)
-	if result.Error != nil {
-		return 0, fmt.Errorf("更新 durable Run 与 Event seq: %w", result.Error)
-	}
-	if result.RowsAffected != 1 {
-		return 0, ErrRunCASConflict
-	}
-	var seq uint64
-	if err := tx.Model(&mysql.WorkflowRun{}).Where("id = ?", runID).Pluck("last_event_seq", &seq).Error; err != nil {
-		return 0, fmt.Errorf("读取数据库分配的 Event seq: %w", err)
-	}
-	return seq, nil
 }
 
 func insertDurableEvent(tx *gorm.DB, runID string, seq uint64, input WorkflowEventInput, payload string) error {

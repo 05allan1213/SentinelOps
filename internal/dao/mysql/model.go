@@ -323,7 +323,15 @@ type WorkflowRun struct {
 	ParentRunID              string         `gorm:"column:parent_run_id;size:64"`
 	ActiveSessionKey         *string        `gorm:"column:active_session_key;size:64;uniqueIndex:uidx_workflow_runs_active_session"`
 	Status                   string         `gorm:"column:status;size:32;default:running;index"`
+	AvailableAt              time.Time      `gorm:"column:available_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3)"`
+	Priority                 int            `gorm:"column:priority;not null;default:0"`
 	RuntimeMode              string         `gorm:"column:runtime_mode;size:32;not null;default:legacy"`
+	Attempt                  uint           `gorm:"column:attempt;not null;default:0"`
+	MaxAttempts              uint           `gorm:"column:max_attempts;not null;default:3"`
+	LeaseOwner               *string        `gorm:"column:lease_owner;size:128"`
+	LeaseUntil               *time.Time     `gorm:"column:lease_until;type:datetime(3)"`
+	LeaseGeneration          uint64         `gorm:"column:lease_generation;not null;default:0"`
+	HeartbeatAt              *time.Time     `gorm:"column:heartbeat_at;type:datetime(3)"`
 	ImmutableInputJSON       *string        `gorm:"column:immutable_input_json;type:json"`
 	QueryText                string         `gorm:"column:query_text;type:longtext"`
 	ContextSnapshotJSON      *string        `gorm:"column:context_snapshot_json;type:json"`
