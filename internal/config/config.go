@@ -119,6 +119,7 @@ type Model struct {
 }
 
 type Pricing struct {
+	Revision    string  `yaml:"revision" json:"revision"`
 	Currency    string  `yaml:"currency" json:"currency"`
 	Unit        string  `yaml:"unit" json:"unit"`
 	Input       float64 `yaml:"input" json:"input"`
@@ -306,6 +307,9 @@ func (c *Config) Validate() error {
 			}
 		default:
 			return fmt.Errorf("model %s uses unsupported driver %q", ref, model.Driver)
+		}
+		if strings.TrimSpace(model.Pricing.Revision) == "" {
+			return fmt.Errorf("model %s pricing revision is required", ref)
 		}
 		if model.Pricing.Currency != "CNY" || model.Pricing.Unit != "per_million_tokens" {
 			return fmt.Errorf("model %s pricing must use CNY per_million_tokens", ref)

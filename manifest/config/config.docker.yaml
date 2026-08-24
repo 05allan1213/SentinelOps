@@ -31,18 +31,18 @@ model_catalog:
     model_id: "qwen3.7-max-2026-06-08"
     driver: "openai_compatible_chat"
     capabilities: ["chat", "tool_calling"]
-    pricing: {currency: "CNY", unit: "per_million_tokens", input: 12, cached_input: 2.4, output: 36}
+    pricing: {revision: "2026-08-24", currency: "CNY", unit: "per_million_tokens", input: 12, cached_input: 2.4, output: 36}
   aliyun_bailian/qwen3.7-text-embedding:
     model_id: "qwen3.7-text-embedding"
     driver: "openai_compatible_embedding"
     capabilities: ["embedding"]
     dimension: 2048
-    pricing: {currency: "CNY", unit: "per_million_tokens", input: 0.5}
+    pricing: {revision: "2026-08-24", currency: "CNY", unit: "per_million_tokens", input: 0.5}
   aliyun_bailian/qwen3-rerank:
     model_id: "qwen3-rerank"
     driver: "dashscope_compatible_rerank"
     capabilities: ["rerank"]
-    pricing: {currency: "CNY", unit: "per_million_tokens", input: 0.5}
+    pricing: {revision: "2026-08-24", currency: "CNY", unit: "per_million_tokens", input: 0.5}
 
 routing:
   chat:

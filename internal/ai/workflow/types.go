@@ -1,6 +1,49 @@
 package workflow
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+
+	"SentinelOps/internal/ai/policy"
+)
+
+// DurableContextSnapshotSchema 是 MySQL context_snapshot_json 的唯一 P11 版本。
+const DurableContextSnapshotSchema = "sentinelops/runtime-context/v1"
+
+// RuntimeSnapshotFields 是 workflow Store 原样持久化的 Runtime Snapshot 列集合。
+// 字段内容由 internal/ai/runtime 冻结，Store 只校验 Schema 形状并原子写入。
+type RuntimeSnapshotFields struct {
+	RuntimeVersion           string
+	RuntimeCompatibilityHash string
+	AgentRevision            string
+	ModelSnapshotJSON        json.RawMessage
+	ToolSnapshotJSON         json.RawMessage
+	MCPCatalogHash           string
+	SkillSnapshotJSON        json.RawMessage
+	PromptHash               string
+	PolicyHash               string
+	ConfigHash               string
+	FeatureSnapshotJSON      json.RawMessage
+}
+
+// DurableIdentitySnapshot 保存 Run 创建时服务端认证后的 Identity，不接受客户端覆盖。
+type DurableIdentitySnapshot struct {
+	UserID       string       `json:"user_id"`
+	Username     string       `json:"username,omitempty"`
+	Role         string       `json:"role"`
+	Scope        policy.Scope `json:"scope"`
+	AuthDisabled bool         `json:"auth_disabled,omitempty"`
+}
+
+// DurableContextSnapshot 保存每次 Attempt 只能从 MySQL 重建的安全值。
+// Budget service、Trace、DB 和其他进程内 handle 不进入该结构。
+type DurableContextSnapshot struct {
+	Schema       string                  `json:"schema"`
+	Identity     DurableIdentitySnapshot `json:"identity"`
+	History      json.RawMessage         `json:"history"`
+	BudgetLimits json.RawMessage         `json:"budget_limits"`
+	DeadlineAt   time.Time               `json:"deadline_at"`
+}
 
 // ── Workflow Run 状态常量 ─────────────────────────────────────────────────────
 //

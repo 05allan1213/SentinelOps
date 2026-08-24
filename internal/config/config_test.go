@@ -23,6 +23,7 @@ model_catalog:
     driver: openai_compatible_chat
     capabilities: [chat, tool_calling]
     pricing:
+      revision: "2026-08-24"
       currency: CNY
       unit: per_million_tokens
       input: 12
@@ -33,12 +34,12 @@ model_catalog:
     driver: openai_compatible_embedding
     capabilities: [embedding]
     dimension: 2048
-    pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
+    pricing: {revision: "2026-08-24", currency: CNY, unit: per_million_tokens, input: 0.5}
   provider_a/rerank-model:
     model_id: rerank-model
     driver: dashscope_compatible_rerank
     capabilities: [rerank]
-    pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
+    pricing: {revision: "2026-08-24", currency: CNY, unit: per_million_tokens, input: 0.5}
 routing:
   chat:
     default:
@@ -122,6 +123,11 @@ func TestValidateRejectsInvalidModelContracts(t *testing.T) {
 			m.Dimension = 1024
 			c.ModelCatalog["provider_a/embedding-model"] = m
 		}, "2048"},
+		{"missing pricing revision", func(c *Config) {
+			m := c.ModelCatalog["provider_a/chat-model"]
+			m.Pricing.Revision = ""
+			c.ModelCatalog["provider_a/chat-model"] = m
+		}, "pricing revision"},
 		{"bad route", func(c *Config) {
 			r := c.Routing.Chat["default"]
 			r.Model = "provider_a/missing"
@@ -172,7 +178,7 @@ func TestResolveUsesProviderNamedByModelReference(t *testing.T) {
 		ModelID:      "provider-b-chat",
 		Driver:       DriverOpenAICompatibleChat,
 		Capabilities: []string{"chat", "tool_calling"},
-		Pricing:      Pricing{Currency: "CNY", Unit: "per_million_tokens", Input: 1, Output: 2},
+		Pricing:      Pricing{Revision: "test-v1", Currency: "CNY", Unit: "per_million_tokens", Input: 1, Output: 2},
 	}
 	route := cfg.Routing.Chat["default"]
 	route.Model = "provider_b/chat-model"
@@ -203,7 +209,7 @@ func TestValidateRequiresOnlyEndpointsUsedByEachProvider(t *testing.T) {
 		ModelID:      "chat-only-model",
 		Driver:       DriverOpenAICompatibleChat,
 		Capabilities: []string{"chat", "tool_calling"},
-		Pricing:      Pricing{Currency: "CNY", Unit: "per_million_tokens"},
+		Pricing:      Pricing{Revision: "test-v1", Currency: "CNY", Unit: "per_million_tokens"},
 	}
 	route := cfg.Routing.Chat["default"]
 	route.Model = "chat_only/chat-model"

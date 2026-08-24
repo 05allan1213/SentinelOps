@@ -338,6 +338,19 @@ type WorkflowRun struct {
 	SessionRevision          *uint64        `gorm:"column:session_revision"`
 	RuntimeVersion           *string        `gorm:"column:runtime_version;size:128"`
 	RuntimeCompatibilityHash *string        `gorm:"column:runtime_compatibility_hash;type:char(64)"`
+	AgentRevision            *string        `gorm:"column:agent_revision;size:128"`
+	ModelSnapshot            *string        `gorm:"column:model_snapshot;type:json"`
+	ToolSnapshot             *string        `gorm:"column:tool_snapshot;type:json"`
+	MCPCatalogHash           *string        `gorm:"column:mcp_catalog_hash;type:char(64)"`
+	SkillSnapshot            *string        `gorm:"column:skill_snapshot;type:json"`
+	PromptHash               *string        `gorm:"column:prompt_hash;type:char(64)"`
+	PolicyHash               *string        `gorm:"column:policy_hash;type:char(64)"`
+	ConfigHash               *string        `gorm:"column:config_hash;type:char(64)"`
+	FeatureSnapshot          *string        `gorm:"column:feature_snapshot;type:json"`
+	BudgetLimitsJSON         *string        `gorm:"column:budget_limits_json;type:json"`
+	BudgetUsageJSON          *string        `gorm:"column:budget_usage_json;type:json"`
+	BudgetReservationsJSON   *string        `gorm:"column:budget_reservations_json;type:json"`
+	UsageQuality             string         `gorm:"column:usage_quality;size:32;not null;default:unknown"`
 	TraceQuality             string         `gorm:"column:trace_quality;size:32;not null;default:unknown"`
 	LastEventSeq             uint64         `gorm:"column:last_event_seq;not null;default:0"`
 	ParkReason               *string        `gorm:"column:park_reason;size:128"`

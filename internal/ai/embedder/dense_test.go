@@ -50,7 +50,7 @@ model_catalog:
     driver: openai_compatible_embedding
     capabilities: [embedding]
     dimension: 2048
-    pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
+    pricing: {revision: test-v1, currency: CNY, unit: per_million_tokens, input: 0.5}
 routing:
   embedding:
     default: {model: provider_custom/embedding}

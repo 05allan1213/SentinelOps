@@ -81,23 +81,23 @@ model_catalog:
     model_id: vendor-chat
     driver: openai_compatible_chat
     capabilities: [chat, tool_calling]
-    pricing: {currency: CNY, unit: per_million_tokens, input: 12, cached_input: 2.4, output: 36}
+    pricing: {revision: test-v1, currency: CNY, unit: per_million_tokens, input: 12, cached_input: 2.4, output: 36}
   provider_b/chat:
     model_id: provider-b-chat
     driver: openai_compatible_chat
     capabilities: [chat, tool_calling]
-    pricing: {currency: CNY, unit: per_million_tokens, input: 1, output: 2}
+    pricing: {revision: test-v1, currency: CNY, unit: per_million_tokens, input: 1, output: 2}
   provider_a/embed:
     model_id: vendor-embed
     driver: openai_compatible_embedding
     capabilities: [embedding]
     dimension: 2048
-    pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
+    pricing: {revision: test-v1, currency: CNY, unit: per_million_tokens, input: 0.5}
   provider_a/rerank:
     model_id: vendor-rerank
     driver: dashscope_compatible_rerank
     capabilities: [rerank]
-    pricing: {currency: CNY, unit: per_million_tokens, input: 0.5}
+    pricing: {revision: test-v1, currency: CNY, unit: per_million_tokens, input: 0.5}
 routing:
   chat:
     default: {model: provider_a/chat, options: {enable_thinking: false}}

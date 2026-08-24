@@ -501,13 +501,26 @@ func p08UserContext(userID string) context.Context {
 
 func p08CreateInput(runID, sessionID string) CreateRunInput {
 	return CreateRunInput{
-		ID:                       runID,
-		WorkflowKey:              "p08-test",
-		SessionID:                sessionID,
-		QueryText:                "current task only",
-		ImmutableInputJSON:       json.RawMessage(`{"query":"current task only"}`),
-		RuntimeVersion:           "sentinelops-test-v1",
-		RuntimeCompatibilityHash: strings.Repeat("a", 64),
+		ID:                 runID,
+		WorkflowKey:        "p08-test",
+		SessionID:          sessionID,
+		QueryText:          "current task only",
+		ImmutableInputJSON: json.RawMessage(`{"query":"current task only"}`),
+		RuntimeSnapshot: RuntimeSnapshotFields{
+			RuntimeVersion:           "sentinelops-test-v1",
+			RuntimeCompatibilityHash: strings.Repeat("a", 64),
+			AgentRevision:            "agent-test-v1",
+			ModelSnapshotJSON:        json.RawMessage(`[]`),
+			ToolSnapshotJSON:         json.RawMessage(`[]`),
+			MCPCatalogHash:           strings.Repeat("b", 64),
+			SkillSnapshotJSON:        json.RawMessage(`[]`),
+			PromptHash:               strings.Repeat("c", 64),
+			PolicyHash:               strings.Repeat("d", 64),
+			ConfigHash:               strings.Repeat("e", 64),
+			FeatureSnapshotJSON:      json.RawMessage(`{}`),
+		},
+		BudgetLimitsJSON: json.RawMessage(`{}`),
+		DeadlineAt:       time.Now().Add(time.Hour),
 		CreatedEvent: WorkflowEventInput{
 			Type:    EventRunCreated,
 			Payload: EventPayload{Attributes: map[string]any{"source": "p08-test"}},
@@ -590,7 +603,7 @@ func TestCompleteRunRejectsSuccessfulRevisionForFailure(t *testing.T) {
 func TestCreateRunRejectsInvalidDurableContract(t *testing.T) {
 	db := newP07Database(t, "p08_invalid_contract")
 	input := p08CreateInput("run-invalid", "session-invalid")
-	input.RuntimeCompatibilityHash = "short"
+	input.RuntimeSnapshot.RuntimeCompatibilityHash = "short"
 	_, err := NewGORMStore(db).CreateRunWithSessionLock(p08UserContext("user-invalid"), input)
 	if err == nil {
 		t.Fatal("create accepted an invalid runtime compatibility hash")
@@ -639,8 +652,12 @@ func TestCreateRunUsesLatestSessionRevisionSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create from latest revision: %v", err)
 	}
-	if run.SessionRevision == nil || *run.SessionRevision != 4 || run.ContextSnapshotJSON == nil || !p08JSONEqual(*run.ContextSnapshotJSON, latest.StateJSON) {
+	if run.SessionRevision == nil || *run.SessionRevision != 4 || run.ContextSnapshotJSON == nil {
 		t.Fatalf("frozen latest snapshot = revision %v context %v", run.SessionRevision, run.ContextSnapshotJSON)
+	}
+	var contextSnapshot DurableContextSnapshot
+	if err := json.Unmarshal([]byte(*run.ContextSnapshotJSON), &contextSnapshot); err != nil || !p08JSONEqual(string(contextSnapshot.History), latest.StateJSON) {
+		t.Fatalf("frozen latest history = %s, err=%v", contextSnapshot.History, err)
 	}
 }
 

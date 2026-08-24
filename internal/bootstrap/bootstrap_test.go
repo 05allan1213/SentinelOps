@@ -43,17 +43,17 @@ func validBootstrapConfig(environment string) *appconfig.Config {
 			"provider_a/chat": {
 				ModelID: "same-vendor-id", Driver: appconfig.DriverOpenAICompatibleChat,
 				Capabilities: []string{"chat", "tool_calling"},
-				Pricing:      appconfig.Pricing{Currency: "CNY", Unit: "per_million_tokens"},
+				Pricing:      appconfig.Pricing{Revision: "test-v1", Currency: "CNY", Unit: "per_million_tokens"},
 			},
 			"provider_a/embed": {
 				ModelID: "embed", Driver: appconfig.DriverOpenAICompatibleEmbedding,
 				Capabilities: []string{"embedding"}, Dimension: 2048,
-				Pricing: appconfig.Pricing{Currency: "CNY", Unit: "per_million_tokens"},
+				Pricing: appconfig.Pricing{Revision: "test-v1", Currency: "CNY", Unit: "per_million_tokens"},
 			},
 			"provider_a/rerank": {
 				ModelID: "rerank", Driver: appconfig.DriverDashScopeCompatibleRerank,
 				Capabilities: []string{"rerank"},
-				Pricing:      appconfig.Pricing{Currency: "CNY", Unit: "per_million_tokens"},
+				Pricing:      appconfig.Pricing{Revision: "test-v1", Currency: "CNY", Unit: "per_million_tokens"},
 			},
 		},
 		Routing: appconfig.Routing{

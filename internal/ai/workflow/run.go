@@ -48,16 +48,17 @@ var (
 
 // CreateRunInput 是首次 durable Run 原子创建所需的不可变输入。
 type CreateRunInput struct {
-	ID                       string
-	WorkflowKey              string
-	SessionID                string
-	ParentRunID              string
-	QueryText                string
-	ImmutableInputJSON       json.RawMessage
-	RuntimeVersion           string
-	RuntimeCompatibilityHash string
-	CreatedEvent             WorkflowEventInput
-	StartedAt                time.Time
+	ID                 string
+	WorkflowKey        string
+	SessionID          string
+	ParentRunID        string
+	QueryText          string
+	ImmutableInputJSON json.RawMessage
+	RuntimeSnapshot    RuntimeSnapshotFields
+	BudgetLimitsJSON   json.RawMessage
+	DeadlineAt         time.Time
+	CreatedEvent       WorkflowEventInput
+	StartedAt          time.Time
 }
 
 // RunTransition 描述一次带 Event 的显式 Run CAS。
@@ -139,10 +140,28 @@ func (s *GORMStore) createRunWithSessionLockOnce(ctx context.Context, userID str
 		}
 		activeSessionKey := input.SessionID
 		immutableInput := string(input.ImmutableInputJSON)
-		contextSnapshot := latest.StateJSON
 		sessionRevision := latest.Revision
-		runtimeVersion := input.RuntimeVersion
-		runtimeCompatibilityHash := input.RuntimeCompatibilityHash
+		identity, err := policy.IdentityFromContext(ctx)
+		if err != nil {
+			return err
+		}
+		contextSnapshot, err := marshalDurableContextSnapshot(identity, latest.StateJSON, input.BudgetLimitsJSON, input.DeadlineAt)
+		if err != nil {
+			return err
+		}
+		runtimeVersion := input.RuntimeSnapshot.RuntimeVersion
+		runtimeCompatibilityHash := input.RuntimeSnapshot.RuntimeCompatibilityHash
+		agentRevision := input.RuntimeSnapshot.AgentRevision
+		modelSnapshot := string(input.RuntimeSnapshot.ModelSnapshotJSON)
+		toolSnapshot := string(input.RuntimeSnapshot.ToolSnapshotJSON)
+		mcpCatalogHash := input.RuntimeSnapshot.MCPCatalogHash
+		skillSnapshot := string(input.RuntimeSnapshot.SkillSnapshotJSON)
+		promptHash := input.RuntimeSnapshot.PromptHash
+		policyHash := input.RuntimeSnapshot.PolicyHash
+		configHash := input.RuntimeSnapshot.ConfigHash
+		featureSnapshot := string(input.RuntimeSnapshot.FeatureSnapshotJSON)
+		budgetLimits := string(input.BudgetLimitsJSON)
+		emptyBudgetState := `{}`
 		created = &mysql.WorkflowRun{
 			ID:                       input.ID,
 			WorkflowKey:              input.WorkflowKey,
@@ -158,6 +177,19 @@ func (s *GORMStore) createRunWithSessionLockOnce(ctx context.Context, userID str
 			SessionRevision:          &sessionRevision,
 			RuntimeVersion:           &runtimeVersion,
 			RuntimeCompatibilityHash: &runtimeCompatibilityHash,
+			AgentRevision:            &agentRevision,
+			ModelSnapshot:            &modelSnapshot,
+			ToolSnapshot:             &toolSnapshot,
+			MCPCatalogHash:           &mcpCatalogHash,
+			SkillSnapshot:            &skillSnapshot,
+			PromptHash:               &promptHash,
+			PolicyHash:               &policyHash,
+			ConfigHash:               &configHash,
+			FeatureSnapshot:          &featureSnapshot,
+			BudgetLimitsJSON:         &budgetLimits,
+			BudgetUsageJSON:          &emptyBudgetState,
+			BudgetReservationsJSON:   &emptyBudgetState,
+			UsageQuality:             "unknown",
 			LastEventSeq:             1,
 			StartedAt:                input.StartedAt,
 		}
@@ -363,16 +395,67 @@ func authorizeDurableCreate(ctx context.Context, input CreateRunInput) (string, 
 	if len(input.ImmutableInputJSON) == 0 || !json.Valid(input.ImmutableInputJSON) {
 		return "", fmt.Errorf("valid immutable input JSON is required")
 	}
-	if strings.TrimSpace(input.RuntimeVersion) == "" || len(input.RuntimeVersion) > 128 {
-		return "", fmt.Errorf("runtime version is required")
+	if err := validateRuntimeSnapshotFields(input.RuntimeSnapshot); err != nil {
+		return "", err
 	}
-	if len(input.RuntimeCompatibilityHash) != 64 {
-		return "", fmt.Errorf("runtime compatibility hash must be 64 hexadecimal characters")
+	if len(input.BudgetLimitsJSON) == 0 || !json.Valid(input.BudgetLimitsJSON) {
+		return "", fmt.Errorf("valid budget limits JSON is required")
 	}
-	if _, err := hex.DecodeString(input.RuntimeCompatibilityHash); err != nil {
-		return "", fmt.Errorf("runtime compatibility hash is not hexadecimal: %w", err)
+	if input.DeadlineAt.IsZero() {
+		return "", fmt.Errorf("run deadline is required")
 	}
 	return userID, nil
+}
+
+func validateRuntimeSnapshotFields(snapshot RuntimeSnapshotFields) error {
+	if strings.TrimSpace(snapshot.RuntimeVersion) == "" || len(snapshot.RuntimeVersion) > 128 {
+		return fmt.Errorf("runtime version is required")
+	}
+	for name, value := range map[string]string{
+		"runtime compatibility hash": snapshot.RuntimeCompatibilityHash,
+		"MCP catalog hash":           snapshot.MCPCatalogHash,
+		"prompt hash":                snapshot.PromptHash,
+		"policy hash":                snapshot.PolicyHash,
+		"config hash":                snapshot.ConfigHash,
+	} {
+		if len(value) != 64 || strings.ToLower(value) != value {
+			return fmt.Errorf("%s must be 64 lowercase hexadecimal characters", name)
+		}
+		if _, err := hex.DecodeString(value); err != nil {
+			return fmt.Errorf("%s is not hexadecimal: %w", name, err)
+		}
+	}
+	if strings.TrimSpace(snapshot.AgentRevision) == "" || len(snapshot.AgentRevision) > 128 {
+		return fmt.Errorf("agent revision is required")
+	}
+	for name, value := range map[string]json.RawMessage{
+		"model snapshot":   snapshot.ModelSnapshotJSON,
+		"tool snapshot":    snapshot.ToolSnapshotJSON,
+		"skill snapshot":   snapshot.SkillSnapshotJSON,
+		"feature snapshot": snapshot.FeatureSnapshotJSON,
+	} {
+		if len(value) == 0 || !json.Valid(value) {
+			return fmt.Errorf("valid %s JSON is required", name)
+		}
+	}
+	return nil
+}
+
+func marshalDurableContextSnapshot(identity policy.Identity, history string, budgetLimits json.RawMessage, deadline time.Time) (string, error) {
+	snapshot := DurableContextSnapshot{
+		Schema: DurableContextSnapshotSchema,
+		Identity: DurableIdentitySnapshot{
+			UserID: identity.UserID, Username: identity.Username, Role: string(identity.Role),
+			Scope: identity.Scope, AuthDisabled: identity.AuthDisabled,
+		},
+		History: json.RawMessage(history), BudgetLimits: append(json.RawMessage(nil), budgetLimits...),
+		DeadlineAt: deadline.UTC(),
+	}
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		return "", fmt.Errorf("序列化 durable Context Snapshot: %w", err)
+	}
+	return string(encoded), nil
 }
 
 func insertDurableEvent(tx *gorm.DB, runID string, seq uint64, input WorkflowEventInput, payload string) error {
