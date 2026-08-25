@@ -138,7 +138,11 @@ func TestRoleMatrixHTTP(t *testing.T) {
 		{"viewer business write", "viewer", http.MethodPost, "/api/event/v1/create", http.StatusForbidden},
 		{"operator business write", "operator", http.MethodPost, "/api/event/v1/create", http.StatusOK},
 		{"operator approval", "operator", http.MethodPost, "/api/approval/v1/decide", http.StatusForbidden},
+		{"operator plural approval", "operator", http.MethodPost, "/api/ops/v1/approvals/id/approve", http.StatusForbidden},
+		{"operator plural rejection", "operator", http.MethodPost, "/api/ops/v1/approvals/id/reject", http.StatusForbidden},
 		{"approver approval", "approver", http.MethodPost, "/api/approval/v1/decide", http.StatusOK},
+		{"approver plural approval", "approver", http.MethodPost, "/api/ops/v1/approvals/id/approve", http.StatusOK},
+		{"approver plural rejection", "approver", http.MethodPost, "/api/ops/v1/approvals/id/reject", http.StatusOK},
 		{"approver management", "approver", http.MethodPost, "/api/settings/v1/general", http.StatusForbidden},
 		{"admin management", "admin", http.MethodPost, "/api/settings/v1/general", http.StatusOK},
 	}
@@ -174,6 +178,8 @@ func TestAuthDisabledRejectsBusinessWrites(t *testing.T) {
 		{http.MethodDelete, "/api/rageval/v1/traces"},
 		{http.MethodPost, "/api/settings/v1/general"},
 		{http.MethodPost, "/api/approval/v1/decide"},
+		{http.MethodPost, "/api/ops/v1/approvals/id/approve"},
+		{http.MethodPost, "/api/ops/v1/approvals/id/reject"},
 	} {
 		status, _ := doRequest(t, route.method, baseURL+route.path, "", "")
 		if status != http.StatusForbidden {

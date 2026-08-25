@@ -83,3 +83,16 @@ func TestAuthDisabledRoleMatrixIsReadOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestSelfApprovalAlwaysRejected(t *testing.T) {
+	for _, role := range []Role{RoleViewer, RoleOperator, RoleApprover, RoleAdmin} {
+		identity := Identity{UserID: "same-user", Role: role, Scope: Scope{UserID: "same-user"}}
+		if role == RoleAdmin {
+			identity.Scope.All = true
+		}
+		ctx := WithIdentity(context.Background(), identity)
+		if err := Authorize(ctx, PermissionDecideProposal, Resource{OwnerID: "same-user"}); !errors.Is(err, ErrForbidden) {
+			t.Fatalf("role %s self-approved an L2 proposal: %v", role, err)
+		}
+	}
+}

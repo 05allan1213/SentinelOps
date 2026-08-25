@@ -68,7 +68,7 @@ func requestPermission(method, path string) (policy.Permission, bool) {
 	if path == "/api/rageval/v1/feedback" {
 		return policy.PermissionWriteOwnFeedback, false
 	}
-	if strings.Contains(path, "/approval/") {
+	if strings.Contains(path, "/approval/") || strings.Contains(path, "/approvals/") {
 		return policy.PermissionDecideProposal, false
 	}
 	if isManagementPath(path) {

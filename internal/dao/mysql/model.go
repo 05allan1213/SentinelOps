@@ -402,6 +402,38 @@ type WorkflowCheckpoint struct {
 
 func (WorkflowCheckpoint) TableName() string { return "workflow_checkpoints" }
 
+// AgentApproval 保存一次稳定 Proposal 的审批事实。
+type AgentApproval struct {
+	ID                        string     `gorm:"column:id;primaryKey;size:128"`
+	RunID                     string     `gorm:"column:run_id;size:64;not null;uniqueIndex:uidx_agent_approvals_run_proposal,priority:1"`
+	ToolCallIDObserved        *string    `gorm:"column:tool_call_id_observed;size:128"`
+	ToolName                  string     `gorm:"column:tool_name;size:128;not null"`
+	ToolRevision              string     `gorm:"column:tool_revision;size:128;not null"`
+	ToolSchemaHash            string     `gorm:"column:tool_schema_hash;type:char(64);not null"`
+	RiskLevel                 string     `gorm:"column:risk_level;size:32;not null"`
+	ProposalJSONRedacted      string     `gorm:"column:proposal_json_redacted;type:json;not null"`
+	ProposalHash              string     `gorm:"column:proposal_hash;type:char(64);not null;uniqueIndex:uidx_agent_approvals_run_proposal,priority:2"`
+	PolicyHash                string     `gorm:"column:policy_hash;type:char(64);not null"`
+	RuntimeCompatibilityHash  string     `gorm:"column:runtime_compatibility_hash;type:char(64);not null"`
+	RequestedBy               string     `gorm:"column:requested_by;size:128;not null"`
+	DecidedBy                 *string    `gorm:"column:decided_by;size:128"`
+	Status                    string     `gorm:"column:status;size:32;not null;default:preparing"`
+	Version                   uint64     `gorm:"column:version;not null;default:1"`
+	DecisionReason            *string    `gorm:"column:decision_reason;type:text"`
+	InterruptID               *string    `gorm:"column:interrupt_id;size:128"`
+	InterruptAddress          *string    `gorm:"column:interrupt_address;size:512"`
+	CheckpointID              *string    `gorm:"column:checkpoint_id;size:128"`
+	CheckpointPayloadSHA256   *string    `gorm:"column:checkpoint_payload_sha256;type:char(64)"`
+	CheckpointLeaseGeneration *uint64    `gorm:"column:checkpoint_lease_generation"`
+	PreparingAt               time.Time  `gorm:"column:preparing_at;type:datetime(3);not null"`
+	PublishedAt               *time.Time `gorm:"column:published_at;type:datetime(3)"`
+	ExpiresAt                 *time.Time `gorm:"column:expires_at;type:datetime(3)"`
+	CreatedAt                 time.Time  `gorm:"column:created_at;type:datetime(3);not null"`
+	DecidedAt                 *time.Time `gorm:"column:decided_at;type:datetime(3)"`
+}
+
+func (AgentApproval) TableName() string { return "agent_approvals" }
+
 // SessionStateRevision 会话状态修订记录，保存会话状态的版本化快照
 type SessionStateRevision struct {
 	ID        uint           `gorm:"primaryKey;autoIncrement"`

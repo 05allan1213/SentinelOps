@@ -12,7 +12,9 @@ import (
 	"github.com/gogf/gf/v2/errors/gerror"
 )
 
-type ControllerV1 struct{}
+type ControllerV1 struct {
+	approvals approvalRepository
+}
 
 func NewV1() *ControllerV1 { return &ControllerV1{} }
 
