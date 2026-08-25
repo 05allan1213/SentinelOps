@@ -10,6 +10,10 @@ import (
 const validConfig = `
 app:
   environment: test
+model_reliability:
+  retry: {max_retries: 1, base_backoff_ms: 10}
+  breaker: {failure_threshold: 3, open_timeout_ms: 30000}
+  limiter: {qps: 10, burst: 20}
 providers:
   provider_a:
     secret_ref: env:PROVIDER_A_KEY
@@ -43,11 +47,13 @@ model_catalog:
 routing:
   chat:
     default:
-      model: provider_a/chat-model
-      options: {enable_thinking: false}
+      candidates:
+        - model: provider_a/chat-model
+          options: {enable_thinking: false}
     reasoning:
-      model: provider_a/chat-model
-      options: {enable_thinking: true}
+      candidates:
+        - model: provider_a/chat-model
+          options: {enable_thinking: true}
   embedding:
     default: {model: provider_a/embedding-model}
   rerank:
@@ -130,7 +136,7 @@ func TestValidateRejectsInvalidModelContracts(t *testing.T) {
 		}, "pricing revision"},
 		{"bad route", func(c *Config) {
 			r := c.Routing.Chat["default"]
-			r.Model = "provider_a/missing"
+			r.Candidates[0].Model = "provider_a/missing"
 			c.Routing.Chat["default"] = r
 		}, "routing"},
 		{"missing chat endpoint", func(c *Config) {
@@ -180,9 +186,9 @@ func TestResolveUsesProviderNamedByModelReference(t *testing.T) {
 		Capabilities: []string{"chat", "tool_calling"},
 		Pricing:      Pricing{Revision: "test-v1", Currency: "CNY", Unit: "per_million_tokens", Input: 1, Output: 2},
 	}
-	route := cfg.Routing.Chat["default"]
+	route := cfg.Routing.Chat["default"].Candidates[0]
 	route.Model = "provider_b/chat-model"
-	cfg.Routing.Chat["default"] = route
+	cfg.Routing.Chat["default"] = ChatRoute{Candidates: []Route{route}}
 
 	provider, model, err := cfg.Resolve(route)
 	if err != nil {
@@ -211,9 +217,9 @@ func TestValidateRequiresOnlyEndpointsUsedByEachProvider(t *testing.T) {
 		Capabilities: []string{"chat", "tool_calling"},
 		Pricing:      Pricing{Revision: "test-v1", Currency: "CNY", Unit: "per_million_tokens"},
 	}
-	route := cfg.Routing.Chat["default"]
+	route := cfg.Routing.Chat["default"].Candidates[0]
 	route.Model = "chat_only/chat-model"
-	cfg.Routing.Chat["default"] = route
+	cfg.Routing.Chat["default"] = ChatRoute{Candidates: []Route{route}}
 
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("chat-only provider rejected: %v", err)

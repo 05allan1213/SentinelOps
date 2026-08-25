@@ -47,7 +47,7 @@ var GetSolveAgent = agent.NewSingletonAgent(agent.AgentConfig{
 func NewSolveAgent(ctx context.Context, m model.ToolCallingChatModel, handler *runtime.RuntimeHandler) (adk.Agent, error) {
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "SolveAgent", Description: "Call the Solve Agent to generate emergency response plans for specific security incidents. Handles: incident containment steps, patch recommendations, remediation procedures, recovery guidance for a single event. Returns structured three-phase response plan.",
-		Instruction: agents.Solve, Model: m, RuntimeHandler: handler, MaxIterations: solveMaxIterations,
+		Instruction: agents.Solve, Model: m, Profile: "reasoning", RuntimeHandler: handler, MaxIterations: solveMaxIterations,
 		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
 		ToolNames:        solveL0Tools,
 	})
@@ -61,11 +61,7 @@ var (
 
 // BuildDurableSolveAgent 使用调用方提供的唯一 RuntimeHandler 构建 L0 处置 Agent。
 func BuildDurableSolveAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
-	m, err := newSolveModel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return NewSolveAgent(ctx, m, handler)
+	return NewSolveAgent(ctx, nil, handler)
 }
 
 // GetDurableSolveAgent lazily constructs the ADK specialist. P19 owns outer

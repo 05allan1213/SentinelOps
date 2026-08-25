@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"SentinelOps/internal/ai/models"
 	"SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/ai/tools"
 
@@ -22,6 +23,7 @@ type SpecialistConfig struct {
 	Description      string
 	Instruction      string
 	Model            model.BaseChatModel
+	Profile          string
 	ToolNames        []string
 	MaxIterations    int
 	RetrievalOptions RetrievalOptions
@@ -45,9 +47,6 @@ func NewSpecialistAgent(ctx context.Context, cfg SpecialistConfig) (adk.Agent, e
 	if cfg.Name == "" || cfg.Description == "" || cfg.Instruction == "" {
 		return nil, fmt.Errorf("specialist name, description and instruction are required")
 	}
-	if cfg.Model == nil {
-		return nil, fmt.Errorf("specialist model is required")
-	}
 	if cfg.RuntimeHandler == nil {
 		return nil, fmt.Errorf("specialist RuntimeHandler is required")
 	}
@@ -59,16 +58,27 @@ func NewSpecialistAgent(ctx context.Context, cfg SpecialistConfig) (adk.Agent, e
 	if err != nil {
 		return nil, err
 	}
-	return adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+	agentConfig := &adk.ChatModelAgentConfig{
 		Name:          cfg.Name,
 		Description:   cfg.Description,
 		Instruction:   cfg.Instruction,
-		Model:         cfg.Model,
 		ToolsConfig:   adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: registered}},
 		GenModelInput: NewSpecialistGenModelInput(SpecialistPromptConfig{Instruction: cfg.Instruction, RetrievalOptions: cfg.RetrievalOptions}),
 		MaxIterations: cfg.MaxIterations,
 		Handlers:      handlers,
-	})
+	}
+	if cfg.Model != nil {
+		agentConfig.Model = cfg.Model
+	} else {
+		reliability, buildErr := models.BuildReliability(ctx, cfg.Profile, runtime.PhysicalModelBinder(cfg.RuntimeHandler))
+		if buildErr != nil {
+			return nil, fmt.Errorf("configure %s model reliability: %w", cfg.Name, buildErr)
+		}
+		if buildErr = models.ConfigureChatModelAgent(agentConfig, reliability); buildErr != nil {
+			return nil, fmt.Errorf("configure %s ChatModelAgent: %w", cfg.Name, buildErr)
+		}
+	}
+	return adk.NewChatModelAgent(ctx, agentConfig)
 }
 
 // NewSpecialistGenModelInput builds the exact old prompt shape without ADK's

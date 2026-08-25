@@ -46,7 +46,7 @@ var GetIntelligenceAgent = agent.NewSingletonAgent(agent.AgentConfig{
 func NewIntelligenceAgent(ctx context.Context, m model.ToolCallingChatModel, handler *runtime.RuntimeHandler) (adk.Agent, error) {
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "IntelligenceAgent", Description: "Call the Intelligence Agent to search and analyze the latest threat intelligence from the internet. Handles: CVE details lookup, vulnerability advisories, exploit PoC status, threat actor profiling, malicious IP/domain reputation. Automatically saves findings to the local knowledge base. Returns structured threat intelligence report.",
-		Instruction: agents.Intelligence, Model: m, RuntimeHandler: handler, MaxIterations: intelligenceMaxIterations,
+		Instruction: agents.Intelligence, Model: m, Profile: "default", RuntimeHandler: handler, MaxIterations: intelligenceMaxIterations,
 		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
 		ToolNames:        intelligenceTools,
 	})
@@ -60,11 +60,7 @@ var (
 
 // BuildDurableIntelligenceAgent 使用调用方提供的唯一 RuntimeHandler 构建情报 Agent。
 func BuildDurableIntelligenceAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
-	m, err := newIntelligenceModel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return NewIntelligenceAgent(ctx, m, handler)
+	return NewIntelligenceAgent(ctx, nil, handler)
 }
 
 // GetDurableIntelligenceAgent 懒构建 ADK 情报 Agent；P19 负责接入 Planner/AgentTool。

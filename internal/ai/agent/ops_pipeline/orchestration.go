@@ -40,7 +40,7 @@ var GetOpsAgent = agent.NewSingletonAgent(agent.AgentConfig{
 func NewOpsAgent(ctx context.Context, m model.ToolCallingChatModel, handler *runtime.RuntimeHandler) (adk.Agent, error) {
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "OpsAgent", Description: "Call the Ops Agent to trigger automated incident response for a specific security event. Handles: IP blocking, multi-channel alert notifications (DingTalk/WeCom/Email), event status updates. Requires event_id in the query. Returns execution result.",
-		Instruction: agents.Ops, Model: m, RuntimeHandler: handler, MaxIterations: opsMaxIterations,
+		Instruction: agents.Ops, Model: m, Profile: "default", RuntimeHandler: handler, MaxIterations: opsMaxIterations,
 		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
 		ToolNames:        opsDurableTools,
 	})
@@ -54,11 +54,7 @@ var (
 
 // BuildDurableOpsAgent 使用调用方提供的唯一 RuntimeHandler 构建运维 Agent。
 func BuildDurableOpsAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
-	m, err := newOpsModel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return NewOpsAgent(ctx, m, handler)
+	return NewOpsAgent(ctx, nil, handler)
 }
 
 // GetDurableOpsAgent 懒构建 ADK 运维 Agent；旧 ExecuteRun 路径和 P19 接线均保持独立。

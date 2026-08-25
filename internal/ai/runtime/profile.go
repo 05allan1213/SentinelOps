@@ -24,7 +24,7 @@ func BuildDurableRuntimeSnapshot(config *appconfig.Config) (FrozenRuntimeSnapsho
 	if config == nil {
 		return FrozenRuntimeSnapshot{}, fmt.Errorf("application configuration is required")
 	}
-	models := make([]ModelSnapshot, 0, 4)
+	models := make([]ModelSnapshot, 0, 6)
 	for _, route := range []struct{ kind, profile string }{{"chat", "default"}, {"chat", "reasoning"}, {"embedding", "default"}, {"rerank", "default"}} {
 		_, chatRouteExists := config.Routing.Chat[route.profile]
 		if (route.kind == "chat" && !chatRouteExists) ||
@@ -32,11 +32,11 @@ func BuildDurableRuntimeSnapshot(config *appconfig.Config) (FrozenRuntimeSnapsho
 			(route.kind == "rerank" && len(config.Routing.Rerank) == 0) {
 			continue
 		}
-		model, err := ModelSnapshotFromRoute(config, route.kind, route.profile)
+		resolved, err := ModelSnapshotsFromRoute(config, route.kind, route.profile)
 		if err != nil {
 			return FrozenRuntimeSnapshot{}, err
 		}
-		models = append(models, model)
+		models = append(models, resolved...)
 	}
 
 	inventory := append(policy.RequiredDurableToolNames(), policy.DurableFrameworkToolNames()...)

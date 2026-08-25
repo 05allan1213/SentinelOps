@@ -26,7 +26,7 @@ func TestMutationRouteSnapshotCoversEveryDurableMutation(t *testing.T) {
 				Pricing: appconfig.Pricing{Revision: "p26", Currency: "CNY", Unit: "per_million_tokens", Input: 1, Output: 2},
 			},
 		},
-		Routing: appconfig.Routing{Chat: map[string]appconfig.Route{"default": {Model: "test/chat"}}},
+		Routing: appconfig.Routing{Chat: map[string]appconfig.ChatRoute{"default": {Candidates: []appconfig.Route{{Model: "test/chat"}}}}},
 	}
 	frozen, err := BuildDurableRuntimeSnapshot(config)
 	if err != nil {

@@ -16,6 +16,7 @@ import (
 	"SentinelOps/internal/ai/workflow"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
@@ -121,6 +122,10 @@ func CallMetadataFromContext(ctx context.Context) (CallMetadata, error) {
 func (h *RuntimeHandler) WrapModel(_ context.Context, endpoint model.BaseChatModel, _ *adk.ModelContext) (model.BaseChatModel, error) {
 	if h == nil || endpoint == nil {
 		return nil, fmt.Errorf("runtime Handler and Model endpoint are required")
+	}
+	if endpointType, ok := components.GetType(endpoint); ok && endpointType == "FailoverProxyModel" {
+		// P27 已把同一 Handler 绑定到每个真实候选；代理层不能再次 reserve/settle。
+		return endpoint, nil
 	}
 	return &runtimeModelEndpoint{handler: h, endpoint: endpoint}, nil
 }
@@ -291,7 +296,7 @@ func (h *RuntimeHandler) prepareModelCall(ctx context.Context) (context.Context,
 		Subject: invocation.CatalogRef, Lease: attempt.Lease, TraceID: attempt.Trace.ID,
 		Deadline: attempt.Deadline, Model: cloneModelInvocation(&invocation),
 	}
-	if err := limiter.Wait(ctx); err != nil {
+	if err := limiter.Wait(ctx, invocation.CatalogRef); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			_, reserveErr := budget.ReserveCall(ctx, call)
 			return nil, nil, BudgetReservation{}, errors.Join(err, reserveErr)

@@ -29,6 +29,11 @@ func validBootstrapConfig(environment string) *appconfig.Config {
 			JWT:  appconfig.JWT{Enabled: true, SecretRef: "env:TEST_JWT_SECRET"},
 			Seed: appconfig.Seed{AdminPasswordRef: "env:TEST_ADMIN_PASSWORD"},
 		},
+		ModelReliability: appconfig.ModelReliability{
+			Retry:   appconfig.ModelRetry{MaxRetries: 1, BaseBackoffMS: 1},
+			Breaker: appconfig.ModelBreaker{FailureThreshold: 3, OpenTimeoutMS: 30000},
+			Limiter: appconfig.ModelLimiter{QPS: 1000, Burst: 1000},
+		},
 		Providers: map[string]appconfig.Provider{
 			"provider_a": {
 				SecretRef: "env:TEST_MODEL_KEY",
@@ -57,9 +62,9 @@ func validBootstrapConfig(environment string) *appconfig.Config {
 			},
 		},
 		Routing: appconfig.Routing{
-			Chat: map[string]appconfig.Route{
-				"default":   {Model: "provider_a/chat"},
-				"reasoning": {Model: "provider_a/chat"},
+			Chat: map[string]appconfig.ChatRoute{
+				"default":   {Candidates: []appconfig.Route{{Model: "provider_a/chat"}}},
+				"reasoning": {Candidates: []appconfig.Route{{Model: "provider_a/chat"}}},
 			},
 			Embedding: map[string]appconfig.Route{"default": {Model: "provider_a/embed"}},
 			Rerank:    map[string]appconfig.Route{"default": {Model: "provider_a/rerank"}},

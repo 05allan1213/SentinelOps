@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"SentinelOps/internal/ai/models"
 	airuntime "SentinelOps/internal/ai/runtime"
 	aitools "SentinelOps/internal/ai/tools"
 
@@ -20,6 +21,7 @@ const executorMaxIterations = 20
 // ExecutorBuilderConfig 只接收 strict Registry Tool 和官方 AgentTool 的组装结果。
 type ExecutorBuilderConfig struct {
 	Model               model.BaseChatModel
+	Reliability         *models.Reliability
 	RegisteredToolNames []string
 	AgentTools          []tool.BaseTool
 	RuntimeHandler      *airuntime.RuntimeHandler
@@ -40,8 +42,8 @@ func newExecutorAgentConfig(ctx context.Context, cfg *ExecutorBuilderConfig) (*a
 	if ctx == nil {
 		return nil, fmt.Errorf("executor context is required")
 	}
-	if cfg == nil || cfg.Model == nil {
-		return nil, fmt.Errorf("executor Model is required")
+	if cfg == nil || (cfg.Model == nil && cfg.Reliability == nil) || (cfg.Model != nil && cfg.Reliability != nil) {
+		return nil, fmt.Errorf("executor requires exactly one Model or Reliability configuration")
 	}
 
 	registeredTools, err := aitools.GetManyRequired(cfg.RegisteredToolNames)
@@ -62,10 +64,9 @@ func newExecutorAgentConfig(ctx context.Context, cfg *ExecutorBuilderConfig) (*a
 		return nil, fmt.Errorf("configure executor Handlers: %w", err)
 	}
 
-	return &adk.ChatModelAgentConfig{
+	agentConfig := &adk.ChatModelAgentConfig{
 		Name:        "executor",
 		Description: "an executor agent",
-		Model:       cfg.Model,
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{Tools: toolList},
 		},
@@ -73,7 +74,13 @@ func newExecutorAgentConfig(ctx context.Context, cfg *ExecutorBuilderConfig) (*a
 		OutputKey:     planexecute.ExecutedStepSessionKey,
 		MaxIterations: executorMaxIterations,
 		Handlers:      handlers,
-	}, nil
+	}
+	if cfg.Model != nil {
+		agentConfig.Model = cfg.Model
+	} else if err = models.ConfigureChatModelAgent(agentConfig, cfg.Reliability); err != nil {
+		return nil, fmt.Errorf("configure executor ChatModelAgent: %w", err)
+	}
+	return agentConfig, nil
 }
 
 func executorGenModelInput(ctx context.Context, _ string, _ *adk.AgentInput) ([]adk.Message, error) {

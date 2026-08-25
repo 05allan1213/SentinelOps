@@ -19,7 +19,7 @@ func requireOnlineConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	route := cfg.Routing.Chat["default"]
+	route := cfg.Routing.Chat["default"].Candidates[0]
 	provider, _, err := cfg.Resolve(route)
 	if err != nil {
 		t.Fatal(err)

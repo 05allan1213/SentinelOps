@@ -139,7 +139,7 @@ func TestProviderCatalogRoutingRemainsSingleSource(t *testing.T) {
 		Capabilities: []string{"chat", "tool_calling"},
 		Pricing:      Pricing{Revision: "test-v1", Currency: "CNY", Unit: "per_million_tokens"},
 	}
-	route := cfg.Routing.Chat["default"]
+	route := cfg.Routing.Chat["default"].Candidates[0]
 	route.Model = "provider_b/chat-model"
 	provider, model, err := cfg.Resolve(route)
 	if err != nil {

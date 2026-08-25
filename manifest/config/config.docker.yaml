@@ -12,6 +12,11 @@ logger:
   level: "all"
   stdout: true
 
+model_reliability:
+  retry: {max_retries: 1, base_backoff_ms: 100}
+  breaker: {failure_threshold: 5, open_timeout_ms: 30000}
+  limiter: {qps: 10, burst: 20}
+
 # 模型访问分为 Provider -> Model Catalog -> Routing 三层。下方百炼配置只是当前
 # 开发示例；业务代码按 provider/model 引用动态解析，不绑定固定供应商。
 # 本文件只保存 Secret 引用，容器通过环境变量即时注入解析值。
@@ -47,11 +52,13 @@ model_catalog:
 routing:
   chat:
     default:
-      model: "aliyun_bailian/qwen3.7-max-2026-06-08"
-      options: {enable_thinking: false}
+      candidates:
+        - model: "aliyun_bailian/qwen3.7-max-2026-06-08"
+          options: {enable_thinking: false}
     reasoning:
-      model: "aliyun_bailian/qwen3.7-max-2026-06-08"
-      options: {enable_thinking: true}
+      candidates:
+        - model: "aliyun_bailian/qwen3.7-max-2026-06-08"
+          options: {enable_thinking: true}
   embedding:
     default: {model: "aliyun_bailian/qwen3.7-text-embedding"}
   rerank:

@@ -27,15 +27,16 @@ const (
 
 // Config 是完整替代加载后的应用配置真值。
 type Config struct {
-	App          App                 `yaml:"app" json:"app"`
-	Database     Database            `yaml:"database" json:"database"`
-	Auth         Auth                `yaml:"auth" json:"auth"`
-	SOAR         SOAR                `yaml:"soar" json:"soar"`
-	Secrets      SecretReferences    `yaml:"secret_refs" json:"secret_refs"`
-	AgentRuntime AgentRuntime        `yaml:"agent_runtime" json:"agent_runtime"`
-	Providers    map[string]Provider `yaml:"providers" json:"providers"`
-	ModelCatalog map[string]Model    `yaml:"model_catalog" json:"model_catalog"`
-	Routing      Routing             `yaml:"routing" json:"routing"`
+	App              App                 `yaml:"app" json:"app"`
+	Database         Database            `yaml:"database" json:"database"`
+	Auth             Auth                `yaml:"auth" json:"auth"`
+	SOAR             SOAR                `yaml:"soar" json:"soar"`
+	Secrets          SecretReferences    `yaml:"secret_refs" json:"secret_refs"`
+	AgentRuntime     AgentRuntime        `yaml:"agent_runtime" json:"agent_runtime"`
+	ModelReliability ModelReliability    `yaml:"model_reliability" json:"model_reliability"`
+	Providers        map[string]Provider `yaml:"providers" json:"providers"`
+	ModelCatalog     map[string]Model    `yaml:"model_catalog" json:"model_catalog"`
+	Routing          Routing             `yaml:"routing" json:"routing"`
 }
 
 // App 描述不含 Secret 的进程环境元数据。
@@ -120,6 +121,31 @@ type AgentRuntime struct {
 	AdminQueryDatabaseDebug bool `yaml:"admin_query_database_debug" json:"admin_query_database_debug"`
 }
 
+// ModelReliability 描述进程级 Retry、breaker 与模型 QPS 保护参数。
+type ModelReliability struct {
+	Retry   ModelRetry   `yaml:"retry" json:"retry"`
+	Breaker ModelBreaker `yaml:"breaker" json:"breaker"`
+	Limiter ModelLimiter `yaml:"limiter" json:"limiter"`
+}
+
+// ModelRetry 只配置 Eino 官方 Retry 的次数和退避基数。
+type ModelRetry struct {
+	MaxRetries    int `yaml:"max_retries" json:"max_retries"`
+	BaseBackoffMS int `yaml:"base_backoff_ms" json:"base_backoff_ms"`
+}
+
+// ModelBreaker 配置按 provider-qualified Catalog Ref 隔离的跨请求健康状态。
+type ModelBreaker struct {
+	FailureThreshold int `yaml:"failure_threshold" json:"failure_threshold"`
+	OpenTimeoutMS    int `yaml:"open_timeout_ms" json:"open_timeout_ms"`
+}
+
+// ModelLimiter 配置按 provider-qualified Catalog Ref 隔离的进程级限流。
+type ModelLimiter struct {
+	QPS   float64 `yaml:"qps" json:"qps"`
+	Burst int     `yaml:"burst" json:"burst"`
+}
+
 // Provider 描述供应商实例的 Secret 引用与有限 Driver Endpoint。
 type Provider struct {
 	SecretRef    SecretRef         `yaml:"secret_ref" json:"secret_ref"`
@@ -145,9 +171,14 @@ type Pricing struct {
 }
 
 type Routing struct {
-	Chat      map[string]Route `yaml:"chat" json:"chat"`
-	Embedding map[string]Route `yaml:"embedding" json:"embedding"`
-	Rerank    map[string]Route `yaml:"rerank" json:"rerank"`
+	Chat      map[string]ChatRoute `yaml:"chat" json:"chat"`
+	Embedding map[string]Route     `yaml:"embedding" json:"embedding"`
+	Rerank    map[string]Route     `yaml:"rerank" json:"rerank"`
+}
+
+// ChatRoute 是一个业务 Profile 的有序候选列表。
+type ChatRoute struct {
+	Candidates []Route `yaml:"candidates" json:"candidates"`
 }
 
 type Route struct {
@@ -289,6 +320,15 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
+	if c.ModelReliability.Retry.MaxRetries < 0 || c.ModelReliability.Retry.BaseBackoffMS <= 0 {
+		return fmt.Errorf("model_reliability.retry requires non-negative max_retries and positive base_backoff_ms")
+	}
+	if c.ModelReliability.Breaker.FailureThreshold <= 0 || c.ModelReliability.Breaker.OpenTimeoutMS <= 0 {
+		return fmt.Errorf("model_reliability.breaker requires positive failure_threshold and open_timeout_ms")
+	}
+	if c.ModelReliability.Limiter.QPS <= 0 || c.ModelReliability.Limiter.Burst <= 0 {
+		return fmt.Errorf("model_reliability.limiter requires positive qps and burst")
+	}
 	if len(c.ModelCatalog) == 0 {
 		return fmt.Errorf("model_catalog is required")
 	}
@@ -340,10 +380,10 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("model %s pricing must use CNY per_million_tokens", ref)
 		}
 	}
-	if err := c.validateRoute("routing.chat.default", c.Routing.Chat["default"], "chat", "tool_calling"); err != nil {
+	if err := c.validateChatRoute("routing.chat.default", c.Routing.Chat["default"]); err != nil {
 		return err
 	}
-	if err := c.validateRoute("routing.chat.reasoning", c.Routing.Chat["reasoning"], "chat", "tool_calling"); err != nil {
+	if err := c.validateChatRoute("routing.chat.reasoning", c.Routing.Chat["reasoning"]); err != nil {
 		return err
 	}
 	if err := c.validateRoute("routing.embedding.default", c.Routing.Embedding["default"], "embedding"); err != nil {
@@ -351,6 +391,24 @@ func (c *Config) Validate() error {
 	}
 	if err := c.validateRoute("routing.rerank.default", c.Routing.Rerank["default"], "rerank"); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (c *Config) validateChatRoute(name string, profile ChatRoute) error {
+	if len(profile.Candidates) == 0 {
+		return fmt.Errorf("%s requires at least one candidate", name)
+	}
+	seen := make(map[string]struct{}, len(profile.Candidates))
+	for index, candidate := range profile.Candidates {
+		candidateName := fmt.Sprintf("%s.candidates[%d]", name, index)
+		if _, exists := seen[candidate.Model]; exists {
+			return fmt.Errorf("%s duplicate candidate %s", name, candidate.Model)
+		}
+		seen[candidate.Model] = struct{}{}
+		if err := c.validateRoute(candidateName, candidate, "chat", "tool_calling"); err != nil {
+			return err
+		}
 	}
 	return nil
 }

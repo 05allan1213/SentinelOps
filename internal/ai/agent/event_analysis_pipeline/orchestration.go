@@ -49,7 +49,7 @@ var GetEventAnalysisAgent = agent.NewSingletonAgent(agent.AgentConfig{
 func NewEventAnalysisAgent(ctx context.Context, m model.ToolCallingChatModel, handler *runtime.RuntimeHandler) (adk.Agent, error) {
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "EventAnalysisAgent", Description: "Call the Event Analysis Agent to query, analyze and correlate security events. Handles: recent events listing, CVE analysis, severity distribution, event timeline, subscription status, threat correlation. Returns structured analysis results.",
-		Instruction: agents.EventAnalysis, Model: m, RuntimeHandler: handler, MaxIterations: eventAnalysisMaxStep,
+		Instruction: agents.EventAnalysis, Model: m, Profile: "default", RuntimeHandler: handler, MaxIterations: eventAnalysisMaxStep,
 		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: true, SplitEnabled: true},
 		ToolNames:        eventAnalysisL0Tools,
 	})
@@ -63,11 +63,7 @@ var (
 
 // BuildDurableEventAnalysisAgent 使用调用方提供的唯一 RuntimeHandler 构建 L0 专业 Agent。
 func BuildDurableEventAnalysisAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
-	m, err := newEventModel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return NewEventAnalysisAgent(ctx, m, handler)
+	return NewEventAnalysisAgent(ctx, nil, handler)
 }
 
 // GetDurableEventAnalysisAgent lazily constructs the ADK specialist. It is not

@@ -46,7 +46,7 @@ var GetReportAgent = agent.NewSingletonAgent(agent.AgentConfig{
 func NewReportAgent(ctx context.Context, m model.ToolCallingChatModel, handler *runtime.RuntimeHandler) (adk.Agent, error) {
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "ReportAgent", Description: "Call the Report Agent to generate structured security reports (weekly/monthly/custom). Handles: creating new reports, querying existing reports, fetching report templates, summarizing event trends. Returns report content or creation confirmation.",
-		Instruction: agents.Report, Model: m, RuntimeHandler: handler, MaxIterations: reportMaxIterations,
+		Instruction: agents.Report, Model: m, Profile: "reasoning", RuntimeHandler: handler, MaxIterations: reportMaxIterations,
 		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: true, SplitEnabled: true},
 		ToolNames:        reportTools,
 	})
@@ -60,11 +60,7 @@ var (
 
 // BuildDurableReportAgent 使用调用方提供的唯一 RuntimeHandler 构建报告 Agent。
 func BuildDurableReportAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
-	m, err := newReportModel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return NewReportAgent(ctx, m, handler)
+	return NewReportAgent(ctx, nil, handler)
 }
 
 // GetDurableReportAgent 懒构建 ADK 报告 Agent；P19 负责接入 Planner/AgentTool。

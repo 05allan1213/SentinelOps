@@ -33,9 +33,9 @@ func TestChatProfileUsesProviderSelectedByRouting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	route := cfg.Routing.Chat["default"]
+	route := cfg.Routing.Chat["default"].Candidates[0]
 	route.Model = "provider_b/chat"
-	cfg.Routing.Chat["default"] = route
+	cfg.Routing.Chat["default"] = appconfig.ChatRoute{Candidates: []appconfig.Route{route}}
 
 	profile, err := resolveChatProfile(cfg, "default")
 	if err != nil {
@@ -51,9 +51,9 @@ func TestChatProfileOmitsUnconfiguredThinkingOption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	route := cfg.Routing.Chat["default"]
+	route := cfg.Routing.Chat["default"].Candidates[0]
 	route.Options = appconfig.RouteOptions{}
-	cfg.Routing.Chat["default"] = route
+	cfg.Routing.Chat["default"] = appconfig.ChatRoute{Candidates: []appconfig.Route{route}}
 
 	profile, err := resolveChatProfile(cfg, "default")
 	if err != nil {
@@ -100,8 +100,12 @@ model_catalog:
     pricing: {revision: test-v1, currency: CNY, unit: per_million_tokens, input: 0.5}
 routing:
   chat:
-    default: {model: provider_a/chat, options: {enable_thinking: false}}
-    reasoning: {model: provider_a/chat, options: {enable_thinking: true}}
+    default:
+      candidates:
+        - {model: provider_a/chat, options: {enable_thinking: false}}
+    reasoning:
+      candidates:
+        - {model: provider_a/chat, options: {enable_thinking: true}}
   embedding:
     default: {model: provider_a/embed}
   rerank:

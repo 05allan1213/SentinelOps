@@ -92,9 +92,9 @@ func TestRuntimeSnapshotProviderQualifiedIdentityAndSecretsExcluded(t *testing.T
 			"provider_a/chat": {ModelID: "shared-vendor-id", Driver: appconfig.DriverOpenAICompatibleChat, Pricing: appconfig.Pricing{Revision: "pricing-1", Currency: "CNY", Unit: "per_million_tokens"}},
 			"provider_b/chat": {ModelID: "shared-vendor-id", Driver: appconfig.DriverOpenAICompatibleChat, Pricing: appconfig.Pricing{Revision: "pricing-1", Currency: "CNY", Unit: "per_million_tokens"}},
 		},
-		Routing: appconfig.Routing{Chat: map[string]appconfig.Route{
-			"default":   {Model: "provider_a/chat"},
-			"reasoning": {Model: "provider_b/chat"},
+		Routing: appconfig.Routing{Chat: map[string]appconfig.ChatRoute{
+			"default":   {Candidates: []appconfig.Route{{Model: "provider_a/chat"}}},
+			"reasoning": {Candidates: []appconfig.Route{{Model: "provider_b/chat"}}},
 		}},
 	}
 	a, err := ModelSnapshotFromRoute(cfg, "chat", "default")

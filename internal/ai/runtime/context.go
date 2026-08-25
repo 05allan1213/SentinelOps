@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"SentinelOps/internal/ai/policy"
@@ -80,7 +81,8 @@ type AttemptContext struct {
 	Snapshot FrozenRuntimeSnapshot
 	History  json.RawMessage
 
-	cancel context.CancelFunc
+	cancel        context.CancelFunc
+	physicalCalls *atomic.Uint64
 }
 
 // Cancel 释放 Attempt deadline timer，并传播协作式取消。
@@ -161,7 +163,7 @@ func BuildAttemptContext(parent context.Context, claimed workflow.ClaimedRun, bu
 		},
 		Identity: validatedIdentity, Scope: validatedIdentity.Scope, Budget: budget, Lease: claimed.Token,
 		Trace: TraceIdentity{ID: uuid.NewString()}, Deadline: deadline, Snapshot: snapshot,
-		History: append(json.RawMessage(nil), stored.History...), cancel: cancel,
+		History: append(json.RawMessage(nil), stored.History...), cancel: cancel, physicalCalls: &atomic.Uint64{},
 	}
 	return context.WithValue(leaseContext, attemptContextKey{}, attempt), attempt, nil
 }

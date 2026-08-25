@@ -47,7 +47,7 @@ var GetRiskAgent = agent.NewSingletonAgent(agent.AgentConfig{
 func NewRiskAgent(ctx context.Context, m model.ToolCallingChatModel, handler *runtime.RuntimeHandler) (adk.Agent, error) {
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "RiskAgent", Description: "Call the Risk Assessment Agent to evaluate CVE severity, attack paths, and impact scope. Handles: CVE risk scoring, vulnerability assessment, CVSS analysis, attack surface analysis, mitigation priority ranking. Returns structured risk assessment.",
-		Instruction: agents.Risk, Model: m, RuntimeHandler: handler, MaxIterations: riskMaxIterations,
+		Instruction: agents.Risk, Model: m, Profile: "reasoning", RuntimeHandler: handler, MaxIterations: riskMaxIterations,
 		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: true, SplitEnabled: true},
 		ToolNames:        riskL0Tools,
 	})
@@ -61,11 +61,7 @@ var (
 
 // BuildDurableRiskAgent 使用调用方提供的唯一 RuntimeHandler 构建 L0 风险 Agent。
 func BuildDurableRiskAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
-	m, err := newRiskModel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return NewRiskAgent(ctx, m, handler)
+	return NewRiskAgent(ctx, nil, handler)
 }
 
 // GetDurableRiskAgent lazily constructs the ADK specialist. P19 owns outer

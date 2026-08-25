@@ -44,6 +44,9 @@ func TestExecutorBuilder(t *testing.T) {
 	if len(cfg.Handlers) != 1 || cfg.Handlers[0] != handler {
 		t.Fatalf("Handlers 未保持唯一 RuntimeHandler 最外层: %#v", cfg.Handlers)
 	}
+	if cfg.Model != chatModel || cfg.ModelRetryConfig != nil || cfg.ModelFailoverConfig != nil {
+		t.Fatalf("旧兼容路径可靠性配置 = Model:%T Retry:%#v Failover:%#v, want 仅直连 Model", cfg.Model, cfg.ModelRetryConfig, cfg.ModelFailoverConfig)
+	}
 	if len(cfg.ToolsConfig.Tools) != 2 {
 		t.Fatalf("Executor Tool 数量 = %d, want Registry + AgentTool", len(cfg.ToolsConfig.Tools))
 	}

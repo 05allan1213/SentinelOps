@@ -232,41 +232,62 @@ func RuntimeSnapshotFromRun(run mysql.WorkflowRun) (FrozenRuntimeSnapshot, error
 
 // ModelSnapshotFromRoute 从唯一 Provider → Model Catalog → Routing 构造模型身份。
 func ModelSnapshotFromRoute(cfg *appconfig.Config, kind, profile string) (ModelSnapshot, error) {
-	if cfg == nil {
-		return ModelSnapshot{}, fmt.Errorf("application configuration is required")
-	}
-	var routes map[string]appconfig.Route
-	switch kind {
-	case "chat":
-		routes = cfg.Routing.Chat
-	case "embedding":
-		routes = cfg.Routing.Embedding
-	case "rerank":
-		routes = cfg.Routing.Rerank
-	default:
-		return ModelSnapshot{}, fmt.Errorf("unsupported model route kind %q", kind)
-	}
-	route, ok := routes[profile]
-	if !ok {
-		return ModelSnapshot{}, fmt.Errorf("routing.%s.%s is not configured", kind, profile)
-	}
-	_, model, err := cfg.Resolve(route)
+	models, err := ModelSnapshotsFromRoute(cfg, kind, profile)
 	if err != nil {
 		return ModelSnapshot{}, err
 	}
-	provider, _, ok := strings.Cut(route.Model, "/")
-	if !ok || provider == "" {
-		return ModelSnapshot{}, fmt.Errorf("model reference %q is not provider-qualified", route.Model)
+	return models[0], nil
+}
+
+// ModelSnapshotsFromRoute 为 Chat Profile 保留全部有序候选身份。
+func ModelSnapshotsFromRoute(cfg *appconfig.Config, kind, profile string) ([]ModelSnapshot, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("application configuration is required")
 	}
-	return ModelSnapshot{
-		Kind: kind, Profile: profile, CatalogRef: route.Model, Provider: provider,
-		Driver: model.Driver, ModelID: model.ModelID,
-		RouteOptions: RouteOptionsSnapshot{EnableThinking: cloneBool(route.Options.EnableThinking), Instruct: route.Options.Instruct},
-		Pricing: PricingSnapshot{
-			Revision: model.Pricing.Revision, Currency: model.Pricing.Currency, Unit: model.Pricing.Unit,
-			Input: model.Pricing.Input, CachedInput: model.Pricing.CachedInput, Output: model.Pricing.Output,
-		},
-	}, nil
+	var routes []appconfig.Route
+	switch kind {
+	case "chat":
+		chatRoute, ok := cfg.Routing.Chat[profile]
+		if !ok || len(chatRoute.Candidates) == 0 {
+			return nil, fmt.Errorf("routing.%s.%s is not configured", kind, profile)
+		}
+		routes = chatRoute.Candidates
+	case "embedding":
+		route, ok := cfg.Routing.Embedding[profile]
+		if !ok {
+			return nil, fmt.Errorf("routing.%s.%s is not configured", kind, profile)
+		}
+		routes = []appconfig.Route{route}
+	case "rerank":
+		route, ok := cfg.Routing.Rerank[profile]
+		if !ok {
+			return nil, fmt.Errorf("routing.%s.%s is not configured", kind, profile)
+		}
+		routes = []appconfig.Route{route}
+	default:
+		return nil, fmt.Errorf("unsupported model route kind %q", kind)
+	}
+	result := make([]ModelSnapshot, 0, len(routes))
+	for order, route := range routes {
+		_, catalogModel, err := cfg.Resolve(route)
+		if err != nil {
+			return nil, err
+		}
+		provider, _, qualified := strings.Cut(route.Model, "/")
+		if !qualified || provider == "" {
+			return nil, fmt.Errorf("model reference %q is not provider-qualified", route.Model)
+		}
+		result = append(result, ModelSnapshot{
+			Kind: kind, Profile: profile, CandidateOrder: order, CatalogRef: route.Model, Provider: provider,
+			Driver: catalogModel.Driver, ModelID: catalogModel.ModelID,
+			RouteOptions: RouteOptionsSnapshot{EnableThinking: cloneBool(route.Options.EnableThinking), Instruct: route.Options.Instruct},
+			Pricing: PricingSnapshot{
+				Revision: catalogModel.Pricing.Revision, Currency: catalogModel.Pricing.Currency, Unit: catalogModel.Pricing.Unit,
+				Input: catalogModel.Pricing.Input, CachedInput: catalogModel.Pricing.CachedInput, Output: catalogModel.Pricing.Output,
+			},
+		})
+	}
+	return result, nil
 }
 
 func decodeSnapshotField(name, value string, destination any) error {
