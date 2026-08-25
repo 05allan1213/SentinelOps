@@ -2,8 +2,12 @@ package trace
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
+
+	"SentinelOps/internal/ai/policy"
 )
 
 // ── Context 传播设计 ───────────────────────────────────────────────────────────
@@ -26,6 +30,8 @@ type traceCtxKey struct{}
 // Eino callback 的 OnStart 注入，OnEnd/OnError 读取，用于精确匹配开始/结束的节点。
 // 与 SpanStack 分离：Stack 维护父子关系，nodeIDKey 只标识"当前正在执行的节点"。
 type nodeIDKey struct{}
+
+type modelMetadataKey struct{}
 
 // ── 节点调用栈 SpanStack ──────────────────────────────────────────────────────
 //
@@ -93,6 +99,8 @@ type ActiveTrace struct {
 	TraceID   string
 	StartTime time.Time
 	Stack     *SpanStack
+	Attempt   AttemptMetadata
+	writeCtx  context.Context
 
 	// nodeStartTimes：记录每个节点的 startTime（nodeID → time.Time）。
 	// 原因：Eino callback 的 OnStart 和 OnEnd 是两次独立的函数调用，
@@ -119,14 +127,135 @@ type ActiveTrace struct {
 
 	// pendingNodeIDs：已 INSERT 但尚未 UPDATE 为终态的节点 ID 集合。
 	// OnStart / StartSpan 时加入，OnEnd / OnError / FinishSpan 时移除。
-	// asyncFinishRun 的兜底清理使用此集合（WHERE node_id IN (...)），
+	// AttemptBarrier.Flush 的兜底清理使用此集合（WHERE node_id IN (...)），
 	// 替代原来的范围扫描（WHERE trace_id = ? AND status = 'running'），
 	// 从根本上避免 InnoDB Next-Key Lock 与并发点更新之间的死锁。
 	pendingNodeIDs map[string]struct{}
 
 	// StreamWg 跟踪所有 OnEndWithStreamOutput 启动的后台排空 goroutine。
-	// asyncFinishRun 通过 WaitGroup + 超时等待这些 goroutine 完成，
-	StreamWg sync.WaitGroup
+	// AttemptBarrier.Flush 通过 WaitGroup + deadline 等待这些 goroutine 完成。
+	StreamWg  sync.WaitGroup
+	writeWg   sync.WaitGroup
+	writeErr  error
+	finish    traceFinish
+	submitMu  sync.Mutex
+	writeTail chan struct{}
+}
+
+type traceFinish struct {
+	set     bool
+	status  string
+	errMsg  string
+	errCode string
+	endTime time.Time
+}
+
+func newActiveTrace(ctx context.Context, metadata AttemptMetadata) (*ActiveTrace, error) {
+	if ctx == nil || metadata.TraceID == "" {
+		return nil, fmt.Errorf("Trace context and trace_id are required")
+	}
+	if metadata.RunID != "" && (metadata.Attempt == 0 || metadata.LeaseGeneration == 0 || metadata.RuntimeVersion == "") {
+		return nil, fmt.Errorf("durable Attempt Trace identity is incomplete")
+	}
+	metadata.Query = policy.NewRedactor().RedactText(metadata.Query)
+	metadata.Models = append([]ModelMetadata(nil), metadata.Models...)
+	return &ActiveTrace{
+		TraceID: metadata.TraceID, StartTime: time.Now(), Stack: &SpanStack{}, Attempt: metadata,
+		writeCtx: context.WithoutCancel(ctx),
+	}, nil
+}
+
+func (t *ActiveTrace) nodeMetadata(model ModelMetadata) (string, error) {
+	metadata := t.nodeMetadataMap(model)
+	redacted, err := redactTraceValue(metadata)
+	if err != nil {
+		return "", err
+	}
+	encoded, err := json.Marshal(redacted)
+	return string(encoded), err
+}
+
+func (t *ActiveTrace) nodeMetadataMap(model ModelMetadata) map[string]any {
+	metadata := map[string]any{
+		"trace_id": t.TraceID,
+	}
+	if t.Attempt.RunID != "" {
+		metadata["run_id"] = t.Attempt.RunID
+		metadata["attempt"] = t.Attempt.Attempt
+		metadata["lease_generation"] = t.Attempt.LeaseGeneration
+		metadata["runtime_version"] = t.Attempt.RuntimeVersion
+	}
+	if model.valid() {
+		metadata["model"] = model.metadata()
+	}
+	return metadata
+}
+
+func (t *ActiveTrace) mergeNodeMetadata(encoded string, model ModelMetadata) string {
+	metadata := t.nodeMetadataMap(model)
+	if encoded != "" {
+		var current map[string]any
+		if json.Unmarshal([]byte(encoded), &current) == nil {
+			for key, value := range current {
+				metadata[key] = value
+			}
+		}
+	}
+	redacted, err := redactTraceValue(metadata)
+	if err != nil {
+		return ""
+	}
+	value, err := json.Marshal(redacted)
+	if err != nil {
+		return ""
+	}
+	return string(value)
+}
+
+func (t *ActiveTrace) resolveModel(kind, modelName string) ModelMetadata {
+	for _, model := range t.Attempt.Models {
+		if (kind == "" || model.Kind == kind) && (model.ModelID == modelName || model.CatalogRef == modelName) {
+			return model
+		}
+	}
+	return ModelMetadata{}
+}
+
+func (t *ActiveTrace) addWriteError(err error) {
+	if err == nil {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.writeErr == nil {
+		t.writeErr = err
+	}
+}
+
+func (t *ActiveTrace) writeError() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.writeErr
+}
+
+// WithModelMetadata 将当前 physical Model 的快照身份传给同一 Eino Callback 链。
+func WithModelMetadata(ctx context.Context, metadata ModelMetadata) context.Context {
+	if ctx == nil || !metadata.valid() {
+		return ctx
+	}
+	return context.WithValue(ctx, modelMetadataKey{}, metadata)
+}
+
+func modelMetadataFromContext(ctx context.Context) ModelMetadata {
+	if ctx == nil {
+		return ModelMetadata{}
+	}
+	metadata, _ := ctx.Value(modelMetadataKey{}).(ModelMetadata)
+	return metadata
+}
+
+func redactTraceValue(value any) (any, error) {
+	return policy.NewRedactor().Redact(value)
 }
 
 // AddTokens 线程安全地向 ActiveTrace 累加 Token 数量。

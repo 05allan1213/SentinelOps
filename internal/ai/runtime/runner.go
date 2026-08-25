@@ -12,6 +12,7 @@ import (
 
 	"SentinelOps/internal/ai/evidence"
 	"SentinelOps/internal/ai/policy"
+	aitrace "SentinelOps/internal/ai/trace"
 	"SentinelOps/internal/ai/workflow"
 
 	"github.com/cloudwego/eino/adk"
@@ -58,7 +59,7 @@ func NewDurableExecutor(store *workflow.GORMStore, resolver AgentResolver, curre
 }
 
 // ExecuteClaimedRun 从 MySQL 快照重建 Context，并只通过 P12 StartRecovery 调用官方 Runner。
-func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workflow.ClaimedRun) (RunExecutionResult, error) {
+func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workflow.ClaimedRun) (result RunExecutionResult, execErr error) {
 	if e == nil || claimed == nil || claimed.Run.ImmutableInputJSON == nil {
 		return RunExecutionResult{}, fmt.Errorf("claimed durable Run input is required")
 	}
@@ -71,6 +72,29 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 		return RunExecutionResult{}, err
 	}
 	defer attempt.Cancel()
+	models := make([]aitrace.ModelMetadata, 0, len(attempt.Snapshot.Models()))
+	for _, model := range attempt.Snapshot.Models() {
+		models = append(models, aitrace.ModelMetadata{
+			Kind: model.Kind, CatalogRef: model.CatalogRef, Provider: model.Provider, Driver: model.Driver,
+			ModelID: model.ModelID, Profile: model.Profile,
+			RouteOptions:     map[string]any{"enable_thinking": model.RouteOptions.EnableThinking, "instruct": model.RouteOptions.Instruct},
+			SnapshotIdentity: model.Identity(), PricingRevision: model.Pricing.Revision,
+			PricingCurrency: model.Pricing.Currency, PricingUnit: model.Pricing.Unit,
+			InputPrice: model.Pricing.Input, CachedInputPrice: model.Pricing.CachedInput, OutputPrice: model.Pricing.Output,
+		})
+	}
+	attemptCtx, traceBarrier, err := aitrace.StartAttempt(attemptCtx, aitrace.AttemptMetadata{
+		TraceID: attempt.Trace.ID, RunID: attempt.Run.ID, SessionID: attempt.Run.SessionID,
+		Attempt: attempt.Run.Attempt, LeaseGeneration: attempt.Run.LeaseGeneration,
+		RuntimeVersion: attempt.Run.RuntimeVersion, Query: input.Query, Models: models,
+	})
+	if err != nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+	}
+	defer func() {
+		result.TraceID = attempt.Trace.ID
+		result.TraceBarrier = traceBarrier
+	}()
 	agent, err := e.resolveAgent(attemptCtx, input.Agent)
 	if err != nil {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
@@ -188,7 +212,7 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 	}
 	return RunExecutionResult{
 		OutputPayload: string(outputPayload), RevisionStateJSON: revision,
-		TraceQuality: "unknown", TraceID: attempt.Trace.ID,
+		TraceQuality: "unknown", TraceID: attempt.Trace.ID, TraceBarrier: traceBarrier,
 	}, nil
 }
 

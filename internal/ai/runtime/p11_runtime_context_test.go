@@ -184,7 +184,7 @@ func TestTypedContextRebuildsAttemptFromDatabaseTruth(t *testing.T) {
 	}
 }
 
-func TestAttemptPreservesRunSnapshotAndRotatesAttemptTrace(t *testing.T) {
+func TestTraceAttemptPreservesRunSnapshotAndRotatesTraceID(t *testing.T) {
 	baseRun, frozen := p11AttemptRun(t)
 	_, first, err := BuildAttemptContext(context.Background(), workflow.ClaimedRun{
 		Run: baseRun, Token: workflow.LeaseToken{RunID: baseRun.ID, Owner: "worker-a", Generation: 1},

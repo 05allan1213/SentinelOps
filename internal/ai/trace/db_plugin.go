@@ -166,12 +166,14 @@ func (p *GORMPlugin) dbAfterCallback(db *gorm.DB) {
 		metadata["sql"] = sqlText
 	}
 
-	metaJSON := ""
-	if b, err := jsonMarshal(metadata); err == nil {
-		metaJSON = string(b)
+	metaJSON := at.mergeNodeMetadata("", ModelMetadata{})
+	if redacted, err := redactTraceValue(metadata); err == nil {
+		if b, marshalErr := jsonMarshal(redacted); marshalErr == nil {
+			metaJSON = at.mergeNodeMetadata(string(b), ModelMetadata{})
+		}
 	}
 
-	asyncInsertNode(&dao.TraceNode{
+	asyncInsertNode(at, &dao.TraceNode{
 		TraceID:      at.TraceID,
 		NodeID:       nodeID,
 		ParentNodeID: parentID,

@@ -13,6 +13,7 @@ import (
 	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/limiter"
 	"SentinelOps/internal/ai/policy"
+	aitrace "SentinelOps/internal/ai/trace"
 	"SentinelOps/internal/ai/workflow"
 
 	"github.com/cloudwego/eino/adk"
@@ -315,7 +316,27 @@ func (h *RuntimeHandler) prepareModelCall(ctx context.Context, input ...[]*schem
 		return nil, nil, BudgetReservation{}, err
 	}
 	metadata := runtimeCallMetadata(attempt, reservation.Identity, BudgetCallKindModel, invocation.CatalogRef, &invocation)
-	return context.WithValue(ctx, callMetadataContextKey{}, metadata), budget, reservation, nil
+	callCtx := context.WithValue(ctx, callMetadataContextKey{}, metadata)
+	callCtx = aitrace.WithModelMetadata(callCtx, traceModelMetadata(attempt.Snapshot, invocation))
+	return callCtx, budget, reservation, nil
+}
+
+func traceModelMetadata(snapshot FrozenRuntimeSnapshot, invocation ModelInvocation) aitrace.ModelMetadata {
+	metadata := aitrace.ModelMetadata{
+		Kind: "chat", CatalogRef: invocation.CatalogRef, Provider: invocation.Provider, Driver: invocation.Driver,
+		ModelID: invocation.ModelID, Profile: invocation.Profile, SnapshotIdentity: invocation.SnapshotIdentity,
+		PricingRevision: invocation.PricingRevision, PricingCurrency: invocation.PricingCurrency, PricingUnit: invocation.PricingUnit,
+		InputPrice: invocation.InputPrice, CachedInputPrice: invocation.CachedInputPrice, OutputPrice: invocation.OutputPrice,
+	}
+	for _, candidate := range snapshot.Models() {
+		if candidate.Identity() != invocation.SnapshotIdentity {
+			continue
+		}
+		metadata.Kind = candidate.Kind
+		metadata.RouteOptions = map[string]any{"enable_thinking": candidate.RouteOptions.EnableThinking, "instruct": candidate.RouteOptions.Instruct}
+		break
+	}
+	return metadata
 }
 
 func modelBudgetEstimate(input []*schema.Message) workflow.BaseBudgetEstimate {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 	"SentinelOps/utility/stringutil"
 
@@ -69,8 +70,10 @@ func StartSpan(ctx context.Context, nodeType, nodeName string) (context.Context,
 	now := time.Now()
 
 	at.SetNodeStartTime(nodeID, now)
+	modelMetadata := at.resolveModel(modelKindForNodeType(nodeType), nodeName)
+	metadata, _ := at.nodeMetadata(modelMetadata)
 
-	asyncInsertNode(&dao.TraceNode{
+	asyncInsertNode(at, &dao.TraceNode{
 		TraceID:      at.TraceID,
 		NodeID:       nodeID,
 		ParentNodeID: parentID,
@@ -79,6 +82,7 @@ func StartSpan(ctx context.Context, nodeType, nodeName string) (context.Context,
 		NodeName:     nodeName,
 		Status:       StatusRunning,
 		StartTime:    now,
+		Metadata:     metadata,
 	})
 	at.TrackNode(nodeID)
 
@@ -119,7 +123,8 @@ func FinishSpan(ctx context.Context, nodeID string, err error, meta map[string]a
 		if hit, ok := meta["hit"].(bool); ok {
 			update.CacheHit = hit
 		}
-		if b, e := json.Marshal(meta); e == nil {
+		redacted, redactErr := redactTraceValue(meta)
+		if b, e := json.Marshal(redacted); redactErr == nil && e == nil {
 			update.Metadata = string(b)
 		}
 	}
@@ -128,13 +133,17 @@ func FinishSpan(ctx context.Context, nodeID string, err error, meta map[string]a
 	errMsg, errCode, errType := "", "", ""
 	if err != nil {
 		status = StatusError
-		errMsg = stringutil.TruncateError(err, GetConfig().MaxErrorLength)
+		errMsg = policy.NewRedactor().RedactText(stringutil.TruncateError(err, GetConfig().MaxErrorLength))
 		errCode, errType = classifyError(err)
 	}
 
 	// 将 UntrackNode 推迟到 asyncFinishNode goroutine 的 UPDATE 完成后，
 	// 避免 INSERT/UPDATE 竞态下节点提前从 pendingNodeIDs 移除。
-	asyncFinishNode(nodeID, status, errMsg, errCode, errType, nodeStartTime, endTime, update,
+	if update == nil {
+		update = &NodeUpdate{}
+	}
+	update.Metadata = at.mergeNodeMetadata(update.Metadata, ModelMetadata{})
+	asyncFinishNode(at, nodeID, status, errMsg, errCode, errType, nodeStartTime, endTime, update,
 		func() { at.UntrackNode(nodeID) })
 }
 
@@ -161,7 +170,11 @@ func FinishSpanWithCost(ctx context.Context, nodeID, modelName string, inputToke
 	if inputTokens > 0 || outputTokens > 0 {
 		at.AddTokensWithModel(inputTokens, outputTokens, modelName)
 	}
-	costCNY := estimateCost(ctx, modelName, int64(inputTokens), int64(outputTokens))
+	modelMetadata := at.resolveModel("", modelName)
+	costCNY := modelMetadata.cost(int64(inputTokens), 0, int64(outputTokens), 0)
+	if !modelMetadata.valid() {
+		costCNY = estimateCost(ctx, modelName, int64(inputTokens), int64(outputTokens))
+	}
 	if costCNY > 0 {
 		at.AddCost(costCNY)
 	}
@@ -171,16 +184,30 @@ func FinishSpanWithCost(ctx context.Context, nodeID, modelName string, inputToke
 		InputTokens:  inputTokens,
 		OutputTokens: outputTokens,
 		CostCNY:      costCNY,
+		Metadata:     at.mergeNodeMetadata("", modelMetadata),
 	}
 
 	status := StatusSuccess
 	errMsg, errCode, errType := "", "", ""
 	if err != nil {
 		status = StatusError
-		errMsg = stringutil.TruncateError(err, GetConfig().MaxErrorLength)
+		errMsg = policy.NewRedactor().RedactText(stringutil.TruncateError(err, GetConfig().MaxErrorLength))
 		errCode, errType = classifyError(err)
 	}
 
-	asyncFinishNode(nodeID, status, errMsg, errCode, errType, nodeStartTime, endTime, update,
+	asyncFinishNode(at, nodeID, status, errMsg, errCode, errType, nodeStartTime, endTime, update,
 		func() { at.UntrackNode(nodeID) })
+}
+
+func modelKindForNodeType(nodeType string) string {
+	switch nodeType {
+	case NodeTypeLLM:
+		return "chat"
+	case NodeTypeEmbedding:
+		return "embedding"
+	case NodeTypeRerank:
+		return "rerank"
+	default:
+		return ""
+	}
 }

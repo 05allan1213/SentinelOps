@@ -29,6 +29,11 @@
 
 package trace
 
+import (
+	"math"
+	"strings"
+)
+
 // ── 链路状态常量 ───────────────────────────────────────────────────────────────
 //
 //	running：链路/节点已启动，尚未收到结束信号
@@ -39,6 +44,72 @@ const (
 	StatusSuccess = "success"
 	StatusError   = "error"
 )
+
+const (
+	// TraceQualityComplete 表示 Attempt 的全部 MySQL Trace 写已在 deadline 内完成。
+	TraceQualityComplete = "complete"
+	// TraceQualityIncomplete 表示 barrier 超时或任一 MySQL Trace 写失败。
+	TraceQualityIncomplete = "incomplete"
+)
+
+// AttemptMetadata 是 durable Attempt 注入现有 MySQL Trace 的关联事实。
+type AttemptMetadata struct {
+	TraceID         string
+	RunID           string
+	SessionID       string
+	Attempt         uint
+	LeaseGeneration uint64
+	RuntimeVersion  string
+	Query           string
+	Models          []ModelMetadata
+}
+
+// ModelMetadata 保存 provider-qualified Model Snapshot 和快照定价，不包含 Secret。
+type ModelMetadata struct {
+	Kind             string
+	CatalogRef       string
+	Provider         string
+	Driver           string
+	ModelID          string
+	Profile          string
+	RouteOptions     map[string]any
+	SnapshotIdentity string
+	PricingRevision  string
+	PricingCurrency  string
+	PricingUnit      string
+	InputPrice       float64
+	CachedInputPrice float64
+	OutputPrice      float64
+}
+
+func (m ModelMetadata) metadata() map[string]any {
+	return map[string]any{
+		"kind": m.Kind, "catalog_ref": m.CatalogRef, "provider": m.Provider, "driver": m.Driver,
+		"model_id": m.ModelID, "profile": m.Profile, "route_options": m.RouteOptions,
+		"model_snapshot_identity": m.SnapshotIdentity, "pricing_revision": m.PricingRevision,
+		"pricing_currency": m.PricingCurrency, "pricing_unit": m.PricingUnit,
+	}
+}
+
+func (m ModelMetadata) cost(input, cachedInput, output, reasoning int64) float64 {
+	if input < 0 {
+		input = 0
+	}
+	if output < 0 {
+		output = 0
+	}
+	cachedInput = max(min(cachedInput, input), 0)
+	reasoning = max(min(reasoning, output), 0)
+	regularInput := input - cachedInput
+	value := (float64(regularInput)*m.InputPrice + float64(cachedInput)*m.CachedInputPrice + float64(output)*m.OutputPrice) / 1_000_000
+	return math.Round(value*1e9) / 1e9
+}
+
+func (m ModelMetadata) valid() bool {
+	provider, _, ok := strings.Cut(m.CatalogRef, "/")
+	return ok && provider == m.Provider && m.Kind != "" && m.Driver != "" && m.ModelID != "" &&
+		m.Profile != "" && m.SnapshotIdentity != "" && m.PricingRevision != ""
+}
 
 // ── 节点类型常量 ───────────────────────────────────────────────────────────────
 //

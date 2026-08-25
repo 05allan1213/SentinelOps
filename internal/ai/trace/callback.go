@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"SentinelOps/internal/ai/evidence"
+	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 	"SentinelOps/utility/stringutil"
 
@@ -84,8 +85,10 @@ func NewCallbackHandler() callbacks.Handler {
 		nodeStartTime := time.Now()
 
 		at.SetNodeStartTime(nodeID, nodeStartTime)
+		modelMetadata := modelMetadataFromContext(ctx)
+		metadata, _ := at.nodeMetadata(modelMetadata)
 
-		asyncInsertNode(&dao.TraceNode{
+		asyncInsertNode(at, &dao.TraceNode{
 			TraceID:      at.TraceID,
 			NodeID:       nodeID,
 			ParentNodeID: parentID,
@@ -94,13 +97,14 @@ func NewCallbackHandler() callbacks.Handler {
 			NodeName:     resolveNodeName(info),
 			Status:       StatusRunning,
 			StartTime:    nodeStartTime,
+			Metadata:     metadata,
 		})
 		at.TrackNode(nodeID)
 
 		// TOOL 节点：在 OnStart 捕获输入参数（OnEnd 时输入已不可见）
 		if info.Component == components.ComponentOfTool {
 			if toolIn := tool.ConvCallbackInput(input); toolIn != nil && toolIn.ArgumentsInJSON != "" {
-				at.SetToolInput(nodeID, stringutil.TruncateRunes(toolIn.ArgumentsInJSON, 1000))
+				at.SetToolInput(nodeID, policy.NewRedactor().RedactText(stringutil.TruncateRunes(toolIn.ArgumentsInJSON, 1000)))
 			}
 		}
 
@@ -126,7 +130,7 @@ func NewCallbackHandler() callbacks.Handler {
 		update := buildNodeUpdate(ctx, info, output, at, nodeID)
 		// 将 UntrackNode 推迟到 asyncFinishNode goroutine 的 UPDATE 完成后，
 		// 避免 INSERT/UPDATE 竞态下节点提前从 pendingNodeIDs 移除。
-		asyncFinishNode(nodeID, StatusSuccess, "", "", "", nodeStartTime, endTime, update,
+		asyncFinishNode(at, nodeID, StatusSuccess, "", "", "", nodeStartTime, endTime, update,
 			func() { at.UntrackNode(nodeID) })
 		at.Stack.Pop()
 		return ctx
@@ -145,7 +149,7 @@ func NewCallbackHandler() callbacks.Handler {
 		errCode, errType := classifyError(err)
 		endTime := time.Now()
 		nodeStartTime := at.GetNodeStartTime(nodeID)
-		asyncFinishNode(nodeID, StatusError, stringutil.TruncateError(err, GetConfig().MaxErrorLength), errCode, errType, nodeStartTime, endTime, nil,
+		asyncFinishNode(at, nodeID, StatusError, policy.NewRedactor().RedactText(stringutil.TruncateError(err, GetConfig().MaxErrorLength)), errCode, errType, nodeStartTime, endTime, nil,
 			func() { at.UntrackNode(nodeID) })
 		at.Stack.Pop()
 		return ctx
@@ -173,7 +177,7 @@ func NewCallbackHandler() callbacks.Handler {
 		}
 		nodeStartTime := at.GetNodeStartTime(nodeID)
 		// 后台排空流：读取所有 chunk，取最后一个（含完整 TokenUsage）写终态。
-		// Add(1) 在 goroutine 外调用，避免 asyncFinishRun 在 goroutine 启动前就 Wait() 通过的竞态。
+		// Add(1) 在 goroutine 外调用，避免 Attempt barrier 在 goroutine 启动前就 Wait() 通过的竞态。
 		at.StreamWg.Add(1)
 		go func() {
 			defer at.StreamWg.Done()
@@ -185,7 +189,7 @@ func NewCallbackHandler() callbacks.Handler {
 					if err != io.EOF {
 						// 流异常（网络断开、LLM 报错等）：标记为错误
 						errCode, errType := classifyError(err)
-						asyncFinishNode(nodeID, StatusError, stringutil.TruncateError(err, GetConfig().MaxErrorLength), errCode, errType, nodeStartTime, time.Now(), nil,
+						asyncFinishNode(at, nodeID, StatusError, policy.NewRedactor().RedactText(stringutil.TruncateError(err, GetConfig().MaxErrorLength)), errCode, errType, nodeStartTime, time.Now(), nil,
 							func() { at.UntrackNode(nodeID) })
 					} else {
 						// 流正常结束：使用最后一个 chunk 提取 TokenUsage
@@ -193,7 +197,7 @@ func NewCallbackHandler() callbacks.Handler {
 						if lastChunk != nil {
 							update = buildNodeUpdate(ctx, info, lastChunk, at, nodeID)
 						}
-						asyncFinishNode(nodeID, StatusSuccess, "", "", "", nodeStartTime, time.Now(), update,
+						asyncFinishNode(at, nodeID, StatusSuccess, "", "", "", nodeStartTime, time.Now(), update,
 							func() { at.UntrackNode(nodeID) })
 					}
 					return
@@ -275,6 +279,7 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 		info.Component, info.Type, info.Name)
 
 	update := &NodeUpdate{}
+	modelMetadata := modelMetadataFromContext(ctx)
 	switch info.Component {
 	case components.ComponentOfChatModel:
 		modelOut := model.ConvCallbackOutput(output)
@@ -283,6 +288,9 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 		}
 		if modelOut.Config != nil {
 			update.ModelName = modelOut.Config.Model
+		}
+		if !modelMetadata.valid() {
+			modelMetadata = at.resolveModel("chat", update.ModelName)
 		}
 		if modelOut.TokenUsage != nil {
 			usage := usageFromModel(modelOut.TokenUsage, modelOut.Extra)
@@ -296,14 +304,17 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 			// 累加到链路级别的 Token 累加器（携带模型名以追踪主模型）
 			at.AddUsageWithModel(update.InputTokens, update.CachedInputTokens, update.OutputTokens, update.ReasoningTokens, update.ModelName)
 			// 计算节点级别成本并累加到链路总成本
-			nodeCost := estimateCostWithBreakdown(ctx, update.ModelName,
-				int64(update.InputTokens), int64(update.CachedInputTokens), int64(update.OutputTokens), int64(update.ReasoningTokens))
+			nodeCost := modelMetadata.cost(int64(update.InputTokens), int64(update.CachedInputTokens), int64(update.OutputTokens), int64(update.ReasoningTokens))
+			if !modelMetadata.valid() {
+				nodeCost = estimateCostWithBreakdown(ctx, update.ModelName,
+					int64(update.InputTokens), int64(update.CachedInputTokens), int64(update.OutputTokens), int64(update.ReasoningTokens))
+			}
 			update.CostCNY = nodeCost
 			at.AddCost(nodeCost)
 		}
 		// record_prompt=true 时记录 Completion 文本（含 PII 风险，默认关闭）
 		if GetConfig().RecordPrompt && modelOut.Message != nil {
-			update.CompletionText = stringutil.TruncateRunes(modelOut.Message.Content, 5000)
+			update.CompletionText = policy.NewRedactor().RedactText(stringutil.TruncateRunes(modelOut.Message.Content, 5000))
 		}
 
 	case components.ComponentOfTool:
@@ -313,7 +324,7 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 			meta["tool_input"] = toolInput
 		}
 		if toolOut := tool.ConvCallbackOutput(output); toolOut != nil && toolOut.Response != "" {
-			meta["tool_output"] = stringutil.TruncateRunes(toolOut.Response, 2000)
+			meta["tool_output"] = policy.NewRedactor().RedactText(stringutil.TruncateRunes(toolOut.Response, 2000))
 		}
 		if b, err := json.Marshal(meta); err == nil {
 			update.Metadata = string(b)
@@ -365,6 +376,9 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 		} else {
 			g.Log().Warningf(ctx, "[Embedding] Config 为 nil，无法获取模型名")
 		}
+		if !modelMetadata.valid() {
+			modelMetadata = at.resolveModel("embedding", modelName)
+		}
 
 		if modelOut.TokenUsage != nil {
 			usage := usageFromModel(modelOut.TokenUsage, modelOut.Extra)
@@ -374,8 +388,11 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 			// 累加到链路级别的 Token 累加器
 			at.AddUsageWithModel(update.InputTokens, update.CachedInputTokens, 0, 0, modelName)
 			// 计算节点级别成本并累加到链路总成本
-			nodeCost := estimateCostWithBreakdown(ctx, modelName,
-				int64(update.InputTokens), int64(update.CachedInputTokens), 0, 0)
+			nodeCost := modelMetadata.cost(int64(update.InputTokens), int64(update.CachedInputTokens), 0, 0)
+			if !modelMetadata.valid() {
+				nodeCost = estimateCostWithBreakdown(ctx, modelName,
+					int64(update.InputTokens), int64(update.CachedInputTokens), 0, 0)
+			}
 			update.CostCNY = nodeCost
 			at.AddCost(nodeCost)
 			// 添加调试日志
@@ -385,6 +402,7 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 			g.Log().Warningf(ctx, "[Embedding] TokenUsage 为 nil")
 		}
 	}
+	update.Metadata = at.mergeNodeMetadata(update.Metadata, modelMetadata)
 	return update
 }
 

@@ -48,7 +48,14 @@ type RunExecutionResult struct {
 	RevisionStateJSON []byte
 	TraceQuality      string
 	TraceID           string
+	TraceBarrier      AttemptTraceBarrier
 	RunTransitioned   bool
+}
+
+// AttemptTraceBarrier 是现有 MySQL Trace Attempt-scoped barrier 的最薄消费契约。
+type AttemptTraceBarrier interface {
+	Finish(error)
+	Flush(context.Context) string
 }
 
 type classifiedExecutionError struct {
@@ -175,6 +182,16 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		}
 	}
 	result, executionErr, heartbeatErr := w.executeWithHeartbeat(runCtx, claimed)
+	if result.TraceBarrier != nil {
+		traceErr := executionErr
+		if heartbeatErr != nil {
+			traceErr = heartbeatErr
+		}
+		result.TraceBarrier.Finish(traceErr)
+		flushCtx, cancel := context.WithTimeout(context.WithoutCancel(runCtx), 5*time.Second)
+		result.TraceQuality = result.TraceBarrier.Flush(flushCtx)
+		cancel()
+	}
 	if heartbeatErr != nil {
 		return true, heartbeatErr
 	}

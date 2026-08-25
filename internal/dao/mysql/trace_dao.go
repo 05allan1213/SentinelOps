@@ -59,7 +59,7 @@ func (d *TraceDAO) ListRuns(ctx context.Context, status, traceID, sessionID stri
 	query.Order("created_at DESC").Limit(pageSize).Offset(offset).
 		Select("id, trace_id, trace_name, entry_point, session_id, query_text, " +
 			"status, error_message, error_code, start_time, end_time, duration_ms, " +
-			"total_input_tokens, total_output_tokens, " +
+			"total_input_tokens, cached_input_tokens, total_output_tokens, reasoning_tokens, " +
 			"estimated_cost_cny, tags, created_at, updated_at").
 		Find(&runs)
 

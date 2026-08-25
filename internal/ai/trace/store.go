@@ -2,12 +2,16 @@ package trace
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	"SentinelOps/internal/ai/policy"
 	appconfig "SentinelOps/internal/config"
 	dao "SentinelOps/internal/dao/mysql"
+	"SentinelOps/utility/stringutil"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"gorm.io/gorm/clause"
@@ -107,40 +111,67 @@ func classifyError(err error) (code, errType string) {
 //
 // 设计原则：trace 写库不阻塞主请求链路。
 //
-// 所有 async* 函数启动独立 goroutine 执行数据库操作，主 goroutine 立即返回。
-// 每个 goroutine 包含 recover() 防护，防止 DB 连接失败等异常向上 panic。
+// 所有 async* 写都提交到 ActiveTrace 的串行尾链，调用方立即返回。
+// 每个写 goroutine 包含 recover() 防护，错误由 Attempt barrier 汇总。
+
+func (at *ActiveTrace) submit(write func(context.Context) error) {
+	if at == nil || write == nil {
+		return
+	}
+	at.writeWg.Add(1)
+	at.submitMu.Lock()
+	previous := at.writeTail
+	done := make(chan struct{})
+	at.writeTail = done
+	at.submitMu.Unlock()
+	go func() {
+		defer at.writeWg.Done()
+		defer close(done)
+		if previous != nil {
+			<-previous
+		}
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				at.addWriteError(fmt.Errorf("trace write panic: %v", recovered))
+			}
+		}()
+		ctx, cancel := context.WithTimeout(at.writeCtx, 10*time.Second)
+		defer cancel()
+		at.addWriteError(write(ctx))
+	}()
+}
 
 // asyncInsertRun 异步写入 TraceRun 初始记录（status=running）。
 // 使用 INSERT IGNORE（OnConflict DoNothing）：trace_id uniqueIndex 冲突时静默跳过，
 // 语义比 recover() 吞错更清晰。
-func asyncInsertRun(run *dao.TraceRun) {
-	go func() {
-		defer func() { recover() }()
-		ctx := context.Background()
+func submitInsertRun(at *ActiveTrace, run *dao.TraceRun) {
+	at.submit(func(ctx context.Context) error {
 		db, err := dao.DB(ctx)
 		if err != nil {
-			return
+			return err
 		}
 		if result := db.Clauses(clause.OnConflict{DoNothing: true}).Create(run); result.Error != nil {
 			g.Log().Warningf(ctx, "[trace] asyncInsertRun failed: %v", result.Error)
+			return result.Error
 		}
-	}()
+		return nil
+	})
 }
 
 // asyncInsertNode 异步写入 TraceNode 初始记录（status=running）。
 // 使用 INSERT IGNORE（OnConflict DoNothing）：node_id uniqueIndex 冲突时静默跳过。
-func asyncInsertNode(node *dao.TraceNode) {
-	go func() {
-		defer func() { recover() }()
-		ctx := context.Background()
+func asyncInsertNode(at *ActiveTrace, node *dao.TraceNode) {
+	at.submit(func(ctx context.Context) error {
 		db, err := dao.DB(ctx)
 		if err != nil {
-			return
+			return err
 		}
 		if result := db.Clauses(clause.OnConflict{DoNothing: true}).Create(node); result.Error != nil {
 			g.Log().Warningf(ctx, "[trace] asyncInsertNode failed: %v", result.Error)
+			return result.Error
 		}
-	}()
+		return nil
+	})
 }
 
 // NodeUpdate 封装节点结束时需要 UPDATE 的字段，按组件类型选填。
@@ -178,14 +209,12 @@ type NodeUpdate struct {
 // onFinish（通常为 at.UntrackNode）在 UPDATE 执行后调用，而非调用前。
 // 这修复了 INSERT/UPDATE 竞态：若 asyncInsertNode goroutine 尚未完成，本次 UPDATE
 // 会 0 rows affected，节点最终以 status='running' 入库。推迟 Untrack 保证该节点
-// 仍在 pendingNodeIDs 中，asyncFinishRun 的兜底清理能找到并修正它。
-func asyncFinishNode(nodeID, status, errMsg, errCode, errType string, startTime, endTime time.Time, update *NodeUpdate, onFinish func()) {
-	go func() {
-		defer func() { recover() }()
-		ctx := context.Background()
+// 仍在 pendingNodeIDs 中，AttemptBarrier.Flush 的兜底清理能找到并修正它。
+func asyncFinishNode(at *ActiveTrace, nodeID, status, errMsg, errCode, errType string, startTime, endTime time.Time, update *NodeUpdate, onFinish func()) {
+	at.submit(func(ctx context.Context) error {
 		db, err := dao.DB(ctx)
 		if err != nil {
-			return
+			return err
 		}
 		durationMs := endTime.Sub(startTime).Milliseconds()
 		updates := map[string]any{
@@ -203,6 +232,12 @@ func asyncFinishNode(nodeID, status, errMsg, errCode, errType string, startTime,
 			updates["error_type"] = errType
 		}
 		if update != nil {
+			redactor := policy.NewRedactor()
+			update.PromptText = redactor.RedactText(update.PromptText)
+			update.CompletionText = redactor.RedactText(update.CompletionText)
+			update.QueryText = redactor.RedactText(update.QueryText)
+			update.RetrievedDocs = redactor.RedactText(update.RetrievedDocs)
+			update.Metadata = redactor.RedactText(update.Metadata)
 			if update.ModelName != "" {
 				updates["model_name"] = update.ModelName
 			}
@@ -245,20 +280,22 @@ func asyncFinishNode(nodeID, status, errMsg, errCode, errType string, startTime,
 				updates["metadata"] = update.Metadata
 			}
 		}
-		if result := db.Model(&dao.TraceNode{}).
+		result := db.Model(&dao.TraceNode{}).
 			Where("node_id = ? AND status = ?", nodeID, StatusRunning).
-			Updates(updates); result.Error != nil {
+			Updates(updates)
+		if result.Error != nil {
 			g.Log().Warningf(ctx, "[trace] asyncFinishNode update failed node=%s: %v", nodeID, result.Error)
 		}
 		// UPDATE 后再 Untrack：onFinish（即 at.UntrackNode）在 UPDATE 执行后调用。
 		// 目的：修复 INSERT/UPDATE 竞态。若 asyncInsertNode goroutine 尚未执行，
 		// UPDATE 会 0 rows affected，节点行以 status='running' 插入。
-		// 延迟 Untrack 确保该节点仍在 pendingNodeIDs 中，asyncFinishRun 的兜底清理
+		// 延迟 Untrack 确保该节点仍在 pendingNodeIDs 中，AttemptBarrier.Flush 的兜底清理
 		// 可通过 DrainPendingNodeIDs() 找到并强制更新为终态。
 		if onFinish != nil {
 			onFinish()
 		}
-	}()
+		return result.Error
+	})
 }
 
 // costConfig 模型定价配置（CNY/1M tokens，直接从配置读取，无需汇率转换）
@@ -379,100 +416,150 @@ func estimateTokenCost(cost costConfig, inputTokens, cachedInputTokens, outputTo
 		float64(outputTokens)*cost.Output) / 1_000_000.0
 }
 
-// asyncFinishRun 异步将 TraceRun 由 running 更新为终态，汇总全链路 Token 消耗。
-// 由 FinishRun（tracer.go）在 Controller 层的 defer 中调用，保证请求结束时必然执行。
-//
-// 兜底清理机制：TraceRun 更新完成后，等待 ActiveTrace.StreamWg（所有流式节点排空 goroutine
-// 的 WaitGroup）归零，最长 10s 超时。等待结束后将仍在 pendingNodeIDs 中的节点强制更新为终态。
-// 这处理两类残留场景：
-//  1. 流式节点排空超时：10s 内排空 goroutine 未完成（流未关闭），节点 status 卡在 running。
-//  2. INSERT/UPDATE 竞态：asyncInsertNode goroutine 晚于 asyncFinishNode 执行，
-//     UPDATE 0 rows affected，节点以 status='running' 入库。
-//     UntrackNode 推迟到 UPDATE 后执行，节点仍在 pendingNodeIDs 中，此处可修正终态。
-func asyncFinishRun(at *ActiveTrace, status, errMsg, errCode string, endTime time.Time) {
+// AttemptBarrier 等待同一 ActiveTrace 的流式回调和全部异步 MySQL 写。
+type AttemptBarrier struct {
+	active       *ActiveTrace
+	skipFinalize bool
+}
+
+// Finish 记录 Attempt 业务结果；真正的 TraceRun 终态写由 Flush 在节点落盘后执行。
+func (b *AttemptBarrier) Finish(err error) {
+	if b == nil || b.active == nil {
+		return
+	}
+	status, errMsg, errCode := StatusSuccess, "", ""
+	if err != nil {
+		status = StatusError
+		errMsg = policy.NewRedactor().RedactText(stringutil.TruncateError(err, GetConfig().MaxErrorLength))
+		errCode, _ = classifyError(err)
+	}
+	b.active.mu.Lock()
+	b.active.finish = traceFinish{set: true, status: status, errMsg: errMsg, errCode: errCode, endTime: time.Now()}
+	b.active.mu.Unlock()
+}
+
+// Flush 返回可直接传给唯一 Run 完成 primitive 的 trace_quality。
+func (b *AttemptBarrier) Flush(ctx context.Context) string {
+	if b == nil || b.active == nil {
+		return TraceQualityIncomplete
+	}
+	at := b.active
+	if ctx == nil {
+		ctx = at.writeCtx
+	}
+	if ctx == nil {
+		return TraceQualityIncomplete
+	}
+	quality := TraceQualityComplete
+	streamsComplete := waitTraceGroup(ctx, &at.StreamWg)
+	if !streamsComplete {
+		quality = TraceQualityIncomplete
+	}
+	writesComplete := waitTraceGroup(ctx, &at.writeWg)
+	if !writesComplete {
+		quality = TraceQualityIncomplete
+	}
+	if at.writeError() != nil {
+		quality = TraceQualityIncomplete
+	}
+	if b.skipFinalize {
+		return quality
+	}
+	finalizeCtx := ctx
+	if !streamsComplete || !writesComplete {
+		var cancel context.CancelFunc
+		finalizeCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+		defer cancel()
+	}
+	if streamsComplete && writesComplete {
+		if err := cleanupPendingNodes(finalizeCtx, at); err != nil {
+			quality = TraceQualityIncomplete
+		}
+	}
+	if err := finalizeTraceRun(finalizeCtx, at, quality); err != nil {
+		return TraceQualityIncomplete
+	}
+	return quality
+}
+
+func waitTraceGroup(ctx context.Context, group *sync.WaitGroup) bool {
+	done := make(chan struct{})
 	go func() {
-		defer func() { recover() }()
-		ctx := context.Background()
-		db, err := dao.DB(ctx)
-		if err != nil {
-			return
-		}
-		durationMs := endTime.Sub(at.StartTime).Milliseconds()
-		at.mu.Lock()
-		totalIn := at.TotalInputTokens
-		totalCachedIn := at.TotalCachedInputTokens
-		totalOut := at.TotalOutputTokens
-		totalReasoning := at.TotalReasoningTokens
-		primaryModel := at.PrimaryModelName
-		totalCostCNY := at.TotalCostCNY
-		at.mu.Unlock()
-
-		// 直接读各节点成本之和
-		costCNY := totalCostCNY
-		// 若节点级成本均为 0（极少数情况，如所有节点未记录 TokenUsage），
-		// 降级到主模型估算，保证总成本字段不为空
-		if costCNY == 0 {
-			costCNY = estimateCostWithBreakdown(ctx, primaryModel, totalIn, totalCachedIn, totalOut, totalReasoning)
-		}
-		_ = primaryModel // 已通过节点累加计算成本，此处仅用于降级兜底
-
-		updates := map[string]any{
-			"status":              status,
-			"end_time":            endTime,
-			"duration_ms":         durationMs,
-			"total_input_tokens":  totalIn,
-			"cached_input_tokens": totalCachedIn,
-			"total_output_tokens": totalOut,
-			"reasoning_tokens":    totalReasoning,
-			"estimated_cost_cny":  costCNY,
-		}
-		if errMsg != "" {
-			updates["error_message"] = errMsg
-		}
-		if errCode != "" {
-			updates["error_code"] = errCode
-		}
-		if result := db.Model(&dao.TraceRun{}).
-			Where("trace_id = ?", at.TraceID).
-			Updates(updates); result.Error != nil {
-			g.Log().Warningf(ctx, "[trace] asyncFinishRun update failed trace=%s: %v", at.TraceID, result.Error)
-		}
-
-		// 等待所有流式节点的排空 goroutine 完成，最长等待 10s（防止流异常永久阻塞）。
-		// 慢请求（LLM 单步 >3s）也不会提前触发，不会误标正在运行的流式节点为终态。
-		streamDone := make(chan struct{})
-		go func() {
-			at.StreamWg.Wait()
-			close(streamDone)
-		}()
-
-		select {
-		case <-streamDone:
-			// 所有流正常结束
-		case <-time.After(10 * time.Second):
-			// 超时兜底：流异常未关闭（网络断开等），记录警告后继续清理
-			g.Log().Warningf(ctx, "[trace] asyncFinishRun stream wait timeout trace=%s", at.TraceID)
-		}
-
-		// 清理残留 running 节点（正常路径下 pendingNodeIDs 通常已空）。
-		// 残留来源：INSERT/UPDATE 竞态，或流异常导致 asyncFinishNode 未被调用。
-		// 使用 DrainPendingNodeIDs() 精确点更新，避免范围扫描触发 InnoDB Next-Key Lock。
-		pendingIDs := at.DrainPendingNodeIDs()
-		if len(pendingIDs) == 0 {
-			return
-		}
-		ctx2 := context.Background()
-		db2, err2 := dao.DB(ctx2)
-		if err2 != nil {
-			return
-		}
-		if result := db2.Model(&dao.TraceNode{}).
-			Where("node_id IN ? AND status = ?", pendingIDs, StatusRunning).
-			Updates(map[string]any{
-				"status":   status,
-				"end_time": endTime,
-			}); result.Error != nil {
-			g.Log().Warningf(ctx2, "[trace] asyncFinishRun cleanup nodes failed trace=%s: %v", at.TraceID, result.Error)
-		}
+		group.Wait()
+		close(done)
 	}()
+	select {
+	case <-done:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func cleanupPendingNodes(ctx context.Context, at *ActiveTrace) error {
+	pendingIDs := at.DrainPendingNodeIDs()
+	if len(pendingIDs) == 0 {
+		return nil
+	}
+	db, err := dao.DB(ctx)
+	if err != nil {
+		return err
+	}
+	at.mu.Lock()
+	finish := at.finish
+	at.mu.Unlock()
+	result := db.Model(&dao.TraceNode{}).
+		Where("node_id IN ? AND status = ?", pendingIDs, StatusRunning).
+		Updates(map[string]any{"status": finish.status, "end_time": finish.endTime})
+	return result.Error
+}
+
+func finalizeTraceRun(ctx context.Context, at *ActiveTrace, quality string) error {
+	at.mu.Lock()
+	finish := at.finish
+	totalIn, totalCachedIn := at.TotalInputTokens, at.TotalCachedInputTokens
+	totalOut, totalReasoning := at.TotalOutputTokens, at.TotalReasoningTokens
+	costCNY := at.TotalCostCNY
+	at.mu.Unlock()
+	if !finish.set {
+		finish = traceFinish{set: true, status: StatusSuccess, endTime: time.Now()}
+	}
+	tags := authoritativeTraceTags(ctx, map[string]any{
+		"run_id": at.Attempt.RunID, "attempt": at.Attempt.Attempt,
+		"lease_generation": at.Attempt.LeaseGeneration, "runtime_version": at.Attempt.RuntimeVersion,
+		"trace_quality": quality,
+	})
+	redactedTags, err := redactTraceValue(tags)
+	if err != nil {
+		return err
+	}
+	tagsJSON, err := json.Marshal(redactedTags)
+	if err != nil {
+		return err
+	}
+	db, err := dao.DB(ctx)
+	if err != nil {
+		return err
+	}
+	updates := map[string]any{
+		"status": finish.status, "end_time": finish.endTime,
+		"duration_ms":        max(finish.endTime.Sub(at.StartTime).Milliseconds(), 0),
+		"total_input_tokens": totalIn, "cached_input_tokens": totalCachedIn,
+		"total_output_tokens": totalOut, "reasoning_tokens": totalReasoning,
+		"estimated_cost_cny": costCNY, "tags": string(tagsJSON),
+	}
+	if finish.errMsg != "" {
+		updates["error_message"] = finish.errMsg
+	}
+	if finish.errCode != "" {
+		updates["error_code"] = finish.errCode
+	}
+	result := db.Model(&dao.TraceRun{}).Where("trace_id = ?", at.TraceID).Updates(updates)
+	return result.Error
+}
+
+func newTestBarrier(write func(context.Context) error) *AttemptBarrier {
+	at := &ActiveTrace{TraceID: "test-trace", StartTime: time.Now(), Stack: &SpanStack{}, writeCtx: context.TODO()}
+	at.submit(write)
+	return &AttemptBarrier{active: at, skipFinalize: true}
 }

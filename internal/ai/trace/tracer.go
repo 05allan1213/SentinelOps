@@ -7,7 +7,6 @@ import (
 
 	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
-	"SentinelOps/utility/stringutil"
 
 	"github.com/google/uuid"
 )
@@ -67,30 +66,59 @@ func StartRun(ctx context.Context, name, entryPoint, sessionID string, messageIn
 	tags = authoritativeTraceTags(ctx, tags)
 	tagsJSON := ""
 	if len(tags) > 0 {
-		if b, err := json.Marshal(tags); err == nil {
+		redactedTags, redactErr := redactTraceValue(tags)
+		if b, err := json.Marshal(redactedTags); redactErr == nil && err == nil {
 			tagsJSON = string(b)
 		}
 	}
 
-	at := &ActiveTrace{
-		TraceID:   traceID,
-		StartTime: now,
-		Stack:     &SpanStack{},
+	at, err := newActiveTrace(ctx, AttemptMetadata{TraceID: traceID, SessionID: sessionID, Query: queryText})
+	if err != nil {
+		return ctx
 	}
+	at.StartTime = now
 
-	asyncInsertRun(&dao.TraceRun{
+	submitInsertRun(at, &dao.TraceRun{
 		TraceID:      traceID,
 		TraceName:    name,
 		EntryPoint:   entryPoint,
 		SessionID:    sessionID,
 		MessageIndex: messageIndex,
-		QueryText:    queryText,
+		QueryText:    at.Attempt.Query,
 		Status:       StatusRunning,
 		StartTime:    now,
 		Tags:         tagsJSON,
 	})
 
 	return Inject(ctx, at)
+}
+
+// StartAttempt 为 Query/Resume/Replay 的每次实际执行创建独立 MySQL Trace 和 barrier。
+func StartAttempt(ctx context.Context, metadata AttemptMetadata) (context.Context, *AttemptBarrier, error) {
+	at, err := newActiveTrace(ctx, metadata)
+	if err != nil {
+		return ctx, nil, err
+	}
+	tags := authoritativeTraceTags(ctx, map[string]any{
+		"run_id": metadata.RunID, "attempt": metadata.Attempt,
+		"lease_generation": metadata.LeaseGeneration, "runtime_version": metadata.RuntimeVersion,
+		"trace_quality": "pending",
+	})
+	redactedTags, err := redactTraceValue(tags)
+	if err != nil {
+		return ctx, nil, err
+	}
+	tagsJSON, err := json.Marshal(redactedTags)
+	if err != nil {
+		return ctx, nil, err
+	}
+	submitInsertRun(at, &dao.TraceRun{
+		TraceID: metadata.TraceID, TraceName: "durable.attempt", EntryPoint: "worker",
+		SessionID: metadata.SessionID, QueryText: at.Attempt.Query, Status: StatusRunning,
+		StartTime: at.StartTime, Tags: string(tagsJSON),
+	})
+	attemptCtx := Inject(ctx, at)
+	return attemptCtx, &AttemptBarrier{active: at}, nil
 }
 
 func authoritativeTraceTags(ctx context.Context, tags map[string]any) map[string]any {
@@ -117,14 +145,11 @@ func FinishRun(ctx context.Context, err error) {
 	if at == nil {
 		return
 	}
-	endTime := time.Now()
-	status := StatusSuccess
-	errMsg := ""
-	errCode := ""
-	if err != nil {
-		status = StatusError
-		errMsg = stringutil.TruncateError(err, GetConfig().MaxErrorLength)
-		errCode, _ = classifyError(err)
-	}
-	asyncFinishRun(at, status, errMsg, errCode, endTime)
+	barrier := &AttemptBarrier{active: at}
+	barrier.Finish(err)
+	go func() {
+		flushCtx, cancel := context.WithTimeout(at.writeCtx, 10*time.Second)
+		defer cancel()
+		_ = barrier.Flush(flushCtx)
+	}()
 }

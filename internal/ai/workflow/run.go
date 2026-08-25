@@ -87,6 +87,13 @@ type CompleteRunInput struct {
 	RevisionStateJSON json.RawMessage
 }
 
+const (
+	// TraceQualityComplete 表示当前 Attempt 的 MySQL Trace 已在终态前完整落盘。
+	TraceQualityComplete = "complete"
+	// TraceQualityIncomplete 表示 Trace barrier 超时或写入失败，禁止作为 Eval/发布样本。
+	TraceQualityIncomplete = "incomplete"
+)
+
 // CreateRunWithSessionLock 原子建立 Revision 0、冻结 Snapshot、占用 Session 并写 run.created。
 func (s *GORMStore) CreateRunWithSessionLock(ctx context.Context, input CreateRunInput) (*mysql.WorkflowRun, error) {
 	userID, err := authorizeDurableCreate(ctx, input)
@@ -365,21 +372,15 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 				return err
 			}
 		}
-		eventType := EventRunFailed
-		if input.TargetStatus == RunStatusSucceeded {
-			eventType = EventRunCompleted
-		}
-		event := WorkflowEventInput{
-			Type:    eventType,
-			TraceID: input.TraceID,
-			Payload: EventPayload{Attributes: map[string]any{
-				"from_status": run.Status,
-				"to_status":   input.TargetStatus,
-			}},
-		}
-		eventPayload, err := marshalDurableEvent(event)
+		completionEvents, err := completionTraceEvents(input)
 		if err != nil {
 			return err
+		}
+		for index := range completionEvents {
+			if completionEvents[index].Type == EventRunCompleted || completionEvents[index].Type == EventRunFailed {
+				completionEvents[index].Payload.Attributes["from_status"] = run.Status
+				completionEvents[index].Payload.Attributes["to_status"] = input.TargetStatus
+			}
 		}
 		now := time.Now()
 		updates := map[string]any{
@@ -395,12 +396,52 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 			"trace_quality":      input.TraceQuality,
 			"park_reason":        nil,
 		}
-		seq, err := updateFencedDurableRunAndAllocateSeq(tx, run.ID, run.Status, input.Lease, updates)
-		if err != nil {
-			return err
+		for index, event := range completionEvents {
+			eventPayload, err := marshalDurableEvent(event)
+			if err != nil {
+				return err
+			}
+			eventUpdates := map[string]any{}
+			if index == len(completionEvents)-1 {
+				eventUpdates = updates
+			}
+			seq, err := updateFencedDurableRunAndAllocateSeq(tx, run.ID, run.Status, input.Lease, eventUpdates)
+			if err != nil {
+				return err
+			}
+			if err := insertDurableEvent(tx, run.ID, seq, event, eventPayload); err != nil {
+				return err
+			}
 		}
-		return insertDurableEvent(tx, run.ID, seq, event, eventPayload)
+		return nil
 	})
+}
+
+func completionTraceEvents(input CompleteRunInput) ([]WorkflowEventInput, error) {
+	terminalType := EventRunFailed
+	if input.TargetStatus == RunStatusSucceeded {
+		terminalType = EventRunCompleted
+	}
+	terminal := WorkflowEventInput{Type: terminalType, TraceID: input.TraceID, Payload: EventPayload{Attributes: map[string]any{}}}
+	if input.TraceID == "" {
+		return []WorkflowEventInput{terminal}, nil
+	}
+	var traceType string
+	switch input.TraceQuality {
+	case TraceQualityComplete:
+		traceType = EventTraceFlushed
+	case TraceQualityIncomplete:
+		traceType = EventTraceIncomplete
+	case "", "unknown":
+		return []WorkflowEventInput{terminal}, nil
+	default:
+		return nil, fmt.Errorf("unsupported trace quality %q", input.TraceQuality)
+	}
+	traceEvent := WorkflowEventInput{
+		Type: traceType, TraceID: input.TraceID,
+		Payload: EventPayload{Reference: input.TraceID, Attributes: map[string]any{"trace_quality": input.TraceQuality}},
+	}
+	return []WorkflowEventInput{traceEvent, terminal}, nil
 }
 
 // ValidateRunTransition 校验完整 durable 状态矩阵和 parked 的显式解锁意图。
