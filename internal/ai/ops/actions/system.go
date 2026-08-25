@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"SentinelOps/internal/ai/effects"
 	dao "SentinelOps/internal/dao/mysql"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -50,11 +51,37 @@ func (a *BlockIPAction) Execute(ctx context.Context, params map[string]string) (
 	ip := params["ip"]
 	reason := params["reason"]
 	if ip == "" {
-		return ActionResult{}, fmt.Errorf("block_ip: ip 不能为空")
+		return ActionResult{}, effects.NewInvocationError(effects.InvocationSafeNotSent, false, nil, fmt.Errorf("block_ip: ip 不能为空"))
+	}
+	metadata, metadataErr := effects.ExecutionMetadataFromContext(ctx)
+	if metadataErr == nil && metadata.EffectStep == "nginx_reload" {
+		databaseBlocked, err := dao.IsProtectedAsset(ctx, "blocked_ip", ip)
+		if err != nil || !databaseBlocked {
+			return ActionResult{}, effects.NewInvocationError(effects.InvocationSafeNotSent, true,
+				map[string]any{"database": databaseBlocked, "blocklist_file": "unchecked", "nginx_reload": "not_sent"},
+				fmt.Errorf("block_ip: database target state is not confirmed"))
+		}
+		mgr := NewNginxBlocklistManager(ctx)
+		hasRule, err := mgr.HasIPRule(ip)
+		if err != nil || !hasRule && mgr.IsEnabled() {
+			evidence := map[string]any{"database": "confirmed", "blocklist_file": hasRule, "nginx_reload": "not_sent"}
+			if err == nil {
+				err = fmt.Errorf("block_ip: nginx reload prerequisite missing")
+			}
+			return ActionResult{}, effects.NewInvocationError(effects.InvocationSafeNotSent, true, evidence, err)
+		}
+		if err := mgr.Reload(ctx); err != nil {
+			return ActionResult{}, effects.NewInvocationError(effects.InvocationUnknown, false,
+				map[string]any{"database": "confirmed", "blocklist_file": true, "nginx_reload": "unknown"},
+				fmt.Errorf("block_ip: nginx reload result unknown"))
+		}
+		return ActionResult{Success: true, Message: "Nginx 已重载", Output: map[string]string{
+			"ip": ip, "database": "confirmed", "blocklist_file": "confirmed", "nginx_reload": "confirmed",
+		}}, nil
 	}
 	protected, err := dao.IsProtectedAsset(ctx, "whitelist_ip", ip)
 	if err != nil {
-		return ActionResult{}, fmt.Errorf("block_ip: 保护名单查询失败: %w", err)
+		return ActionResult{}, effects.NewInvocationError(effects.InvocationSafeNotSent, true, nil, fmt.Errorf("block_ip: 保护名单查询失败"))
 	}
 	if protected {
 		return ActionResult{
@@ -65,19 +92,34 @@ func (a *BlockIPAction) Execute(ctx context.Context, params map[string]string) (
 	}
 	alreadyBlocked, err := dao.IsProtectedAsset(ctx, "blocked_ip", ip)
 	if err != nil {
-		return ActionResult{}, fmt.Errorf("block_ip: 查询封禁状态失败: %w", err)
+		return ActionResult{}, effects.NewInvocationError(effects.InvocationSafeNotSent, true, nil, fmt.Errorf("block_ip: 查询封禁状态失败"))
 	}
 	if !alreadyBlocked {
 		if err := dao.CreateProtectedAsset(ctx, &dao.OpsProtectedAsset{
 			AssetType: "blocked_ip", Value: ip, Reason: reason,
 		}); err != nil {
-			return ActionResult{}, fmt.Errorf("block_ip: 写入封禁记录失败: %w", err)
+			return ActionResult{}, effects.NewInvocationError(effects.InvocationUnknown, false,
+				map[string]any{"database": "unknown", "blocklist_file": "not_sent", "nginx_reload": "not_sent"},
+				fmt.Errorf("block_ip: database target state is unknown"))
 		}
 	}
 
-	// nginx 后端：写黑名单文件并 reload
-	nginxMsg := ""
 	mgr := NewNginxBlocklistManager(ctx)
+	if metadataErr == nil {
+		changed, ruleErr := mgr.EnsureIPRule(ip)
+		if ruleErr != nil {
+			return ActionResult{}, effects.NewInvocationError(effects.InvocationUnknown, false,
+				map[string]any{"database": "confirmed", "blocklist_file": "unknown", "nginx_reload": "not_sent"},
+				fmt.Errorf("block_ip: local target state is partially applied"))
+		}
+		return ActionResult{Success: true, Message: fmt.Sprintf("IP %s 已加入封禁名单", ip), Output: map[string]string{
+			"ip": ip, "blocked": "true", "database": "confirmed", "blocklist_file": "confirmed",
+			"blocklist_changed": fmt.Sprint(changed), "nginx_reload": "pending", "backend": mgr.backend,
+		}}, nil
+	}
+
+	// legacy 路径保持原同步 AddIP + reload 行为。
+	nginxMsg := ""
 	if mgr.IsEnabled() {
 		if err := mgr.AddIP(ctx, ip); err != nil {
 			g.Log().Warningf(ctx, "[block_ip] nginx 封禁失败，已记录数据库: %v", err)

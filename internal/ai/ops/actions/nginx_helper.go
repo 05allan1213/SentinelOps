@@ -38,26 +38,64 @@ func (m *NginxBlocklistManager) AddIP(ctx context.Context, ip string) error {
 	if !m.IsEnabled() {
 		return nil // 后端未启用，静默跳过
 	}
+	if _, err := m.EnsureIPRule(ip); err != nil {
+		return err
+	}
+	return m.Reload(ctx)
+}
+
+// EnsureIPRule 以目标状态幂等写入 deny 规则，但不执行外部 reload。
+func (m *NginxBlocklistManager) EnsureIPRule(ip string) (bool, error) {
+	if !m.IsEnabled() {
+		return false, nil
+	}
 
 	// 检查是否已存在，避免重复追加相同的 deny 规则
-	existing, _ := os.ReadFile(m.blocklistPath)
+	existing, readErr := os.ReadFile(m.blocklistPath)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return false, fmt.Errorf("读取黑名单文件失败: %w", readErr)
+	}
 	line := fmt.Sprintf("deny %s;", ip)
 	if strings.Contains(string(existing), line) {
-		return nil // 已存在
+		return false, nil // 已存在
 	}
 
 	// 追加写入
 	f, err := os.OpenFile(m.blocklistPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("打开黑名单文件失败: %w", err)
+		return false, fmt.Errorf("打开黑名单文件失败: %w", err)
 	}
 	_, werr := fmt.Fprintln(f, line)
-	f.Close()
+	closeErr := f.Close()
 	if werr != nil {
-		return fmt.Errorf("写入黑名单失败: %w", werr)
+		return false, fmt.Errorf("写入黑名单失败: %w", werr)
 	}
+	if closeErr != nil {
+		return false, fmt.Errorf("关闭黑名单文件失败: %w", closeErr)
+	}
+	return true, nil
+}
 
-	// 写入黑名单后向 nginx 发送 SIGHUP，让新追加的 deny 规则立即生效
+// HasIPRule 查询可核对的黑名单文件目标状态。
+func (m *NginxBlocklistManager) HasIPRule(ip string) (bool, error) {
+	if !m.IsEnabled() {
+		return false, nil
+	}
+	content, err := os.ReadFile(m.blocklistPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return strings.Contains(string(content), fmt.Sprintf("deny %s;", ip)), nil
+}
+
+// Reload 只执行 Catalog 固定的 nginx_reload derived step。
+func (m *NginxBlocklistManager) Reload(ctx context.Context) error {
+	if !m.IsEnabled() {
+		return nil
+	}
 	return m.reloadNginx(ctx)
 }
 

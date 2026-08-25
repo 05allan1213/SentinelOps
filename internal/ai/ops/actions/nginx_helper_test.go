@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -37,5 +38,26 @@ func TestNewNginxBlocklistManagerReadsSoarAIopsConfig(t *testing.T) {
 	}
 	if mgr.containerName != "nginx" {
 		t.Fatalf("containerName 读取错误，got=%q", mgr.containerName)
+	}
+}
+
+func TestDerivedEffectNginxRuleHasQueryableIdempotentTargetState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "blocked_ips.conf")
+	mgr := &NginxBlocklistManager{blocklistPath: path, containerName: "unused", backend: "nginx"}
+	changed, err := mgr.EnsureIPRule("192.0.2.24")
+	if err != nil || !changed {
+		t.Fatalf("first EnsureIPRule changed=%t err=%v", changed, err)
+	}
+	changed, err = mgr.EnsureIPRule("192.0.2.24")
+	if err != nil || changed {
+		t.Fatalf("second EnsureIPRule changed=%t err=%v", changed, err)
+	}
+	present, err := mgr.HasIPRule("192.0.2.24")
+	if err != nil || !present {
+		t.Fatalf("HasIPRule present=%t err=%v", present, err)
+	}
+	absent, err := mgr.HasIPRule("198.51.100.24")
+	if err != nil || absent {
+		t.Fatalf("HasIPRule absent=%t err=%v", absent, err)
 	}
 }

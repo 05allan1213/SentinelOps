@@ -251,6 +251,17 @@ func validateProductionSecrets(ctx context.Context, cfg *appconfig.Config, role 
 			ref  appconfig.SecretRef
 		}{name: "SMTP", ref: cfg.SOAR.Integrations.Email.SMTPPasswordRef})
 	}
+	for name, ref := range map[string]appconfig.SecretRef{
+		"DingTalk webhook": cfg.SOAR.Integrations.DingTalk.WebhookRef,
+		"WeCom webhook":    cfg.SOAR.Integrations.WeCom.WebhookRef,
+	} {
+		if ref != "" {
+			required = append(required, struct {
+				name string
+				ref  appconfig.SecretRef
+			}{name: name, ref: ref})
+		}
+	}
 	for _, item := range required {
 		if item.ref == "" {
 			return fmt.Errorf("production %s secret reference is required", item.name)

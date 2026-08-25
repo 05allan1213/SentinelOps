@@ -401,7 +401,7 @@ func dedupKey(e dao.Event) string {
 
 // IndexDocuments 将内存中的事件列表向量化并写入 Milvus，按配置的批次大小分批执行。
 // 接受 DedupAndInsert 返回的已插入事件（含完整 Content），无需再查询 MySQL。
-// 单批失败不中断其余批次；仅对成功写入 Milvus 的记录更新 indexed_at，保证标记准确。
+// 单批失败不中断其余批次；成功项仍更新 indexed_at，最终向调用方返回聚合错误。
 func IndexDocuments(ctx context.Context, events []dao.Event) error {
 	if len(events) == 0 {
 		return nil
@@ -414,10 +414,6 @@ func IndexDocuments(ctx context.Context, events []dao.Event) error {
 
 	// 委托 indexer 层执行文档构建 + 分批写入 Milvus
 	ids, err := indexer.StoreEvents(ctx, events, batchSize)
-	if err != nil {
-		// GetIndexer 初始化失败，无法继续
-		return err
-	}
 
 	if len(ids) > 0 {
 		// 仅标记实际写入成功的记录，截断到秒与 DATETIME 列精度一致
@@ -427,6 +423,12 @@ func IndexDocuments(ctx context.Context, events []dao.Event) error {
 		}
 		g.Log().Infof(ctx, "[pipeline] 向量索引完成，成功 %d/%d 条（分 %d 批）",
 			len(ids), len(events), (len(events)+batchSize-1)/batchSize)
+	}
+	if err != nil {
+		return err
+	}
+	if len(ids) != len(events) {
+		return fmt.Errorf("Milvus 索引结果不完整: succeeded=%d total=%d", len(ids), len(events))
 	}
 	return nil
 }

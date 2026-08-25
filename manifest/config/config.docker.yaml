@@ -172,9 +172,9 @@ knowledge:
 soar:
   integrations:
     dingtalk:
-      webhook_url: ""
+      webhook_ref: ""
     wecom:
-      webhook_url: ""
+      webhook_ref: ""
     email:
       smtp_host: ""
       smtp_port: ""

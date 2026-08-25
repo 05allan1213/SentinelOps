@@ -100,7 +100,7 @@ var catalog = map[string]CatalogEntry{
 	"notify_dingtalk":        durableMutation("notify_dingtalk", RiskL2, "703c119af23182856ed4ea05b0f1bf3450a34bda75fdf46a9b7de8f37c3ca419", EffectNonReconciliableExternal, []string{"primary"}),
 	"notify_wecom":           durableMutation("notify_wecom", RiskL2, "2586c79fad8589a5093513cc93aa5359360004a5bc5d788ba62e6335a64bcc56", EffectNonReconciliableExternal, []string{"primary"}),
 	"notify_email":           durableMutation("notify_email", RiskL2, "eef7181e2387c8d36aad2f7dbffec4295d21f2ffb60c08feab6893983aca28d1", EffectNonReconciliableExternal, []string{"primary"}),
-	"webhook_out":            durableMutation("webhook_out", RiskL2, "585972c40375f8bf1e8a97276026c4666b25f1aa05a836ed64b76c633466ac3d", EffectNonReconciliableExternal, []string{"primary"}),
+	"webhook_out":            durableMutation("webhook_out", RiskL2, "585972c40375f8bf1e8a97276026c4666b25f1aa05a836ed64b76c633466ac3d", EffectProviderIdempotent, []string{"primary"}),
 	"query_database": {
 		Name:             "query_database",
 		Risk:             RiskL0,

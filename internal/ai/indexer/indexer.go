@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -100,8 +101,8 @@ func NewIndexer(ctx context.Context, partition string) (*einomilvus.Indexer, err
 }
 
 // StoreEvents 将安全事件批量转换为向量文档并写入 Milvus events 分区，按 batchSize 分批执行。
-// 单批写入失败仅记录警告，不中断其余批次。
-// 返回所有成功写入 Milvus 的事件 ID，供调用方据此更新 indexed_at 标记。
+// 单批写入失败会继续其余批次，并在末尾返回聚合错误，禁止局部成功伪装整体成功。
+// 同时返回所有成功写入 Milvus 的事件 ID，供调用方据此更新 indexed_at 标记。
 func StoreEvents(ctx context.Context, events []dao.Event, batchSize int) ([]string, error) {
 	if len(events) == 0 {
 		return nil, nil
@@ -136,6 +137,7 @@ func StoreEvents(ctx context.Context, events []dao.Event, batchSize int) ([]stri
 	// 分批写入 Milvus（Store 内部无分批，单次全量易超 Embedding API 限制）
 	totalBatches := (len(docs) + batchSize - 1) / batchSize
 	var successIDs []string
+	var batchErrors []error
 	for i := 0; i < len(docs); i += batchSize {
 		end := i + batchSize
 		if end > len(docs) {
@@ -145,6 +147,7 @@ func StoreEvents(ctx context.Context, events []dao.Event, batchSize int) ([]stri
 		if storeErr != nil {
 			g.Log().Warningf(ctx, "[indexer] 第 %d/%d 批向量写入失败（%d~%d）: %v",
 				i/batchSize+1, totalBatches, i, end, storeErr)
+			batchErrors = append(batchErrors, fmt.Errorf("Milvus batch %d/%d: %w", i/batchSize+1, totalBatches, storeErr))
 			continue
 		}
 		successIDs = append(successIDs, batchIDs...)
@@ -158,5 +161,16 @@ func StoreEvents(ctx context.Context, events []dao.Event, batchSize int) ([]stri
 			len(successIDs), totalChars, estimatedTokens, estimatedCost)
 	}
 
+	return finalizeStoreResult(successIDs, len(events), batchErrors)
+}
+
+func finalizeStoreResult(successIDs []string, total int, batchErrors []error) ([]string, error) {
+	err := errors.Join(batchErrors...)
+	if err != nil {
+		return successIDs, err
+	}
+	if len(successIDs) != total {
+		return successIDs, fmt.Errorf("Milvus 索引结果不完整: succeeded=%d total=%d", len(successIDs), total)
+	}
 	return successIDs, nil
 }

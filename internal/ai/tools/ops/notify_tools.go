@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/ops/actions"
 	"SentinelOps/internal/ai/ops/ctxkey"
 	"SentinelOps/internal/ai/policy"
@@ -71,7 +72,9 @@ func execAndRecord(ctx context.Context, name string, params map[string]string) (
 	if err != nil {
 		errMsg = err.Error()
 	}
-	writeStep(ctx, stepOrder[name], name, out, errMsg, start)
+	if _, effectErr := effects.ExecutionMetadataFromContext(ctx); effectErr != nil {
+		writeStep(ctx, stepOrder[name], name, out, errMsg, start)
+	}
 	return out, err
 }
 

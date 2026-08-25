@@ -35,7 +35,11 @@ func TestConfigPersistsSecretReferencesOnly(t *testing.T) {
 			Seed: Seed{AdminPasswordRef: "env:ADMIN_PASSWORD"},
 		},
 		Providers: map[string]Provider{"provider_a": {SecretRef: "env:MODEL_KEY"}},
-		SOAR:      SOAR{Integrations: Integrations{Email: Email{SMTPPasswordRef: "env:SMTP_PASSWORD"}}},
+		SOAR: SOAR{Integrations: Integrations{
+			DingTalk: DingTalk{WebhookRef: "env:DINGTALK_WEBHOOK"},
+			WeCom:    WeCom{WebhookRef: "env:WECOM_WEBHOOK"},
+			Email:    Email{SMTPPasswordRef: "env:SMTP_PASSWORD"},
+		}},
 		Secrets: SecretReferences{
 			MCPHeader: "env:MCP_HEADER",
 			Effect:    "env:EFFECT_SECRET",
@@ -47,7 +51,7 @@ func TestConfigPersistsSecretReferencesOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	serialized := string(data)
-	for _, ref := range []string{"env:DB_DSN", "env:JWT_SECRET", "env:ADMIN_PASSWORD", "env:MODEL_KEY", "env:MCP_HEADER", "env:SMTP_PASSWORD", "env:EFFECT_SECRET"} {
+	for _, ref := range []string{"env:DB_DSN", "env:JWT_SECRET", "env:ADMIN_PASSWORD", "env:MODEL_KEY", "env:MCP_HEADER", "env:SMTP_PASSWORD", "env:DINGTALK_WEBHOOK", "env:WECOM_WEBHOOK", "env:EFFECT_SECRET"} {
 		if !strings.Contains(serialized, ref) {
 			t.Fatalf("serialized config is missing reference %q", ref)
 		}
@@ -66,6 +70,8 @@ func TestConfigRejectsLegacyPlaintextSecretFields(t *testing.T) {
 		"admin":        "auth:\n  seed:\n    admin_password: plaintext-admin\n",
 		"provider":     "providers:\n  provider_a:\n    api_key: plaintext-model-key\n",
 		"SMTP":         "soar:\n  integrations:\n    email:\n      smtp_pass: plaintext-smtp\n",
+		"DingTalk":     "soar:\n  integrations:\n    dingtalk:\n      webhook_url: https://secret.example/dingtalk\n",
+		"WeCom":        "soar:\n  integrations:\n    wecom:\n      webhook_url: https://secret.example/wecom\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			cfg, err := Parse([]byte("app:\n  environment: test\n" + fragment))

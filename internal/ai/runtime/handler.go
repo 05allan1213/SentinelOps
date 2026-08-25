@@ -136,7 +136,7 @@ func (h *RuntimeHandler) WrapInvokableToolCall(_ context.Context, endpoint adk.I
 			if approvalErr != nil {
 				return "", approvalErr
 			}
-			result, err := h.effects.ExecuteTransactional(ctx, approved.Request, func(callbackCtx context.Context) (string, error) {
+			result, err := h.effects.Execute(ctx, approved.Request, func(callbackCtx context.Context) (string, error) {
 				return endpoint(callbackCtx, approved.Request.ArgumentsJSON, options...)
 			})
 			return result.Response, err

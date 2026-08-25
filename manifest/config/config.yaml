@@ -201,9 +201,9 @@ knowledge:
 soar:
   integrations:
     dingtalk:
-      webhook_url: ""       # 钉钉机器人 Webhook URL
+      webhook_ref: ""       # 钉钉机器人 Webhook URL Secret 引用
     wecom:
-      webhook_url: ""       # 企微机器人 Webhook URL
+      webhook_ref: ""       # 企微机器人 Webhook URL Secret 引用
     email:
       smtp_host: ""         # SMTP 服务器地址
       smtp_port: ""                 # SMTP 端口

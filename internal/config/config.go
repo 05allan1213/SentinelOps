@@ -86,7 +86,21 @@ type SOAR struct {
 
 // Integrations 保存现有通知集成配置。
 type Integrations struct {
-	Email Email `yaml:"email" json:"email"`
+	DingTalk DingTalk `yaml:"dingtalk" json:"dingtalk"`
+	WeCom    WeCom    `yaml:"wecom" json:"wecom"`
+	Email    Email    `yaml:"email" json:"email"`
+}
+
+// DingTalk 保存钉钉 endpoint Secret 引用。
+type DingTalk struct {
+	WebhookRef       SecretRef `yaml:"webhook_ref" json:"webhook_ref"`
+	LegacyWebhookURL *string   `yaml:"webhook_url,omitempty" json:"-"`
+}
+
+// WeCom 保存企微 endpoint Secret 引用。
+type WeCom struct {
+	WebhookRef       SecretRef `yaml:"webhook_ref" json:"webhook_ref"`
+	LegacyWebhookURL *string   `yaml:"webhook_url,omitempty" json:"-"`
 }
 
 // Email 保存 SMTP 元数据和密码引用。
@@ -232,11 +246,19 @@ func (c *Config) Validate() error {
 	if c.SOAR.Integrations.Email.LegacySMTPPassword != nil {
 		return fmt.Errorf("soar.integrations.email.smtp_pass plaintext is forbidden; use smtp_password_ref")
 	}
+	if c.SOAR.Integrations.DingTalk.LegacyWebhookURL != nil {
+		return fmt.Errorf("soar.integrations.dingtalk.webhook_url plaintext is forbidden; use webhook_ref")
+	}
+	if c.SOAR.Integrations.WeCom.LegacyWebhookURL != nil {
+		return fmt.Errorf("soar.integrations.wecom.webhook_url plaintext is forbidden; use webhook_ref")
+	}
 	for name, ref := range map[string]SecretRef{
 		"database.mysql.dsn_ref":                    c.Database.MySQL.DSNRef,
 		"auth.jwt.secret_ref":                       c.Auth.JWT.SecretRef,
 		"auth.seed.admin_password_ref":              c.Auth.Seed.AdminPasswordRef,
 		"soar.integrations.email.smtp_password_ref": c.SOAR.Integrations.Email.SMTPPasswordRef,
+		"soar.integrations.dingtalk.webhook_ref":    c.SOAR.Integrations.DingTalk.WebhookRef,
+		"soar.integrations.wecom.webhook_ref":       c.SOAR.Integrations.WeCom.WebhookRef,
 		"secret_refs.mcp_header":                    c.Secrets.MCPHeader,
 		"secret_refs.effect":                        c.Secrets.Effect,
 	} {

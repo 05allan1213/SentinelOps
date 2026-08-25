@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/service/pipeline"
 
@@ -43,6 +44,9 @@ func NewSaveIntelligenceTool() tool.InvokableTool {
 		func(ctx context.Context, input *SaveIntelligenceInput, opts ...tool.Option) (string, error) {
 			if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
 				return "", err
+			}
+			if metadata, err := effects.ExecutionMetadataFromContext(ctx); err == nil && metadata.EffectStep == "milvus_index" {
+				return indexIntelligenceDerived(ctx, input, metadata.PrimaryResponse)
 			}
 			// 参数验证
 			if strings.TrimSpace(input.Title) == "" {
@@ -166,6 +170,30 @@ func NewSaveIntelligenceTool() tool.InvokableTool {
 		panic(err)
 	}
 	return t
+}
+
+func indexIntelligenceDerived(ctx context.Context, input *SaveIntelligenceInput, primaryResponse string) (string, error) {
+	var primary SaveIntelligenceOutput
+	if err := json.Unmarshal([]byte(primaryResponse), &primary); err != nil {
+		return "", effects.NewInvocationError(effects.InvocationSafeNotSent, true, nil, fmt.Errorf("milvus_index: primary result is invalid"))
+	}
+	if primary.ID == "" {
+		return `{"indexed":"skipped","reason":"no_primary_record"}`, nil
+	}
+	event, err := dao.GetEventByID(ctx, primary.ID)
+	if err != nil {
+		return "", effects.NewInvocationError(effects.InvocationSafeNotSent, true,
+			map[string]any{"mysql_record": "missing", "milvus_index": "not_sent"},
+			fmt.Errorf("milvus_index: primary record is unavailable"))
+	}
+	event.Content = strings.TrimSpace(input.Content)
+	if err := pipeline.IndexDocuments(ctx, []dao.Event{*event}); err != nil {
+		return "", effects.NewInvocationError(effects.InvocationUnknown, false,
+			map[string]any{"mysql_record": "confirmed", "milvus_index": "unknown"},
+			fmt.Errorf("milvus_index: target state is unknown"))
+	}
+	result, _ := json.Marshal(map[string]string{"id": primary.ID, "indexed": "true"})
+	return string(result), nil
 }
 
 // indexIntelligenceLegacy 防止事务 Context 泄漏到 goroutine 或在 MySQL 提交前产生外部副作用。

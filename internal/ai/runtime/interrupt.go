@@ -22,7 +22,7 @@ const approvalTTL = 30 * time.Minute
 
 var (
 	// ErrTransactionalEffectEndpointUnsupported 表示 Mutation Tool 没有使用现有同步 Invokable endpoint。
-	ErrTransactionalEffectEndpointUnsupported = errors.New("transactional Effect requires an invokable Tool endpoint")
+	ErrTransactionalEffectEndpointUnsupported = errors.New("durable Effect requires an invokable Tool endpoint")
 )
 
 type approvedTransactionalCall struct {
@@ -115,9 +115,6 @@ func (h *RuntimeHandler) handleApprovalToolCall(
 		if err != nil {
 			return nil, true, err
 		}
-		if entry.EffectType != policy.EffectTransactionalDB {
-			return nil, true, mutationDisabledError(entry)
-		}
 		return &approvedTransactionalCall{Request: effects.TransactionalRequest{
 			Lease: attempt.Lease, ApprovalID: restored.ApprovalID, ProposalHash: restored.ProposalHash,
 			ToolCallIDObserved: toolContext.CallID, ToolName: restored.ToolName,
@@ -126,6 +123,7 @@ func (h *RuntimeHandler) handleApprovalToolCall(
 			RuntimeCompatibilityHash: restored.RuntimeCompatibilityHash,
 			EffectSteps:              append([]string(nil), restored.EffectSteps...), Attempt: attempt.Run.Attempt,
 			TraceID: attempt.Trace.ID, GateAllowed: attempt.Snapshot.FeatureGate(gateName),
+			Deadline: attempt.Deadline, LeaseSafetyMargin: 5 * time.Second,
 		}}, true, nil
 	}
 	arguments, canonicalArguments, err := decodeMutationArguments(rawArguments)
