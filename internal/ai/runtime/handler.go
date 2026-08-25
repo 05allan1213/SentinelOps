@@ -151,7 +151,8 @@ func (h *RuntimeHandler) WrapInvokableToolCall(_ context.Context, endpoint adk.I
 			return "", err
 		}
 		result, endpointErr := endpoint(callContext, arguments, options...)
-		settleErr := settleRuntimeCall(callContext, budget, reservation, endpointErr == nil)
+		actual, quality := toolBudgetActual(result)
+		settleErr := settleRuntimeCallWithUsage(callContext, budget, reservation, endpointErr == nil, actual, quality)
 		return result, errors.Join(endpointErr, settleErr)
 	}, nil
 }
@@ -181,7 +182,7 @@ func (h *RuntimeHandler) WrapStreamableToolCall(_ context.Context, endpoint adk.
 		if result == nil {
 			return nil, errors.Join(fmt.Errorf("streamable Tool endpoint returned a nil stream"), settleRuntimeCall(callContext, budget, reservation, false))
 		}
-		return settlingStream(callContext, result, budget, reservation), nil
+		return settlingStreamWithUsage(callContext, result, budget, reservation, func(value string) (*workflow.BaseBudgetActual, string) { return toolBudgetActual(value) }), nil
 	}, nil
 }
 
@@ -208,7 +209,8 @@ func (h *RuntimeHandler) WrapEnhancedInvokableToolCall(_ context.Context, endpoi
 			return nil, err
 		}
 		result, endpointErr := endpoint(callContext, argument, options...)
-		settleErr := settleRuntimeCall(callContext, budget, reservation, endpointErr == nil)
+		actual, quality := toolResultBudgetActual(result)
+		settleErr := settleRuntimeCallWithUsage(callContext, budget, reservation, endpointErr == nil, actual, quality)
 		return result, errors.Join(endpointErr, settleErr)
 	}, nil
 }
@@ -242,7 +244,7 @@ func (h *RuntimeHandler) WrapEnhancedStreamableToolCall(_ context.Context, endpo
 		if result == nil {
 			return nil, errors.Join(fmt.Errorf("enhanced streamable Tool endpoint returned a nil stream"), settleRuntimeCall(callContext, budget, reservation, false))
 		}
-		return settlingStream(callContext, result, budget, reservation), nil
+		return settlingStreamWithUsage(callContext, result, budget, reservation, toolResultBudgetActual), nil
 	}, nil
 }
 
@@ -252,12 +254,13 @@ type runtimeModelEndpoint struct {
 }
 
 func (m *runtimeModelEndpoint) Generate(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.Message, error) {
-	callContext, budget, reservation, err := m.handler.prepareModelCall(ctx)
+	callContext, budget, reservation, err := m.handler.prepareModelCall(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 	result, endpointErr := m.endpoint.Generate(callContext, input, options...)
-	settleErr := settleRuntimeCall(callContext, budget, reservation, endpointErr == nil)
+	actual, quality := modelBudgetActual(result)
+	settleErr := settleRuntimeCallWithUsage(callContext, budget, reservation, endpointErr == nil, actual, quality)
 	if settleErr != nil {
 		result = nil
 	}
@@ -265,7 +268,7 @@ func (m *runtimeModelEndpoint) Generate(ctx context.Context, input []*schema.Mes
 }
 
 func (m *runtimeModelEndpoint) Stream(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.StreamReader[*schema.Message], error) {
-	callContext, budget, reservation, err := m.handler.prepareModelCall(ctx)
+	callContext, budget, reservation, err := m.handler.prepareModelCall(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -276,10 +279,10 @@ func (m *runtimeModelEndpoint) Stream(ctx context.Context, input []*schema.Messa
 	if result == nil {
 		return nil, errors.Join(fmt.Errorf("model endpoint returned a nil stream"), settleRuntimeCall(callContext, budget, reservation, false))
 	}
-	return settlingStream(callContext, result, budget, reservation), nil
+	return settlingStreamWithUsage(callContext, result, budget, reservation, modelBudgetActual), nil
 }
 
-func (h *RuntimeHandler) prepareModelCall(ctx context.Context) (context.Context, CallBudget, BudgetReservation, error) {
+func (h *RuntimeHandler) prepareModelCall(ctx context.Context, input ...[]*schema.Message) (context.Context, CallBudget, BudgetReservation, error) {
 	attempt, budget, err := validateRuntimeCallContext(ctx)
 	if err != nil {
 		return nil, nil, BudgetReservation{}, err
@@ -291,10 +294,14 @@ func (h *RuntimeHandler) prepareModelCall(ctx context.Context) (context.Context,
 	if err := validateModelInvocation(attempt.Snapshot, invocation); err != nil {
 		return nil, nil, BudgetReservation{}, err
 	}
+	var estimateInput []*schema.Message
+	if len(input) > 0 {
+		estimateInput = input[0]
+	}
 	call := BudgetCall{
 		ReservationIdentity: invocation.ReservationIdentity, Kind: BudgetCallKindModel,
 		Subject: invocation.CatalogRef, Lease: attempt.Lease, TraceID: attempt.Trace.ID,
-		Deadline: attempt.Deadline, Model: cloneModelInvocation(&invocation),
+		Deadline: attempt.Deadline, Model: cloneModelInvocation(&invocation), Estimate: modelBudgetEstimate(estimateInput),
 	}
 	if err := limiter.Wait(ctx, invocation.CatalogRef); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -309,6 +316,31 @@ func (h *RuntimeHandler) prepareModelCall(ctx context.Context) (context.Context,
 	}
 	metadata := runtimeCallMetadata(attempt, reservation.Identity, BudgetCallKindModel, invocation.CatalogRef, &invocation)
 	return context.WithValue(ctx, callMetadataContextKey{}, metadata), budget, reservation, nil
+}
+
+func modelBudgetEstimate(input []*schema.Message) workflow.BaseBudgetEstimate {
+	var chars int
+	for _, message := range input {
+		if message != nil {
+			chars += len(message.Content)
+		}
+	}
+	return workflow.BaseBudgetEstimate{InputTokens: int64((chars + 3) / 4)}
+}
+
+func toolBudgetActual(result string) (*workflow.BaseBudgetActual, string) {
+	return &workflow.BaseBudgetActual{ResultChars: int64(len([]rune(result))), ResultBytes: int64(len(result))}, "reliable"
+}
+
+func toolResultBudgetActual(result *schema.ToolResult) (*workflow.BaseBudgetActual, string) {
+	if result == nil {
+		return nil, "unknown"
+	}
+	var text string
+	for _, part := range result.Parts {
+		text += part.Text
+	}
+	return toolBudgetActual(text)
 }
 
 func (h *RuntimeHandler) prepareToolCall(ctx context.Context, toolContext *adk.ToolContext) (context.Context, CallBudget, BudgetReservation, error) {
@@ -396,9 +428,22 @@ func validateToolSnapshot(snapshot FrozenRuntimeSnapshot, toolName string) error
 }
 
 func settleRuntimeCall(ctx context.Context, budget CallBudget, reservation BudgetReservation, succeeded bool) error {
+	return settleRuntimeCallWithUsage(ctx, budget, reservation, succeeded, nil, "unknown")
+}
+
+func settleRuntimeCallWithUsage(ctx context.Context, budget CallBudget, reservation BudgetReservation, succeeded bool, actual *workflow.BaseBudgetActual, quality string) error {
 	metadata, err := CallMetadataFromContext(ctx)
 	if err != nil {
 		return err
+	}
+	if actual != nil && metadata.Model != nil && actual.CostCNY == 0 {
+		uncached := actual.InputTokens - actual.CachedInputTokens
+		if uncached < 0 {
+			uncached = 0
+		}
+		actualCopy := *actual
+		actualCopy.CostCNY = (float64(uncached)*metadata.Model.InputPrice + float64(actual.CachedInputTokens)*metadata.Model.CachedInputPrice + float64(actual.OutputTokens)*metadata.Model.OutputPrice) / 1_000_000
+		actual = &actualCopy
 	}
 	lease, err := workflow.LeaseTokenFromContext(ctx)
 	if err != nil {
@@ -406,19 +451,36 @@ func settleRuntimeCall(ctx context.Context, budget CallBudget, reservation Budge
 	}
 	return budget.SettleCall(ctx, BudgetSettlement{
 		ReservationIdentity: reservation.Identity, Lease: lease,
-		TraceID: metadata.TraceID, Succeeded: succeeded,
+		TraceID: metadata.TraceID, Succeeded: succeeded, Actual: actual, UsageQuality: quality,
 	})
 }
 
+func modelBudgetActual(message *schema.Message) (*workflow.BaseBudgetActual, string) {
+	if message == nil || message.ResponseMeta == nil || message.ResponseMeta.Usage == nil {
+		return nil, "unknown"
+	}
+	usage := message.ResponseMeta.Usage
+	return &workflow.BaseBudgetActual{
+		InputTokens: int64(usage.PromptTokens), CachedInputTokens: int64(usage.PromptTokenDetails.CachedTokens),
+		OutputTokens: int64(usage.CompletionTokens), ReasoningTokens: int64(usage.CompletionTokensDetails.ReasoningTokens),
+	}, "reliable"
+}
+
 func settlingStream[T any](ctx context.Context, source *schema.StreamReader[T], budget CallBudget, reservation BudgetReservation) *schema.StreamReader[T] {
+	return settlingStreamWithUsage(ctx, source, budget, reservation, func(T) (*workflow.BaseBudgetActual, string) { return nil, "unknown" })
+}
+
+func settlingStreamWithUsage[T any](ctx context.Context, source *schema.StreamReader[T], budget CallBudget, reservation BudgetReservation, usage func(T) (*workflow.BaseBudgetActual, string)) *schema.StreamReader[T] {
 	reader, writer := schema.Pipe[T](1)
 	go func() {
 		defer source.Close()
 		defer writer.Close()
+		var actual *workflow.BaseBudgetActual
+		quality := "unknown"
 		for {
 			item, receiveErr := source.Recv()
 			if errors.Is(receiveErr, io.EOF) {
-				if settleErr := settleRuntimeCall(ctx, budget, reservation, true); settleErr != nil {
+				if settleErr := settleRuntimeCallWithUsage(ctx, budget, reservation, true, actual, quality); settleErr != nil {
 					var zero T
 					writer.Send(zero, settleErr)
 				}
@@ -426,11 +488,14 @@ func settlingStream[T any](ctx context.Context, source *schema.StreamReader[T], 
 			}
 			if receiveErr != nil {
 				var zero T
-				writer.Send(zero, errors.Join(receiveErr, settleRuntimeCall(ctx, budget, reservation, false)))
+				writer.Send(zero, errors.Join(receiveErr, settleRuntimeCallWithUsage(ctx, budget, reservation, false, actual, quality)))
 				return
 			}
+			if candidate, candidateQuality := usage(item); candidate != nil {
+				actual, quality = candidate, candidateQuality
+			}
 			if writer.Send(item, nil) {
-				_ = settleRuntimeCall(ctx, budget, reservation, false)
+				_ = settleRuntimeCallWithUsage(ctx, budget, reservation, false, actual, quality)
 				return
 			}
 		}

@@ -15,7 +15,15 @@ const (
 	// BudgetCallKindModel 表示一次真实 Model endpoint 调用。
 	BudgetCallKindModel BudgetCallKind = "model_call"
 	// BudgetCallKindL0Tool 表示一次 L0 Tool endpoint 调用。
-	BudgetCallKindL0Tool BudgetCallKind = "l0_tool_call"
+	BudgetCallKindL0Tool    BudgetCallKind = "l0_tool_call"
+	BudgetCallKindPlanner   BudgetCallKind = "planner"
+	BudgetCallKindExecutor  BudgetCallKind = "executor"
+	BudgetCallKindReplanner BudgetCallKind = "replanner"
+	BudgetCallKindRetry     BudgetCallKind = "retry"
+	BudgetCallKindFailover  BudgetCallKind = "failover"
+	BudgetCallKindMCP       BudgetCallKind = "mcp"
+	BudgetCallKindRAG       BudgetCallKind = "rag"
+	BudgetCallKindSkill     BudgetCallKind = "skill"
 )
 
 // BudgetCallKind 是 RuntimeHandler 与同一 durable Budget handle 的调用分类。
@@ -31,6 +39,12 @@ type ModelInvocation struct {
 	ModelID             string
 	Profile             string
 	SnapshotIdentity    string
+	PricingRevision     string
+	PricingCurrency     string
+	PricingUnit         string
+	InputPrice          float64
+	CachedInputPrice    float64
+	OutputPrice         float64
 }
 
 // BudgetCall 描述 RuntimeHandler 在 endpoint 前交给 durable handle 的安全事实。
@@ -42,6 +56,7 @@ type BudgetCall struct {
 	TraceID             string
 	Deadline            time.Time
 	Model               *ModelInvocation
+	Estimate            workflow.BaseBudgetEstimate
 }
 
 // BudgetReservation 是 Handler 需要传播到 endpoint metadata 的稳定 identity。
@@ -55,6 +70,8 @@ type BudgetSettlement struct {
 	Lease               workflow.LeaseToken
 	TraceID             string
 	Succeeded           bool
+	Actual              *workflow.BaseBudgetActual
+	UsageQuality        string
 }
 
 // CallBudget 是 P14 RuntimeHandler 消费的最小 durable Budget 能力。
@@ -63,6 +80,12 @@ type CallBudget interface {
 	BudgetHandle
 	ReserveCall(context.Context, BudgetCall) (BudgetReservation, error)
 	SettleCall(context.Context, BudgetSettlement) error
+}
+
+// ControlPlaneBudget 是 Runner 在 Planner/Executor/Replanner attempt 前复用的同一 reservation primitive。
+type ControlPlaneBudget interface {
+	CallBudget
+	ReserveControlPlane(context.Context, BudgetCall) (BudgetReservation, error)
 }
 
 // DurableBudget 在现有 workflow.GORMStore 上重建 immutable、并发安全的 Run handle。
@@ -103,6 +126,14 @@ type durableBudgetHandle struct {
 
 func (*durableBudgetHandle) RuntimeBudgetHandle() {}
 
+// ReserveControlPlane 为官方 planexecute 的控制面 attempt 预留额度，不创建第二个 Store。
+func (h *durableBudgetHandle) ReserveControlPlane(ctx context.Context, call BudgetCall) (BudgetReservation, error) {
+	if call.Kind != BudgetCallKindPlanner && call.Kind != BudgetCallKindExecutor && call.Kind != BudgetCallKindReplanner {
+		return BudgetReservation{}, fmt.Errorf("unsupported control-plane budget kind %q", call.Kind)
+	}
+	return h.ReserveCall(ctx, call)
+}
+
 func (h *durableBudgetHandle) ReserveCall(ctx context.Context, call BudgetCall) (BudgetReservation, error) {
 	if h == nil || h.store == nil || call.Lease.RunID != h.runID {
 		return BudgetReservation{}, workflow.ErrLeaseLost
@@ -120,15 +151,23 @@ func (h *durableBudgetHandle) ReserveCall(ctx context.Context, call BudgetCall) 
 		metadata = workflow.BaseBudgetMetadata{
 			CatalogRef: call.Model.CatalogRef, Provider: call.Model.Provider, Driver: call.Model.Driver,
 			ModelID: call.Model.ModelID, Profile: call.Model.Profile, SnapshotIdentity: call.Model.SnapshotIdentity,
+			PricingRevision: call.Model.PricingRevision, PricingCurrency: call.Model.PricingCurrency, PricingUnit: call.Model.PricingUnit,
+			InputPrice: call.Model.InputPrice, CachedInputPrice: call.Model.CachedInputPrice, OutputPrice: call.Model.OutputPrice,
 		}
 	} else if call.Kind != BudgetCallKindL0Tool {
-		return BudgetReservation{}, fmt.Errorf("unsupported Runtime budget call kind %q", call.Kind)
+		metadata = workflow.BaseBudgetMetadata{ToolName: call.Subject, Phase: string(call.Kind)}
+		switch call.Kind {
+		case BudgetCallKindPlanner, BudgetCallKindExecutor, BudgetCallKindReplanner, BudgetCallKindRetry, BudgetCallKindFailover, BudgetCallKindMCP, BudgetCallKindRAG, BudgetCallKindSkill:
+			kind = workflow.BaseBudgetKind(call.Kind)
+		default:
+			return BudgetReservation{}, fmt.Errorf("unsupported Runtime budget call kind %q", call.Kind)
+		}
 	}
 	persistenceContext, cancel := durableBudgetPersistenceContext(ctx)
 	defer cancel()
 	reservation, err := h.store.ReserveBaseBudget(persistenceContext, workflow.ReserveBaseBudgetInput{
 		Lease: call.Lease, Identity: call.ReservationIdentity, Kind: kind, Subject: call.Subject,
-		TraceID: call.TraceID, Deadline: call.Deadline, Metadata: metadata,
+		TraceID: call.TraceID, Deadline: call.Deadline, Metadata: metadata, Estimate: call.Estimate,
 	})
 	if err != nil {
 		return BudgetReservation{}, err
@@ -148,7 +187,7 @@ func (h *durableBudgetHandle) SettleCall(ctx context.Context, settlement BudgetS
 	defer cancel()
 	return h.store.SettleBaseBudget(persistenceContext, workflow.SettleBaseBudgetInput{
 		Lease: settlement.Lease, Identity: settlement.ReservationIdentity,
-		Outcome: outcome, TraceID: settlement.TraceID,
+		Outcome: outcome, TraceID: settlement.TraceID, Actual: settlement.Actual, UsageQuality: settlement.UsageQuality,
 	})
 }
 

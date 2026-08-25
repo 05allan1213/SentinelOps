@@ -76,6 +76,8 @@ func (m *boundPhysicalModel) callContext(ctx context.Context) (context.Context, 
 		ReservationIdentity: modelReservationIdentity(attempt, ordinal, frozen.CatalogRef),
 		CatalogRef:          frozen.CatalogRef, Provider: frozen.Provider, Driver: frozen.Driver,
 		ModelID: frozen.ModelID, Profile: frozen.Profile, SnapshotIdentity: frozen.Identity(),
+		PricingRevision: frozen.Pricing.Revision, PricingCurrency: frozen.Pricing.Currency, PricingUnit: frozen.Pricing.Unit,
+		InputPrice: frozen.Pricing.Input, CachedInputPrice: frozen.Pricing.CachedInput, OutputPrice: frozen.Pricing.Output,
 	}
 	return WithModelInvocation(ctx, invocation)
 }
