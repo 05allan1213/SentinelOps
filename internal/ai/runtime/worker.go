@@ -26,6 +26,7 @@ type WorkerConfig struct {
 	Transition             func(context.Context, workflow.RunTransition) error
 	Complete               func(context.Context, workflow.CompleteRunInput) error
 	ProjectRevision        func(context.Context, string, []byte) error
+	Retention              *RetentionCoordinator
 }
 
 // Worker 只委派唯一 workflow.GORMStore，并承载 P20 唯一 durable poll loop。
@@ -40,6 +41,7 @@ type Worker struct {
 	projectRevision func(context.Context, string, []byte) error
 	expireApprovals func(context.Context, string, int) (int, error)
 	reconciler      *effects.Reconciler
+	retention       *RetentionCoordinator
 }
 
 // RunExecutionResult 是 Worker 交给唯一完成 primitive 的基础结果。
@@ -114,6 +116,7 @@ func NewWorker(store *workflow.GORMStore, config WorkerConfig) (*Worker, error) 
 	worker := &Worker{
 		store: store, config: config, claimNext: config.ClaimNext, execute: config.Execute,
 		heartbeat: config.Heartbeat, transition: config.Transition, complete: config.Complete, projectRevision: config.ProjectRevision,
+		retention: config.Retention,
 	}
 	if worker.claimNext == nil {
 		worker.claimNext = worker.ClaimNext
@@ -154,8 +157,19 @@ func (w *Worker) ClaimNext(ctx context.Context) (*workflow.ClaimedRun, bool, err
 
 // RunOnce 认领并执行一个 Run；API/SSE 生命周期不参与此调用。
 func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
-	if w == nil || w.execute == nil {
-		return false, fmt.Errorf("durable Run executor is required")
+	if w == nil {
+		return false, fmt.Errorf("durable Worker is required")
+	}
+	retained := false
+	if w.retention != nil {
+		var err error
+		retained, _, err = w.retention.RunOnce(ctx)
+		if err != nil {
+			return false, err
+		}
+	}
+	if w.execute == nil {
+		return retained, nil
 	}
 	expired := 0
 	if w.expireApprovals != nil {
@@ -171,7 +185,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 	}
 	claimed, ok, err := w.claimNext(ctx)
 	if err != nil || !ok {
-		return ok || expired > 0 || reconciled, err
+		return ok || retained || expired > 0 || reconciled, err
 	}
 	runCtx := ctx
 	if w.store != nil {

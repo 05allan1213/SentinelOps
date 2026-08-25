@@ -67,3 +67,35 @@ func (c *ControllerV1) ResetIngestKey(ctx context.Context, _ *v1.ResetIngestKeyR
 	}
 	return &v1.ResetIngestKeyRes{APIKey: newKey}, nil
 }
+
+func (c *ControllerV1) GetRetention(ctx context.Context, _ *v1.GetRetentionReq) (*v1.GetRetentionRes, error) {
+	settings, err := settingssvc.GetRetention(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.GetRetentionRes{Settings: v1.RetentionSettings{PayloadDays: settings.PayloadDays, AuditDays: settings.AuditDays}}, nil
+}
+
+func (c *ControllerV1) SaveRetention(ctx context.Context, req *v1.SaveRetentionReq) (*v1.SaveRetentionRes, error) {
+	err := settingssvc.SaveRetention(ctx, settingssvc.RetentionSettings{PayloadDays: req.PayloadDays, AuditDays: req.AuditDays}, req.Reason)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.SaveRetentionRes{}, nil
+}
+
+func (c *ControllerV1) ListRetentionAudit(ctx context.Context, req *v1.ListRetentionAuditReq) (*v1.ListRetentionAuditRes, error) {
+	records, err := settingssvc.ListRetentionAudit(ctx, req.Limit)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.RetentionAuditItem, 0, len(records))
+	for _, record := range records {
+		items = append(items, v1.RetentionAuditItem{
+			ActorID: record.ActorID, OldPayloadDays: record.OldPayloadDays, OldAuditDays: record.OldAuditDays,
+			NewPayloadDays: record.NewPayloadDays, NewAuditDays: record.NewAuditDays,
+			Reason: record.Reason, ChangedAt: record.ChangedAt,
+		})
+	}
+	return &v1.ListRetentionAuditRes{Items: items}, nil
+}

@@ -3,6 +3,7 @@ package mysql
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"SentinelOps/internal/ai/policy"
@@ -19,6 +20,99 @@ const EvidenceTraceQualityPredicate = "COALESCE(CASE WHEN JSON_VALID(agent_trace
 // NewTraceDAO 创建 DAO 实例
 func NewTraceDAO() *TraceDAO {
 	return &TraceDAO{}
+}
+
+// PhysicalDeleteTracePayloads 清理终态 Run 关联 Trace 的 Prompt/Completion/Tool/Retrieval 正文。
+func (d *TraceDAO) PhysicalDeleteTracePayloads(ctx context.Context, cutoff time.Time, limit int) (int64, error) {
+	db, err := DB(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return physicalDeleteTracePayloads(ctx, db, cutoff, limit)
+}
+
+// PhysicalDeleteTraceMetadata 在审计保留期后硬删除终态 Run 关联 Trace。
+func (d *TraceDAO) PhysicalDeleteTraceMetadata(ctx context.Context, cutoff time.Time, limit int) (int64, error) {
+	db, err := DB(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return physicalDeleteTraceMetadata(ctx, db, cutoff, limit)
+}
+
+func physicalDeleteTracePayloads(ctx context.Context, db *gorm.DB, cutoff time.Time, limit int) (int64, error) {
+	if db == nil || cutoff.IsZero() || limit <= 0 || limit > 1000 {
+		return 0, gorm.ErrInvalidData
+	}
+	traceIDs, err := terminalTraceIDs(db.WithContext(ctx), cutoff, limit)
+	if err != nil || len(traceIDs) == 0 {
+		return 0, err
+	}
+	var updated int64
+	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&TraceRun{}).Where("trace_id IN ?", traceIDs).Update("query_text", "")
+		if result.Error != nil {
+			return result.Error
+		}
+		updated = result.RowsAffected
+		result = tx.Model(&TraceNode{}).Where("trace_id IN ?", traceIDs).Updates(map[string]any{
+			"prompt_text": "", "completion_text": "", "query_text": "", "retrieved_docs": "",
+			"metadata": gorm.Expr("CASE WHEN JSON_VALID(metadata) THEN JSON_REMOVE(metadata, '$.tool_input', '$.tool_output', '$.prompt', '$.completion', '$.documents') ELSE '' END"),
+		})
+		return result.Error
+	})
+	return updated, err
+}
+
+func physicalDeleteTraceMetadata(ctx context.Context, db *gorm.DB, cutoff time.Time, limit int) (int64, error) {
+	if db == nil || cutoff.IsZero() || limit <= 0 || limit > 1000 {
+		return 0, gorm.ErrInvalidData
+	}
+	traceIDs, err := terminalTraceIDs(db.WithContext(ctx), cutoff, limit)
+	if err != nil || len(traceIDs) == 0 {
+		return 0, err
+	}
+	var deleted int64
+	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if result := tx.Unscoped().Where("trace_id IN ?", traceIDs).Delete(&TraceNode{}); result.Error != nil {
+			return result.Error
+		}
+		result := tx.Where("trace_id IN ?", traceIDs).Delete(&TraceRun{})
+		if result.Error != nil {
+			return result.Error
+		}
+		deleted = result.RowsAffected
+		return nil
+	})
+	return deleted, err
+}
+
+func terminalTraceIDs(db *gorm.DB, cutoff time.Time, limit int) ([]string, error) {
+	var ids []string
+	runIDExpr := "JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.run_id'))"
+	err := db.Model(&TraceRun{}).
+		Joins("JOIN workflow_runs ON workflow_runs.id = "+runIDExpr).
+		Where("JSON_VALID(agent_trace_runs.tags) AND workflow_runs.status IN ? AND workflow_runs.finished_at IS NOT NULL AND workflow_runs.finished_at < ?",
+			[]string{"success", "succeeded", "failed", "canceled"}, cutoff).
+		Order("workflow_runs.finished_at ASC, agent_trace_runs.trace_id ASC").Limit(limit).
+		Pluck("agent_trace_runs.trace_id", &ids).Error
+	return ids, err
+}
+
+func containsTracePayloadKeys(metadata string) bool {
+	if metadata == "" {
+		return false
+	}
+	var value map[string]any
+	if json.Unmarshal([]byte(metadata), &value) != nil {
+		return true
+	}
+	for _, key := range []string{"tool_input", "tool_output", "prompt", "completion", "documents"} {
+		if _, ok := value[key]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func scopedTraceRuns(ctx context.Context, db *gorm.DB) (*gorm.DB, error) {

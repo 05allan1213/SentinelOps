@@ -134,6 +134,24 @@ agent_runtime:
   shadow_mode: false
   admin_query_database_debug: false
 
+observability:
+  langfuse:
+    enabled: false
+    host: "https://cloud.langfuse.com"
+    public_key_ref: "env:SENTINELOPS_LANGFUSE_PUBLIC_KEY"
+    secret_key_ref: "env:SENTINELOPS_LANGFUSE_SECRET_KEY"
+    service_name: "sentinelops"
+    sample_rate: 1
+    timeout_ms: 10000
+    max_attribute_value_length: 65536
+    max_span_attribute_bytes: 262144
+    shutdown_timeout_ms: 10000
+  retention:
+    enabled: true
+    lease_duration_ms: 30000
+    interval_ms: 3600000
+    batch_size: 100
+
 # 后台调度器
 scheduler:
   fetch_interval_minutes: 15

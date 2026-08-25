@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	appconfig "SentinelOps/internal/config"
 )
@@ -143,6 +144,32 @@ func TestBootstrapWorkerDoesNotBindHTTP(t *testing.T) {
 	joined := strings.Join(calls, ",")
 	if !strings.Contains(joined, "worker") || strings.Contains(joined, "api") || strings.Contains(joined, "serve") {
 		t.Fatalf("calls = %v, want worker without HTTP", calls)
+	}
+}
+
+func TestLangfuseShutdownUsesConfiguredDeadline(t *testing.T) {
+	var deadline time.Time
+	var calls []string
+	deps := recordingDependencies(validBootstrapConfig("production"), &calls)
+	deps.shutdownRuntime = func(ctx context.Context) error {
+		var ok bool
+		deadline, ok = ctx.Deadline()
+		if !ok {
+			return fmt.Errorf("shutdown context has no deadline")
+		}
+		return nil
+	}
+	deps.initRuntime = func(context.Context) error { return nil }
+	deps.waitWorker = func(context.Context) error { return nil }
+	config := validBootstrapConfig("production")
+	config.Observability.Langfuse.ShutdownTimeoutMS = 37
+	deps.loadConfig = func(string) (*appconfig.Config, string, error) { return config, "test-config.yaml", nil }
+	started := time.Now()
+	if err := run(context.Background(), Options{Role: RoleWorker, Resolver: validResolver()}, deps); err != nil {
+		t.Fatal(err)
+	}
+	if deadline.IsZero() || deadline.Before(started.Add(30*time.Millisecond)) || deadline.After(started.Add(500*time.Millisecond)) {
+		t.Fatalf("shutdown deadline=%v, want about 37ms after start %v", deadline, started)
 	}
 }
 

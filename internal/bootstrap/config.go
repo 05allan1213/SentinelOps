@@ -4,8 +4,10 @@ package bootstrap
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"SentinelOps/internal/ai/retrieval"
 	appconfig "SentinelOps/internal/config"
@@ -33,16 +35,17 @@ type Options struct {
 }
 
 type dependencies struct {
-	loadConfig   func(string) (*appconfig.Config, string, error)
-	initDatabase func(context.Context, []byte) error
-	initRuntime  func(context.Context) error
-	initAuth     func([]byte) error
-	seedAdmin    func(context.Context, []byte) error
-	warmUp       func(context.Context) error
-	bindAPI      func(context.Context) error
-	startWorker  func(context.Context) error
-	serveAPI     func(context.Context) error
-	waitWorker   func(context.Context) error
+	loadConfig      func(string) (*appconfig.Config, string, error)
+	initDatabase    func(context.Context, []byte) error
+	initRuntime     func(context.Context) error
+	shutdownRuntime func(context.Context) error
+	initAuth        func([]byte) error
+	seedAdmin       func(context.Context, []byte) error
+	warmUp          func(context.Context) error
+	bindAPI         func(context.Context) error
+	startWorker     func(context.Context) error
+	serveAPI        func(context.Context) error
+	waitWorker      func(context.Context) error
 }
 
 // ParseRole 解析第一个位置参数；未提供时使用环境变量，仍未提供则默认为开发 all。
@@ -74,20 +77,21 @@ func Run(ctx context.Context, options Options) error {
 
 func defaultDependencies() dependencies {
 	return dependencies{
-		loadConfig:   appconfig.LoadDirectory,
-		initDatabase: dao.InitWithDSN,
-		initRuntime:  initializeSharedRuntime,
-		initAuth:     authpkg.Init,
-		seedAdmin:    dao.SeedAdmin,
-		warmUp:       retrieval.WarmUp,
-		bindAPI:      bindAPI,
-		startWorker:  startWorker,
-		serveAPI:     serveAPI,
-		waitWorker:   waitWorker,
+		loadConfig:      appconfig.LoadDirectory,
+		initDatabase:    dao.InitWithDSN,
+		initRuntime:     initializeSharedRuntime,
+		shutdownRuntime: shutdownSharedRuntime,
+		initAuth:        authpkg.Init,
+		seedAdmin:       dao.SeedAdmin,
+		warmUp:          retrieval.WarmUp,
+		bindAPI:         bindAPI,
+		startWorker:     startWorker,
+		serveAPI:        serveAPI,
+		waitWorker:      waitWorker,
 	}
 }
 
-func run(ctx context.Context, options Options, deps dependencies) error {
+func run(ctx context.Context, options Options, deps dependencies) (runErr error) {
 	if deps.loadConfig == nil {
 		return fmt.Errorf("configuration loader is required")
 	}
@@ -172,6 +176,17 @@ func run(ctx context.Context, options Options, deps dependencies) error {
 	if databaseReady && deps.initRuntime != nil {
 		if err := deps.initRuntime(ctx); err != nil {
 			return fmt.Errorf("initialize shared runtime: %w", err)
+		}
+		if deps.shutdownRuntime != nil {
+			shutdownTimeout := 10 * time.Second
+			if cfg.Observability.Langfuse.ShutdownTimeoutMS > 0 {
+				shutdownTimeout = time.Duration(cfg.Observability.Langfuse.ShutdownTimeoutMS) * time.Millisecond
+			}
+			defer func() {
+				shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+				defer cancel()
+				runErr = errors.Join(runErr, deps.shutdownRuntime(shutdownCtx))
+			}()
 		}
 	}
 	if deps.warmUp == nil {

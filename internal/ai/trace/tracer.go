@@ -118,7 +118,14 @@ func StartAttempt(ctx context.Context, metadata AttemptMetadata) (context.Contex
 		StartTime: at.StartTime, Tags: string(tagsJSON),
 	})
 	attemptCtx := Inject(ctx, at)
-	return attemptCtx, &AttemptBarrier{active: at}, nil
+	barrier := &AttemptBarrier{active: at}
+	if runtime := currentLangfuseRuntime(); runtime != nil {
+		userID, _ := policy.UserID(ctx)
+		attemptCtx = runtime.StartAttempt(attemptCtx, metadata, userID)
+		barrier.langfuse = runtime
+		barrier.langfuseCtx = attemptCtx
+	}
+	return attemptCtx, barrier, nil
 }
 
 func authoritativeTraceTags(ctx context.Context, tags map[string]any) map[string]any {

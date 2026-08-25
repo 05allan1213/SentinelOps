@@ -19,6 +19,7 @@ import (
 	dao "SentinelOps/internal/dao/mysql"
 	"SentinelOps/internal/service/knowledge"
 	"SentinelOps/internal/service/scheduler"
+	settingssvc "SentinelOps/internal/service/settings"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/gogf/gf/v2/frame/g"
@@ -30,7 +31,7 @@ func startWorker(ctx context.Context) error {
 		return err
 	}
 	var durableWorker *airuntime.Worker
-	if config.AgentRuntime.Enabled {
+	if config.AgentRuntime.Enabled || config.Observability.Retention.Enabled {
 		durableWorker, err = newDurableWorker(ctx, config)
 		if err != nil {
 			return err
@@ -54,6 +55,35 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 		return nil, err
 	}
 	store := workflow.NewGORMStore(db)
+	owner, err := os.Hostname()
+	if err != nil || owner == "" {
+		owner = "sentinelops-worker"
+	}
+	var retention *airuntime.RetentionCoordinator
+	if config.Observability.Retention.Enabled {
+		if err := store.EnsureRetentionLeaseRun(ctx); err != nil {
+			return nil, err
+		}
+		retentionConfig := config.Observability.Retention
+		retention, err = airuntime.NewRetentionCoordinator(store, dao.NewTraceDAO(), airuntime.RetentionConfig{
+			Owner: owner, LeaseDuration: time.Duration(retentionConfig.LeaseDurationMS) * time.Millisecond,
+			Interval: time.Duration(retentionConfig.IntervalMS) * time.Millisecond, BatchSize: retentionConfig.BatchSize,
+			LoadPolicy: func(loadCtx context.Context) (airuntime.RetentionPolicy, error) {
+				settings, loadErr := settingssvc.GetRetention(loadCtx)
+				return airuntime.RetentionPolicy{PayloadDays: settings.PayloadDays, AuditDays: settings.AuditDays}, loadErr
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !config.AgentRuntime.Enabled {
+		return airuntime.NewWorker(store, airuntime.WorkerConfig{
+			Owner: owner, LeaseDuration: 30 * time.Second,
+			MinPollBackoff: 100 * time.Millisecond, MaxPollBackoff: 2 * time.Second,
+			Retention: retention,
+		})
+	}
 	skillSnapshots, err := skill_pipeline.BuildConfiguredSkillSnapshots(ctx, config)
 	if err != nil {
 		return nil, err
@@ -75,14 +105,11 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 	if err != nil {
 		return nil, err
 	}
-	owner, err := os.Hostname()
-	if err != nil || owner == "" {
-		owner = "sentinelops-worker"
-	}
 	return airuntime.NewWorker(store, airuntime.WorkerConfig{
 		Owner: owner, LeaseDuration: 30 * time.Second,
 		MinPollBackoff: 100 * time.Millisecond, MaxPollBackoff: 2 * time.Second,
 		Execute: executor.ExecuteClaimedRun, QueryEffectTargetState: queryEffectTargetState,
+		Retention: retention,
 	})
 }
 

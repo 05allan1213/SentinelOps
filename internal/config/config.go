@@ -39,6 +39,35 @@ type Config struct {
 	Routing          Routing             `yaml:"routing" json:"routing"`
 	MCP              MCPConfig           `yaml:"mcp" json:"mcp"`
 	Skill            SkillConfig         `yaml:"skill" json:"skill"`
+	Observability    ObservabilityConfig `yaml:"observability" json:"observability"`
+}
+
+// ObservabilityConfig 保存可选官方导出与既有 Worker retention 的静态边界。
+type ObservabilityConfig struct {
+	Langfuse  LangfuseConfig  `yaml:"langfuse" json:"langfuse"`
+	Retention RetentionConfig `yaml:"retention" json:"retention"`
+}
+
+// LangfuseConfig 不保存解析后的 Key；静态 Enabled 仍需数据库动态 Gate 同时允许。
+type LangfuseConfig struct {
+	Enabled                 bool      `yaml:"enabled" json:"enabled"`
+	Host                    string    `yaml:"host" json:"host"`
+	PublicKeyRef            SecretRef `yaml:"public_key_ref" json:"public_key_ref"`
+	SecretKeyRef            SecretRef `yaml:"secret_key_ref" json:"secret_key_ref"`
+	ServiceName             string    `yaml:"service_name" json:"service_name"`
+	SampleRate              float64   `yaml:"sample_rate" json:"sample_rate"`
+	TimeoutMS               int       `yaml:"timeout_ms" json:"timeout_ms"`
+	MaxAttributeValueLength int       `yaml:"max_attribute_value_length" json:"max_attribute_value_length"`
+	MaxSpanAttributeBytes   int       `yaml:"max_span_attribute_bytes" json:"max_span_attribute_bytes"`
+	ShutdownTimeoutMS       int       `yaml:"shutdown_timeout_ms" json:"shutdown_timeout_ms"`
+}
+
+// RetentionConfig 配置同一 Worker poll loop 的有界清理批次；天数来自 admin 审计 settings。
+type RetentionConfig struct {
+	Enabled         bool `yaml:"enabled" json:"enabled"`
+	LeaseDurationMS int  `yaml:"lease_duration_ms" json:"lease_duration_ms"`
+	IntervalMS      int  `yaml:"interval_ms" json:"interval_ms"`
+	BatchSize       int  `yaml:"batch_size" json:"batch_size"`
 }
 
 // MCPConfig 保存 MCP Server 的安全配置，不保存解析后的 Header Secret。
@@ -341,11 +370,32 @@ func (c *Config) Validate() error {
 		"soar.integrations.wecom.webhook_ref":       c.SOAR.Integrations.WeCom.WebhookRef,
 		"secret_refs.mcp_header":                    c.Secrets.MCPHeader,
 		"secret_refs.effect":                        c.Secrets.Effect,
+		"observability.langfuse.public_key_ref":     c.Observability.Langfuse.PublicKeyRef,
+		"observability.langfuse.secret_key_ref":     c.Observability.Langfuse.SecretKeyRef,
 	} {
 		if ref != "" {
 			if err := ref.Validate(); err != nil {
 				return fmt.Errorf("%s: %w", name, err)
 			}
+		}
+	}
+	if c.Observability.Langfuse.Enabled {
+		langfuse := c.Observability.Langfuse
+		if strings.TrimSpace(langfuse.Host) == "" || strings.TrimSpace(langfuse.ServiceName) == "" {
+			return fmt.Errorf("enabled Langfuse requires host and service_name")
+		}
+		if langfuse.PublicKeyRef == "" || langfuse.SecretKeyRef == "" {
+			return fmt.Errorf("enabled Langfuse requires public_key_ref and secret_key_ref")
+		}
+		if langfuse.SampleRate < 0 || langfuse.SampleRate > 1 || langfuse.TimeoutMS <= 0 ||
+			langfuse.MaxAttributeValueLength <= 0 || langfuse.MaxSpanAttributeBytes <= 0 || langfuse.ShutdownTimeoutMS <= 0 {
+			return fmt.Errorf("enabled Langfuse has invalid sampling, timeout or attribute limits")
+		}
+	}
+	if c.Observability.Retention.Enabled {
+		retention := c.Observability.Retention
+		if retention.LeaseDurationMS <= 0 || retention.IntervalMS <= 0 || retention.BatchSize <= 0 || retention.BatchSize > 1000 {
+			return fmt.Errorf("enabled retention requires positive lease/interval and batch_size <= 1000")
 		}
 	}
 	for name, server := range c.MCP.Servers {

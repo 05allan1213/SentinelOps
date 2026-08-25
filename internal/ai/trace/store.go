@@ -414,6 +414,9 @@ func estimateTokenCost(cost costConfig, inputTokens, cachedInputTokens, outputTo
 type AttemptBarrier struct {
 	active       *ActiveTrace
 	skipFinalize bool
+	langfuse     *LangfuseRuntime
+	langfuseCtx  context.Context
+	langfuseEnd  sync.Once
 }
 
 // Finish 记录 Attempt 业务结果；真正的 TraceRun 终态写由 Flush 在节点落盘后执行。
@@ -430,6 +433,13 @@ func (b *AttemptBarrier) Finish(err error) {
 	b.active.mu.Lock()
 	b.active.finish = traceFinish{set: true, status: status, errMsg: errMsg, errCode: errCode, endTime: time.Now()}
 	b.active.mu.Unlock()
+	if b.langfuse != nil {
+		output := "success"
+		if err != nil {
+			output = policy.NewRedactor().RedactText(stringutil.TruncateError(err, GetConfig().MaxErrorLength))
+		}
+		b.langfuseEnd.Do(func() { b.langfuse.EndAttempt(b.langfuseCtx, output) })
+	}
 }
 
 // Flush 返回可直接传给唯一 Run 完成 primitive 的 trace_quality。
@@ -472,6 +482,9 @@ func (b *AttemptBarrier) Flush(ctx context.Context) string {
 	}
 	if err := finalizeTraceRun(finalizeCtx, at, quality); err != nil {
 		return TraceQualityIncomplete
+	}
+	if b.langfuse != nil {
+		_ = b.langfuse.Flush(ctx)
 	}
 	return quality
 }

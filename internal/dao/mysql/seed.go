@@ -43,6 +43,9 @@ func SeedSettings(ctx context.Context) {
 	defaults := []struct{ key, value string }{
 		{"general.site_name", "安全事件智能研判多智能体协同平台"},
 		{"general.auto_mark_read", "true"},
+		{RetentionPayloadDaysKey, "30"},
+		{RetentionAuditDaysKey, "180"},
+		{"observability.langfuse.enabled", "false"},
 	}
 	for _, d := range defaults {
 		if existing, _ := GetSetting(ctx, d.key); existing == "" {
