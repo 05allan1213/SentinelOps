@@ -352,11 +352,10 @@ func ExecuteIntent(ctx context.Context, sessionId, query string, messageIndex in
 // sessionId 注入机制：
 //
 //	context.WithValue(ctx, SessionIdCtxKey{}, sessionId) 将 sessionId 嵌入 context，
-//	随后整个调用树（BuildPlanAgent → adk.Runner → Executor → Worker 工具 Invoke）共享同一个 ctx。
-//	Worker 工具（agent_worker.go）在 Invoke 时通过 ctx.Value(SessionIdCtxKey{}) 取出 sessionId，
-//	调用 cache.GetSessionMemory(sessionId) 读取进程内会话历史（零 Redis 开销），
-//	将最近 3 条历史拼成上下文前缀注入给专业 Agent，使 Worker 感知多轮对话上下文。
-//	这是 Go 惯用的跨层透明传递方式，中间层（BuildPlanAgent、adk.Runner）无需感知。
+//	随后整个调用树（BuildPlanAgent → adk.Runner → Executor → AgentTool）共享同一个 ctx。
+//	AgentTool 的薄 Agent 委托通过 ctx.Value(SessionIdCtxKey{}) 取出 sessionId，
+//	将 SessionMemory 历史作为 ADK messages 注入一次后调用真实专业 ChatModelAgent。
+//	中间层不隔离 context，Eino state、interrupt 和 recursive cancel 可按官方协议传播。
 func ExecuteDeepThink(ctx context.Context, sessionId, query string, messageIndex int, onOutput func(intentType, chunk string)) error {
 	g.Log().Infof(ctx, "[Intent] 深度思考请求 | session=%s | query=%q", sessionId, query)
 
@@ -365,8 +364,8 @@ func ExecuteDeepThink(ctx context.Context, sessionId, query string, messageIndex
 	workflowRun.recordUserInput(ctx, query)
 	workflowRun.recordRunStatus(ctx, "running", "深度思考处理中")
 
-	// 注入 sessionId：Worker 工具通过 ctx.Value(SessionIdCtxKey{}) 取出，读取会话历史后注入专业 Agent。
-	// 传递路径：此处注入 → BuildPlanAgent → adk.Runner.Query → Executor → Worker.Invoke → buildWorkerContext
+	// 注入 sessionId：AgentTool 委托读取会话历史并作为 ADK messages 注入专业 Agent。
+	// 传递路径：此处注入 → BuildPlanAgent → adk.Runner.Query → Executor → AgentTool → workerAgentInput
 	recCtx = context.WithValue(recCtx, plan_pipeline.SessionIdCtxKey{}, sessionId)
 
 	// 加载并初始化会话记忆；messageIndex==0 表示新会话第一条消息，强制清空历史

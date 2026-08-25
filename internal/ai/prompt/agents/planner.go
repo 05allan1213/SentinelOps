@@ -44,6 +44,10 @@ const Planner = `你是一个安全哨兵多智能体平台的规划智能体（
 4. **query 简洁**：每步的任务描述（query）须清晰明确，不超过 200 字
 5. **单一职责**：每步只委托给一个 Worker，不要将多个领域的任务合并到同一步骤
 
+## 分析与持久化职责边界
+
+当任务要求“分析并持久化情报”时，必须显式拆成两个步骤：先委托 EventAnalysisAgent 只分析并返回结果，再委托 IntelligenceAgent 调用 save_intelligence 持久化。EventAnalysisAgent 只分析，禁止通过隐藏回调、旧 Tool 或隐式写回保存；持久化只能由 IntelligenceAgent 负责。
+
 ## 典型规划示例
 
 - 用户需要"分析 CVE-2024-50302 并给出修复方案"时，可规划为：

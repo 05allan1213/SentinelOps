@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 
+	"SentinelOps/internal/ai/workflow"
+
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/planexecute"
 	"github.com/cloudwego/eino/schema"
@@ -110,6 +112,21 @@ func checkpointWorkflow(ctx context.Context, stepName string, values map[string]
 	}
 }
 
+func eventWorkflow(ctx context.Context, eventType string, values map[string]any) {
+	recorder := workflowRecorderFromContext(ctx)
+	if recorder == nil {
+		return
+	}
+	payload, err := json.Marshal(values)
+	if err != nil {
+		g.Log().Warningf(ctx, "[PlanPipeline] 序列化工作流事件失败 | type=%s err=%v", eventType, err)
+		return
+	}
+	if err = recorder.Event(ctx, eventType, string(payload)); err != nil {
+		g.Log().Warningf(ctx, "[PlanPipeline] 写入工作流事件失败 | type=%s err=%v", eventType, err)
+	}
+}
+
 func summarizeCheckpointContent(content string) string {
 	content = strings.TrimSpace(content)
 	runes := []rune(content)
@@ -195,6 +212,9 @@ func BuildPlanAgent(ctx context.Context, query string, onStep func(string), onFi
 		if event.Err != nil {
 			return fullContent, fmt.Errorf("plan agent 执行错误: %w", event.Err)
 		}
+		if event.Action != nil && event.Action.Interrupted != nil {
+			eventWorkflow(ctx, workflow.EventAgentInterrupted, map[string]any{"agent_name": event.AgentName})
+		}
 		if event.Output == nil {
 			continue
 		}
@@ -218,6 +238,10 @@ func BuildPlanAgent(ctx context.Context, query string, onStep func(string), onFi
 				"tool_name": msg.ToolName,
 				"summary":   summarizeCheckpointContent(content),
 			})
+			eventWorkflow(ctx, workflow.EventAgentToolResult, map[string]any{
+				"agent_name": event.AgentName, "tool_name": msg.ToolName,
+				"summary": summarizeCheckpointContent(content),
+			})
 			if onStep != nil {
 				onStep(marshalStepMsg(PlanStepMsg{
 					Type:    "tool_result",
@@ -236,6 +260,11 @@ func BuildPlanAgent(ctx context.Context, query string, onStep func(string), onFi
 
 		// 带 ToolCalls 的 Assistant 消息（Executor 决定调用 Worker）→ 推送 tool_call 事件
 		if len(msg.ToolCalls) != 0 {
+			for _, tc := range msg.ToolCalls {
+				eventWorkflow(ctx, workflow.EventAgentToolCall, map[string]any{
+					"agent_name": event.AgentName, "tool_name": tc.Function.Name,
+				})
+			}
 			if onStep != nil {
 				for _, tc := range msg.ToolCalls {
 					onStep(marshalStepMsg(PlanStepMsg{
@@ -261,6 +290,13 @@ func BuildPlanAgent(ctx context.Context, query string, onStep func(string), onFi
 				checkpointWorkflow(ctx, "planner", map[string]any{
 					"steps": planParsed.Steps,
 				})
+				eventType := workflow.EventAgentPlan
+				attributes := map[string]any{"agent_name": event.AgentName, "step_count": len(planParsed.Steps)}
+				if event.AgentName == "replanner" {
+					eventType = workflow.EventAgentReplan
+					attributes["decision"] = "continue"
+				}
+				eventWorkflow(ctx, eventType, attributes)
 				if onStep != nil {
 					onStep(marshalStepMsg(PlanStepMsg{Type: "plan_steps", Steps: planParsed.Steps}))
 				}
@@ -269,6 +305,9 @@ func BuildPlanAgent(ctx context.Context, query string, onStep func(string), onFi
 			var resp planexecute.Response
 			if json.Unmarshal([]byte(trimmed), &resp) == nil && resp.Response != "" {
 				finalAnswer = resp.Response
+				eventWorkflow(ctx, workflow.EventAgentReplan, map[string]any{
+					"agent_name": event.AgentName, "decision": "respond",
+				})
 			}
 			continue
 		}

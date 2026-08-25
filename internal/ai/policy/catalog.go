@@ -113,6 +113,12 @@ var catalog = map[string]CatalogEntry{
 		SelectOnly:       true,
 		AllowedRelations: []string{"events", "reports", "subscriptions"},
 	},
+	"event_analysis_agent":  durableFramework("event_analysis_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
+	"report_agent":          durableFramework("report_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
+	"risk_assessment_agent": durableFramework("risk_assessment_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
+	"solve_agent":           durableFramework("solve_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
+	"intelligence_agent":    durableFramework("intelligence_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
+	"ops_agent":             durableFramework("ops_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
 }
 
 var durableInventories = map[string][]string{
@@ -133,6 +139,10 @@ func durableMutation(name string, risk RiskLevel, schemaHash string, effectType 
 		Name: name, Risk: risk, Revision: "v1", SchemaHash: schemaHash,
 		EffectType: effectType, EffectSteps: steps, Policy: "mutation_disabled_v1", Audience: AudienceDurable,
 	}
+}
+
+func durableFramework(name, schemaHash string) CatalogEntry {
+	return CatalogEntry{Name: name, Risk: RiskL0, Revision: "v1", SchemaHash: schemaHash, Policy: "framework_agent_tool_v1", Audience: AudienceDurable}
 }
 
 // LookupCatalog 返回不可修改 Catalog 真值的值副本。
@@ -260,7 +270,7 @@ func RequiredDurableToolNames() []string {
 func DefaultRegistryToolNames() []string {
 	names := make([]string, 0, len(catalog)-1)
 	for name, entry := range catalog {
-		if entry.Audience == AudienceDurable {
+		if entry.Audience == AudienceDurable && entry.Policy != "framework_agent_tool_v1" {
 			names = append(names, name)
 		}
 	}
