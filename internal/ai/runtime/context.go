@@ -11,6 +11,7 @@ import (
 
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
+	"SentinelOps/internal/dao/mysql"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/planexecute"
@@ -107,31 +108,13 @@ func BuildAttemptContext(parent context.Context, claimed workflow.ClaimedRun, bu
 		run.LeaseOwner == nil || *run.LeaseOwner != claimed.Token.Owner {
 		return nil, nil, workflow.ErrLeaseLost
 	}
-	if run.ContextSnapshotJSON == nil {
-		return nil, nil, fmt.Errorf("workflow Run is missing context_snapshot_json")
-	}
-	var stored workflow.DurableContextSnapshot
-	decoder := json.NewDecoder(strings.NewReader(*run.ContextSnapshotJSON))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&stored); err != nil {
-		return nil, nil, fmt.Errorf("decode durable Context Snapshot: %w", err)
+	identityContext, stored, validatedIdentity, err := claimedRunIdentityContext(parent, run)
+	if err != nil {
+		return nil, nil, err
 	}
 	if stored.Schema != workflow.DurableContextSnapshotSchema || stored.DeadlineAt.IsZero() ||
 		len(stored.History) == 0 || !json.Valid(stored.History) || len(stored.BudgetLimits) == 0 || !json.Valid(stored.BudgetLimits) {
 		return nil, nil, fmt.Errorf("durable Context Snapshot contract is incomplete")
-	}
-	identity := policy.Identity{
-		UserID: stored.Identity.UserID, Username: stored.Identity.Username,
-		Role: policy.Role(stored.Identity.Role), Scope: stored.Identity.Scope,
-		AuthDisabled: stored.Identity.AuthDisabled,
-	}
-	identityContext := policy.WithIdentity(parent, identity)
-	validatedIdentity, err := policy.IdentityFromContext(identityContext)
-	if err != nil {
-		return nil, nil, fmt.Errorf("validate durable Identity Snapshot: %w", err)
-	}
-	if validatedIdentity.UserID != run.UserID {
-		return nil, nil, fmt.Errorf("durable Identity Snapshot user does not own Run")
 	}
 	if run.BudgetLimitsJSON == nil || run.BudgetUsageJSON == nil || run.BudgetReservationsJSON == nil {
 		return nil, nil, fmt.Errorf("workflow Run is missing durable Budget state")
@@ -181,6 +164,37 @@ func BuildAttemptContext(parent context.Context, claimed workflow.ClaimedRun, bu
 		History: append(json.RawMessage(nil), stored.History...), cancel: cancel,
 	}
 	return context.WithValue(leaseContext, attemptContextKey{}, attempt), attempt, nil
+}
+
+// claimedRunIdentityContext 从服务端冻结的 Context Snapshot 重建 Worker 写入所需身份。
+// Worker 的进程 context 不携带请求身份，终态、重试和 parked 写入仍必须通过同一 owner/scope 校验。
+func claimedRunIdentityContext(parent context.Context, run mysql.WorkflowRun) (context.Context, workflow.DurableContextSnapshot, policy.Identity, error) {
+	if parent == nil {
+		return nil, workflow.DurableContextSnapshot{}, policy.Identity{}, fmt.Errorf("parent context is required")
+	}
+	if run.ContextSnapshotJSON == nil {
+		return nil, workflow.DurableContextSnapshot{}, policy.Identity{}, fmt.Errorf("workflow Run is missing context_snapshot_json")
+	}
+	var stored workflow.DurableContextSnapshot
+	decoder := json.NewDecoder(strings.NewReader(*run.ContextSnapshotJSON))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&stored); err != nil {
+		return nil, workflow.DurableContextSnapshot{}, policy.Identity{}, fmt.Errorf("decode durable Context Snapshot: %w", err)
+	}
+	identity := policy.Identity{
+		UserID: stored.Identity.UserID, Username: stored.Identity.Username,
+		Role: policy.Role(stored.Identity.Role), Scope: stored.Identity.Scope,
+		AuthDisabled: stored.Identity.AuthDisabled,
+	}
+	identityContext := policy.WithIdentity(parent, identity)
+	validatedIdentity, err := policy.IdentityFromContext(identityContext)
+	if err != nil {
+		return nil, workflow.DurableContextSnapshot{}, policy.Identity{}, fmt.Errorf("validate durable Identity Snapshot: %w", err)
+	}
+	if validatedIdentity.UserID != run.UserID {
+		return nil, workflow.DurableContextSnapshot{}, policy.Identity{}, fmt.Errorf("durable Identity Snapshot user does not own Run")
+	}
+	return identityContext, stored, validatedIdentity, nil
 }
 
 // AttemptContextFromContext 读取唯一 typed Runtime Context。

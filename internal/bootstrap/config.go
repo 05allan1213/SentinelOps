@@ -117,8 +117,11 @@ func run(ctx context.Context, options Options, deps dependencies) error {
 	if role == RoleAll && cfg.App.Environment != "development" {
 		return fmt.Errorf("bootstrap role all is development-only")
 	}
-	if cfg.AgentRuntime.Enabled {
-		return fmt.Errorf("durable agent gate must remain disabled during bootstrap split")
+	if cfg.AgentRuntime.AcceptNewRuns && !cfg.AgentRuntime.Enabled {
+		return fmt.Errorf("durable accept-new-runs requires agent runtime enabled")
+	}
+	if cfg.AgentRuntime.AcceptNewRuns && cfg.App.Environment != "development" && cfg.App.Environment != "test" {
+		return fmt.Errorf("durable accept-new-runs must remain disabled outside development or test before P42")
 	}
 	resolver := options.Resolver
 	if resolver == nil {

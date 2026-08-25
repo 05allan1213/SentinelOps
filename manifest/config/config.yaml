@@ -136,6 +136,9 @@ secret_refs:
 
 agent_runtime:
   enabled: false
+  accept_new_runs: false
+  shadow_mode: false
+  admin_query_database_debug: false
 
 # 后台调度器
 scheduler:

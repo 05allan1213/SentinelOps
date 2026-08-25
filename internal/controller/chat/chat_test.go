@@ -2,34 +2,33 @@ package chat
 
 import (
 	"context"
+	"errors"
 	"testing"
-	"time"
+
+	"SentinelOps/internal/ai/runtime"
+	"SentinelOps/internal/ai/workflow"
+	"SentinelOps/internal/dao/mysql"
+	chatsvc "SentinelOps/internal/service/chat"
 )
 
-func TestWorkflowPersistContextIgnoresCancellation(t *testing.T) {
-	parentCtx, cancel := context.WithCancel(context.Background())
+func TestSSEReadUsesRequestCancellation(t *testing.T) {
+	var observed error
+	service, err := chatsvc.NewDurableService(chatsvc.DurableServiceConfig{
+		AcceptNewRuns: true,
+		Snapshot:      runtime.FrozenRuntimeSnapshot{},
+		CreateRun:     func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error) { return nil, nil },
+		ListEvents: func(ctx context.Context, _ string, _ int64) ([]workflow.StreamEvent, error) {
+			observed = ctx.Err()
+			return nil, ctx.Err()
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-
-	persistCtx := workflowPersistContext(parentCtx)
-	if persistCtx.Err() != nil {
-		t.Fatalf("workflowPersistContext 不应继承已取消状态，got=%v", persistCtx.Err())
-	}
-}
-
-func TestWorkflowPersistContextPreservesDeadline(t *testing.T) {
-	deadline := time.Now().Add(time.Minute)
-	parentCtx, cancel := context.WithDeadline(context.Background(), deadline)
-	defer cancel()
-
-	persistCtx := workflowPersistContext(parentCtx)
-	gotDeadline, ok := persistCtx.Deadline()
-	if !ok {
-		t.Fatal("workflowPersistContext 应保留 deadline")
-	}
-	if !gotDeadline.Equal(deadline) {
-		t.Fatalf("deadline 不一致，got=%v want=%v", gotDeadline, deadline)
-	}
-	if persistCtx.Err() != nil {
-		t.Fatalf("deadline 未到期时不应报错，got=%v", persistCtx.Err())
+	err = streamDurableEvents(ctx, service, "run-canceled-sse", 0, func(workflow.StreamEvent) {})
+	if !errors.Is(err, context.Canceled) || !errors.Is(observed, context.Canceled) {
+		t.Fatalf("stream error=%v observed read context=%v, want request cancellation", err, observed)
 	}
 }

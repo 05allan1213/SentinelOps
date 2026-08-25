@@ -44,8 +44,10 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 			Where(`(
 				(status = ? AND available_at <= CURRENT_TIMESTAMP(3) AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
 				OR
+				(status = ? AND available_at <= CURRENT_TIMESTAMP(3) AND lease_owner IS NULL)
+				OR
 				(status = ? AND (lease_owner IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
-			)`, RunStatusPending, RunStatusRunning).
+			)`, RunStatusPending, RunStatusRetryableFailed, RunStatusRunning).
 			Order("priority DESC, available_at ASC, id ASC").
 			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 			Limit(1)
@@ -57,6 +59,21 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 			return fmt.Errorf("锁定可认领 workflow Run: %w", result.Error)
 		}
 
+		if run.Status == RunStatusRetryableFailed {
+			if err := ValidateRunTransition(run.Status, RunStatusPending, TransitionIntentRetryReady, ""); err != nil {
+				return err
+			}
+			ready := tx.Model(&mysql.WorkflowRun{}).
+				Where("id = ? AND runtime_mode = ? AND status = ? AND lease_generation = ?", run.ID, RuntimeModeDurableV1, RunStatusRetryableFailed, run.LeaseGeneration).
+				Update("status", RunStatusPending)
+			if ready.Error != nil {
+				return fmt.Errorf("恢复可重试 workflow Run 为 pending: %w", ready.Error)
+			}
+			if ready.RowsAffected != 1 {
+				return ErrLeaseLost
+			}
+			run.Status = RunStatusPending
+		}
 		updates := map[string]any{
 			"status":           RunStatusRunning,
 			"lease_owner":      input.Owner,

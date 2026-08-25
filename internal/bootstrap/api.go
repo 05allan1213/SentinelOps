@@ -3,6 +3,9 @@ package bootstrap
 import (
 	"context"
 
+	airuntime "SentinelOps/internal/ai/runtime"
+	"SentinelOps/internal/ai/workflow"
+	appconfig "SentinelOps/internal/config"
 	"SentinelOps/internal/controller/auth"
 	"SentinelOps/internal/controller/chat"
 	"SentinelOps/internal/controller/event"
@@ -15,6 +18,8 @@ import (
 	"SentinelOps/internal/controller/subscription"
 	termmapping "SentinelOps/internal/controller/term_mapping"
 	tracectrl "SentinelOps/internal/controller/trace"
+	dao "SentinelOps/internal/dao/mysql"
+	chatsvc "SentinelOps/internal/service/chat"
 	"SentinelOps/utility/middleware"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -27,6 +32,10 @@ func FrontendHostingEnabled(ctx context.Context) bool {
 }
 
 func bindAPI(ctx context.Context) error {
+	durableService, err := newDurableAPIService(ctx)
+	if err != nil {
+		return err
+	}
 	s := g.Server()
 	if FrontendHostingEnabled(ctx) {
 		s.SetServerRoot("web/dist")
@@ -40,7 +49,8 @@ func bindAPI(ctx context.Context) error {
 		group.Middleware(middleware.JWTMiddleware())
 		group.Middleware(middleware.AuthorizationMiddleware())
 		group.Middleware(middleware.RateLimitMiddleware)
-		group.Bind(chat.NewV1())
+		group.Bind(chat.NewV1(durableService))
+		group.Bind(chat.NewV2(durableService))
 		group.Bind(auth.NewV1())
 		group.Bind(event.NewV1())
 		group.Bind(subscription.NewV1())
@@ -60,6 +70,24 @@ func bindAPI(ctx context.Context) error {
 		group.Bind(ingestctrl.NewV1())
 	})
 	return nil
+}
+
+func newDurableAPIService(ctx context.Context) (*chatsvc.DurableService, error) {
+	config, err := appconfig.Current()
+	if err != nil {
+		return nil, err
+	}
+	db, err := dao.DB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := airuntime.BuildP20L0Snapshot(config)
+	if err != nil {
+		return nil, err
+	}
+	return chatsvc.NewDurableService(chatsvc.DurableServiceConfig{
+		Store: workflow.NewGORMStore(db), AcceptNewRuns: config.AgentRuntime.AcceptNewRuns, Snapshot: snapshot,
+	})
 }
 
 func serveAPI(context.Context) error {

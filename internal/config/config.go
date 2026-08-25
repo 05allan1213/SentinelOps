@@ -98,9 +98,12 @@ type Email struct {
 	LegacySMTPPassword *string   `yaml:"smtp_pass,omitempty" json:"-"`
 }
 
-// AgentRuntime 保存 durable Agent 的静态 Gate；P04 必须保持关闭。
+// AgentRuntime 保存 durable Agent 的静态 Gate；P42 前生产环境禁止 accept_new_runs。
 type AgentRuntime struct {
-	Enabled bool `yaml:"enabled" json:"enabled"`
+	Enabled                 bool `yaml:"enabled" json:"enabled"`
+	AcceptNewRuns           bool `yaml:"accept_new_runs" json:"accept_new_runs"`
+	ShadowMode              bool `yaml:"shadow_mode" json:"shadow_mode"`
+	AdminQueryDatabaseDebug bool `yaml:"admin_query_database_debug" json:"admin_query_database_debug"`
 }
 
 // Provider 描述供应商实例的 Secret 引用与有限 Driver Endpoint。

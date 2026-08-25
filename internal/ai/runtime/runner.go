@@ -2,12 +2,20 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"strings"
+	"time"
 
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
+	"SentinelOps/internal/dao/mysql"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/schema"
 )
 
 // RecoveryExecution 暴露官方 Eino Event iterator 和 cancel function，不定义项目 Runner 接口。
@@ -21,6 +29,279 @@ type RecoveryExecution struct {
 type RecoveryStartResult struct {
 	Decision  RecoveryDecision
 	Execution *RecoveryExecution
+}
+
+// AgentResolver 只把 immutable input 中白名单 Agent 名映射到真实 Eino Agent。
+type AgentResolver func(context.Context, string) (adk.Agent, error)
+
+// DurableExecutor 组合 P10-P14 primitive 与官方 Runner，不定义第二套 Agent Loop。
+type DurableExecutor struct {
+	store                    *workflow.GORMStore
+	budgets                  BudgetHandleFactory
+	resolveAgent             AgentResolver
+	currentCompatibilityHash string
+}
+
+// NewDurableExecutor 创建 Worker 唯一执行入口。
+func NewDurableExecutor(store *workflow.GORMStore, resolver AgentResolver, currentCompatibilityHash string) (*DurableExecutor, error) {
+	if store == nil || resolver == nil {
+		return nil, fmt.Errorf("durable Store and Agent resolver are required")
+	}
+	if err := validateSnapshotHash("current runtime compatibility hash", currentCompatibilityHash); err != nil {
+		return nil, err
+	}
+	budgets, err := NewDurableBudget(store)
+	if err != nil {
+		return nil, err
+	}
+	return &DurableExecutor{store: store, budgets: budgets, resolveAgent: resolver, currentCompatibilityHash: currentCompatibilityHash}, nil
+}
+
+type immutableRunInput struct {
+	Agent string `json:"agent"`
+	Query string `json:"query"`
+}
+
+// ExecuteClaimedRun 从 MySQL 快照重建 Context，并只通过 P12 StartRecovery 调用官方 Runner。
+func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workflow.ClaimedRun) (RunExecutionResult, error) {
+	if e == nil || claimed == nil || claimed.Run.ImmutableInputJSON == nil {
+		return RunExecutionResult{}, fmt.Errorf("claimed durable Run input is required")
+	}
+	var input immutableRunInput
+	decoder := json.NewDecoder(strings.NewReader(*claimed.Run.ImmutableInputJSON))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		return RunExecutionResult{}, fmt.Errorf("decode immutable durable input: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return RunExecutionResult{}, fmt.Errorf("decode immutable durable input: trailing JSON value")
+	}
+	if strings.TrimSpace(input.Agent) == "" || strings.TrimSpace(input.Query) == "" {
+		return RunExecutionResult{}, fmt.Errorf("immutable durable input requires agent and query")
+	}
+	attemptCtx, attempt, err := BuildAttemptContext(ctx, *claimed, e.budgets)
+	if err != nil {
+		return RunExecutionResult{}, err
+	}
+	defer attempt.Cancel()
+	agent, err := e.resolveAgent(attemptCtx, input.Agent)
+	if err != nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+	}
+	runner, err := NewDurableRunner(attemptCtx, agent, e.store, false)
+	if err != nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+	}
+	started, startErr := StartRecovery(attemptCtx, e.store, runner, attempt, e.currentCompatibilityHash, nil)
+	if started != nil && started.Decision.Mode == workflow.RecoveryModeParked {
+		return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true}, startErr
+	}
+	if startErr != nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, classifyRunnerError(startErr)
+	}
+	if started == nil || started.Execution == nil || started.Execution.Events == nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, fmt.Errorf("official Runner returned no execution")
+	}
+	lifecycle := workerLifecycleContext(ctx)
+	cancelStop := make(chan struct{})
+	cancelResult := make(chan executionCancelResult, 1)
+	go watchExecutionCancellation(lifecycle, e.store, attempt, started.Execution.Cancel, cancelStop, cancelResult)
+	defer close(cancelStop)
+
+	var finalOutput string
+	for {
+		event, ok := started.Execution.Events.Next()
+		if !ok {
+			break
+		}
+		if event == nil {
+			continue
+		}
+		if event.Err != nil {
+			if canceled, result, cancelErr := resolveExecutionCancellation(lifecycle, cancelResult, attempt.Trace.ID); canceled {
+				return result, cancelErr
+			}
+			return RunExecutionResult{TraceID: attempt.Trace.ID}, classifyRunnerError(event.Err)
+		}
+		message, _, messageErr := adk.GetMessage(event)
+		if messageErr != nil {
+			return RunExecutionResult{TraceID: attempt.Trace.ID}, classifyRunnerError(messageErr)
+		}
+		if message == nil {
+			continue
+		}
+		projected, projectErr := projectAgentEvent(event.AgentName, message, attempt.Trace.ID)
+		if projectErr != nil {
+			return RunExecutionResult{TraceID: attempt.Trace.ID}, projectErr
+		}
+		for _, durableEvent := range projected {
+			if err := e.store.AppendRunEvent(attemptCtx, claimed.Token, durableEvent); err != nil {
+				return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+			}
+		}
+		if message.Role == schema.Assistant && len(message.ToolCalls) == 0 && strings.TrimSpace(message.Content) != "" {
+			finalOutput = message.Content
+		}
+	}
+	if canceled, result, cancelErr := resolveExecutionCancellation(lifecycle, cancelResult, attempt.Trace.ID); canceled {
+		return result, cancelErr
+	}
+	if strings.TrimSpace(finalOutput) == "" {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, fmt.Errorf("durable L0 Agent returned no final answer")
+	}
+	outputPayload, err := json.Marshal(map[string]any{"answer": finalOutput, "trace_id": attempt.Trace.ID})
+	if err != nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+	}
+	revision, err := buildP20Revision(claimed.Run, input.Query, finalOutput)
+	if err != nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+	}
+	return RunExecutionResult{
+		OutputPayload: string(outputPayload), RevisionStateJSON: revision,
+		TraceQuality: "unknown", TraceID: attempt.Trace.ID,
+	}, nil
+}
+
+type executionCancelResult struct {
+	handoff bool
+	err     error
+}
+
+func watchExecutionCancellation(
+	lifecycle context.Context,
+	store *workflow.GORMStore,
+	attempt *AttemptContext,
+	cancel adk.AgentCancelFunc,
+	stop <-chan struct{},
+	result chan<- executionCancelResult,
+) {
+	select {
+	case <-stop:
+		return
+	case <-lifecycle.Done():
+	}
+	cause := context.Cause(lifecycle)
+	if errors.Is(cause, workflow.ErrLeaseLost) {
+		handle, err := RequestLostLeaseCancel(cancel)
+		if err == nil {
+			err = handle.Wait()
+		}
+		if err != nil {
+			result <- executionCancelResult{err: fmt.Errorf("cancel lost-lease execution: %w", err)}
+			return
+		}
+		result <- executionCancelResult{err: workflow.ErrLeaseLost}
+		return
+	}
+	handle, err := RequestDrain(cancel, DrainAfterToolCalls, 5*time.Second)
+	if err != nil {
+		result <- executionCancelResult{err: fmt.Errorf("request safe-point drain: %w", err)}
+		return
+	}
+	confirmCtx, confirmCancel := context.WithTimeout(policy.WithIdentity(context.Background(), attempt.Identity), 5*time.Second)
+	defer confirmCancel()
+	if err := confirmSafePointEventually(confirmCtx, store, attempt, handle); err != nil {
+		result <- executionCancelResult{err: err}
+		return
+	}
+	result <- executionCancelResult{handoff: true}
+}
+
+func confirmSafePointEventually(ctx context.Context, store *workflow.GORMStore, attempt *AttemptContext, handle *adk.CancelHandle) error {
+	for {
+		err := ConfirmSafePointHandoff(ctx, store, attempt, handle)
+		if err == nil || !errors.Is(err, workflow.ErrRecoveryHandoffDenied) {
+			return err
+		}
+		timer := time.NewTimer(10 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return fmt.Errorf("wait for fenced safe-point checkpoint: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+}
+
+func resolveExecutionCancellation(
+	lifecycle context.Context,
+	result <-chan executionCancelResult,
+	traceID string,
+) (bool, RunExecutionResult, error) {
+	if lifecycle.Err() == nil {
+		return false, RunExecutionResult{}, nil
+	}
+	outcome := <-result
+	executionResult := RunExecutionResult{TraceID: traceID, RunTransitioned: true}
+	if outcome.handoff {
+		return true, executionResult, nil
+	}
+	if outcome.err != nil {
+		return true, executionResult, outcome.err
+	}
+	return true, executionResult, context.Cause(lifecycle)
+}
+
+func projectAgentEvent(agentName string, message *schema.Message, traceID string) ([]workflow.WorkflowEventInput, error) {
+	events := make([]workflow.WorkflowEventInput, 0, len(message.ToolCalls)+1)
+	for _, call := range message.ToolCalls {
+		events = append(events, workflow.WorkflowEventInput{Type: workflow.EventAgentToolCall, TraceID: traceID,
+			Payload: workflow.EventPayload{Summary: "durable L0 Tool call", Attributes: map[string]any{"agent_name": agentName, "tool_name": call.Function.Name}}})
+	}
+	if message.Role == schema.Tool {
+		events = append(events, workflow.WorkflowEventInput{Type: workflow.EventAgentToolResult, TraceID: traceID,
+			Payload: workflow.EventPayload{Summary: truncateEventSummary(message.Content), Attributes: map[string]any{"agent_name": agentName, "tool_name": message.ToolName}}})
+	}
+	if message.Role == schema.Assistant && len(message.ToolCalls) == 0 && strings.TrimSpace(message.Content) != "" {
+		events = append(events, workflow.WorkflowEventInput{Type: workflow.EventAgentPlan, TraceID: traceID,
+			Payload: workflow.EventPayload{Summary: truncateEventSummary(message.Content), Reference: traceID, Attributes: map[string]any{"agent_name": agentName}}})
+	}
+	return events, nil
+}
+
+func truncateEventSummary(value string) string {
+	runes := []rune(strings.TrimSpace(value))
+	if len(runes) > 500 {
+		return string(runes[:500])
+	}
+	return string(runes)
+}
+
+func buildP20Revision(run mysql.WorkflowRun, query, output string) ([]byte, error) {
+	if run.ContextSnapshotJSON == nil {
+		return nil, fmt.Errorf("durable Run Context Snapshot is missing")
+	}
+	var snapshot workflow.DurableContextSnapshot
+	if err := json.Unmarshal([]byte(*run.ContextSnapshotJSON), &snapshot); err != nil {
+		return nil, err
+	}
+	state := map[string]any{}
+	if err := json.Unmarshal(snapshot.History, &state); err != nil {
+		return nil, err
+	}
+	history, _ := state["history"].([]any)
+	history = append(history,
+		map[string]any{"role": "user", "content": query},
+		map[string]any{"role": "assistant", "content": output},
+	)
+	state["schema"] = workflow.SessionStateSchemaV1
+	if run.SessionRevision != nil {
+		state["revision"] = *run.SessionRevision + 1
+	}
+	state["history"] = history
+	return json.Marshal(state)
+}
+
+func classifyRunnerError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var networkError net.Error
+	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &networkError) && networkError.Timeout() {
+		return Retryable(err)
+	}
+	return err
 }
 
 // NewDurableRunner 直接把 P10 Store 注入官方 Eino RunnerConfig。

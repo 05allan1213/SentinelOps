@@ -239,15 +239,30 @@ func TestBootstrapLoadsConfigBeforeRetrievalWarmUp(t *testing.T) {
 	}
 }
 
-func TestConfigDurableAgentGateRemainsClosed(t *testing.T) {
+func TestProductionAcceptNewRunsGateRemainsClosed(t *testing.T) {
+	var calls []string
+	cfg := validBootstrapConfig("production")
+	cfg.AgentRuntime.Enabled = true
+	cfg.AgentRuntime.AcceptNewRuns = true
+	err := run(context.Background(), Options{Role: RoleAPI, Resolver: validResolver()}, recordingDependencies(cfg, &calls))
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "accept-new-runs") {
+		t.Fatalf("run() error = %v, want production accept-new-runs rejection", err)
+	}
+	if strings.Contains(strings.Join(calls, ","), "api") {
+		t.Fatalf("API started with production accept-new-runs enabled: %v", calls)
+	}
+}
+
+func TestDevelopmentExplicitlyEnablesDurableRuntime(t *testing.T) {
 	var calls []string
 	cfg := validBootstrapConfig("development")
 	cfg.AgentRuntime.Enabled = true
-	err := run(context.Background(), Options{Role: RoleAPI, Resolver: validResolver()}, recordingDependencies(cfg, &calls))
-	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "durable agent gate") {
-		t.Fatalf("run() error = %v, want durable Agent gate rejection", err)
+	cfg.AgentRuntime.AcceptNewRuns = true
+	if err := run(context.Background(), Options{Role: RoleAll, Resolver: validResolver()}, recordingDependencies(cfg, &calls)); err != nil {
+		t.Fatal(err)
 	}
-	if strings.Contains(strings.Join(calls, ","), "api") {
-		t.Fatalf("API started with durable Agent gate enabled: %v", calls)
+	joined := strings.Join(calls, ",")
+	if !strings.Contains(joined, "api") || !strings.Contains(joined, "worker") {
+		t.Fatalf("calls=%v, want explicit development API and Worker", calls)
 	}
 }

@@ -68,6 +68,7 @@ type RunTransition struct {
 	TargetStatus   string
 	Intent         string
 	ParkReason     string
+	AvailableAt    time.Time
 	Lease          LeaseToken
 	Event          WorkflowEventInput
 }
@@ -242,6 +243,17 @@ func (s *GORMStore) TransitionRunWithEvent(ctx context.Context, transition RunTr
 		switch {
 		case transition.TargetStatus == RunStatusParked:
 			updates["park_reason"] = parkReason
+			updates["lease_owner"] = nil
+			updates["lease_until"] = nil
+			updates["heartbeat_at"] = nil
+		case transition.TargetStatus == RunStatusRetryableFailed:
+			if transition.AvailableAt.IsZero() {
+				transition.AvailableAt = time.Now()
+			}
+			updates["available_at"] = transition.AvailableAt.UTC()
+			updates["lease_owner"] = nil
+			updates["lease_until"] = nil
+			updates["heartbeat_at"] = nil
 		case transition.TargetStatus == RunStatusPending && run.Status == RunStatusParked:
 			updates["park_reason"] = nil
 		}
@@ -250,6 +262,25 @@ func (s *GORMStore) TransitionRunWithEvent(ctx context.Context, transition RunTr
 			return err
 		}
 		return insertDurableEvent(tx, run.ID, seq, transition.Event, eventPayload)
+	})
+}
+
+// AppendRunEvent 在当前 generation 的 running lease 内只分配 seq 并追加 Agent Event。
+// 它不改变 Run 状态，仍与 last_event_seq 在同一 MySQL Transaction 提交。
+func (s *GORMStore) AppendRunEvent(ctx context.Context, token LeaseToken, event WorkflowEventInput) error {
+	if err := s.authorizeRunScope(ctx, token.RunID); err != nil {
+		return err
+	}
+	payload, err := marshalDurableEvent(event)
+	if err != nil {
+		return err
+	}
+	return s.withFencedRunTransaction(ctx, token, RunStatusRunning, func(tx *gorm.DB, run *mysql.WorkflowRun) error {
+		seq, err := updateFencedDurableRunAndAllocateSeq(tx, run.ID, RunStatusRunning, token, map[string]any{})
+		if err != nil {
+			return err
+		}
+		return insertDurableEvent(tx, run.ID, seq, event, payload)
 	})
 }
 

@@ -2,78 +2,55 @@ package chatsvc
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
 )
 
-type stubWorkflowStore struct {
-	appendCtxErr error
-}
-
-func (s *stubWorkflowStore) CreateRun(ctx context.Context, input workflow.WorkflowRunInput) (*mysql.WorkflowRun, error) {
-	return nil, nil
-}
-
-func (s *stubWorkflowStore) AppendEvent(ctx context.Context, event workflow.StreamEvent) error {
-	s.appendCtxErr = ctx.Err()
-	return nil
-}
-
-func (s *stubWorkflowStore) ListEventsAfter(ctx context.Context, runID string, afterSeq int64) ([]workflow.StreamEvent, error) {
-	return nil, nil
-}
-
-func (s *stubWorkflowStore) SaveCheckpoint(ctx context.Context, snapshot workflow.CheckpointSnapshot) error {
-	return nil
-}
-
-func (s *stubWorkflowStore) LatestCheckpoint(ctx context.Context, runID, checkpointKey string) (workflow.CheckpointSnapshot, error) {
-	return workflow.CheckpointSnapshot{}, nil
-}
-
-func (s *stubWorkflowStore) FinishRun(ctx context.Context, runID, status, outputPayload, errorMessage string) error {
-	return nil
-}
-
-func TestChatWorkflowRunAppendEventUsesContextWithoutCancel(t *testing.T) {
-	store := &stubWorkflowStore{}
-	run := &chatWorkflowRun{
-		store:   store,
-		runID:   "run-1",
-		enabled: true,
+func TestDurableEventsUsesCallerCancellation(t *testing.T) {
+	service, err := NewDurableService(DurableServiceConfig{
+		AcceptNewRuns: true,
+		Snapshot:      runtime.FrozenRuntimeSnapshot{},
+		CreateRun:     func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error) { return nil, nil },
+		ListEvents: func(ctx context.Context, _ string, _ int64) ([]workflow.StreamEvent, error) {
+			return nil, ctx.Err()
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	parentCtx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-
-	run.appendEvent(parentCtx, "plan_step", map[string]any{"content": "test"})
-
-	if store.appendCtxErr != nil {
-		t.Fatalf("AppendEvent 不应继承已取消的 context，got=%v", store.appendCtxErr)
-	}
-	if run.seq != 1 {
-		t.Fatalf("事件序号应自增到 1，got=%d", run.seq)
+	if _, err := service.Events(ctx, "run-canceled", 0); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Events error=%v, want caller cancellation", err)
 	}
 }
 
-func TestChatWorkflowRunAppendEventPreservesDeadline(t *testing.T) {
-	store := &stubWorkflowStore{}
-	run := &chatWorkflowRun{
-		store:   store,
-		runID:   "run-1",
-		enabled: true,
+func TestDurableCreatePreservesCallerDeadline(t *testing.T) {
+	deadline := time.Now().Add(time.Minute)
+	service, err := NewDurableService(DurableServiceConfig{
+		AcceptNewRuns: true,
+		Snapshot:      p20ServiceSnapshot(),
+		CreateRun: func(ctx context.Context, _ workflow.CreateRunInput) (*mysql.WorkflowRun, error) {
+			got, ok := ctx.Deadline()
+			if !ok || !got.Equal(deadline) {
+				t.Fatalf("CreateRun deadline=%v/%t, want %v", got, ok, deadline)
+			}
+			return &mysql.WorkflowRun{ID: "run-deadline", Status: workflow.RunStatusPending}, nil
+		},
+		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	parentCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
-
-	run.appendEvent(parentCtx, "plan_step", "test")
-
-	if store.appendCtxErr != nil {
-		t.Fatalf("AppendEvent 在 deadline 未到期时不应报错，got=%v", store.appendCtxErr)
+	if _, err := service.CreateRun(ctx, CreateDurableRunRequest{SessionID: "session-deadline", Query: "deadline"}); err != nil {
+		t.Fatal(err)
 	}
 }
 
