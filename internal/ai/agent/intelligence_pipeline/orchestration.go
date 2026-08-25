@@ -1,10 +1,23 @@
 package intelligence_pipeline
 
 import (
+	"context"
+	"fmt"
+	"sync"
+
 	"SentinelOps/internal/ai/agent"
+	"SentinelOps/internal/ai/agent/base"
 	"SentinelOps/internal/ai/models"
 	"SentinelOps/internal/ai/prompt/agents"
+	"SentinelOps/internal/ai/runtime"
+
+	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/components/model"
 )
+
+const intelligenceMaxIterations = 12
+
+var intelligenceTools = []string{"query_internal_docs", "get_current_time", "web_search", "save_intelligence"}
 
 // GetIntelligenceAgent 返回威胁情报 Agent 单例（懒初始化，线程安全）。
 //
@@ -23,13 +36,40 @@ var GetIntelligenceAgent = agent.NewSingletonAgent(agent.AgentConfig{
 	GraphName:      "IntelligenceAgent",
 	SystemPrompt:   agents.Intelligence,
 	ModelFactory:   models.ChatDefault,
-	MaxStep:        12,
+	MaxStep:        intelligenceMaxIterations,
 	RewriteEnabled: false, // 情报查询通常是明确的查询词（CVE 编号/漏洞名称），不需要重写
 	SplitEnabled:   false, // 情报查询聚焦单一主题，无需子问题拆分
-	ToolNames: []string{
-		"query_internal_docs",
-		"get_current_time",
-		"web_search",
-		"save_intelligence",
-	},
+	ToolNames:      intelligenceTools,
 })
+
+// NewIntelligenceAgent 构建迁移后的情报专业 ChatModelAgent；save_intelligence 由 RuntimeHandler fail-closed。
+func NewIntelligenceAgent(ctx context.Context, m model.ToolCallingChatModel, handler *runtime.RuntimeHandler) (adk.Agent, error) {
+	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
+		Name: "IntelligenceAgent", Description: "Call the Intelligence Agent to search and analyze the latest threat intelligence from the internet. Handles: CVE details lookup, vulnerability advisories, exploit PoC status, threat actor profiling, malicious IP/domain reputation. Automatically saves findings to the local knowledge base. Returns structured threat intelligence report.",
+		Instruction: agents.Intelligence, Model: m, RuntimeHandler: handler, MaxIterations: intelligenceMaxIterations,
+		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
+		ToolNames:        intelligenceTools,
+	})
+}
+
+var (
+	intelligenceDurableOnce  sync.Once
+	intelligenceDurableAgent adk.Agent
+	intelligenceDurableErr   error
+)
+
+// GetDurableIntelligenceAgent 懒构建 ADK 情报 Agent；P19 负责接入 Planner/AgentTool。
+func GetDurableIntelligenceAgent(ctx context.Context) (adk.Agent, error) {
+	intelligenceDurableOnce.Do(func() {
+		m, err := newIntelligenceModel(ctx)
+		if err != nil {
+			intelligenceDurableErr = err
+			return
+		}
+		intelligenceDurableAgent, intelligenceDurableErr = NewIntelligenceAgent(ctx, m, runtime.NewRuntimeHandler())
+	})
+	if intelligenceDurableErr != nil {
+		return nil, fmt.Errorf("intelligence ADK agent: %w", intelligenceDurableErr)
+	}
+	return intelligenceDurableAgent, nil
+}

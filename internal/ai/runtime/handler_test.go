@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"SentinelOps/internal/ai/policy"
+	aitools "SentinelOps/internal/ai/tools"
 	"SentinelOps/internal/ai/workflow"
 	appconfig "SentinelOps/internal/config"
 
@@ -136,6 +137,117 @@ func TestRuntimeHandlerRejectsPolicyScopeDeadlineBeforeEndpoint(t *testing.T) {
 	}
 	if endpointCalls != 0 {
 		t.Fatalf("rejected endpoint calls = %d, want 0", endpointCalls)
+	}
+}
+
+func TestMutationDisabledAcrossAllToolEndpoints(t *testing.T) {
+	handler := NewRuntimeHandler()
+	ctx, _ := p14InvocationContext(t, "run-mutation-endpoints", "user-mutation-endpoints", newP14RecordingBudget())
+	mutationTools := []string{"create_report", "save_intelligence", "update_event_status", "block_ip", "notify_dingtalk", "notify_wecom", "notify_email", "webhook_out"}
+	endpointCalls := 0
+	plain := func(context.Context, string, ...tool.Option) (string, error) {
+		endpointCalls++
+		return "unexpected", nil
+	}
+	streamPlain := func(context.Context, string, ...tool.Option) (*schema.StreamReader[string], error) {
+		endpointCalls++
+		return schema.StreamReaderFromArray([]string{"unexpected"}), nil
+	}
+	enhanced := func(context.Context, *schema.ToolArgument, ...tool.Option) (*schema.ToolResult, error) {
+		endpointCalls++
+		return &schema.ToolResult{}, nil
+	}
+	enhancedStream := func(context.Context, *schema.ToolArgument, ...tool.Option) (*schema.StreamReader[*schema.ToolResult], error) {
+		endpointCalls++
+		return schema.StreamReaderFromArray([]*schema.ToolResult{{}}), nil
+	}
+
+	for _, name := range mutationTools {
+		invokable, err := handler.WrapInvokableToolCall(ctx, plain, &adk.ToolContext{Name: name, CallID: "mutation-invokable-" + name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = invokable(ctx, `{}`); !errors.Is(err, policy.ErrMutationDisabled) {
+			t.Fatalf("invokable mutation %q error = %v", name, err)
+		}
+
+		streamable, err := handler.WrapStreamableToolCall(ctx, streamPlain, &adk.ToolContext{Name: name, CallID: "mutation-streamable-" + name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = streamable(ctx, `{}`); !errors.Is(err, policy.ErrMutationDisabled) {
+			t.Fatalf("streamable mutation %q error = %v", name, err)
+		}
+
+		enhancedInvokable, err := handler.WrapEnhancedInvokableToolCall(ctx, enhanced, &adk.ToolContext{Name: name, CallID: "mutation-enhanced-" + name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = enhancedInvokable(ctx, &schema.ToolArgument{Text: `{}`}); !errors.Is(err, policy.ErrMutationDisabled) {
+			t.Fatalf("enhanced mutation %q error = %v", name, err)
+		}
+
+		enhancedStreamable, err := handler.WrapEnhancedStreamableToolCall(ctx, enhancedStream, &adk.ToolContext{Name: name, CallID: "mutation-enhanced-stream-" + name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = enhancedStreamable(ctx, &schema.ToolArgument{Text: `{}`}); !errors.Is(err, policy.ErrMutationDisabled) {
+			t.Fatalf("enhanced streamable mutation %q error = %v", name, err)
+		}
+	}
+
+	if endpointCalls != 0 {
+		t.Fatalf("mutation endpoint calls = %d, want 0", endpointCalls)
+	}
+}
+
+func TestMutationDisabledInNestedBeforeAgentTool(t *testing.T) {
+	handler := NewRuntimeHandler()
+	mutationTool := aitools.Get("create_report")
+	if mutationTool == nil {
+		t.Fatal("create_report is not registered")
+	}
+	dynamicHandler := &p14DynamicToolHandler{
+		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}, tool: mutationTool,
+	}
+	handlers, err := RuntimeHandlerFirst(handler, dynamicHandler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget := newP14RecordingBudget()
+	ctx, invocation := p14InvocationContext(t, "run-nested-mutation", "user-nested-mutation", budget)
+	ctx, err = WithModelInvocation(ctx, invocation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := &p14MutationToolCallingModel{}
+	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name: "p18-nested-mutation", Description: "P18 nested mutation policy contract", Model: model,
+		GenModelInput: LiteralGenModelInput, Handlers: handlers,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	iterator := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent}).Query(ctx, "invoke nested mutation")
+	rejected := false
+	for {
+		event, ok := iterator.Next()
+		if !ok {
+			break
+		}
+		if event.Err == nil {
+			continue
+		}
+		if !errors.Is(event.Err, policy.ErrMutationDisabled) {
+			t.Fatalf("nested mutation error = %v", event.Err)
+		}
+		rejected = true
+	}
+	if !rejected || model.calls != 1 {
+		t.Fatalf("nested mutation rejection/calls = %v/%d, want true/1", rejected, model.calls)
+	}
+	if reserved, settled := budget.counts(); reserved != 1 || settled != 1 {
+		t.Fatalf("nested mutation model budget = %d/%d, want 1/1", reserved, settled)
 	}
 }
 
@@ -466,6 +578,29 @@ func (m *p14DynamicToolCallingModel) Stream(ctx context.Context, input []*schema
 }
 
 func (*p14DynamicToolCallingModel) BindTools([]*schema.ToolInfo) error { return nil }
+
+type p14MutationToolCallingModel struct{ calls int }
+
+func (m *p14MutationToolCallingModel) Generate(context.Context, []*schema.Message, ...model.Option) (*schema.Message, error) {
+	m.calls++
+	if m.calls == 1 {
+		return &schema.Message{Role: schema.Assistant, ToolCalls: []schema.ToolCall{{
+			ID: "nested-mutation-call", Type: "function",
+			Function: schema.FunctionCall{Name: "create_report", Arguments: `{}`},
+		}}}, nil
+	}
+	return schema.AssistantMessage("unexpected", nil), nil
+}
+
+func (m *p14MutationToolCallingModel) Stream(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	message, err := m.Generate(ctx, input, options...)
+	if err != nil {
+		return nil, err
+	}
+	return schema.StreamReaderFromArray([]*schema.Message{message}), nil
+}
+
+func (*p14MutationToolCallingModel) BindTools([]*schema.ToolInfo) error { return nil }
 
 func (m *p14Model) Generate(ctx context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
 	m.calls++
