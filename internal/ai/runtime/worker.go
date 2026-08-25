@@ -7,21 +7,24 @@ import (
 	"strings"
 	"time"
 
+	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/workflow"
 )
 
 // WorkerConfig 是 P09 Worker 雏形所需的 lease 与有界空轮询参数。
 type WorkerConfig struct {
-	Owner               string
-	LeaseDuration       time.Duration
-	MinPollBackoff      time.Duration
-	MaxPollBackoff      time.Duration
-	ApprovalExpiryBatch int
-	ClaimNext           func(context.Context) (*workflow.ClaimedRun, bool, error)
-	Heartbeat           func(context.Context, workflow.LeaseToken) error
-	Execute             func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
-	Transition          func(context.Context, workflow.RunTransition) error
-	Complete            func(context.Context, workflow.CompleteRunInput) error
+	Owner                  string
+	LeaseDuration          time.Duration
+	MinPollBackoff         time.Duration
+	MaxPollBackoff         time.Duration
+	ApprovalExpiryBatch    int
+	ReconciliationBatch    int
+	QueryEffectTargetState effects.TargetStateQuery
+	ClaimNext              func(context.Context) (*workflow.ClaimedRun, bool, error)
+	Heartbeat              func(context.Context, workflow.LeaseToken) error
+	Execute                func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
+	Transition             func(context.Context, workflow.RunTransition) error
+	Complete               func(context.Context, workflow.CompleteRunInput) error
 }
 
 // Worker 只委派唯一 workflow.GORMStore，并承载 P20 唯一 durable poll loop。
@@ -34,6 +37,7 @@ type Worker struct {
 	transition      func(context.Context, workflow.RunTransition) error
 	complete        func(context.Context, workflow.CompleteRunInput) error
 	expireApprovals func(context.Context, string, int) (int, error)
+	reconciler      *effects.Reconciler
 }
 
 // RunExecutionResult 是 Worker 交给唯一完成 primitive 的基础结果。
@@ -92,6 +96,12 @@ func NewWorker(store *workflow.GORMStore, config WorkerConfig) (*Worker, error) 
 	if config.ApprovalExpiryBatch == 0 {
 		config.ApprovalExpiryBatch = 100
 	}
+	if config.ReconciliationBatch < 0 || config.ReconciliationBatch > 1000 {
+		return nil, fmt.Errorf("reconciliation batch must be between 0 and 1000")
+	}
+	if config.ReconciliationBatch == 0 {
+		config.ReconciliationBatch = 100
+	}
 	worker := &Worker{
 		store: store, config: config, claimNext: config.ClaimNext, execute: config.Execute,
 		heartbeat: config.Heartbeat, transition: config.Transition, complete: config.Complete,
@@ -112,6 +122,16 @@ func NewWorker(store *workflow.GORMStore, config WorkerConfig) (*Worker, error) 
 	}
 	if store != nil {
 		worker.expireApprovals = store.ExpireDueApprovals
+	}
+	if config.QueryEffectTargetState != nil {
+		if store == nil {
+			return nil, fmt.Errorf("workflow Store is required for Effect reconciliation")
+		}
+		reconciler, err := effects.NewReconciler(store)
+		if err != nil {
+			return nil, err
+		}
+		worker.reconciler = reconciler
 	}
 	return worker, nil
 }
@@ -136,9 +156,13 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 			return false, err
 		}
 	}
+	reconciled, err := w.reconcileEffects(ctx)
+	if err != nil {
+		return false, err
+	}
 	claimed, ok, err := w.claimNext(ctx)
 	if err != nil || !ok {
-		return ok || expired > 0, err
+		return ok || expired > 0 || reconciled, err
 	}
 	runCtx := ctx
 	if w.store != nil {
@@ -191,6 +215,43 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 	})
 }
 
+func (w *Worker) reconcileEffects(ctx context.Context) (bool, error) {
+	if w.reconciler == nil {
+		return false, nil
+	}
+	reaped, err := w.reconciler.ReapExpired(ctx, w.config.ReconciliationBatch)
+	if err != nil {
+		return false, err
+	}
+	claim, ok, err := w.reconciler.Claim(ctx, workflow.ReconciliationClaimInput{
+		Owner: w.config.Owner, LeaseDuration: w.config.LeaseDuration,
+	})
+	if err != nil || !ok {
+		return reaped > 0, err
+	}
+	runCtx, _, _, err := claimedRunIdentityContext(ctx, claim.Run)
+	if err != nil {
+		return true, err
+	}
+	resolution, heartbeatErr := w.queryReconciliationWithHeartbeat(runCtx, claim)
+	if heartbeatErr != nil {
+		return true, heartbeatErr
+	}
+	return true, w.reconciler.Resolve(runCtx, resolution)
+}
+
+func (w *Worker) queryReconciliationWithHeartbeat(ctx context.Context, claim *workflow.ReconciliationClaim) (workflow.ResolveEffectInput, error) {
+	var resolution workflow.ResolveEffectInput
+	var queryErr error
+	heartbeatErr := w.withLeaseHeartbeat(ctx, claim.Token, func(queryCtx context.Context) {
+		resolution, queryErr = w.reconciler.Query(queryCtx, claim, w.config.QueryEffectTargetState, w.config.Owner)
+	})
+	if heartbeatErr != nil {
+		return workflow.ResolveEffectInput{}, heartbeatErr
+	}
+	return resolution, queryErr
+}
+
 // ExpireDueApprovals 复用同一 durable poll loop 执行一次有界到期扫描。
 func (w *Worker) ExpireDueApprovals(ctx context.Context) (int, error) {
 	if w == nil || w.expireApprovals == nil {
@@ -200,11 +261,26 @@ func (w *Worker) ExpireDueApprovals(ctx context.Context) (int, error) {
 }
 
 func (w *Worker) executeWithHeartbeat(ctx context.Context, claimed *workflow.ClaimedRun) (RunExecutionResult, error, error) {
+	var result RunExecutionResult
+	var executionErr error
+	heartbeatErr := w.withLeaseHeartbeat(ctx, claimed.Token, func(executionCtx context.Context) {
+		callCtx := executionCtx
+		if w.store != nil {
+			// Agent 执行保留 frozen identity/value，并由官方 Eino cancel 完成 safe-point；
+			// lifecycle context 单独传入，避免 SIGTERM 先取消 Runner 而来不及提交 Checkpoint。
+			callCtx = context.WithValue(context.WithoutCancel(executionCtx), workerLifecycleContextKey{}, executionCtx)
+		}
+		result, executionErr = w.execute(callCtx, claimed)
+	})
+	return result, executionErr, heartbeatErr
+}
+
+func (w *Worker) withLeaseHeartbeat(ctx context.Context, token workflow.LeaseToken, call func(context.Context)) error {
 	if w.heartbeat == nil {
-		result, err := w.execute(ctx, claimed)
-		return result, err, nil
+		call(ctx)
+		return nil
 	}
-	executionCtx, cancel := context.WithCancelCause(ctx)
+	leaseCtx, cancel := context.WithCancelCause(ctx)
 	stop := make(chan struct{})
 	heartbeatResult := make(chan error, 1)
 	interval := w.config.LeaseDuration / 3
@@ -219,11 +295,11 @@ func (w *Worker) executeWithHeartbeat(ctx context.Context, claimed *workflow.Cla
 			case <-stop:
 				heartbeatResult <- nil
 				return
-			case <-executionCtx.Done():
+			case <-leaseCtx.Done():
 				heartbeatResult <- nil
 				return
 			case <-ticker.C:
-				if err := w.heartbeat(executionCtx, claimed.Token); err != nil {
+				if err := w.heartbeat(leaseCtx, token); err != nil {
 					cancel(err)
 					heartbeatResult <- err
 					return
@@ -231,17 +307,10 @@ func (w *Worker) executeWithHeartbeat(ctx context.Context, claimed *workflow.Cla
 			}
 		}
 	}()
-	callCtx := executionCtx
-	if w.store != nil {
-		// Agent 执行保留 frozen identity/value，并由官方 Eino cancel 完成 safe-point；
-		// lifecycle context 单独传入，避免 SIGTERM 先取消 Runner 而来不及提交 Checkpoint。
-		callCtx = context.WithValue(context.WithoutCancel(executionCtx), workerLifecycleContextKey{}, executionCtx)
-	}
-	result, executionErr := w.execute(callCtx, claimed)
+	call(leaseCtx)
 	close(stop)
 	cancel(nil)
-	heartbeatErr := <-heartbeatResult
-	return result, executionErr, heartbeatErr
+	return <-heartbeatResult
 }
 
 func workerLifecycleContext(ctx context.Context) context.Context {

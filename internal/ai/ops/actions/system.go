@@ -47,6 +47,26 @@ type BlockIPAction struct{}
 
 func (a *BlockIPAction) Name() string { return "block_ip" }
 
+// QueryTargetState 只读取数据库与 Nginx 黑名单目标，不触发 reload 或写入。
+func (a *BlockIPAction) QueryTargetState(ctx context.Context, params map[string]string) (TargetState, error) {
+	ip := params["ip"]
+	if ip == "" {
+		return TargetState{}, fmt.Errorf("block_ip: ip 不能为空")
+	}
+	databaseBlocked, err := dao.IsProtectedAsset(ctx, "blocked_ip", ip)
+	if err != nil {
+		return TargetState{}, err
+	}
+	mgr := NewNginxBlocklistManager(ctx)
+	hasRule, ruleErr := mgr.HasIPRule(ip)
+	if ruleErr != nil && mgr.IsEnabled() {
+		return TargetState{Known: false, Evidence: map[string]any{"database": databaseBlocked, "blocklist_file": "unknown", "nginx_reload": "unknown"}}, ruleErr
+	}
+	return TargetState{Known: true, Applied: databaseBlocked && (!mgr.IsEnabled() || hasRule), Evidence: map[string]any{
+		"database": databaseBlocked, "blocklist_file": hasRule, "nginx_reload": "target_configuration_present",
+	}}, nil
+}
+
 func (a *BlockIPAction) Execute(ctx context.Context, params map[string]string) (ActionResult, error) {
 	ip := params["ip"]
 	reason := params["reason"]

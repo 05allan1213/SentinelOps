@@ -385,6 +385,9 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 		updates := map[string]any{
 			"status":             input.TargetStatus,
 			"active_session_key": nil,
+			"lease_owner":        nil,
+			"lease_until":        nil,
+			"heartbeat_at":       nil,
 			"finished_at":        &now,
 			"duration_ms":        max(now.Sub(run.StartedAt).Milliseconds(), 0),
 			"output_payload":     outputPayload,

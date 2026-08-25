@@ -63,12 +63,21 @@ func (s *GORMStore) ReapExpiredLeases(ctx context.Context, input ReapInput) (int
 
 	var reaped int64
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		reconciled, err := reconcileExpiredRunningEffectsTx(tx, input.Limit)
+		if err != nil {
+			return err
+		}
+		reaped = reconciled
+		remaining := input.Limit - int(reconciled)
+		if remaining == 0 {
+			return nil
+		}
 		var runs []mysql.WorkflowRun
 		result := applyDurableRuntimeContract(tx.Model(&mysql.WorkflowRun{})).
 			Where("status = ? AND lease_owner IS NOT NULL AND lease_until IS NOT NULL AND lease_until <= CURRENT_TIMESTAMP(3)", RunStatusRunning).
 			Order("lease_until ASC, id ASC").
 			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-			Limit(input.Limit).
+			Limit(remaining).
 			Find(&runs)
 		if result.Error != nil {
 			return fmt.Errorf("锁定过期 workflow Run lease: %w", result.Error)

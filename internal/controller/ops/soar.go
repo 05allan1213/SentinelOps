@@ -13,7 +13,8 @@ import (
 )
 
 type ControllerV1 struct {
-	approvals approvalRepository
+	approvals      approvalRepository
+	reconciliation reconciliationRepository
 }
 
 func NewV1() *ControllerV1 { return &ControllerV1{} }

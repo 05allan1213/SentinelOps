@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"SentinelOps/internal/ai/embedder"
 	milvus "SentinelOps/internal/dao/milvus"
@@ -173,4 +174,20 @@ func finalizeStoreResult(successIDs []string, total int, batchErrors []error) ([
 		return successIDs, fmt.Errorf("Milvus 索引结果不完整: succeeded=%d total=%d", len(successIDs), total)
 	}
 	return successIDs, nil
+}
+
+// QueryMilvusTargetState 通过现有 MySQL indexed_at 元数据核对 Milvus 派生目标；
+// 只读，不启动索引器、不写入向量库。
+func QueryMilvusTargetState(ctx context.Context, eventID string) (bool, map[string]any, error) {
+	if eventID == "" {
+		return false, nil, fmt.Errorf("milvus target event id is required")
+	}
+	event, err := dao.GetEventByID(ctx, eventID)
+	if err != nil {
+		return false, map[string]any{"mysql_record": "unknown", "milvus_index": "unknown"}, err
+	}
+	if event.IndexedAt == nil {
+		return false, map[string]any{"mysql_record": "confirmed", "milvus_index": "not_confirmed"}, nil
+	}
+	return true, map[string]any{"mysql_record": "confirmed", "milvus_index": "confirmed", "indexed_at": event.IndexedAt.UTC().Format(time.RFC3339Nano)}, nil
 }
