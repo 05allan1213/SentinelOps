@@ -2,10 +2,26 @@
 package risk_pipeline
 
 import (
+	"context"
+	"fmt"
+	"sync"
+
 	"SentinelOps/internal/ai/agent"
+	"SentinelOps/internal/ai/agent/base"
 	"SentinelOps/internal/ai/models"
 	"SentinelOps/internal/ai/prompt/agents"
+	"SentinelOps/internal/ai/runtime"
+
+	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/components/model"
 )
+
+var riskL0Tools = []string{
+	"query_events", "query_reports", "search_similar_events", "query_internal_docs",
+	"query_subscriptions", "get_current_time", "web_search",
+}
+
+const riskMaxIterations = 25
 
 // GetRiskAgent 返回风险评估 Agent 单例（懒初始化，线程安全）。
 //
@@ -21,16 +37,41 @@ var GetRiskAgent = agent.NewSingletonAgent(agent.AgentConfig{
 	GraphName:      "RiskAgent",
 	SystemPrompt:   agents.Risk,
 	ModelFactory:   models.ChatReasoning,
-	MaxStep:        25,
+	MaxStep:        riskMaxIterations,
 	RewriteEnabled: true,
 	SplitEnabled:   true,
-	ToolNames: []string{
-		"query_events",
-		"query_reports",
-		"search_similar_events",
-		"query_internal_docs",
-		"query_subscriptions",
-		"get_current_time",
-		"web_search",
-	},
+	ToolNames:      riskL0Tools,
 })
+
+// NewRiskAgent builds the migrated read-only L0 ChatModelAgent.
+func NewRiskAgent(ctx context.Context, m model.ToolCallingChatModel, handler *runtime.RuntimeHandler) (adk.Agent, error) {
+	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
+		Name: "RiskAgent", Description: "Call the Risk Assessment Agent to evaluate CVE severity, attack paths, and impact scope. Handles: CVE risk scoring, vulnerability assessment, CVSS analysis, attack surface analysis, mitigation priority ranking. Returns structured risk assessment.",
+		Instruction: agents.Risk, Model: m, RuntimeHandler: handler, MaxIterations: riskMaxIterations,
+		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: true, SplitEnabled: true},
+		ToolNames:        riskL0Tools,
+	})
+}
+
+var (
+	durableOnce  sync.Once
+	durableAgent adk.Agent
+	durableErr   error
+)
+
+// GetDurableRiskAgent lazily constructs the ADK specialist. P19 owns outer
+// Planner/AgentTool wiring.
+func GetDurableRiskAgent(ctx context.Context) (adk.Agent, error) {
+	durableOnce.Do(func() {
+		m, err := newRiskModel(ctx)
+		if err != nil {
+			durableErr = err
+			return
+		}
+		durableAgent, durableErr = NewRiskAgent(ctx, m, runtime.NewRuntimeHandler())
+	})
+	if durableErr != nil {
+		return nil, fmt.Errorf("risk ADK agent: %w", durableErr)
+	}
+	return durableAgent, nil
+}

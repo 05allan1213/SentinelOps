@@ -4,11 +4,23 @@
 package solve_pipeline
 
 import (
+	"context"
+	"fmt"
+	"sync"
+
 	"SentinelOps/internal/ai/agent"
 	"SentinelOps/internal/ai/agent/base"
 	"SentinelOps/internal/ai/models"
 	"SentinelOps/internal/ai/prompt/agents"
+	"SentinelOps/internal/ai/runtime"
+
+	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/components/model"
 )
+
+var solveL0Tools = []string{"search_similar_events", "query_internal_docs", "web_search"}
+
+const solveMaxIterations = 10
 
 // UserMessage 复用 base.UserMessage（type alias）。
 type UserMessage = base.UserMessage
@@ -27,10 +39,39 @@ var GetSolveAgent = agent.NewSingletonAgent(agent.AgentConfig{
 	GraphName:    "SolveAgent",
 	SystemPrompt: agents.Solve,
 	ModelFactory: models.ChatReasoning,
-	MaxStep:      10,
-	ToolNames: []string{
-		"search_similar_events",
-		"query_internal_docs",
-		"web_search",
-	},
+	MaxStep:      solveMaxIterations,
+	ToolNames:    solveL0Tools,
 })
+
+// NewSolveAgent builds the migrated read-only L0 ChatModelAgent.
+func NewSolveAgent(ctx context.Context, m model.ToolCallingChatModel, handler *runtime.RuntimeHandler) (adk.Agent, error) {
+	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
+		Name: "SolveAgent", Description: "Call the Solve Agent to generate emergency response plans for specific security incidents. Handles: incident containment steps, patch recommendations, remediation procedures, recovery guidance for a single event. Returns structured three-phase response plan.",
+		Instruction: agents.Solve, Model: m, RuntimeHandler: handler, MaxIterations: solveMaxIterations,
+		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
+		ToolNames:        solveL0Tools,
+	})
+}
+
+var (
+	durableOnce  sync.Once
+	durableAgent adk.Agent
+	durableErr   error
+)
+
+// GetDurableSolveAgent lazily constructs the ADK specialist. P19 owns outer
+// Planner/AgentTool wiring.
+func GetDurableSolveAgent(ctx context.Context) (adk.Agent, error) {
+	durableOnce.Do(func() {
+		m, err := newSolveModel(ctx)
+		if err != nil {
+			durableErr = err
+			return
+		}
+		durableAgent, durableErr = NewSolveAgent(ctx, m, runtime.NewRuntimeHandler())
+	})
+	if durableErr != nil {
+		return nil, fmt.Errorf("solve ADK agent: %w", durableErr)
+	}
+	return durableAgent, nil
+}

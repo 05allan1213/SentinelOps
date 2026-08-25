@@ -1,0 +1,27 @@
+# P17 EventAnalysis/Risk/Solve L0 Agent 迁移
+
+- Status: `PASS`
+- Started from: `7f0fc84cf19c41425f3ca12fea9404fd0c8d6a48`；`main`；开工时工作树仅有 P17 当前单元修改
+- Spec references: 上位 Spec Task 3D、Task 3D 出口门禁、Task 6.4；实施 Plan P16/P17、`2.1～2.7`
+- Actual files: `internal/ai/agent/base/specialist.go`、`internal/ai/agent/base/specialist_test.go`；三个 `internal/ai/agent/*_pipeline/orchestration.go` 与 `adk_test.go`；`internal/ai/prompt/agents/event_analysis.go`；`manifest/agent/migration-contract-v1.yaml`；本证据文件
+- Red test and expected failure: 先加入三个 `New*Agent` contract test 和 `NewSpecialistGenModelInput` 单测；过滤命令因三个 ADK builder 与共享输入入口不存在而退出 1，另有测试缺少 `strings` 导入，均为目标测试缺口而非工具错误
+- Local commands:
+  - `go test ./internal/ai/agent/base ./internal/ai/agent/event_analysis_pipeline ./internal/ai/agent/risk_pipeline ./internal/ai/agent/solve_pipeline -run 'Test(SpecialistGenModelInput|EventAnalysisADKContract|RiskADKContract|SolveADKContract)' -count=1`
+  - `go test ./internal/ai/agent/base ./internal/ai/retrieval ./internal/ai/agent/... ./internal/testutil/agent -run 'Test(MigrationManifest|SharedRetrieval|ScriptedHarness|SpecialistGenModelInput|EventAnalysisADKContract|RiskADKContract|SolveADKContract)' -count=1`
+  - `go test ./internal/ai/agent ./internal/ai/agent/base ./internal/ai/agent/event_analysis_pipeline ./internal/ai/agent/risk_pipeline ./internal/ai/agent/solve_pipeline ./internal/testutil/agent -count=1`
+  - `go test -race ./internal/ai/agent/base ./internal/ai/agent/event_analysis_pipeline ./internal/ai/agent/risk_pipeline ./internal/ai/agent/solve_pipeline ./internal/testutil/agent -count=1`
+  - `go vet ./internal/ai/agent/base ./internal/ai/agent/event_analysis_pipeline ./internal/ai/agent/risk_pipeline ./internal/ai/agent/solve_pipeline ./internal/ai/agent ./internal/testutil/agent`
+  - `staticcheck ./internal/ai/agent/base ./internal/ai/agent/event_analysis_pipeline ./internal/ai/agent/risk_pipeline ./internal/ai/agent/solve_pipeline ./internal/ai/agent ./internal/testutil/agent`
+  - `goimports -l <P17 Go files>`；`git diff --check`
+  - `go test ./internal/ai/tools -run 'TestGetManyRequired|TestDefault' -count=1`
+- Results: `PASS`
+- Key assertions:
+  - 三个新 builder 均直接调用官方 `adk.NewChatModelAgent`，配置显式 `GenModelInput`、唯一 RuntimeHandler 最外层和 strict `tools.GetManyRequired`。
+  - EventAnalysis、Risk、Solve 的新 inventory 分别为 manifest 中 L0 清单；源码生产路径无 `save_intelligence`、其它 Mutation Tool 或 `query_database`。
+  - EventAnalysis Prompt 删除“保存到本地知识库”指令，manifest instruction SHA 更新为 `9be69dfa2527db3a295e37baf168ada997eeeb85ba2f4b3ab4883c3e78070ca0`；持久化职责仍由后续 Planner 显式委派 Intelligence。
+  - `NewSpecialistGenModelInput` 只读取当前末条 User Message，历史只传一次，Retriever 只调用一次；使用官方 FString 模板显式组装日期/文档/历史/当前 Query，未使用 ADK 默认 SessionValues 插值。
+  - profile routing 仍由 `newEventModel`→`models.ChatDefault`、`newRiskModel`/`newSolveModel`→`models.ChatReasoning` 提供；业务 builder 不比较供应商名称。
+  - 目标测试、直接受影响包、race、vet、staticcheck、goimports、Registry 回归和 diff check 均通过。
+- Deviations from recommended route: 旧 `GetEventAnalysisAgent`/`GetRiskAgent`/`GetSolveAgent` compose Graph 保留为兼容基线，P17 只新增并验证 ADK durable builder；外层 Planner/AgentTool 接线和旧路径切换严格留给 P19。未创建 Runnable→Agent、Resume/Event/Interrupt bridge，也未修改 P20 Worker/API。
+- Raw artifact references: 无
+- Unfinished items: P18/P19 及后续单元、完整 `go test -race ./...`、E2E/Eval、在线供应商和 P43 全量门禁均 `NOT RUN`。
