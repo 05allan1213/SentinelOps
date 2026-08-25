@@ -119,6 +119,10 @@ secret_refs:
   mcp_header: ""
   effect: ""
 
+mcp:
+  enabled: false
+  servers: {}
+
 agent_runtime:
   enabled: false
   accept_new_runs: false

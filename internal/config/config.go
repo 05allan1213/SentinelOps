@@ -37,6 +37,47 @@ type Config struct {
 	Providers        map[string]Provider `yaml:"providers" json:"providers"`
 	ModelCatalog     map[string]Model    `yaml:"model_catalog" json:"model_catalog"`
 	Routing          Routing             `yaml:"routing" json:"routing"`
+	MCP              MCPConfig           `yaml:"mcp" json:"mcp"`
+}
+
+// MCPConfig 保存 MCP Server 的安全配置，不保存解析后的 Header Secret。
+type MCPConfig struct {
+	Enabled bool                 `yaml:"enabled" json:"enabled"`
+	Servers map[string]MCPServer `yaml:"servers" json:"servers"`
+}
+
+// MCPServer 是配置层的 MCP Server 描述；Transport/Policy 由 MCP 包消费。
+type MCPServer struct {
+	Enabled                  bool              `yaml:"enabled" json:"enabled"`
+	Required                 bool              `yaml:"required" json:"required"`
+	Transport                string            `yaml:"transport" json:"transport"`
+	URL                      string            `yaml:"url" json:"url"`
+	Command                  string            `yaml:"command" json:"command"`
+	Args                     []string          `yaml:"args" json:"args"`
+	Env                      map[string]string `yaml:"env" json:"env"`
+	EnvAllowlist             []string          `yaml:"env_allowlist" json:"env_allowlist"`
+	CWD                      string            `yaml:"cwd" json:"cwd"`
+	HeaderName               string            `yaml:"header_name" json:"header_name"`
+	HeaderRef                SecretRef         `yaml:"header_ref" json:"header_ref"`
+	AllowedTools             []string          `yaml:"allowed_tools" json:"allowed_tools"`
+	ToolNamespace            string            `yaml:"tool_namespace" json:"tool_namespace"`
+	AllowedHosts             []string          `yaml:"allowed_hosts" json:"allowed_hosts"`
+	AllowedCIDRs             []string          `yaml:"allowed_cidrs" json:"allowed_cidrs"`
+	AllowedPorts             []int             `yaml:"allowed_ports" json:"allowed_ports"`
+	MaxToolPages             int               `yaml:"max_tool_pages" json:"max_tool_pages"`
+	MaxResultChars           int               `yaml:"max_result_chars" json:"max_result_chars"`
+	MaxResultBytes           int               `yaml:"max_result_bytes" json:"max_result_bytes"`
+	IncludeStructuredContent bool              `yaml:"include_structured_content" json:"include_structured_content"`
+	IncludeMeta              bool              `yaml:"include_meta" json:"include_meta"`
+	ErrorAsError             *bool             `yaml:"error_as_error" json:"error_as_error"`
+	ListToolsMode            string            `yaml:"list_tools_mode" json:"list_tools_mode"`
+	MetadataMode             string            `yaml:"metadata_mode" json:"metadata_mode"`
+	DescriptionMaxChars      int               `yaml:"description_max_chars" json:"description_max_chars"`
+	PreserveTailChars        int               `yaml:"preserve_tail_chars" json:"preserve_tail_chars"`
+	ConnectAttempts          int               `yaml:"connect_attempts" json:"connect_attempts"`
+	BackoffMS                int               `yaml:"backoff_ms" json:"backoff_ms"`
+	TimeoutMS                int               `yaml:"timeout_ms" json:"timeout_ms"`
+	ToolTimeoutMS            int               `yaml:"tool_timeout_ms" json:"tool_timeout_ms"`
 }
 
 // App 描述不含 Secret 的进程环境元数据。
@@ -296,6 +337,21 @@ func (c *Config) Validate() error {
 		if ref != "" {
 			if err := ref.Validate(); err != nil {
 				return fmt.Errorf("%s: %w", name, err)
+			}
+		}
+	}
+	for name, server := range c.MCP.Servers {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("mcp server name is required")
+		}
+		if server.HeaderRef != "" {
+			if err := server.HeaderRef.Validate(); err != nil {
+				return fmt.Errorf("mcp server %s header_ref: %w", name, err)
+			}
+		}
+		for key, value := range server.Env {
+			if strings.TrimSpace(key) == "" || strings.TrimSpace(key) != key || strings.ContainsAny(key, "=\x00\r\n") || strings.ContainsAny(value, "\x00\r\n") {
+				return fmt.Errorf("mcp server %s has invalid environment entry", name)
 			}
 		}
 	}

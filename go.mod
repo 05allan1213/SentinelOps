@@ -9,6 +9,7 @@ require (
 	github.com/cloudwego/eino-ext/components/indexer/milvus v0.0.0-20260820123736-6752ff8da9b1
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/cloudwego/eino-ext/components/tool/duckduckgo/v2 v2.0.0-20260820123736-6752ff8da9b1
+	github.com/cloudwego/eino-ext/components/tool/mcp/officialmcp v0.1.1
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17
 	github.com/dslipak/pdf v0.0.2
 	github.com/fumiama/go-docx v0.0.0-20250506085032-0c30fd09304b
@@ -18,6 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/milvus-io/milvus-sdk-go/v2 v2.4.2
 	github.com/mmcdole/gofeed v1.3.0
+	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/pdfcpu/pdfcpu v0.11.1
 	github.com/redis/go-redis/v9 v9.22.0
 	golang.org/x/crypto v0.55.0
@@ -58,6 +60,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
+	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/goph/emperror v0.17.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grokify/html-strip-tags-go v0.1.0 // indirect
@@ -90,6 +93,8 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	github.com/segmentio/asm v1.1.3 // indirect
+	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
@@ -98,6 +103,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel v1.38.0 // indirect
 	go.opentelemetry.io/otel/metric v1.38.0 // indirect
@@ -108,6 +114,7 @@ require (
 	golang.org/x/exp v0.0.0-20250718183923-645b1fa84792 // indirect
 	golang.org/x/image v0.32.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect

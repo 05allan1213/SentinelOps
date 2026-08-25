@@ -141,6 +141,12 @@ secret_refs:
   mcp_header: ""
   effect: ""
 
+# MCP 默认关闭；启用时每个 Server 必须显式配置 Tool、Host、Port 与 Transport。
+# Header 只允许 Secret 引用，不能填写 Authorization 明文。
+mcp:
+  enabled: false
+  servers: {}
+
 agent_runtime:
   enabled: false
   accept_new_runs: false

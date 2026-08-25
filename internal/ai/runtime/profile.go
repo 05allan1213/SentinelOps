@@ -10,6 +10,7 @@ import (
 
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/prompt/agents"
+	mcptools "SentinelOps/internal/ai/tools/mcp"
 	appconfig "SentinelOps/internal/config"
 )
 
@@ -57,6 +58,14 @@ func BuildDurableRuntimeSnapshot(config *appconfig.Config) (FrozenRuntimeSnapsho
 		Models       []ModelSnapshot        `json:"models"`
 		AgentRuntime appconfig.AgentRuntime `json:"agent_runtime"`
 	}{Models: models, AgentRuntime: config.AgentRuntime}
+	mcpConfig, err := mcptools.FromAppConfig(config)
+	if err != nil {
+		return FrozenRuntimeSnapshot{}, err
+	}
+	mcpCatalogHash, err := mcptools.ConfigCatalogHash(mcpConfig)
+	if err != nil {
+		return FrozenRuntimeSnapshot{}, err
+	}
 	return FreezeRuntimeSnapshot(RuntimeSnapshotInput{
 		Runtime:       RuntimeVersionSnapshot{Go: goruntime.Version(), Eino: einoVersion, App: buildRevision()},
 		AgentRevision: agentRevision,
@@ -65,14 +74,12 @@ func BuildDurableRuntimeSnapshot(config *appconfig.Config) (FrozenRuntimeSnapsho
 			"report": agents.Report, "intelligence": agents.Intelligence, "ops": agents.Ops,
 			"planner": agents.Planner,
 		}),
-		PolicyHash: hashSnapshotValue(policyEntries),
-		ConfigHash: hashSnapshotValue(configIdentity),
-		Models:     models,
-		Tools:      tools,
-		MCPCatalogHash: hashSnapshotValue(struct {
-			Enabled bool `json:"enabled"`
-		}{Enabled: false}),
-		Skills: []SkillSnapshot{},
+		PolicyHash:     hashSnapshotValue(policyEntries),
+		ConfigHash:     hashSnapshotValue(configIdentity),
+		Models:         models,
+		Tools:          tools,
+		MCPCatalogHash: mcpCatalogHash,
+		Skills:         []SkillSnapshot{},
 		FeatureGates: map[string]bool{
 			"agent_runtime.enabled":                    config.AgentRuntime.Enabled,
 			"agent_runtime.accept_new_runs":            config.AgentRuntime.AcceptNewRuns,
@@ -80,7 +87,7 @@ func BuildDurableRuntimeSnapshot(config *appconfig.Config) (FrozenRuntimeSnapsho
 			"agent_runtime.l1_writes":                  false,
 			"agent_runtime.l2_writes":                  false,
 			"agent_runtime.admin_query_database_debug": config.AgentRuntime.AdminQueryDatabaseDebug,
-			"mcp.enabled":                              false,
+			"mcp.enabled":                              config.MCP.Enabled,
 			"skill.enabled":                            false,
 			"langfuse.enabled":                         false,
 		},
