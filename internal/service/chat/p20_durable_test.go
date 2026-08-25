@@ -26,7 +26,7 @@ func TestCreateRunCallsDurablePrimitiveOnceAndNeverExecutesAgent(t *testing.T) {
 		t.Fatal(err)
 	}
 	run, err := service.CreateRun(context.Background(), CreateDurableRunRequest{
-		SessionID: "session-p20", Query: "read-only security analysis", Agent: DurableAgentEventAnalysis,
+		SessionID: "session-p20", Query: "durable security plan", Agent: DurableAgentPlan,
 	})
 	if err != nil {
 		t.Fatal(err)

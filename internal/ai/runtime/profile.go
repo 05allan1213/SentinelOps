@@ -14,20 +14,22 @@ import (
 )
 
 const (
-	// P20L0AgentName 是本单元唯一可被新 durable Run 选择的专业 Agent。
-	P20L0AgentName = "EventAnalysisAgent"
-	einoVersion    = "v0.9.15"
-	agentRevision  = "sentinelops-agent-contract-v1"
+	einoVersion   = "v0.9.15"
+	agentRevision = "sentinelops-agent-contract-v2"
 )
 
-// BuildP20L0Snapshot 从非敏感配置与版本化 Catalog 构造 API/Worker 共用的精确快照。
-func BuildP20L0Snapshot(config *appconfig.Config) (FrozenRuntimeSnapshot, error) {
+// BuildDurableRuntimeSnapshot 从非敏感配置与完整的 Plan/专业 Agent Catalog
+// 构造 API/Worker 共用的精确快照。L1/L2 静态上限在 P42 前保持关闭。
+func BuildDurableRuntimeSnapshot(config *appconfig.Config) (FrozenRuntimeSnapshot, error) {
 	if config == nil {
 		return FrozenRuntimeSnapshot{}, fmt.Errorf("application configuration is required")
 	}
-	models := make([]ModelSnapshot, 0, 3)
-	for _, route := range []struct{ kind, profile string }{{"chat", "default"}, {"embedding", "default"}, {"rerank", "default"}} {
-		if (route.kind == "embedding" && len(config.Routing.Embedding) == 0) || (route.kind == "rerank" && len(config.Routing.Rerank) == 0) {
+	models := make([]ModelSnapshot, 0, 4)
+	for _, route := range []struct{ kind, profile string }{{"chat", "default"}, {"chat", "reasoning"}, {"embedding", "default"}, {"rerank", "default"}} {
+		_, chatRouteExists := config.Routing.Chat[route.profile]
+		if (route.kind == "chat" && !chatRouteExists) ||
+			(route.kind == "embedding" && len(config.Routing.Embedding) == 0) ||
+			(route.kind == "rerank" && len(config.Routing.Rerank) == 0) {
 			continue
 		}
 		model, err := ModelSnapshotFromRoute(config, route.kind, route.profile)
@@ -37,19 +39,14 @@ func BuildP20L0Snapshot(config *appconfig.Config) (FrozenRuntimeSnapshot, error)
 		models = append(models, model)
 	}
 
-	inventory := policy.DurableInventories()[P20L0AgentName]
-	if len(inventory) == 0 {
-		return FrozenRuntimeSnapshot{}, fmt.Errorf("P20 L0 inventory is missing")
-	}
+	inventory := append(policy.RequiredDurableToolNames(), policy.DurableFrameworkToolNames()...)
+	sort.Strings(inventory)
 	tools := make([]ToolSnapshot, 0, len(inventory))
 	policyEntries := make([]policy.CatalogEntry, 0, len(inventory))
 	for _, name := range inventory {
 		entry, err := policy.LookupCatalog(name)
 		if err != nil {
 			return FrozenRuntimeSnapshot{}, err
-		}
-		if entry.Risk != policy.RiskL0 {
-			return FrozenRuntimeSnapshot{}, fmt.Errorf("P20 L0 Agent contains mutation Tool %q", name)
 		}
 		tools = append(tools, ToolSnapshot{Name: name, Revision: entry.Revision, SchemaHash: entry.SchemaHash})
 		policyEntries = append(policyEntries, entry)
@@ -63,11 +60,15 @@ func BuildP20L0Snapshot(config *appconfig.Config) (FrozenRuntimeSnapshot, error)
 	return FreezeRuntimeSnapshot(RuntimeSnapshotInput{
 		Runtime:       RuntimeVersionSnapshot{Go: goruntime.Version(), Eino: einoVersion, App: buildRevision()},
 		AgentRevision: agentRevision,
-		PromptHash:    hashSnapshotValue(agents.EventAnalysis),
-		PolicyHash:    hashSnapshotValue(policyEntries),
-		ConfigHash:    hashSnapshotValue(configIdentity),
-		Models:        models,
-		Tools:         tools,
+		PromptHash: hashSnapshotValue(map[string]string{
+			"event_analysis": agents.EventAnalysis, "risk": agents.Risk, "solve": agents.Solve,
+			"report": agents.Report, "intelligence": agents.Intelligence, "ops": agents.Ops,
+			"planner": agents.Planner,
+		}),
+		PolicyHash: hashSnapshotValue(policyEntries),
+		ConfigHash: hashSnapshotValue(configIdentity),
+		Models:     models,
+		Tools:      tools,
 		MCPCatalogHash: hashSnapshotValue(struct {
 			Enabled bool `json:"enabled"`
 		}{Enabled: false}),

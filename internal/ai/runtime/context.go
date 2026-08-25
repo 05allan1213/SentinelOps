@@ -209,6 +209,13 @@ func AttemptContextFromContext(ctx context.Context) (*AttemptContext, error) {
 	return attempt, nil
 }
 
+// IsDurableV1Context 判断调用是否来自已经通过 typed Context builder 的 durable_v1 Attempt。
+// legacy 兼容入口用它拒绝任何新 Runtime 调用，不能只依赖调用方自报模式。
+func IsDurableV1Context(ctx context.Context) bool {
+	attempt, err := AttemptContextFromContext(ctx)
+	return err == nil && attempt.Run.ID != ""
+}
+
 // SafeSessionValues 校验并复制可交给 Eino WithSessionValues 的严格白名单。
 func SafeSessionValues(values map[string]any) (map[string]any, error) {
 	result := make(map[string]any, len(values))

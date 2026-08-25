@@ -81,7 +81,7 @@ func newDurableAPIService(ctx context.Context) (*chatsvc.DurableService, error) 
 	if err != nil {
 		return nil, err
 	}
-	snapshot, err := airuntime.BuildP20L0Snapshot(config)
+	snapshot, err := airuntime.BuildDurableRuntimeSnapshot(config)
 	if err != nil {
 		return nil, err
 	}

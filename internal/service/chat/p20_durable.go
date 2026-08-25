@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	// DurableAgentEventAnalysis 是 P20 首个可由 durable Run 选择的 L0 Agent。
-	DurableAgentEventAnalysis = "event_analysis_agent"
-	defaultDurableRunTimeout  = 15 * time.Minute
+	// DurableAgentPlan 是 P26 后所有新 durable Run 使用的官方 Plan/Executor/Replanner 入口。
+	DurableAgentPlan         = "plan_agent"
+	defaultDurableRunTimeout = 15 * time.Minute
 )
 
 // CreateDurableRunRequest 是 API 创建 durable Run 的客户端无身份请求。
@@ -90,10 +90,10 @@ func (s *DurableService) CreateRun(ctx context.Context, request CreateDurableRun
 		return nil, fmt.Errorf("session_id and query are required")
 	}
 	if request.Agent == "" {
-		request.Agent = DurableAgentEventAnalysis
+		request.Agent = DurableAgentPlan
 	}
-	if request.Agent != DurableAgentEventAnalysis {
-		return nil, fmt.Errorf("durable Agent %q is not enabled in P20", request.Agent)
+	if request.Agent != DurableAgentPlan {
+		return nil, fmt.Errorf("durable Agent %q is not enabled", request.Agent)
 	}
 	immutableInput, err := json.Marshal(map[string]any{
 		"agent": request.Agent, "query": request.Query,

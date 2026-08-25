@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"strings"
 
+	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/models"
 	dao "SentinelOps/internal/dao/mysql"
 
@@ -29,6 +30,9 @@ type AIDecideAction struct{}
 func (a *AIDecideAction) Name() string { return "ai_decide" }
 
 func (a *AIDecideAction) Execute(ctx context.Context, params map[string]string) (ActionResult, error) {
+	if err := effects.RequireMutationRoute(ctx); err != nil {
+		return ActionResult{}, err
+	}
 	eventID := params["event_id"]
 	candidatesStr := params["candidates"]
 	if eventID == "" || candidatesStr == "" {

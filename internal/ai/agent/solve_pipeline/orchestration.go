@@ -59,16 +59,20 @@ var (
 	durableErr   error
 )
 
+// BuildDurableSolveAgent 使用调用方提供的唯一 RuntimeHandler 构建 L0 处置 Agent。
+func BuildDurableSolveAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
+	m, err := newSolveModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return NewSolveAgent(ctx, m, handler)
+}
+
 // GetDurableSolveAgent lazily constructs the ADK specialist. P19 owns outer
 // Planner/AgentTool wiring.
 func GetDurableSolveAgent(ctx context.Context) (adk.Agent, error) {
 	durableOnce.Do(func() {
-		m, err := newSolveModel(ctx)
-		if err != nil {
-			durableErr = err
-			return
-		}
-		durableAgent, durableErr = NewSolveAgent(ctx, m, runtime.NewRuntimeHandler())
+		durableAgent, durableErr = BuildDurableSolveAgent(ctx, runtime.NewRuntimeHandler())
 	})
 	if durableErr != nil {
 		return nil, fmt.Errorf("solve ADK agent: %w", durableErr)

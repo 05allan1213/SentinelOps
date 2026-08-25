@@ -55,7 +55,7 @@ func NewRuntimeHandler() *RuntimeHandler {
 	return &RuntimeHandler{BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}}
 }
 
-// NewHITLRuntimeHandler 原位启用 P22 Approval 生命周期；生产 builder 尚未接线且写 Gate 继续关闭。
+// NewHITLRuntimeHandler 原位启用 Approval/Effect 生命周期；P26 生产 Worker 复用它，写 Gate 继续关闭。
 func NewHITLRuntimeHandler(store *workflow.GORMStore) (*RuntimeHandler, error) {
 	if store == nil {
 		return nil, fmt.Errorf("workflow GORMStore is required for HITL")

@@ -32,6 +32,11 @@ import (
 //  2. 将以上内容渲染为 ExecutorPrompt，以 ReAct 循环（ChatModelAgent）驱动工具调用完成该步骤。
 //  3. 执行结果存入 Session（key="ExecutedStep"），供 Replanner 在下一轮读取做重规划决策。
 func NewExecutor(ctx context.Context) (adk.Agent, error) {
+	return NewExecutorWithRuntimeHandler(ctx, airuntime.NewRuntimeHandler())
+}
+
+// NewExecutorWithRuntimeHandler 把同一个 RuntimeHandler 注入外层 Executor 和全部 AgentTool 叶子。
+func NewExecutorWithRuntimeHandler(ctx context.Context, handler *airuntime.RuntimeHandler) (adk.Agent, error) {
 	execModel, err := models.ChatDefault(ctx)
 	if err != nil {
 		return nil, err
@@ -39,7 +44,7 @@ func NewExecutor(ctx context.Context) (adk.Agent, error) {
 	return NewExecutorBuilder(ctx, &ExecutorBuilderConfig{
 		Model:               execModel,
 		RegisteredToolNames: []string{"query_internal_docs", "get_current_time"},
-		AgentTools:          newWorkerAgentTools(ctx),
-		RuntimeHandler:      airuntime.NewRuntimeHandler(),
+		AgentTools:          newWorkerAgentTools(ctx, handler),
+		RuntimeHandler:      handler,
 	})
 }

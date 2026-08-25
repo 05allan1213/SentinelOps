@@ -466,7 +466,7 @@ func (*p22ApprovalInterruptAgent) Run(ctx context.Context, _ *adk.AgentInput, _ 
 	return iterator
 }
 
-func p22RuntimeContext(t *testing.T, db *gorm.DB, suffix, toolName string, risk policy.RiskLevel) (*workflow.GORMStore, context.Context) {
+func p22RuntimeContext(t *testing.T, db *gorm.DB, suffix, toolName string, risk policy.RiskLevel, additionalTools ...string) (*workflow.GORMStore, context.Context) {
 	t.Helper()
 	entry, err := policy.LookupCatalog(toolName)
 	if err != nil || entry.Risk != risk {
@@ -474,6 +474,13 @@ func p22RuntimeContext(t *testing.T, db *gorm.DB, suffix, toolName string, risk 
 	}
 	input := p14SnapshotInput(t)
 	input.Tools = append(input.Tools, ToolSnapshot{Name: entry.Name, Revision: entry.Revision, SchemaHash: entry.SchemaHash})
+	for _, name := range additionalTools {
+		additional, lookupErr := policy.LookupCatalog(name)
+		if lookupErr != nil {
+			t.Fatalf("P22 additional Catalog fixture %q: %v", name, lookupErr)
+		}
+		input.Tools = append(input.Tools, ToolSnapshot{Name: additional.Name, Revision: additional.Revision, SchemaHash: additional.SchemaHash})
+	}
 	input.FeatureGates["agent_runtime.l1_writes"] = risk == policy.RiskL1
 	input.FeatureGates["agent_runtime.l2_writes"] = risk == policy.RiskL2
 	frozen, err := FreezeRuntimeSnapshot(input)

@@ -59,16 +59,20 @@ var (
 	durableErr   error
 )
 
+// BuildDurableRiskAgent 使用调用方提供的唯一 RuntimeHandler 构建 L0 风险 Agent。
+func BuildDurableRiskAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
+	m, err := newRiskModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return NewRiskAgent(ctx, m, handler)
+}
+
 // GetDurableRiskAgent lazily constructs the ADK specialist. P19 owns outer
 // Planner/AgentTool wiring.
 func GetDurableRiskAgent(ctx context.Context) (adk.Agent, error) {
 	durableOnce.Do(func() {
-		m, err := newRiskModel(ctx)
-		if err != nil {
-			durableErr = err
-			return
-		}
-		durableAgent, durableErr = NewRiskAgent(ctx, m, runtime.NewRuntimeHandler())
+		durableAgent, durableErr = BuildDurableRiskAgent(ctx, runtime.NewRuntimeHandler())
 	})
 	if durableErr != nil {
 		return nil, fmt.Errorf("risk ADK agent: %w", durableErr)

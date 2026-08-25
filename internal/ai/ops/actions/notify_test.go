@@ -27,7 +27,7 @@ func (r *p24ActionResolver) Resolve(_ context.Context, ref appconfig.SecretRef) 
 }
 
 func TestConfigRejectsPlaintextSMTPParameter(t *testing.T) {
-	_, err := (&EmailAction{}).Execute(context.Background(), map[string]string{
+	_, err := (&EmailAction{}).Execute(effects.WithLegacyMutationContext(context.Background()), map[string]string{
 		"smtp_host": "smtp.example.test",
 		"smtp_pass": "plaintext-is-forbidden",
 	})
@@ -54,7 +54,7 @@ func TestExternalEffectEphemeralSecretReachesWebhookEndpoint(t *testing.T) {
 		appconfig.SetCurrent(oldConfig)
 		appconfig.SetSecretResolver(appconfig.NewEnvironmentResolver())
 	}()
-	result, err := (&WebhookOutAction{}).Execute(context.Background(), map[string]string{
+	result, err := (&WebhookOutAction{}).Execute(effects.WithLegacyMutationContext(context.Background()), map[string]string{
 		"url": server.URL, "payload": `{"event":"p24"}`, "method": http.MethodPost,
 	})
 	if err != nil {
@@ -82,7 +82,7 @@ func TestExternalEffectUnknownErrorDoesNotExposeResolvedSecret(t *testing.T) {
 		appconfig.SetCurrent(oldConfig)
 		appconfig.SetSecretResolver(appconfig.NewEnvironmentResolver())
 	}()
-	_, err := (&WebhookOutAction{}).Execute(context.Background(), map[string]string{"url": url, "payload": `{}`})
+	_, err := (&WebhookOutAction{}).Execute(effects.WithLegacyMutationContext(context.Background()), map[string]string{"url": url, "payload": `{}`})
 	if err == nil || !strings.Contains(err.Error(), "result unknown") || strings.Contains(err.Error(), "p24-short-lived-token") {
 		t.Fatalf("error=%v", err)
 	}

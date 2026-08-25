@@ -64,7 +64,17 @@ func (e *Executor) ExecuteTransactional(ctx context.Context, request Transaction
 	if endpoint == nil {
 		return workflow.TransitionEffectResult{}, fmt.Errorf("original Tool endpoint callback is required")
 	}
-	return e.store.TransitionEffectWithEvent(ctx, input, workflow.TransactionalEffectCallback(endpoint))
+	effectKey, err := policy.EffectKey(request.Lease.RunID, request.ProposalHash, workflow.EffectStepPrimary)
+	if err != nil {
+		return workflow.TransitionEffectResult{}, err
+	}
+	routedEndpoint := func(callbackCtx context.Context) (string, error) {
+		return endpoint(withExecutionMetadata(callbackCtx, ExecutionMetadata{
+			EffectKey: effectKey, EffectStep: workflow.EffectStepPrimary, EffectRole: workflow.EffectRolePrimary,
+			EffectType: policy.EffectTransactionalDB,
+		}))
+	}
+	return e.store.TransitionEffectWithEvent(ctx, input, workflow.TransactionalEffectCallback(routedEndpoint))
 }
 
 // Execute 按 Catalog DAG 执行同一原 endpoint；derived step 通过 ctx metadata 进入原业务实现。

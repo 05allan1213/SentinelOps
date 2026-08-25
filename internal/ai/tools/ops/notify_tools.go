@@ -66,6 +66,9 @@ func execAndRecord(ctx context.Context, name string, params map[string]string) (
 	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
 		return "", err
 	}
+	if err := effects.RequireMutationRoute(ctx); err != nil {
+		return "", err
+	}
 	start := time.Now()
 	out, err := execAction(ctx, name, params)
 	errMsg := ""
@@ -191,7 +194,7 @@ type WebhookOutInput struct {
 	Method  string `json:"method,omitempty" jsonschema:"description=HTTP 方法，默认 POST"`
 }
 
-// NewWebhookOutTool 创建 L2 webhook_out Tool Schema；P13 阶段不进入任何 Agent inventory。
+// NewWebhookOutTool 创建 P26 durable Ops inventory 使用的 L2 webhook_out Tool。
 func NewWebhookOutTool() tool.InvokableTool {
 	t, err := utils.InferOptionableTool(
 		"webhook_out",

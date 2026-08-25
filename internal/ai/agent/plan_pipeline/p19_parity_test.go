@@ -70,7 +70,7 @@ func TestAgentToolFrameworkEntriesAreL0AndEffectFree(t *testing.T) {
 func TestAgentToolMutationLeavesStayDisabled(t *testing.T) {
 	for _, name := range []string{
 		"create_report", "save_intelligence", "update_event_status", "block_ip",
-		"notify_dingtalk", "notify_wecom", "notify_email",
+		"notify_dingtalk", "notify_wecom", "notify_email", "webhook_out",
 	} {
 		if err := policy.RequireExecutable(name); err == nil || !strings.Contains(err.Error(), policy.PolicyMutationDisabled) {
 			t.Fatalf("mutation leaf %q is reachable through AgentTool: %v", name, err)

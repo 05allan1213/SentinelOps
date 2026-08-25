@@ -61,16 +61,20 @@ var (
 	durableErr   error
 )
 
+// BuildDurableEventAnalysisAgent 使用调用方提供的唯一 RuntimeHandler 构建 L0 专业 Agent。
+func BuildDurableEventAnalysisAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
+	m, err := newEventModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return NewEventAnalysisAgent(ctx, m, handler)
+}
+
 // GetDurableEventAnalysisAgent lazily constructs the ADK specialist. It is not
 // connected to the outer Planner until P19.
 func GetDurableEventAnalysisAgent(ctx context.Context) (adk.Agent, error) {
 	durableOnce.Do(func() {
-		m, err := newEventModel(ctx)
-		if err != nil {
-			durableErr = err
-			return
-		}
-		durableAgent, durableErr = NewEventAnalysisAgent(ctx, m, runtime.NewRuntimeHandler())
+		durableAgent, durableErr = BuildDurableEventAnalysisAgent(ctx, runtime.NewRuntimeHandler())
 	})
 	if durableErr != nil {
 		return nil, fmt.Errorf("event analysis ADK agent: %w", durableErr)

@@ -36,6 +36,9 @@ type DingTalkAction struct{}
 func (a *DingTalkAction) Name() string { return "notify_dingtalk" }
 
 func (a *DingTalkAction) Execute(ctx context.Context, params map[string]string) (ActionResult, error) {
+	if err := effects.RequireMutationRoute(ctx); err != nil {
+		return ActionResult{}, err
+	}
 	title := params["title"]
 	content := params["content"]
 	cfg, err := appconfig.Current()
@@ -68,6 +71,9 @@ type WeComAction struct{}
 func (a *WeComAction) Name() string { return "notify_wecom" }
 
 func (a *WeComAction) Execute(ctx context.Context, params map[string]string) (ActionResult, error) {
+	if err := effects.RequireMutationRoute(ctx); err != nil {
+		return ActionResult{}, err
+	}
 	content := params["content"]
 	cfg, err := appconfig.Current()
 	if err != nil {
@@ -96,6 +102,9 @@ type EmailAction struct{}
 func (a *EmailAction) Name() string { return "notify_email" }
 
 func (a *EmailAction) Execute(ctx context.Context, params map[string]string) (ActionResult, error) {
+	if err := effects.RequireMutationRoute(ctx); err != nil {
+		return ActionResult{}, err
+	}
 	host := params["smtp_host"]
 	if host == "" {
 		host = g.Cfg().MustGet(ctx, "soar.integrations.email.smtp_host").String()
@@ -251,6 +260,9 @@ type WebhookOutAction struct{}
 func (a *WebhookOutAction) Name() string { return "webhook_out" }
 
 func (a *WebhookOutAction) Execute(ctx context.Context, params map[string]string) (ActionResult, error) {
+	if err := effects.RequireMutationRoute(ctx); err != nil {
+		return ActionResult{}, err
+	}
 	url := params["url"]
 	payload := params["payload"]
 	method := params["method"]

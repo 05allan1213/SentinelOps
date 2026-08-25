@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 
@@ -26,6 +27,9 @@ func NewCreateReportTool() tool.InvokableTool {
 		"Create and save an analysis report to the dao. Use after generating report content. Required: title, content. Optional: type (weekly/monthly/custom), period.",
 		func(ctx context.Context, input *CreateReportInput, opts ...tool.Option) (output string, err error) {
 			if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+				return "", err
+			}
+			if err := effects.RequireMutationRoute(ctx); err != nil {
 				return "", err
 			}
 			db, err := dao.DB(ctx)

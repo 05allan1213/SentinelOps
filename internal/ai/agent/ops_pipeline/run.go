@@ -11,6 +11,7 @@ import (
 
 	"SentinelOps/internal/ai/agent/base"
 	"SentinelOps/internal/ai/agent/event_analysis_pipeline"
+	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/prompt/agents"
 	dao "SentinelOps/internal/dao/mysql"
 
@@ -20,7 +21,11 @@ import (
 )
 
 // ExecuteRun 两阶段运维执行：事件分析 Agent → 运维 Agent
-func ExecuteRun(ctx context.Context, runID string, event *dao.Event) error {
+func ExecuteRun(ctx context.Context, gate LegacyWriteGate, runID string, event *dao.Event) error {
+	if err := RequireLegacyOpsWrites(ctx, gate); err != nil {
+		return err
+	}
+	ctx = effects.WithLegacyMutationContext(ctx)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
 
@@ -73,7 +78,7 @@ func nextAutoOpsStatus(current string) string {
 
 // RunEventAnalysis 调用事件分析 Agent，返回分析文本（供 ai_analyze action 注入使用）
 func RunEventAnalysis(ctx context.Context, event *dao.Event) (string, error) {
-	agentCtx := context.Background()
+	agentCtx := ctx
 	runner, err := event_analysis_pipeline.GetEventAnalysisAgent(agentCtx)
 	if err != nil {
 		return "", fmt.Errorf("初始化事件分析 Agent 失败: %w", err)
@@ -91,7 +96,7 @@ func RunEventAnalysis(ctx context.Context, event *dao.Event) (string, error) {
 
 func runOpsAgent(ctx context.Context, runID string, event *dao.Event, analysis string) error {
 	// 将 runID 注入 context，供工具层自动写步骤记录
-	agentCtx := context.WithValue(context.Background(), runIDCtxKey{}, runID)
+	agentCtx := context.WithValue(ctx, runIDCtxKey{}, runID)
 	runner, err := GetOpsAgent(agentCtx)
 	if err != nil {
 		return fmt.Errorf("初始化运维 Agent 失败: %w", err)
@@ -124,7 +129,10 @@ func runOpsAgent(ctx context.Context, runID string, event *dao.Event, analysis s
 var eventIDPattern = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
 
 // RunWithQuery 供 Plan Agent Worker 调用：从 query 中提取事件 ID，异步触发运维并返回确认文本。
-func RunWithQuery(ctx context.Context, query string) (string, error) {
+func RunWithQuery(ctx context.Context, gate LegacyWriteGate, query string) (string, error) {
+	if err := RequireLegacyOpsWrites(ctx, gate); err != nil {
+		return "", err
+	}
 	eventID := eventIDPattern.FindString(query)
 	if eventID == "" {
 		return "未在任务描述中找到有效的事件 ID（UUID 格式），无法触发运维。请在任务中明确指定事件 ID。", nil
@@ -144,9 +152,10 @@ func RunWithQuery(ctx context.Context, query string) (string, error) {
 
 	runID := uuid.New().String()
 	g.Log().Infof(ctx, "[ops] Plan Agent 触发运维 | runID=%s | event=%s", runID, eventID)
+	legacyCtx := context.WithoutCancel(ctx)
 	go func() {
-		if err := ExecuteRun(context.Background(), runID, event); err != nil {
-			g.Log().Warningf(context.Background(), "[ops] Plan Agent 触发运维失败 | runID=%s | err=%v", runID, err)
+		if err := ExecuteRun(legacyCtx, gate, runID, event); err != nil {
+			g.Log().Warningf(legacyCtx, "[ops] Plan Agent 触发运维失败 | runID=%s | err=%v", runID, err)
 		}
 	}()
 	return fmt.Sprintf("已触发事件「%s」的 AI 智能运维（run_id: %s），正在异步执行封禁/通知/状态更新等响应动作。\n\n请前往「AI 智能运维」界面查看实时执行进度和步骤详情。", event.Title, runID), nil

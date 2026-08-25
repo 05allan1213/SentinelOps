@@ -127,7 +127,7 @@ var durableInventories = map[string][]string{
 	"SolveAgent":         {"search_similar_events", "query_internal_docs", "web_search"},
 	"ReportAgent":        {"query_events", "query_reports", "query_report_templates", "search_similar_events", "get_current_time", "create_report", "web_search"},
 	"IntelligenceAgent":  {"query_internal_docs", "get_current_time", "web_search", "save_intelligence"},
-	"OpsAgent":           {"query_events", "trigger_ops", "update_event_status", "block_ip", "notify_dingtalk", "notify_wecom", "notify_email", "get_current_time"},
+	"OpsAgent":           {"query_events", "trigger_ops", "update_event_status", "block_ip", "notify_dingtalk", "notify_wecom", "notify_email", "webhook_out", "get_current_time"},
 }
 
 func durableL0(name, schemaHash, policy string) CatalogEntry {
@@ -261,6 +261,19 @@ func RequiredDurableToolNames() []string {
 	names := make([]string, 0, len(set))
 	for name := range set {
 		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// DurableFrameworkToolNames 返回 Executor 暴露的官方 AgentTool Catalog 名称。
+// framework Tool 只计量编排调用，不拥有 Effect step。
+func DurableFrameworkToolNames() []string {
+	names := make([]string, 0, 6)
+	for name, entry := range catalog {
+		if entry.Audience == AudienceDurable && entry.Policy == "framework_agent_tool_v1" {
+			names = append(names, name)
+		}
 	}
 	sort.Strings(names)
 	return names

@@ -169,7 +169,7 @@ func expectedMigrationContracts() map[string]expectedAgentContract {
 		"ops_agent": {
 			graph: "OpsAgent", description: "Call the Ops Agent to trigger automated incident response for a specific security event. Handles: IP blocking, multi-channel alert notifications (DingTalk/WeCom/Email), event status updates. Requires event_id in the query. Returns execution result.",
 			instructionRef: "agents.Ops", instruction: agentprompts.Ops, instructionInputs: []string{"date"},
-			legacyTools: []string{"query_events", "trigger_ops", "update_event_status", "block_ip", "notify_dingtalk", "notify_wecom", "notify_email", "get_current_time"}, durableTools: []string{"query_events", "trigger_ops", "update_event_status", "block_ip", "notify_dingtalk", "notify_wecom", "notify_email", "get_current_time"}, maxIterations: 20,
+			legacyTools: []string{"query_events", "trigger_ops", "update_event_status", "block_ip", "notify_dingtalk", "notify_wecom", "notify_email", "get_current_time"}, durableTools: []string{"query_events", "trigger_ops", "update_event_status", "block_ip", "notify_dingtalk", "notify_wecom", "notify_email", "webhook_out", "get_current_time"}, maxIterations: 20,
 		},
 	}
 }

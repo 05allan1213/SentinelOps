@@ -36,13 +36,16 @@ type SaveIntelligenceOutput struct {
 }
 
 // NewSaveIntelligenceTool 创建情报沉淀工具。
-// legacy 调用仍直接触发索引；transactional Effect 只提交 MySQL，由 derived pending Effect 驱动索引。
+// gated legacy 调用仍直接触发索引；transactional Effect 只提交 MySQL，由 derived pending Effect 驱动索引。
 func NewSaveIntelligenceTool() tool.InvokableTool {
 	t, err := utils.InferOptionableTool(
 		"save_intelligence",
 		"Save analyzed threat intelligence to the local knowledge base (MySQL). The data will be automatically vectorized and indexed into Milvus, making it available for future semantic searches. If a record with the same CVE ID already exists, it will be updated with the latest analysis instead of creating a duplicate.",
 		func(ctx context.Context, input *SaveIntelligenceInput, opts ...tool.Option) (string, error) {
 			if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
+				return "", err
+			}
+			if err := effects.RequireMutationRoute(ctx); err != nil {
 				return "", err
 			}
 			if metadata, err := effects.ExecutionMetadataFromContext(ctx); err == nil && metadata.EffectStep == "milvus_index" {

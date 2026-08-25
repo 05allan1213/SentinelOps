@@ -22,6 +22,11 @@ var opsTools = []string{
 	"notify_dingtalk", "notify_wecom", "notify_email", "get_current_time",
 }
 
+var opsDurableTools = []string{
+	"query_events", "trigger_ops", "update_event_status", "block_ip",
+	"notify_dingtalk", "notify_wecom", "notify_email", "webhook_out", "get_current_time",
+}
+
 // GetOpsAgent 运维 Agent 单例：基于事件分析结论执行通知/封禁/状态更新。
 var GetOpsAgent = agent.NewSingletonAgent(agent.AgentConfig{
 	GraphName:    "OpsAgent",
@@ -37,7 +42,7 @@ func NewOpsAgent(ctx context.Context, m model.ToolCallingChatModel, handler *run
 		Name: "OpsAgent", Description: "Call the Ops Agent to trigger automated incident response for a specific security event. Handles: IP blocking, multi-channel alert notifications (DingTalk/WeCom/Email), event status updates. Requires event_id in the query. Returns execution result.",
 		Instruction: agents.Ops, Model: m, RuntimeHandler: handler, MaxIterations: opsMaxIterations,
 		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
-		ToolNames:        opsTools,
+		ToolNames:        opsDurableTools,
 	})
 }
 
@@ -47,15 +52,19 @@ var (
 	opsDurableErr   error
 )
 
+// BuildDurableOpsAgent 使用调用方提供的唯一 RuntimeHandler 构建运维 Agent。
+func BuildDurableOpsAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
+	m, err := newOpsModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return NewOpsAgent(ctx, m, handler)
+}
+
 // GetDurableOpsAgent 懒构建 ADK 运维 Agent；旧 ExecuteRun 路径和 P19 接线均保持独立。
 func GetDurableOpsAgent(ctx context.Context) (adk.Agent, error) {
 	opsDurableOnce.Do(func() {
-		m, err := newOpsModel(ctx)
-		if err != nil {
-			opsDurableErr = err
-			return
-		}
-		opsDurableAgent, opsDurableErr = NewOpsAgent(ctx, m, runtime.NewRuntimeHandler())
+		opsDurableAgent, opsDurableErr = BuildDurableOpsAgent(ctx, runtime.NewRuntimeHandler())
 	})
 	if opsDurableErr != nil {
 		return nil, fmt.Errorf("ops ADK agent: %w", opsDurableErr)

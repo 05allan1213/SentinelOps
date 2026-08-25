@@ -58,15 +58,19 @@ var (
 	intelligenceDurableErr   error
 )
 
+// BuildDurableIntelligenceAgent 使用调用方提供的唯一 RuntimeHandler 构建情报 Agent。
+func BuildDurableIntelligenceAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
+	m, err := newIntelligenceModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return NewIntelligenceAgent(ctx, m, handler)
+}
+
 // GetDurableIntelligenceAgent 懒构建 ADK 情报 Agent；P19 负责接入 Planner/AgentTool。
 func GetDurableIntelligenceAgent(ctx context.Context) (adk.Agent, error) {
 	intelligenceDurableOnce.Do(func() {
-		m, err := newIntelligenceModel(ctx)
-		if err != nil {
-			intelligenceDurableErr = err
-			return
-		}
-		intelligenceDurableAgent, intelligenceDurableErr = NewIntelligenceAgent(ctx, m, runtime.NewRuntimeHandler())
+		intelligenceDurableAgent, intelligenceDurableErr = BuildDurableIntelligenceAgent(ctx, runtime.NewRuntimeHandler())
 	})
 	if intelligenceDurableErr != nil {
 		return nil, fmt.Errorf("intelligence ADK agent: %w", intelligenceDurableErr)

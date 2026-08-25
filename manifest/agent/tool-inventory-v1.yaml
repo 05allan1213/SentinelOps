@@ -41,4 +41,5 @@ agents:
     - notify_dingtalk
     - notify_wecom
     - notify_email
+    - webhook_out
     - get_current_time

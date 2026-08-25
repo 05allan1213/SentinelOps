@@ -26,6 +26,9 @@ type UpdateEventStatusAction struct{}
 func (a *UpdateEventStatusAction) Name() string { return "update_event_status" }
 
 func (a *UpdateEventStatusAction) Execute(ctx context.Context, params map[string]string) (ActionResult, error) {
+	if err := effects.RequireMutationRoute(ctx); err != nil {
+		return ActionResult{}, err
+	}
 	eventID := params["event_id"]
 	status := params["status"]
 	if eventID == "" || status == "" {
@@ -68,6 +71,9 @@ func (a *BlockIPAction) QueryTargetState(ctx context.Context, params map[string]
 }
 
 func (a *BlockIPAction) Execute(ctx context.Context, params map[string]string) (ActionResult, error) {
+	if err := effects.RequireMutationRoute(ctx); err != nil {
+		return ActionResult{}, err
+	}
 	ip := params["ip"]
 	reason := params["reason"]
 	if ip == "" {
@@ -163,6 +169,9 @@ type AIAnalyzeAction struct{}
 func (a *AIAnalyzeAction) Name() string { return "ai_analyze" }
 
 func (a *AIAnalyzeAction) Execute(ctx context.Context, params map[string]string) (ActionResult, error) {
+	if err := effects.RequireMutationRoute(ctx); err != nil {
+		return ActionResult{}, err
+	}
 	eventID := params["event_id"]
 	if eventID == "" {
 		return ActionResult{}, fmt.Errorf("ai_analyze: event_id 不能为空")

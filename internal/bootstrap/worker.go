@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"SentinelOps/internal/ai/agent/event_analysis_pipeline"
+	"SentinelOps/internal/ai/agent/plan_pipeline"
 	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/indexer"
 	"SentinelOps/internal/ai/ops/actions"
@@ -35,7 +35,6 @@ func startWorker(ctx context.Context) error {
 			return err
 		}
 	}
-	scheduler.RunOpsCompensationScan(ctx)
 	knowledge.StartWorkerPool(ctx)
 	scheduler.Run(ctx)
 	if durableWorker != nil {
@@ -54,15 +53,19 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 		return nil, err
 	}
 	store := workflow.NewGORMStore(db)
-	snapshot, err := airuntime.BuildP20L0Snapshot(config)
+	snapshot, err := airuntime.BuildDurableRuntimeSnapshot(config)
+	if err != nil {
+		return nil, err
+	}
+	handler, err := airuntime.NewHITLRuntimeHandler(store)
 	if err != nil {
 		return nil, err
 	}
 	executor, err := airuntime.NewDurableExecutor(store, func(agentCtx context.Context, name string) (adk.Agent, error) {
-		if name != "event_analysis_agent" {
-			return nil, fmt.Errorf("durable Agent %q is not enabled in P20", name)
+		if name != "plan_agent" {
+			return nil, fmt.Errorf("durable Agent %q is not enabled", name)
 		}
-		return event_analysis_pipeline.GetDurableEventAnalysisAgent(agentCtx)
+		return plan_pipeline.NewDurablePlanAgent(agentCtx, handler)
 	}, snapshot.CompatibilityHash())
 	if err != nil {
 		return nil, err

@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestL0SnapshotContainsOnlyCatalogReadToolsAndFrozenGates(t *testing.T) {
+func TestDurableSnapshotContainsCatalogToolsAndFrozenWriteGates(t *testing.T) {
 	config := &appconfig.Config{
 		AgentRuntime: appconfig.AgentRuntime{Enabled: true, AcceptNewRuns: true},
 		Providers: map[string]appconfig.Provider{
@@ -31,22 +31,29 @@ func TestL0SnapshotContainsOnlyCatalogReadToolsAndFrozenGates(t *testing.T) {
 		},
 		Routing: appconfig.Routing{Chat: map[string]appconfig.Route{"default": {Model: "test/chat"}}},
 	}
-	frozen, err := BuildP20L0Snapshot(config)
+	frozen, err := BuildDurableRuntimeSnapshot(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(frozen.Tools()) == 0 || !frozen.document.FeatureGates["agent_runtime.accept_new_runs"] ||
 		frozen.document.FeatureGates["agent_runtime.l1_writes"] || frozen.document.FeatureGates["agent_runtime.l2_writes"] {
-		t.Fatalf("P20 snapshot tools=%+v gates=%+v", frozen.Tools(), frozen.document.FeatureGates)
+		t.Fatalf("durable snapshot tools=%+v gates=%+v", frozen.Tools(), frozen.document.FeatureGates)
 	}
+	mutationSeen := false
 	for _, tool := range frozen.Tools() {
 		entry, err := policy.LookupCatalog(tool.Name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if entry.Risk != policy.RiskL0 || tool.Name == "query_database" {
-			t.Fatalf("P20 snapshot exposed non-L0 Tool %+v", tool)
+		if tool.Name == "query_database" {
+			t.Fatalf("durable snapshot exposed admin-only Tool %+v", tool)
 		}
+		if entry.Risk != policy.RiskL0 {
+			mutationSeen = true
+		}
+	}
+	if !mutationSeen {
+		t.Fatal("durable snapshot does not contain the P26 Mutation inventory")
 	}
 }
 

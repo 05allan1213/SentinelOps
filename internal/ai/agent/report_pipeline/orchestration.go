@@ -58,15 +58,19 @@ var (
 	reportDurableErr   error
 )
 
+// BuildDurableReportAgent 使用调用方提供的唯一 RuntimeHandler 构建报告 Agent。
+func BuildDurableReportAgent(ctx context.Context, handler *runtime.RuntimeHandler) (adk.Agent, error) {
+	m, err := newReportModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return NewReportAgent(ctx, m, handler)
+}
+
 // GetDurableReportAgent 懒构建 ADK 报告 Agent；P19 负责接入 Planner/AgentTool。
 func GetDurableReportAgent(ctx context.Context) (adk.Agent, error) {
 	reportDurableOnce.Do(func() {
-		m, err := newReportModel(ctx)
-		if err != nil {
-			reportDurableErr = err
-			return
-		}
-		reportDurableAgent, reportDurableErr = NewReportAgent(ctx, m, runtime.NewRuntimeHandler())
+		reportDurableAgent, reportDurableErr = BuildDurableReportAgent(ctx, runtime.NewRuntimeHandler())
 	})
 	if reportDurableErr != nil {
 		return nil, fmt.Errorf("report ADK agent: %w", reportDurableErr)

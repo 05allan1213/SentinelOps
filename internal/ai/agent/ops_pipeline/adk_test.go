@@ -2,6 +2,7 @@ package ops_pipeline
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"SentinelOps/internal/ai/runtime"
@@ -10,6 +11,20 @@ import (
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
 )
+
+type p26DurableContext struct {
+	context.Context
+	attempt *runtime.AttemptContext
+}
+
+func (c p26DurableContext) Value(any) any { return c.attempt }
+
+type p26OpenLegacyGate struct{ called bool }
+
+func (g *p26OpenLegacyGate) AllowLegacyOpsWrites(context.Context) bool {
+	g.called = true
+	return true
+}
 
 func TestAgentOpsContract(t *testing.T) {
 	model := agenttest.NewScriptedChatModel(agenttest.ModelStep{Message: schema.AssistantMessage("done", nil)})
@@ -27,15 +42,29 @@ func TestAgentOpsContract(t *testing.T) {
 	assertOpsInventory(t)
 }
 
+func TestNoDirectWriteDurableContextRejectsOpenLegacyGate(t *testing.T) {
+	ctx := p26DurableContext{
+		Context: context.Background(),
+		attempt: &runtime.AttemptContext{Run: runtime.RunIdentity{ID: "run-p26-durable"}},
+	}
+	gate := &p26OpenLegacyGate{}
+	if err := RequireLegacyOpsWrites(ctx, gate); !errors.Is(err, ErrLegacyOpsWritesDisabled) {
+		t.Fatalf("durable context with open Gate error=%v, want ErrLegacyOpsWritesDisabled", err)
+	}
+	if gate.called {
+		t.Fatal("durable context reached the legacy Gate evaluator")
+	}
+}
+
 func assertOpsInventory(t *testing.T) {
 	t.Helper()
-	want := []string{"query_events", "trigger_ops", "update_event_status", "block_ip", "notify_dingtalk", "notify_wecom", "notify_email", "get_current_time"}
-	if len(opsTools) != len(want) {
-		t.Fatalf("tool count = %d, want %d", len(opsTools), len(want))
+	want := []string{"query_events", "trigger_ops", "update_event_status", "block_ip", "notify_dingtalk", "notify_wecom", "notify_email", "webhook_out", "get_current_time"}
+	if len(opsDurableTools) != len(want) {
+		t.Fatalf("tool count = %d, want %d", len(opsDurableTools), len(want))
 	}
 	for index, name := range want {
-		if opsTools[index] != name {
-			t.Fatalf("tool[%d] = %q, want %q", index, opsTools[index], name)
+		if opsDurableTools[index] != name {
+			t.Fatalf("tool[%d] = %q, want %q", index, opsDurableTools[index], name)
 		}
 	}
 }

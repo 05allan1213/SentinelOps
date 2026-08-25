@@ -125,7 +125,7 @@ func (c *ControllerV1) Chat(ctx context.Context, req *v1.ChatReq) (*v1.ChatRes, 
 		return nil, gerror.New("durable chat adapter is not initialized")
 	}
 	run, err := c.durable.CreateRun(ctx, chatsvc.CreateDurableRunRequest{
-		SessionID: req.SessionId, Query: req.Query, Agent: chatsvc.DurableAgentEventAnalysis,
+		SessionID: req.SessionId, Query: req.Query, Agent: chatsvc.DurableAgentPlan,
 	})
 	if err != nil {
 		if status := durableHTTPStatus(err); status != 0 {

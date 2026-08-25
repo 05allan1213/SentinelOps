@@ -142,7 +142,10 @@ func (c *ControllerV1) DirectRunForEvent(ctx context.Context, req *soarv1.Direct
 	if err != nil {
 		return nil, gerror.New("事件不存在")
 	}
-	runID := engine.DirectRunForEvent(ctx, event)
+	runID, err := engine.DirectRunForEvent(ctx, nil, event)
+	if err != nil {
+		return nil, err
+	}
 	return &soarv1.DirectRunForEventRes{RunID: runID}, nil
 }
 

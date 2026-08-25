@@ -31,10 +31,10 @@ const (
 )
 
 // RunOpsCompensationScan 启动 AI 运维补偿扫描后台任务，应在 main 中与 scheduler.Run 一起调用。
-func RunOpsCompensationScan(ctx context.Context) {
+func RunOpsCompensationScan(ctx context.Context, gate engine.LegacyWriteGate) {
 	go func() {
 		// 启动时立即执行一次，覆盖系统上线前的存量事件
-		doOpsScan(ctx)
+		doOpsScan(ctx, gate)
 		ticker := time.NewTicker(soarScanInterval)
 		defer ticker.Stop()
 		for {
@@ -42,14 +42,14 @@ func RunOpsCompensationScan(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				doOpsScan(ctx)
+				doOpsScan(ctx, gate)
 			}
 		}
 	}()
 }
 
 // doOpsScan 执行单次补偿扫描：查询未触发 AI 运维的高危事件，逐一触发响应。
-func doOpsScan(ctx context.Context) {
+func doOpsScan(ctx context.Context, gate engine.LegacyWriteGate) {
 	events, err := dao.ListUnhandledHighSeverityEvents(ctx, soarScanBatch)
 	if err != nil {
 		g.Log().Warningf(ctx, "[ops-scan] 查询未处理高危事件失败: %v", err)
@@ -60,6 +60,9 @@ func doOpsScan(ctx context.Context) {
 	}
 	g.Log().Infof(ctx, "[ops-scan] 发现 %d 条未触发 AI 运维的高危事件，开始补偿触发", len(events))
 	for i := range events {
-		engine.TriggerForEvent(ctx, &events[i])
+		if _, err := engine.TriggerForEvent(ctx, gate, &events[i]); err != nil {
+			g.Log().Warningf(ctx, "[ops-scan] legacy 运维入口已关闭: %v", err)
+			return
+		}
 	}
 }
