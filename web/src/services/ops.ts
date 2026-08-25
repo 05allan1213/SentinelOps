@@ -71,6 +71,55 @@ export interface OpsStats {
   failed_runs: number
 }
 
+export interface ApprovalItem {
+  id: string
+  run_id: string
+  tool_name: string
+  tool_revision: string
+  risk_level: string
+  proposal: unknown
+  proposal_hash: string
+  requested_by: string
+  decided_by?: string
+  status: string
+  version: number
+  decision_reason?: string
+  published_at?: string
+  expires_at?: string
+  decided_at?: string
+}
+
+export interface UnknownEffectItem {
+  id: string
+  run_id: string
+  tool_name: string
+  effect_step: string
+  effect_type: string
+  status: string
+  version: number
+  evidence?: unknown
+  reconciliation_attempts: number
+}
+
+export interface ApprovalDecisionInput {
+  proposal_hash: string
+  version: number
+  reason: string
+}
+
+export interface EffectResolutionInput {
+  resolution: 'executed' | 'not_executed' | 'still_unknown'
+  evidence?: unknown
+  response?: unknown
+  external_reference?: string
+}
+
+export const opsQueryKeys = {
+  approvals: (limit = 20) => ['ops', 'approvals', limit] as const,
+  unknownEffects: (limit = 20) => ['ops', 'effects', 'unknown', limit] as const,
+  runs: (limit = 20) => ['ops', 'runs', limit] as const,
+}
+
 export const opsService = {
   // 响应剧本
   async listPlaybooks(): Promise<Playbook[]> {
@@ -143,5 +192,35 @@ export const opsService = {
   // 删除运行记录
   async deleteRun(id: string): Promise<void> {
     await api.delete(`/ops/v1/runs/${id}`)
+  },
+
+  // Approval / HITL
+  async listApprovals(limit = 20): Promise<ApprovalItem[]> {
+    const res = await api.get<ApiResponse<{ items: ApprovalItem[] }>>('/ops/v1/approvals', { params: { limit } })
+    return (res.data.data?.items || []).filter(item => item.status === 'pending')
+  },
+  async getApproval(id: string): Promise<ApprovalItem> {
+    const res = await api.get<ApiResponse<{ item: ApprovalItem }>>(`/ops/v1/approvals/${id}`)
+    return res.data.data!.item
+  },
+  async approveApproval(id: string, input: ApprovalDecisionInput): Promise<ApprovalItem> {
+    const res = await api.post<ApiResponse<{ item: ApprovalItem }>>(`/ops/v1/approvals/${id}/approve`, input)
+    return res.data.data!.item
+  },
+  async rejectApproval(id: string, input: ApprovalDecisionInput): Promise<ApprovalItem> {
+    const res = await api.post<ApiResponse<{ item: ApprovalItem }>>(`/ops/v1/approvals/${id}/reject`, input)
+    return res.data.data!.item
+  },
+
+  // Unknown Effect 对账，只提交 admin 决定，不直接执行外部 Effect
+  async listUnknownEffects(limit = 20): Promise<UnknownEffectItem[]> {
+    const res = await api.get<ApiResponse<{ items: UnknownEffectItem[] }>>('/ops/v1/effects/unknown', { params: { limit } })
+    return (res.data.data?.items || []).filter(item => item.status === 'unknown' || item.status === 'reconciling')
+  },
+  async resolveEffect(id: string, input: EffectResolutionInput): Promise<void> {
+    await api.post(`/ops/v1/effects/${id}/resolve`, input)
+  },
+  async acceptUnknownEffect(id: string, runId: string, reason: string, evidence?: unknown): Promise<void> {
+    await api.post(`/ops/v1/effects/${id}/accept-unknown`, { run_id: runId, reason, evidence })
   },
 }

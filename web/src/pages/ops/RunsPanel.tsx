@@ -25,7 +25,13 @@ const actionLabel: Record<string, string> = {
   ai_decide: 'AI 决策',
 }
 const fmtDuration = (ms: number) => ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
-const isActive = (s: string) => s === 'running' || s === 'pending'
+const isActive = (s: string) => ['running', 'pending', 'waiting_approval', 'reconciling'].includes(s)
+const isSuccess = (s: string) => s === 'success' || s === 'succeeded'
+const runStatusLabel: Record<string, string> = {
+  pending: '排队中', running: '执行中', waiting_approval: '等待审批', reconciling: '对账中',
+  parked: '已暂停：外部 Effect 结果未知', retryable_failed: '可重试失败',
+  success: '成功', succeeded: '成功', failed: '失败', canceled: '已取消',
+}
 
 export default function RunsPanel() {
   const [runs, setRuns] = useState<OpsRun[]>([])
@@ -106,7 +112,7 @@ export default function RunsPanel() {
   const activeRuns = runs.filter(r => isActive(r.status))
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" data-testid="runs-panel">
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCollapsed(p => !p)}>
           <Zap className="w-4 h-4 text-violet-500" />
@@ -153,7 +159,8 @@ export default function RunsPanel() {
                   </span>
                   <span className="flex-shrink-0">
                     {active ? <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                      : r.status === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      : isSuccess(r.status) ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      : r.status === 'parked' || r.status === 'reconciling' ? <Clock className="w-4 h-4 text-orange-500" />
                       : <XCircle className="w-4 h-4 text-red-400" />}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -165,7 +172,11 @@ export default function RunsPanel() {
                           {severityLabel[r.event_severity] || r.event_severity}
                         </span>
                       )}
-                      {active && <span className="text-[10px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded-full border border-blue-100 flex-shrink-0">执行中</span>}
+                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border flex-shrink-0',
+                        active ? 'text-blue-500 bg-blue-50 border-blue-100' :
+                        isSuccess(r.status) ? 'text-emerald-600 bg-emerald-50 border-emerald-100' :
+                        r.status === 'parked' || r.status === 'reconciling' ? 'text-orange-600 bg-orange-50 border-orange-100' :
+                        'text-red-500 bg-red-50 border-red-100')}>{runStatusLabel[r.status] || r.status}</span>
                     </div>
                     {detail?.plan_summary && (
                       <p className="text-xs text-gray-400 mt-0.5 truncate">{detail.plan_summary}</p>

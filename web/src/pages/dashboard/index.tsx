@@ -17,6 +17,7 @@ import EventTrendChart from './components/EventTrendChart'
 import SeverityDistribution from './components/SeverityDistribution'
 import RecentEvents from './components/RecentEvents'
 import SubscriptionStatus from './components/SubscriptionStatus'
+import ActionQueue from './components/ActionQueue'
 import { eventService } from '@/services/event'
 import { subscriptionService } from '@/services/subscription'
 import { reportService } from '@/services/report'
@@ -886,6 +887,8 @@ export default function Dashboard() {
               </div>
             </DashCard>
           </div>
+
+          <ActionQueue />
         </div>
 
         {/* 右侧侧栏：aside 本身 sticky + alignSelf:start，避免 grid stretch 留白 */}

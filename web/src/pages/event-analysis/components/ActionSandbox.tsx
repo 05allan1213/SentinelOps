@@ -1,4 +1,4 @@
-import { Terminal, Shield, Copy } from 'lucide-react'
+import { Terminal, Shield, Copy, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Props { selected: string | null }
@@ -8,10 +8,10 @@ export default function ActionSandbox({ selected }: Props) {
 
   return (
     <div className="w-56 border-l border-[#30363D] bg-[#0D1117] p-3">
-      <div className="text-[10px] text-[#8B949E] mb-3 uppercase tracking-wider">Proposed Actions</div>
+      <div className="flex items-center gap-1.5 text-[10px] text-[#8B949E] mb-3 uppercase tracking-wider"><Eye className="w-3 h-3" /> Proposal Preview</div>
 
       {!selected ? (
-        <div className="text-xs text-[#8B949E]">等待分析结果</div>
+        <div className="text-xs text-[#8B949E]">等待分析结果；此处仅预览，不执行 Effect。</div>
       ) : (
         <div className="space-y-2">
           <div className="p-2 bg-[#F85149]/10 border border-[#F85149]/30 rounded">
@@ -32,6 +32,7 @@ export default function ActionSandbox({ selected }: Props) {
           <button onClick={() => copy('CVE-2024-38077')} className="w-full p-1.5 bg-[#30363D] rounded text-[10px] text-[#8B949E] flex items-center justify-center gap-1 hover:bg-[#30363D]/80">
             <Copy className="w-3 h-3" /> 复制CVE
           </button>
+          <p className="text-[10px] text-[#8B949E]">执行需要后端 Approval、Effect 结果和审计证据。</p>
         </div>
       )}
     </div>

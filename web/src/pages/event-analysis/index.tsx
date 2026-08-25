@@ -12,6 +12,8 @@ import ResultPanel from './components/ResultPanel'
 import AnalysisModeSelect, { type AnalysisMode } from './components/AnalysisModeSelect'
 import EventPickerModal from './components/EventPickerModal'
 import ReportModal, { buildMarkdown } from './components/ReportModal'
+import ActionSandbox from './components/ActionSandbox'
+import MitigationConsole from './components/MitigationConsole'
 import { eventService } from '@/services/event'
 import { reportService } from '@/services/report'
 
@@ -317,6 +319,8 @@ export default function EventAnalysis() {
         <div className="flex-1">
           <ResultPanel data={riskData} isProcessing={isProcessing} onSolutionUpdate={handleSolutionUpdate} />
         </div>
+        <ActionSandbox selected={riskData ? 'proposal' : null} />
+        <MitigationConsole selected={riskData ? 'proposal' : null} logs={agentLogs} />
       </div>
 
       {/* 事件选择弹窗 */}

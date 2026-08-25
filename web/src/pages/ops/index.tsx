@@ -3,6 +3,7 @@ import { Bot, Play, CheckCircle2, XCircle, TrendingUp } from 'lucide-react'
 import { opsService, type OpsStats } from '@/services/ops'
 import { cn } from '@/utils'
 import RunsPanel from './RunsPanel'
+import ActionQueue from '@/pages/dashboard/components/ActionQueue'
 
 export default function SoarPage() {
   const [stats, setStats] = useState<OpsStats>({ total_runs: 0, success_runs: 0, failed_runs: 0 })
@@ -46,6 +47,8 @@ export default function SoarPage() {
           </div>
         ))}
       </div>
+
+      <ActionQueue />
 
       <RunsPanel />
     </div>

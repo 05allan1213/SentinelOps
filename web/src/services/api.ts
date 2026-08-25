@@ -2,6 +2,27 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios'
 import { ApiResponse } from '@/types'
 import toast from 'react-hot-toast'
 
+export class ApiRequestError extends Error {
+  readonly status?: number
+  readonly payload?: unknown
+
+  constructor(message: string, status?: number, payload?: unknown) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+    this.payload = payload
+  }
+}
+
+export function getApiErrorStatus(error: unknown): number | undefined {
+  if (error instanceof ApiRequestError) return error.status
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const response = (error as { response?: { status?: number } }).response
+    return response?.status
+  }
+  return undefined
+}
+
 const api: AxiosInstance = axios.create({
   baseURL: '/api',
   timeout: 30000,
@@ -27,10 +48,10 @@ api.interceptors.response.use(
   (response: AxiosResponse<ApiResponse<unknown>>) => {
     const { data } = response
     if (data.code !== undefined && data.code !== 0 && data.code !== 200) {
-      return Promise.reject(new Error(data.message || '请求失败'))
+      return Promise.reject(new ApiRequestError(data.message || '请求失败', response.status, data))
     }
     if (data.message && data.message !== 'OK' && (data.data === undefined || data.data === null)) {
-      return Promise.reject(new Error(data.message))
+      return Promise.reject(new ApiRequestError(data.message, response.status, data))
     }
     return response
   },
@@ -54,14 +75,14 @@ api.interceptors.response.use(
       }
       // 重试耗尽，提示用户
       toast.error('操作过于频繁，请稍后再试', { id: 'rate-limit', duration: 4000 })
-      return Promise.reject(new Error('请求过于频繁，请稍后重试'))
+      return Promise.reject(new ApiRequestError('请求过于频繁，请稍后重试', status, error.response?.data))
     }
 
     const statusMsgMap: Record<number, string> = {
       503: '当前请求过多，请稍后重试',
     }
     const message = statusMsgMap[status] ?? error.response?.data?.message ?? error.message ?? '网络错误'
-    return Promise.reject(new Error(message))
+    return Promise.reject(new ApiRequestError(message, status, error.response?.data))
   }
 )
 
