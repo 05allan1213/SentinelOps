@@ -2,11 +2,16 @@ package retrieval
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
+	"SentinelOps/internal/ai/budgetctx"
 	"SentinelOps/internal/ai/cache"
+	"SentinelOps/internal/ai/evidence"
 	"SentinelOps/internal/ai/retrieval/searcher"
 	aitrace "SentinelOps/internal/ai/trace"
+	milvus "SentinelOps/internal/dao/milvus"
 
 	"github.com/cloudwego/eino/components/embedding"
 	einoretriever "github.com/cloudwego/eino/components/retriever"
@@ -41,7 +46,24 @@ func New(cli milvuscli.Client, eb embedding.Embedder, redisCli *goredis.Client, 
 }
 
 // Retrieve 执行检索：Embedding → 缓存/检索 → 过滤 → 返回
-func (r *Retriever) Retrieve(ctx context.Context, query string, opts ...einoretriever.Option) ([]*schema.Document, error) {
+func (r *Retriever) Retrieve(ctx context.Context, query string, opts ...einoretriever.Option) (result []*schema.Document, err error) {
+	scope, scoped := evidence.ScopeFromContext(ctx)
+	if r.cfg.Partition == milvus.PartitionDocuments && !scoped {
+		return nil, fmt.Errorf("%w: missing retrieval scope", ErrEvidenceUnavailable)
+	}
+	ragReservation, err := reserveRAG(ctx, r.cfg, query)
+	if err != nil {
+		return nil, err
+	}
+	if ragReservation != nil {
+		defer func() {
+			settleErr := ragReservation.settle(ctx, result, err == nil)
+			if err == nil && settleErr != nil {
+				result = nil
+				err = settleErr
+			}
+		}()
+	}
 	// ── 阶段1：向量嵌入 ──
 	// 追踪节点：记录 Embedding API 调用耗时和成本
 	embSpanCtx, embSpanID := aitrace.StartSpan(ctx, aitrace.NodeTypeEmbedding, r.cfg.EmbeddingModel)
@@ -59,9 +81,23 @@ func (r *Retriever) Retrieve(ctx context.Context, query string, opts ...einoretr
 
 	// ── 阶段2：语义缓存检查 ──
 	// 命中：跳过 Milvus，直接返回缓存结果（节省 ~50ms）
-	if docs, sim, ok := r.cache.Get(ctx, queryVec); ok {
-		g.Log().Infof(ctx, "[Retriever] 缓存命中 %d 文档 | query=%q | sim=%.4f", len(docs), query, sim)
-		return docs, nil
+	var cachedDocs []*schema.Document
+	var cachedSim float64
+	var cacheHit bool
+	if scoped {
+		cachedDocs, cachedSim, cacheHit = r.cache.GetScoped(ctx, queryVec, scope)
+	} else {
+		cachedDocs, cachedSim, cacheHit = r.cache.Get(ctx, queryVec)
+	}
+	if cacheHit {
+		if r.cfg.Partition == milvus.PartitionDocuments {
+			cachedDocs, err = FilterDocuments(ctx, cachedDocs, scope)
+			if err != nil {
+				return nil, err
+			}
+		}
+		g.Log().Infof(ctx, "[Retriever] 缓存命中 %d 文档 | query=%q | sim=%.4f", len(cachedDocs), query, cachedSim)
+		return cachedDocs, nil
 	}
 	g.Log().Infof(ctx, "[Retriever] 缓存未命中，执行检索 | query=%q | partition=%q | hybrid=%v", query, r.cfg.Partition, r.cfg.HybridEnabled)
 
@@ -106,6 +142,12 @@ func (r *Retriever) Retrieve(ctx context.Context, query string, opts ...einoretr
 	if r.cfg.FinalTopK > 0 && len(filtered) > r.cfg.FinalTopK {
 		filtered = filtered[:r.cfg.FinalTopK]
 	}
+	if r.cfg.Partition == milvus.PartitionDocuments {
+		filtered, err = FilterDocuments(ctx, filtered, scope)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if r.cfg.HybridEnabled {
 		g.Log().Infof(ctx, "[Retriever] 召回 %d 块，保留 %d 块（混合检索，finalTopK=%d）", len(docs), len(filtered), r.cfg.FinalTopK)
@@ -114,6 +156,43 @@ func (r *Retriever) Retrieve(ctx context.Context, query string, opts ...einoretr
 	}
 
 	// ── 阶段5：缓存写入 ──
-	r.cache.Set(ctx, queryVec, filtered)
+	if scoped {
+		r.cache.SetScoped(ctx, queryVec, filtered, scope)
+	} else {
+		r.cache.Set(ctx, queryVec, filtered)
+	}
 	return filtered, nil
+}
+
+type ragReservation struct {
+	reservation budgetctx.RAGReservation
+}
+
+func reserveRAG(ctx context.Context, cfg Config, query string) (*ragReservation, error) {
+	provider, ok := budgetctx.ProviderFromContext(ctx)
+	if !ok {
+		return nil, nil
+	}
+	sum := sha256.Sum256([]byte("rag/v1\x00" + cfg.Partition + "\x00" + query))
+	identity := "rag:" + hex.EncodeToString(sum[:])
+	estimateDocuments := cfg.TopK
+	if estimateDocuments <= 0 {
+		estimateDocuments = 1
+	}
+	reservation, err := provider.ReserveRAG(ctx, identity, int64(estimateDocuments), int64(estimateDocuments*8000))
+	if err != nil {
+		return nil, fmt.Errorf("%w: reserve RAG: %v", ErrEvidenceUnavailable, err)
+	}
+	return &ragReservation{reservation: reservation}, nil
+}
+
+func (r *ragReservation) settle(ctx context.Context, docs []*schema.Document, succeeded bool) error {
+	var documents, contextChars int64
+	for _, doc := range docs {
+		if doc != nil {
+			documents++
+			contextChars += int64(len([]rune(doc.Content)))
+		}
+	}
+	return r.reservation.Settle(ctx, documents, contextChars, succeeded)
 }

@@ -43,22 +43,31 @@ func RegisterExistingFile(ctx context.Context, baseID, filePath string, chunkCfg
 	if err != nil {
 		return nil, fmt.Errorf("stat file: %w", err)
 	}
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("read file: %w", err)
+	}
+	fileHash := fmt.Sprintf("%x", sha256.Sum256(fileData))
 
 	ext := strings.ToLower(filepath.Ext(filePath))
 	docID := uuid.New().String()
 
 	cfgJSON, _ := sonic.Marshal(chunkCfg)
 	doc := &dao.KnowledgeDocument{
-		ID:            docID,
-		BaseID:        baseID,
-		Name:          filepath.Base(filePath),
-		FilePath:      filePath,
-		FileSize:      info.Size(),
-		FileType:      strings.TrimPrefix(ext, "."),
-		ChunkStrategy: string(chunkCfg.Strategy),
-		ChunkConfig:   string(cfgJSON),
-		IndexStatus:   "pending",
-		Enabled:       true,
+		ID:             docID,
+		BaseID:         baseID,
+		Name:           filepath.Base(filePath),
+		FilePath:       filePath,
+		FileSize:       info.Size(),
+		FileType:       strings.TrimPrefix(ext, "."),
+		ChunkStrategy:  string(chunkCfg.Strategy),
+		ChunkConfig:    string(cfgJSON),
+		IndexStatus:    "pending",
+		Enabled:        true,
+		ContentHash:    fileHash,
+		SourceVersion:  fileHash,
+		AccessScope:    "public",
+		IndexedVersion: 1,
 	}
 	if err = db.Create(doc).Error; err != nil {
 		return nil, fmt.Errorf("create doc record: %w", err)
@@ -209,17 +218,21 @@ func UploadDoc(ctx context.Context, baseID, fileName string, fileData []byte, ch
 
 	cfgJSON, _ := sonic.Marshal(chunkCfg)
 	doc := &dao.KnowledgeDocument{
-		ID:            docID,
-		BaseID:        baseID,
-		Name:          fileName,
-		FilePath:      savePath,
-		FileSize:      int64(len(fileData)),
-		FileType:      strings.TrimPrefix(ext, "."),
-		FileHash:      hash,
-		ChunkStrategy: string(chunkCfg.Strategy),
-		ChunkConfig:   string(cfgJSON),
-		IndexStatus:   "pending",
-		Enabled:       true,
+		ID:             docID,
+		BaseID:         baseID,
+		Name:           fileName,
+		FilePath:       savePath,
+		FileSize:       int64(len(fileData)),
+		FileType:       strings.TrimPrefix(ext, "."),
+		FileHash:       hash,
+		ContentHash:    hash,
+		SourceVersion:  hash,
+		AccessScope:    "public",
+		IndexedVersion: 1,
+		ChunkStrategy:  string(chunkCfg.Strategy),
+		ChunkConfig:    string(cfgJSON),
+		IndexStatus:    "pending",
+		Enabled:        true,
 	}
 	if err = db.Create(doc).Error; err != nil {
 		os.Remove(savePath)
@@ -400,11 +413,12 @@ func RebuildDoc(ctx context.Context, docID string, newStrategy ...string) error 
 
 	// 若传入新策略，更新分块策略和配置
 	updates := map[string]any{
-		"index_status":   "pending",
-		"index_error":    "",
-		"indexed_at":     nil,
-		"chunk_count":    0,
-		"indexed_chunks": 0,
+		"index_status":    "pending",
+		"index_error":     "",
+		"indexed_at":      nil,
+		"chunk_count":     0,
+		"indexed_chunks":  0,
+		"indexed_version": gorm.Expr("indexed_version + 1"),
 	}
 	if len(newStrategy) > 0 && newStrategy[0] != "" {
 		strategy := aidoc.ChunkStrategy(newStrategy[0])
@@ -471,7 +485,7 @@ func EnableDoc(ctx context.Context, docID string, enabled bool) error {
 	if err != nil {
 		return err
 	}
-	return db.Model(&dao.KnowledgeDocument{}).Where("id = ?", docID).Update("enabled", enabled).Error
+	return db.Model(&dao.KnowledgeDocument{}).Where("id = ?", docID).Updates(map[string]any{"enabled": enabled, "indexed_version": gorm.Expr("indexed_version + 1")}).Error
 }
 
 // EnableChunks 批量启用或禁用分块。
@@ -486,9 +500,9 @@ func EnableChunks(ctx context.Context, docID string, ids []string, enabled bool)
 	}
 	var tx *gorm.DB
 	if len(ids) > 0 {
-		tx = db.Model(&dao.KnowledgeChunk{}).Where("id IN ?", ids).Update("enabled", enabled)
+		tx = db.Model(&dao.KnowledgeChunk{}).Where("id IN ?", ids).Updates(map[string]any{"enabled": enabled, "indexed_version": gorm.Expr("indexed_version + 1")})
 	} else if docID != "" {
-		tx = db.Model(&dao.KnowledgeChunk{}).Where("doc_id = ?", docID).Update("enabled", enabled)
+		tx = db.Model(&dao.KnowledgeChunk{}).Where("doc_id = ?", docID).Updates(map[string]any{"enabled": enabled, "indexed_version": gorm.Expr("indexed_version + 1")})
 	} else {
 		return 0, nil
 	}
@@ -522,7 +536,10 @@ func SearchDocs(ctx context.Context, baseID, query string, topK int) ([]SearchRe
 	}
 
 	// 过滤已禁用文档的分块
-	docs = retrieval.FilterDisabledDocs(ctx, docs)
+	docs, err = retrieval.FilterDisabledDocsStrict(ctx, docs)
+	if err != nil {
+		return nil, err
+	}
 
 	// 按 base_id 过滤（Milvus 无分区级 base_id 过滤，在应用层补充）
 	filtered := make([]*schema.Document, 0, len(docs))
@@ -530,10 +547,6 @@ func SearchDocs(ctx context.Context, baseID, query string, topK int) ([]SearchRe
 		if bid, ok := d.MetaData["base_id"].(string); ok && bid == baseID {
 			filtered = append(filtered, d)
 		}
-	}
-	// 若过滤后结果不足，保留 topK 原始结果（不做 base_id 过滤，退化为全库搜索）
-	if len(filtered) == 0 {
-		filtered = docs
 	}
 	if len(filtered) > topK {
 		filtered = filtered[:topK]
@@ -614,11 +627,15 @@ func buildDocIndex(ctx context.Context, task IndexTask) error {
 	g.Log().Infof(ctx, "[knowledge] 开始分块+向量化文档 %s（策略=%s，childChunkSize=%d）",
 		doc.Name, chunkCfg.Strategy, childSize)
 	chunks, err := pipeline.BuildAndIndex(ctx, pipeline.IndexInput{
-		FilePath: doc.FilePath,
-		BaseID:   task.BaseID,
-		DocID:    task.DocID,
-		DocTitle: docTitle,
-		Config:   chunkCfg,
+		FilePath:       doc.FilePath,
+		BaseID:         task.BaseID,
+		DocID:          task.DocID,
+		DocTitle:       docTitle,
+		SourceVersion:  doc.SourceVersion,
+		ContentHash:    doc.ContentHash,
+		AccessScope:    doc.AccessScope,
+		IndexedVersion: doc.IndexedVersion,
+		Config:         chunkCfg,
 	})
 	if err != nil {
 		db.Model(&dao.KnowledgeDocument{}).Where("id = ?", task.DocID).Updates(map[string]any{
@@ -651,6 +668,10 @@ func buildDocIndex(ctx context.Context, task IndexTask) error {
 			SectionTitle:   c.SectionTitle,
 			CharCount:      c.CharCount,
 			Enabled:        true,
+			ContentHash:    doc.ContentHash,
+			SourceVersion:  doc.SourceVersion,
+			AccessScope:    doc.AccessScope,
+			IndexedVersion: doc.IndexedVersion,
 		})
 	}
 

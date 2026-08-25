@@ -19,11 +19,15 @@ import (
 // IndexInput 知识库索引管道的输入，包含文件路径、分块配置和元数据。
 // 分块配置在运行时传入，无需重建单例 Graph。
 type IndexInput struct {
-	FilePath string
-	BaseID   string            // 所属知识库ID（可选，metadata 注入）
-	DocID    string            // 文档ID（可选，Milvus 删除依据）
-	DocTitle string            // 文档主标题（metadata 注入）
-	Config   aidoc.ChunkConfig // 含 hierarchical 策略参数
+	FilePath       string
+	BaseID         string            // 所属知识库ID（可选，metadata 注入）
+	DocID          string            // 文档ID（可选，Milvus 删除依据）
+	DocTitle       string            // 文档主标题（metadata 注入）
+	SourceVersion  string            // P03 Evidence 字段快照
+	ContentHash    string            // P03 内容 hash 快照
+	AccessScope    string            // P03 授权 Scope 快照
+	IndexedVersion uint64            // P03 索引版本快照
+	Config         aidoc.ChunkConfig // 含 hierarchical 策略参数
 }
 
 // BuildAndIndex 执行知识索引并返回 ChunkResult 列表（供知识库服务写 MySQL）。
@@ -101,12 +105,16 @@ func BuildAndIndex(ctx context.Context, input IndexInput) ([]aidoc.ChunkResult, 
 		id := uuid.New().String()
 		chunks[i].ID = id
 		meta := map[string]any{
-			"_type":         "document",
-			"base_id":       input.BaseID,
-			"doc_id":        input.DocID,
-			"doc_title":     input.DocTitle,
-			"chunk_index":   c.ChunkIndex,
-			"section_title": c.SectionTitle,
+			"_type":           "document",
+			"base_id":         input.BaseID,
+			"doc_id":          input.DocID,
+			"doc_title":       input.DocTitle,
+			"chunk_index":     c.ChunkIndex,
+			"section_title":   c.SectionTitle,
+			"source_version":  input.SourceVersion,
+			"content_hash":    input.ContentHash,
+			"access_scope":    input.AccessScope,
+			"indexed_version": input.IndexedVersion,
 		}
 		if c.ParentContent != "" {
 			meta["parent_content"] = aidoc.TruncateToMaxBytes(c.ParentContent, 6000)

@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	"SentinelOps/internal/ai/evidence"
 	aitrace "SentinelOps/internal/ai/trace"
 
 	"github.com/cloudwego/eino/schema"
@@ -43,6 +44,27 @@ type SemanticCache struct {
 	keyPrefix string          // 缓存键前缀（如 "rag:cache"）
 	ttl       time.Duration   // 缓存有效期（默认 24 小时）
 	threshold float64         // 余弦相似度命中阈值（默认 0.85）
+}
+
+// GetScoped 只在指定 Scope 的命名空间中查找缓存，避免授权和索引状态串读。
+func (sc *SemanticCache) GetScoped(ctx context.Context, vec []float64, scope evidence.Scope) ([]*schema.Document, float64, bool) {
+	return sc.withNamespace(scope.Namespace()).Get(ctx, vec)
+}
+
+// SetScoped 将结果写入指定 Scope 的命名空间。
+func (sc *SemanticCache) SetScoped(ctx context.Context, vec []float64, docs []*schema.Document, scope evidence.Scope) {
+	sc.withNamespace(scope.Namespace()).Set(ctx, vec, docs)
+}
+
+func (sc *SemanticCache) withNamespace(namespace string) *SemanticCache {
+	clone := *sc
+	clone.keyPrefix = sc.keyPrefix + ":" + namespace
+	return &clone
+}
+
+// ScopedKeyPrefix 返回 Scope 隔离后的 Redis 前缀，供 contract test 检查命名空间稳定性。
+func (sc *SemanticCache) ScopedKeyPrefix(scope evidence.Scope) string {
+	return sc.withNamespace(scope.Namespace()).keyPrefix
 }
 
 // New 创建语义缓存实例

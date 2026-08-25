@@ -30,7 +30,10 @@ func NewQueryInternalDocsTool() tool.InvokableTool {
 				return "", fmt.Errorf("retrieve docs: %w", err)
 			}
 			// 过滤掉已禁用文档的分块
-			resp = retrieval.FilterDisabledDocs(ctx, resp)
+			resp, err = retrieval.FilterDisabledDocsStrict(ctx, resp)
+			if err != nil {
+				return "", err
+			}
 			g.Log().Infof(ctx, "[Tool] query_internal_docs 完成 | 返回=%d 条", len(resp))
 			respBytes, _ := json.Marshal(resp)
 			return string(respBytes), nil

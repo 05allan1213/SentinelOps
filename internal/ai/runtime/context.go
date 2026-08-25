@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"SentinelOps/internal/ai/budgetctx"
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
@@ -204,6 +205,7 @@ func BuildAttemptContext(parent context.Context, claimed workflow.ClaimedRun, bu
 		Trace: TraceIdentity{ID: uuid.NewString()}, Deadline: deadline, Snapshot: snapshot,
 		History: append(json.RawMessage(nil), stored.History...), cancel: cancel, physicalCalls: &atomic.Uint64{},
 	}
+	leaseContext = budgetctx.WithProvider(leaseContext, newRAGBudgetProvider(attempt))
 	return context.WithValue(leaseContext, attemptContextKey{}, attempt), attempt, nil
 }
 

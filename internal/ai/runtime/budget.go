@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"SentinelOps/internal/ai/budgetctx"
 	"SentinelOps/internal/ai/workflow"
 )
 
@@ -122,6 +123,39 @@ func (b *DurableBudget) RebuildBudgetHandle(_ context.Context, state BudgetState
 type durableBudgetHandle struct {
 	store *workflow.GORMStore
 	runID string
+}
+
+type ragBudgetProvider struct{ attempt *AttemptContext }
+type ragBudgetReservation struct {
+	budget            CallBudget
+	lease             workflow.LeaseToken
+	traceID, identity string
+}
+
+func newRAGBudgetProvider(attempt *AttemptContext) budgetctx.Provider {
+	return &ragBudgetProvider{attempt: attempt}
+}
+
+func (p *ragBudgetProvider) ReserveRAG(ctx context.Context, identity string, documents, contextChars int64) (budgetctx.RAGReservation, error) {
+	if p == nil || p.attempt == nil {
+		return nil, ErrAttemptContextMissing
+	}
+	budget, err := requireCallBudget(p.attempt.Budget)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := budget.ReserveCall(ctx, BudgetCall{
+		ReservationIdentity: identity, Kind: BudgetCallKindRAG, Subject: "documents",
+		Lease: p.attempt.Lease, TraceID: p.attempt.Trace.ID, Deadline: p.attempt.Deadline,
+		Estimate: workflow.BaseBudgetEstimate{Documents: documents, ContextChars: contextChars},
+	}); err != nil {
+		return nil, err
+	}
+	return &ragBudgetReservation{budget: budget, lease: p.attempt.Lease, traceID: p.attempt.Trace.ID, identity: identity}, nil
+}
+
+func (r *ragBudgetReservation) Settle(ctx context.Context, documents, contextChars int64, succeeded bool) error {
+	return r.budget.SettleCall(ctx, BudgetSettlement{ReservationIdentity: r.identity, Lease: r.lease, TraceID: r.traceID, Succeeded: succeeded, Actual: &workflow.BaseBudgetActual{Documents: documents, ContextChars: contextChars}, UsageQuality: "reliable"})
 }
 
 func (*durableBudgetHandle) RuntimeBudgetHandle() {}

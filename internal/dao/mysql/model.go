@@ -165,14 +165,19 @@ func (TraceNode) TableName() string { return "agent_trace_nodes" }
 // 通过 metadata.base_id 区分所属知识库（Milvus 内无二级分区）。
 // ID 为 "default" 的记录是系统保留的默认知识库，上传的文件默认归入此库。
 type KnowledgeBase struct {
-	ID          string         `gorm:"column:id;primaryKey;size:64"`
-	Name        string         `gorm:"column:name;size:128;not null"`
-	Description string         `gorm:"column:description;type:text"`
-	DocCount    int            `gorm:"column:doc_count;default:0"`   // 文档总数（每次上传 +1、删除 -1）
-	ChunkCount  int            `gorm:"column:chunk_count;default:0"` // 子块总数（索引完成时累加，删除文档时扣减）
-	CreatedAt   time.Time      `gorm:"column:created_at;type:datetime;autoCreateTime"`
-	UpdatedAt   time.Time      `gorm:"column:updated_at;type:datetime;autoUpdateTime"`
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index"` // 软删除：删知识库时级联软删其下所有文档
+	ID             string         `gorm:"column:id;primaryKey;size:64"`
+	Name           string         `gorm:"column:name;size:128;not null"`
+	Description    string         `gorm:"column:description;type:text"`
+	DocCount       int            `gorm:"column:doc_count;default:0"`   // 文档总数（每次上传 +1、删除 -1）
+	ChunkCount     int            `gorm:"column:chunk_count;default:0"` // 子块总数（索引完成时累加，删除文档时扣减）
+	CreatedAt      time.Time      `gorm:"column:created_at;type:datetime;autoCreateTime"`
+	UpdatedAt      time.Time      `gorm:"column:updated_at;type:datetime;autoUpdateTime"`
+	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index"` // 软删除：删知识库时级联软删其下所有文档
+	ContentHash    string         `gorm:"column:content_hash;size:64"`
+	SourceVersion  string         `gorm:"column:source_version;size:128"`
+	AccessScope    string         `gorm:"column:access_scope;size:191;not null;default:public"`
+	IndexedVersion uint64         `gorm:"column:indexed_version;not null;default:0"`
+	UpdatedBy      string         `gorm:"column:updated_by;size:128"`
 }
 
 func (KnowledgeBase) TableName() string { return "knowledge_bases" }
@@ -201,6 +206,11 @@ type KnowledgeDocument struct {
 	CreatedAt       time.Time      `gorm:"column:created_at;type:datetime;autoCreateTime"`
 	UpdatedAt       time.Time      `gorm:"column:updated_at;type:datetime;autoUpdateTime"`
 	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at;index"` // 软删除，硬数据（文件+向量）由 DeleteDoc 负责清理
+	ContentHash     string         `gorm:"column:content_hash;size:64"`
+	SourceVersion   string         `gorm:"column:source_version;size:128"`
+	AccessScope     string         `gorm:"column:access_scope;size:191;not null;default:public"`
+	IndexedVersion  uint64         `gorm:"column:indexed_version;not null;default:0"`
+	UpdatedBy       string         `gorm:"column:updated_by;size:128"`
 }
 
 func (KnowledgeDocument) TableName() string { return "knowledge_documents" }
@@ -218,6 +228,11 @@ type KnowledgeChunk struct {
 	Enabled        bool      `gorm:"column:enabled;default:true"`          // 是否启用，禁用时不参与 RAG 检索
 	CreatedAt      time.Time `gorm:"column:created_at;type:datetime;autoCreateTime"`
 	UpdatedAt      time.Time `gorm:"column:updated_at;type:datetime;autoUpdateTime"`
+	ContentHash    string    `gorm:"column:content_hash;size:64"`
+	SourceVersion  string    `gorm:"column:source_version;size:128"`
+	AccessScope    string    `gorm:"column:access_scope;size:191;not null;default:public"`
+	IndexedVersion uint64    `gorm:"column:indexed_version;not null;default:0"`
+	UpdatedBy      string    `gorm:"column:updated_by;size:128"`
 }
 
 func (KnowledgeChunk) TableName() string { return "knowledge_chunks" }
