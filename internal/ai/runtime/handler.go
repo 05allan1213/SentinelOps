@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/limiter"
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
@@ -44,6 +45,7 @@ type CallMetadata struct {
 type RuntimeHandler struct {
 	*adk.BaseChatModelAgentMiddleware
 	approvalStore *workflow.GORMStore
+	effects       *effects.Executor
 }
 
 var _ adk.ChatModelAgentMiddleware = (*RuntimeHandler)(nil)
@@ -58,7 +60,15 @@ func NewHITLRuntimeHandler(store *workflow.GORMStore) (*RuntimeHandler, error) {
 	if store == nil {
 		return nil, fmt.Errorf("workflow GORMStore is required for HITL")
 	}
-	return &RuntimeHandler{BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}, approvalStore: store}, nil
+	executor, err := effects.NewExecutor(store)
+	if err != nil {
+		return nil, err
+	}
+	return &RuntimeHandler{
+		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{},
+		approvalStore:                store,
+		effects:                      executor,
+	}, nil
 }
 
 // RuntimeHandlerFirst 固定官方 Handlers 中第一个用户 Handler 为共享 RuntimeHandler。
@@ -121,8 +131,15 @@ func (h *RuntimeHandler) WrapInvokableToolCall(_ context.Context, endpoint adk.I
 		return nil, fmt.Errorf("runtime Handler and invokable Tool endpoint are required")
 	}
 	return func(ctx context.Context, arguments string, options ...tool.Option) (string, error) {
-		if handled, interruptErr := h.handleApprovalToolCall(ctx, toolContext, arguments); handled {
-			return "", interruptErr
+		approved, handled, approvalErr := h.handleApprovalToolCall(ctx, toolContext, arguments)
+		if handled {
+			if approvalErr != nil {
+				return "", approvalErr
+			}
+			result, err := h.effects.ExecuteTransactional(ctx, approved.Request, func(callbackCtx context.Context) (string, error) {
+				return endpoint(callbackCtx, approved.Request.ArgumentsJSON, options...)
+			})
+			return result.Response, err
 		}
 		callContext, budget, reservation, err := h.prepareToolCall(ctx, toolContext)
 		if err != nil {
@@ -140,8 +157,13 @@ func (h *RuntimeHandler) WrapStreamableToolCall(_ context.Context, endpoint adk.
 		return nil, fmt.Errorf("runtime Handler and streamable Tool endpoint are required")
 	}
 	return func(ctx context.Context, arguments string, options ...tool.Option) (*schema.StreamReader[string], error) {
-		if handled, interruptErr := h.handleApprovalToolCall(ctx, toolContext, arguments); handled {
-			return nil, interruptErr
+		approved, handled, approvalErr := h.handleApprovalToolCall(ctx, toolContext, arguments)
+		if handled {
+			if approvalErr != nil {
+				return nil, approvalErr
+			}
+			_ = approved
+			return nil, ErrTransactionalEffectEndpointUnsupported
 		}
 		callContext, budget, reservation, err := h.prepareToolCall(ctx, toolContext)
 		if err != nil {
@@ -168,8 +190,13 @@ func (h *RuntimeHandler) WrapEnhancedInvokableToolCall(_ context.Context, endpoi
 		if argument != nil {
 			rawArguments = argument.Text
 		}
-		if handled, interruptErr := h.handleApprovalToolCall(ctx, toolContext, rawArguments); handled {
-			return nil, interruptErr
+		approved, handled, approvalErr := h.handleApprovalToolCall(ctx, toolContext, rawArguments)
+		if handled {
+			if approvalErr != nil {
+				return nil, approvalErr
+			}
+			_ = approved
+			return nil, ErrTransactionalEffectEndpointUnsupported
 		}
 		callContext, budget, reservation, err := h.prepareToolCall(ctx, toolContext)
 		if err != nil {
@@ -191,8 +218,13 @@ func (h *RuntimeHandler) WrapEnhancedStreamableToolCall(_ context.Context, endpo
 		if argument != nil {
 			rawArguments = argument.Text
 		}
-		if handled, interruptErr := h.handleApprovalToolCall(ctx, toolContext, rawArguments); handled {
-			return nil, interruptErr
+		approved, handled, approvalErr := h.handleApprovalToolCall(ctx, toolContext, rawArguments)
+		if handled {
+			if approvalErr != nil {
+				return nil, approvalErr
+			}
+			_ = approved
+			return nil, ErrTransactionalEffectEndpointUnsupported
 		}
 		callContext, budget, reservation, err := h.prepareToolCall(ctx, toolContext)
 		if err != nil {

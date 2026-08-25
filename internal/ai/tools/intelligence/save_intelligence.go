@@ -34,7 +34,8 @@ type SaveIntelligenceOutput struct {
 	Message string `json:"message"`
 }
 
-// NewSaveIntelligenceTool 创建情报沉淀工具（写入 MySQL，触发异步 Milvus 向量化）
+// NewSaveIntelligenceTool 创建情报沉淀工具。
+// legacy 调用仍直接触发索引；transactional Effect 只提交 MySQL，由 derived pending Effect 驱动索引。
 func NewSaveIntelligenceTool() tool.InvokableTool {
 	t, err := utils.InferOptionableTool(
 		"save_intelligence",
@@ -108,8 +109,7 @@ func NewSaveIntelligenceTool() tool.InvokableTool {
 					existing.Severity = severity
 					existing.EventType = "web"
 
-					// 向量内容异步更新
-					pipeline.IndexDocumentsAsync(ctx, []dao.Event{*existing})
+					indexIntelligenceLegacy(ctx, []dao.Event{*existing})
 
 					out := SaveIntelligenceOutput{
 						ID:      existing.ID,
@@ -151,8 +151,7 @@ func NewSaveIntelligenceTool() tool.InvokableTool {
 				return string(b), nil
 			}
 
-			// 触发异步 Milvus 向量化
-			pipeline.IndexDocumentsAsync(ctx, inserted)
+			indexIntelligenceLegacy(ctx, inserted)
 
 			out := SaveIntelligenceOutput{
 				ID:      inserted[0].ID,
@@ -167,4 +166,12 @@ func NewSaveIntelligenceTool() tool.InvokableTool {
 		panic(err)
 	}
 	return t
+}
+
+// indexIntelligenceLegacy 防止事务 Context 泄漏到 goroutine 或在 MySQL 提交前产生外部副作用。
+func indexIntelligenceLegacy(ctx context.Context, events []dao.Event) {
+	if dao.HasBoundTransaction(ctx) {
+		return
+	}
+	pipeline.IndexDocumentsAsync(ctx, events)
 }

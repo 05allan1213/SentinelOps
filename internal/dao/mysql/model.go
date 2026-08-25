@@ -434,6 +434,43 @@ type AgentApproval struct {
 
 func (AgentApproval) TableName() string { return "agent_approvals" }
 
+// AgentEffect 保存稳定 Proposal step 的幂等执行事实。
+type AgentEffect struct {
+	ID                         string     `gorm:"column:id;primaryKey;size:128"`
+	RunID                      string     `gorm:"column:run_id;size:64;not null;uniqueIndex:uidx_agent_effects_proposal_step,priority:1"`
+	ToolCallIDObserved         *string    `gorm:"column:tool_call_id_observed;size:128"`
+	IdempotencyKey             string     `gorm:"column:idempotency_key;size:191;not null;uniqueIndex:uidx_agent_effects_idempotency"`
+	EffectRole                 string     `gorm:"column:effect_role;size:32;not null;default:primary"`
+	EffectStep                 string     `gorm:"column:effect_step;size:128;not null;uniqueIndex:uidx_agent_effects_proposal_step,priority:3"`
+	ParentEffectID             *string    `gorm:"column:parent_effect_id;size:128"`
+	ProposalHash               string     `gorm:"column:proposal_hash;type:char(64);not null;uniqueIndex:uidx_agent_effects_proposal_step,priority:2"`
+	ToolName                   string     `gorm:"column:tool_name;size:128;not null"`
+	ToolRevision               string     `gorm:"column:tool_revision;size:128;not null"`
+	ToolSchemaHash             string     `gorm:"column:tool_schema_hash;type:char(64);not null"`
+	TargetHash                 string     `gorm:"column:target_hash;type:char(64);not null"`
+	RequestRedacted            *string    `gorm:"column:request_redacted;type:json"`
+	ResponseRedacted           *string    `gorm:"column:response_redacted;type:json"`
+	EffectType                 string     `gorm:"column:effect_type;size:64;not null"`
+	Status                     string     `gorm:"column:status;size:32;not null;default:pending"`
+	Version                    uint64     `gorm:"column:version;not null;default:1"`
+	ExternalReference          *string    `gorm:"column:external_reference;size:512"`
+	LeaseGeneration            uint64     `gorm:"column:lease_generation;not null"`
+	Attempt                    uint       `gorm:"column:attempt;not null;default:0"`
+	ReconciliationAttempts     uint       `gorm:"column:reconciliation_attempts;not null;default:0"`
+	NextReconcileAt            *time.Time `gorm:"column:next_reconcile_at;type:datetime(3)"`
+	Resolution                 *string    `gorm:"column:resolution;size:64"`
+	ResolutionEvidenceRedacted *string    `gorm:"column:resolution_evidence_redacted;type:json"`
+	ResolvedBy                 *string    `gorm:"column:resolved_by;size:128"`
+	ResolvedAt                 *time.Time `gorm:"column:resolved_at;type:datetime(3)"`
+	StartedAt                  *time.Time `gorm:"column:started_at;type:datetime(3)"`
+	FinishedAt                 *time.Time `gorm:"column:finished_at;type:datetime(3)"`
+	LastError                  *string    `gorm:"column:last_error;type:text"`
+	CreatedAt                  time.Time  `gorm:"column:created_at;type:datetime(3);not null"`
+	UpdatedAt                  time.Time  `gorm:"column:updated_at;type:datetime(3);not null"`
+}
+
+func (AgentEffect) TableName() string { return "agent_effects" }
+
 // SessionStateRevision 会话状态修订记录，保存会话状态的版本化快照
 type SessionStateRevision struct {
 	ID        uint           `gorm:"primaryKey;autoIncrement"`

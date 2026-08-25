@@ -20,6 +20,26 @@ var (
 	initErr  error
 )
 
+type transactionContextKey struct{}
+
+// ContextWithTransaction 将 workflow 已持有的 GORM Transaction 绑定给现有 DAO 调用链。
+// 只有事务回调生命周期内可使用返回的 Context，禁止传给 goroutine 或外部调用。
+func ContextWithTransaction(ctx context.Context, tx *gorm.DB) (context.Context, error) {
+	if ctx == nil || tx == nil {
+		return nil, fmt.Errorf("transaction context and GORM transaction are required")
+	}
+	return context.WithValue(ctx, transactionContextKey{}, tx), nil
+}
+
+// HasBoundTransaction 表示当前调用必须只执行可加入 MySQL Transaction 的同步工作。
+func HasBoundTransaction(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	tx, ok := ctx.Value(transactionContextKey{}).(*gorm.DB)
+	return ok && tx != nil
+}
+
 // InitWithDSN 初始化 MySQL 连接并核对 goose Schema 版本；调用方只在
 // Secret Resolver 的显式生命周期内提供 DSN。
 func InitWithDSN(ctx context.Context, dsn []byte) error {
@@ -78,6 +98,12 @@ func openAndCheckSchema(ctx context.Context, rawDSN string) (*gorm.DB, error) {
 
 // DB 返回全局 DB 实例，Init 成功后使用
 func DB(ctx context.Context) (*gorm.DB, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("database context is required")
+	}
+	if tx, ok := ctx.Value(transactionContextKey{}).(*gorm.DB); ok && tx != nil {
+		return tx.WithContext(ctx), nil
+	}
 	if initErr != nil {
 		return nil, initErr
 	}

@@ -9,6 +9,7 @@ import (
 	"io"
 	"time"
 
+	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
 
@@ -18,6 +19,15 @@ import (
 )
 
 const approvalTTL = 30 * time.Minute
+
+var (
+	// ErrTransactionalEffectEndpointUnsupported 表示 Mutation Tool 没有使用现有同步 Invokable endpoint。
+	ErrTransactionalEffectEndpointUnsupported = errors.New("transactional Effect requires an invokable Tool endpoint")
+)
+
+type approvedTransactionalCall struct {
+	Request effects.TransactionalRequest
+}
 
 // ApprovalInterruptInfo 是 StatefulInterrupt 对外可见且不含原参数的最小说明。
 type ApprovalInterruptInfo struct {
@@ -54,30 +64,73 @@ func init() {
 	schema.Register[ApprovalInterruptState]()
 }
 
-func (h *RuntimeHandler) handleApprovalToolCall(ctx context.Context, toolContext *adk.ToolContext, rawArguments string) (bool, error) {
+func (h *RuntimeHandler) handleApprovalToolCall(
+	ctx context.Context,
+	toolContext *adk.ToolContext,
+	rawArguments string,
+) (*approvedTransactionalCall, bool, error) {
 	if toolContext == nil {
-		return false, nil
+		return nil, false, nil
 	}
 	entry, err := policy.LookupCatalog(toolContext.Name)
 	if err != nil || entry.Risk == policy.RiskL0 {
-		return false, nil
+		return nil, false, nil
 	}
-	if h == nil || h.approvalStore == nil {
-		return true, mutationDisabledError(entry)
+	if h == nil || h.approvalStore == nil || h.effects == nil {
+		return nil, true, mutationDisabledError(entry)
 	}
 	attempt, _, err := validateRuntimeCallContext(ctx)
 	if err != nil {
-		return true, err
+		return nil, true, err
 	}
 	if toolContext.CallID == "" {
-		return true, fmt.Errorf("mutation Tool call ID is required")
+		return nil, true, fmt.Errorf("mutation Tool call ID is required")
 	}
 	if err := validateToolSnapshot(attempt.Snapshot, toolContext.Name); err != nil {
-		return true, err
+		return nil, true, err
+	}
+	wasInterrupted, hasState, restored := tool.GetInterruptState[ApprovalInterruptState](ctx)
+	isTarget, _, _ := tool.GetResumeContext[ApprovalResumeData](ctx)
+	if wasInterrupted && isTarget {
+		if !hasState || restored.ToolName != entry.Name || restored.ToolRevision != entry.Revision ||
+			restored.ToolSchemaHash != entry.SchemaHash || restored.RiskLevel != entry.Risk ||
+			restored.PolicyHash != attempt.Snapshot.PolicyHash() || restored.RuntimeCompatibilityHash != attempt.Run.RuntimeCompatibilityHash ||
+			!sameEffectSteps(restored.EffectSteps, entry.EffectSteps) {
+			return nil, true, workflow.ErrApprovalInvalidated
+		}
+		canonicalArguments, err := policy.CanonicalToolArgumentsJSON([]byte(restored.ArgumentsJSON))
+		if err != nil || string(canonicalArguments) != restored.ArgumentsJSON {
+			return nil, true, workflow.ErrApprovalInvalidated
+		}
+		gateName := "agent_runtime.l1_writes"
+		if entry.Risk == policy.RiskL2 {
+			gateName = "agent_runtime.l2_writes"
+		}
+		_, err = h.approvalStore.AuthorizeApprovalResume(ctx, workflow.AuthorizeApprovalResumeInput{
+			Lease: attempt.Lease, ApprovalID: restored.ApprovalID, ProposalHash: restored.ProposalHash,
+			ToolName: restored.ToolName, ToolRevision: restored.ToolRevision, ToolSchemaHash: restored.ToolSchemaHash,
+			PolicyHash: restored.PolicyHash, RuntimeCompatibilityHash: restored.RuntimeCompatibilityHash,
+			ExplicitTarget: true, GateAllowed: attempt.Snapshot.FeatureGate(gateName),
+		})
+		if err != nil {
+			return nil, true, err
+		}
+		if entry.EffectType != policy.EffectTransactionalDB {
+			return nil, true, mutationDisabledError(entry)
+		}
+		return &approvedTransactionalCall{Request: effects.TransactionalRequest{
+			Lease: attempt.Lease, ApprovalID: restored.ApprovalID, ProposalHash: restored.ProposalHash,
+			ToolCallIDObserved: toolContext.CallID, ToolName: restored.ToolName,
+			ToolRevision: restored.ToolRevision, ToolSchemaHash: restored.ToolSchemaHash,
+			ArgumentsJSON: restored.ArgumentsJSON, PolicyHash: restored.PolicyHash,
+			RuntimeCompatibilityHash: restored.RuntimeCompatibilityHash,
+			EffectSteps:              append([]string(nil), restored.EffectSteps...), Attempt: attempt.Run.Attempt,
+			TraceID: attempt.Trace.ID, GateAllowed: attempt.Snapshot.FeatureGate(gateName),
+		}}, true, nil
 	}
 	arguments, canonicalArguments, err := decodeMutationArguments(rawArguments)
 	if err != nil {
-		return true, err
+		return nil, true, err
 	}
 	proposal := policy.Proposal{
 		ToolName: entry.Name, ToolRevision: entry.Revision, ToolSchemaHash: entry.SchemaHash,
@@ -87,11 +140,11 @@ func (h *RuntimeHandler) handleApprovalToolCall(ctx context.Context, toolContext
 	}
 	frozen, err := policy.FreezeProposal(proposal)
 	if err != nil {
-		return true, err
+		return nil, true, err
 	}
 	approvalID, err := policy.ApprovalID(attempt.Run.ID, frozen.Hash())
 	if err != nil {
-		return true, err
+		return nil, true, err
 	}
 	state := ApprovalInterruptState{
 		ApprovalID: approvalID, ProposalHash: frozen.Hash(), ProposalCanonicalJSON: string(frozen.CanonicalJSON()),
@@ -101,47 +154,28 @@ func (h *RuntimeHandler) handleApprovalToolCall(ctx context.Context, toolContext
 	}
 	info := ApprovalInterruptInfo{ApprovalID: approvalID, ProposalHash: frozen.Hash(), ToolName: entry.Name, RiskLevel: entry.Risk}
 
-	wasInterrupted, hasState, restored := tool.GetInterruptState[ApprovalInterruptState](ctx)
 	if wasInterrupted {
 		if !hasState || !sameApprovalInterruptState(restored, state) {
-			return true, workflow.ErrApprovalInvalidated
+			return nil, true, workflow.ErrApprovalInvalidated
 		}
-		isTarget, _, _ := tool.GetResumeContext[ApprovalResumeData](ctx)
-		if !isTarget {
-			status, err := h.prepareInterruptedApproval(ctx, attempt, toolContext, entry, frozen, arguments)
-			if err != nil {
-				return true, err
-			}
-			if err := approvalReinterruptError(status); err != nil {
-				return true, err
-			}
-			return true, tool.StatefulInterrupt(ctx, info, state)
-		}
-		gateName := "agent_runtime.l1_writes"
-		if entry.Risk == policy.RiskL2 {
-			gateName = "agent_runtime.l2_writes"
-		}
-		_, err = h.approvalStore.AuthorizeApprovalResume(ctx, workflow.AuthorizeApprovalResumeInput{
-			Lease: attempt.Lease, ApprovalID: restored.ApprovalID, ProposalHash: frozen.Hash(),
-			ToolName: entry.Name, ToolRevision: entry.Revision, ToolSchemaHash: entry.SchemaHash,
-			PolicyHash: attempt.Snapshot.PolicyHash(), RuntimeCompatibilityHash: attempt.Run.RuntimeCompatibilityHash,
-			ExplicitTarget: true, GateAllowed: attempt.Snapshot.FeatureGate(gateName),
-		})
+		status, err := h.prepareInterruptedApproval(ctx, attempt, toolContext, entry, frozen, arguments)
 		if err != nil {
-			return true, err
+			return nil, true, err
 		}
-		// P23 才能把已批准调用交给 Effect Executor；本单元保持所有 Mutation endpoint 为 0。
-		return true, mutationDisabledError(entry)
+		if err := approvalReinterruptError(status); err != nil {
+			return nil, true, err
+		}
+		return nil, true, tool.StatefulInterrupt(ctx, info, state)
 	}
 
 	status, err := h.prepareInterruptedApproval(ctx, attempt, toolContext, entry, frozen, arguments)
 	if err != nil {
-		return true, err
+		return nil, true, err
 	}
 	if err := approvalReinterruptError(status); err != nil {
-		return true, err
+		return nil, true, err
 	}
-	return true, tool.StatefulInterrupt(ctx, info, state)
+	return nil, true, tool.StatefulInterrupt(ctx, info, state)
 }
 
 func (h *RuntimeHandler) prepareInterruptedApproval(
@@ -213,6 +247,18 @@ func sameApprovalInterruptState(left, right ApprovalInterruptState) bool {
 	}
 	for index := range left.EffectSteps {
 		if left.EffectSteps[index] != right.EffectSteps[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func sameEffectSteps(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
 			return false
 		}
 	}
