@@ -106,6 +106,14 @@ func scopedTraceRuns(ctx context.Context, db *gorm.DB) (*gorm.DB, error) {
 	return query.Where("CASE WHEN JSON_VALID(agent_trace_runs.tags) THEN JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.server_user_id')) ELSE NULL END = ?", identity.UserID), nil
 }
 
+func scopedEvidenceTraceRuns(ctx context.Context, db *gorm.DB) (*gorm.DB, error) {
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	return query.Where(dao.EvidenceTraceQualityPredicate), nil
+}
+
 func scopedFeedback(ctx context.Context, db *gorm.DB) (*gorm.DB, error) {
 	identity, err := policy.IdentityFromContext(ctx)
 	if err != nil {
@@ -130,7 +138,7 @@ func GetDashboard(ctx context.Context, window string) (*DashboardMetrics, error)
 
 	// ── 查 agent_trace_runs ──────────────────────────────────────────────────
 	var runs []dao.TraceRun
-	runQuery, err := scopedTraceRuns(ctx, db)
+	runQuery, err := scopedEvidenceTraceRuns(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +178,7 @@ func GetDashboard(ctx context.Context, window string) (*DashboardMetrics, error)
 
 	// ── 查 agent_trace_nodes（RETRIEVER）──────────────────────────────────
 	var retrieverNodes []dao.TraceNode
-	allowedRuns, err := scopedTraceRuns(ctx, db)
+	allowedRuns, err := scopedEvidenceTraceRuns(ctx, db)
 	if err != nil {
 		return nil, err
 	}

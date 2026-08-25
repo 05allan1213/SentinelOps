@@ -113,7 +113,9 @@ func (s *Service) GetStats(ctx context.Context, days int) (*v1.StatsRes, error) 
 		AvgDurationMs:     agg.AvgDur,
 		P95DurationMs:     p95,
 		TotalInputTokens:  agg.TotalIn,
+		CachedInputTokens: agg.TotalCachedIn,
 		TotalOutputTokens: agg.TotalOut,
+		ReasoningTokens:   agg.TotalReasoning,
 		TotalCostCNY:      agg.TotalCost,
 		AvgCostCNY:        avgCost,
 		ErrorRate:         errorRate,
@@ -206,11 +208,13 @@ func (s *Service) GetCostOverview(ctx context.Context, startDate, endDate string
 	dailyTrend := make([]v1.DailyCostPoint, 0, len(dailyRows))
 	for _, r := range dailyRows {
 		dailyTrend = append(dailyTrend, v1.DailyCostPoint{
-			Date:         r.Day,
-			CostCNY:      r.DayCost,
-			InputTokens:  r.DayIn,
-			OutputTokens: r.DayOut,
-			RequestCount: r.DayRequests,
+			Date:              r.Day,
+			CostCNY:           r.DayCost,
+			InputTokens:       r.DayIn,
+			CachedInputTokens: r.DayCachedIn,
+			OutputTokens:      r.DayOut,
+			ReasoningTokens:   r.DayReasoning,
+			RequestCount:      r.DayRequests,
 		})
 	}
 
@@ -226,12 +230,14 @@ func (s *Service) GetCostOverview(ctx context.Context, startDate, endDate string
 			pct = r.NodeCost / cur.TotalCost * 100
 		}
 		modelBreakdown = append(modelBreakdown, v1.ModelCostItem{
-			ModelName:    r.ModelName,
-			TotalCostCNY: r.NodeCost,
-			InputTokens:  r.NodeIn,
-			OutputTokens: r.NodeOut,
-			RequestCount: r.NodeReqs,
-			CostPct:      pct,
+			ModelName:         r.ModelName,
+			TotalCostCNY:      r.NodeCost,
+			InputTokens:       r.NodeIn,
+			CachedInputTokens: r.NodeCachedIn,
+			OutputTokens:      r.NodeOut,
+			ReasoningTokens:   r.NodeReasoning,
+			RequestCount:      r.NodeReqs,
+			CostPct:           pct,
 		})
 	}
 
@@ -262,7 +268,9 @@ func (s *Service) GetCostOverview(ctx context.Context, startDate, endDate string
 	return &v1.CostOverviewRes{
 		TotalCostCNY:      cur.TotalCost,
 		TotalInputTokens:  cur.TotalIn,
+		CachedInputTokens: cur.TotalCachedIn,
 		TotalOutputTokens: cur.TotalOut,
+		ReasoningTokens:   cur.TotalReasoning,
 		TotalRequests:     cur.TotalReqs,
 		AvgCostPerReq:     avgCost,
 		PrevTotalCostCNY:  prev.TotalCost,
@@ -291,10 +299,12 @@ func (s *Service) GetTokenTrend(ctx context.Context, hours int) (*v1.TokenTrendR
 	points := make([]v1.TokenTrendPoint, 0, len(rows))
 	for _, r := range rows {
 		points = append(points, v1.TokenTrendPoint{
-			Hour:         r.HourStr,
-			InputTokens:  r.HourIn,
-			OutputTokens: r.HourOut,
-			RequestCount: r.HourReqs,
+			Hour:              r.HourStr,
+			InputTokens:       r.HourIn,
+			CachedInputTokens: r.HourCachedIn,
+			OutputTokens:      r.HourOut,
+			ReasoningTokens:   r.HourReasoning,
+			RequestCount:      r.HourReqs,
 		})
 	}
 	return &v1.TokenTrendRes{Points: points}, nil

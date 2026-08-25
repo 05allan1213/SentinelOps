@@ -353,12 +353,6 @@ func loadCostConfig(ctx context.Context) map[string]costConfig {
 	return costCfgMap
 }
 
-// estimateCost 按 model_pricing 配置计算链路总成本（CNY）。
-// 匹配规则：先精确匹配 model 名称（小写），再前缀匹配，最后 fallback 到 "default"。
-func estimateCost(ctx context.Context, modelName string, inputTokens, outputTokens int64) float64 {
-	return estimateCostWithBreakdown(ctx, modelName, inputTokens, 0, outputTokens, 0)
-}
-
 func estimateCostWithBreakdown(ctx context.Context, modelName string, inputTokens, cachedInputTokens, outputTokens, reasoningTokens int64) float64 {
 	if inputTokens == 0 && outputTokens == 0 {
 		return 0

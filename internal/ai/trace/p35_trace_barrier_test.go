@@ -55,6 +55,49 @@ func TestTraceAttemptModelSnapshotCostAndUsage(t *testing.T) {
 	}
 }
 
+func TestTraceAttemptUsesNodeKindForSharedVendorModelID(t *testing.T) {
+	models := []ModelMetadata{
+		{Kind: "chat", CatalogRef: "provider-a/chat", Provider: "provider-a", Driver: "chat", ModelID: "shared", Profile: "default", SnapshotIdentity: strings.Repeat("a", 64), PricingRevision: "chat-v1", InputPrice: 1},
+		{Kind: "embedding", CatalogRef: "provider-a/embedding", Provider: "provider-a", Driver: "embedding", ModelID: "shared", Profile: "default", SnapshotIdentity: strings.Repeat("b", 64), PricingRevision: "embedding-v1", InputPrice: 2},
+		{Kind: "rerank", CatalogRef: "provider-a/rerank", Provider: "provider-a", Driver: "rerank", ModelID: "shared", Profile: "default", SnapshotIdentity: strings.Repeat("c", 64), PricingRevision: "rerank-v1", InputPrice: 3},
+	}
+	active, err := newActiveTrace(context.Background(), AttemptMetadata{
+		TraceID: "trace-kind", RunID: "run-kind", Attempt: 1, LeaseGeneration: 1,
+		RuntimeVersion: "runtime-v1", Models: models,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	active.SetNodeType("rerank-node", NodeTypeRerank)
+	kind := modelKindForNodeType(active.GetNodeType("rerank-node"))
+	got := active.resolveModel(kind, "shared")
+	if got.Kind != "rerank" || got.PricingRevision != "rerank-v1" {
+		t.Fatalf("resolved model = kind %q pricing %q, want rerank snapshot", got.Kind, got.PricingRevision)
+	}
+}
+
+func TestTraceAttemptNeverFallsBackToModelNamePricing(t *testing.T) {
+	active, err := newActiveTrace(context.Background(), AttemptMetadata{
+		TraceID: "trace-pricing", RunID: "run-pricing", Attempt: 1,
+		LeaseGeneration: 1, RuntimeVersion: "runtime-v1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := active.costForModel(context.Background(), ModelMetadata{}, "qwen-prefix-that-might-match", 1_000_000, 0, 0, 0); got != 0 {
+		t.Fatalf("durable Attempt fallback cost = %v, want 0 without a valid frozen Snapshot", got)
+	}
+
+	snapshot := ModelMetadata{
+		Kind: "rerank", CatalogRef: "provider-a/rerank", Provider: "provider-a", Driver: "rerank",
+		ModelID: "qwen-prefix-that-might-match", Profile: "default", SnapshotIdentity: strings.Repeat("d", 64),
+		PricingRevision: "snapshot-price", InputPrice: 7,
+	}
+	if got := active.costForModel(context.Background(), snapshot, snapshot.ModelID, 1_000_000, 0, 0, 0); got != 7 {
+		t.Fatalf("durable Attempt snapshot cost = %v, want 7", got)
+	}
+}
+
 func TestTraceRedactionCoversPromptToolApprovalAndEffect(t *testing.T) {
 	secret := "sk-ABCDEFGHIJKLMNOPQRSTUV"
 	redacted, err := redactTraceValue(map[string]any{

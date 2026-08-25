@@ -70,6 +70,7 @@ func StartSpan(ctx context.Context, nodeType, nodeName string) (context.Context,
 	now := time.Now()
 
 	at.SetNodeStartTime(nodeID, now)
+	at.SetNodeType(nodeID, nodeType)
 	modelMetadata := at.resolveModel(modelKindForNodeType(nodeType), nodeName)
 	metadata, _ := at.nodeMetadata(modelMetadata)
 
@@ -170,11 +171,9 @@ func FinishSpanWithCost(ctx context.Context, nodeID, modelName string, inputToke
 	if inputTokens > 0 || outputTokens > 0 {
 		at.AddTokensWithModel(inputTokens, outputTokens, modelName)
 	}
-	modelMetadata := at.resolveModel("", modelName)
-	costCNY := modelMetadata.cost(int64(inputTokens), 0, int64(outputTokens), 0)
-	if !modelMetadata.valid() {
-		costCNY = estimateCost(ctx, modelName, int64(inputTokens), int64(outputTokens))
-	}
+	modelKind := modelKindForNodeType(at.GetNodeType(nodeID))
+	modelMetadata := at.resolveModel(modelKind, modelName)
+	costCNY := at.costForModel(ctx, modelMetadata, modelName, int64(inputTokens), 0, int64(outputTokens), 0)
 	if costCNY > 0 {
 		at.AddCost(costCNY)
 	}

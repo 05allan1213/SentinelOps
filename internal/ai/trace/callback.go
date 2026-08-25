@@ -83,8 +83,11 @@ func NewCallbackHandler() callbacks.Handler {
 		parentID := at.Stack.Top() // 读栈顶作为父节点（Push 前读，保证不是自身）
 		depth := at.Stack.Depth()  // 当前深度即为新节点的 depth
 		nodeStartTime := time.Now()
+		nodeType := resolveNodeType(info)
+		nodeName := resolveNodeName(info)
 
 		at.SetNodeStartTime(nodeID, nodeStartTime)
+		at.SetNodeType(nodeID, nodeType)
 		modelMetadata := modelMetadataFromContext(ctx)
 		metadata, _ := at.nodeMetadata(modelMetadata)
 
@@ -93,8 +96,8 @@ func NewCallbackHandler() callbacks.Handler {
 			NodeID:       nodeID,
 			ParentNodeID: parentID,
 			Depth:        depth,
-			NodeType:     resolveNodeType(info),
-			NodeName:     resolveNodeName(info),
+			NodeType:     nodeType,
+			NodeName:     nodeName,
 			Status:       StatusRunning,
 			StartTime:    nodeStartTime,
 			Metadata:     metadata,
@@ -304,11 +307,8 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 			// 累加到链路级别的 Token 累加器（携带模型名以追踪主模型）
 			at.AddUsageWithModel(update.InputTokens, update.CachedInputTokens, update.OutputTokens, update.ReasoningTokens, update.ModelName)
 			// 计算节点级别成本并累加到链路总成本
-			nodeCost := modelMetadata.cost(int64(update.InputTokens), int64(update.CachedInputTokens), int64(update.OutputTokens), int64(update.ReasoningTokens))
-			if !modelMetadata.valid() {
-				nodeCost = estimateCostWithBreakdown(ctx, update.ModelName,
-					int64(update.InputTokens), int64(update.CachedInputTokens), int64(update.OutputTokens), int64(update.ReasoningTokens))
-			}
+			nodeCost := at.costForModel(ctx, modelMetadata, update.ModelName,
+				int64(update.InputTokens), int64(update.CachedInputTokens), int64(update.OutputTokens), int64(update.ReasoningTokens))
 			update.CostCNY = nodeCost
 			at.AddCost(nodeCost)
 		}
@@ -388,11 +388,8 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 			// 累加到链路级别的 Token 累加器
 			at.AddUsageWithModel(update.InputTokens, update.CachedInputTokens, 0, 0, modelName)
 			// 计算节点级别成本并累加到链路总成本
-			nodeCost := modelMetadata.cost(int64(update.InputTokens), int64(update.CachedInputTokens), 0, 0)
-			if !modelMetadata.valid() {
-				nodeCost = estimateCostWithBreakdown(ctx, modelName,
-					int64(update.InputTokens), int64(update.CachedInputTokens), 0, 0)
-			}
+			nodeCost := at.costForModel(ctx, modelMetadata, modelName,
+				int64(update.InputTokens), int64(update.CachedInputTokens), 0, 0)
 			update.CostCNY = nodeCost
 			at.AddCost(nodeCost)
 			// 添加调试日志

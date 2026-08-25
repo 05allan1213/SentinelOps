@@ -95,6 +95,7 @@ func (s *SpanStack) Depth() int {
 //  3. 时间索引（nodeStartTimes）：OnStart 写入、OnEnd 读取，需加锁
 //  4. Token 累加器（Total*）：多个并行 LLM 节点汇总，需加锁
 //  5. 工具输入缓存（toolInputs）：OnStart 写入参数，OnEnd 写入 metadata
+//  6. 节点类型索引（nodeTypes）：用于按节点语义选择 provider-qualified Snapshot
 type ActiveTrace struct {
 	TraceID   string
 	StartTime time.Time
@@ -106,6 +107,7 @@ type ActiveTrace struct {
 	// 原因：Eino callback 的 OnStart 和 OnEnd 是两次独立的函数调用，
 	// 耗时（duration_ms）= OnEnd.time - OnStart.time，必须在 ActiveTrace 中跨调用传递。
 	nodeStartTimes map[string]time.Time
+	nodeTypes      map[string]string
 
 	// Token 累加器：一次请求可能调用多个 LLM 节点（Router + SubAgent 内多轮 ReAct），
 	// 各节点的 Token 消耗由 buildNodeUpdate() 提取后通过 AddTokens() 累加到此处，
@@ -161,6 +163,7 @@ func newActiveTrace(ctx context.Context, metadata AttemptMetadata) (*ActiveTrace
 	metadata.Models = append([]ModelMetadata(nil), metadata.Models...)
 	return &ActiveTrace{
 		TraceID: metadata.TraceID, StartTime: time.Now(), Stack: &SpanStack{}, Attempt: metadata,
+		nodeStartTimes: make(map[string]time.Time), nodeTypes: make(map[string]string), toolInputs: make(map[string]string),
 		writeCtx: context.WithoutCancel(ctx),
 	}, nil
 }
@@ -219,6 +222,38 @@ func (t *ActiveTrace) resolveModel(kind, modelName string) ModelMetadata {
 		}
 	}
 	return ModelMetadata{}
+}
+
+// costForModel 保证 durable Attempt 只使用冻结 Snapshot 定价。
+// 旧 HTTP Trace 为保持兼容，仍保留历史配置回退。
+func (t *ActiveTrace) costForModel(ctx context.Context, metadata ModelMetadata, modelName string, input, cachedInput, output, reasoning int64) float64 {
+	if metadata.valid() {
+		return metadata.cost(input, cachedInput, output, reasoning)
+	}
+	if t.Attempt.RunID != "" {
+		return 0
+	}
+	return estimateCostWithBreakdown(ctx, modelName, input, cachedInput, output, reasoning)
+}
+
+// SetNodeType 记录节点语义类型，供手动收尾按 kind 解析准确的 Model Snapshot。
+func (t *ActiveTrace) SetNodeType(nodeID, nodeType string) {
+	if nodeID == "" || nodeType == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.nodeTypes == nil {
+		t.nodeTypes = make(map[string]string)
+	}
+	t.nodeTypes[nodeID] = nodeType
+}
+
+// GetNodeType 返回节点开始时记录的语义类型。
+func (t *ActiveTrace) GetNodeType(nodeID string) string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.nodeTypes[nodeID]
 }
 
 func (t *ActiveTrace) addWriteError(err error) {

@@ -43,15 +43,20 @@ go test ./internal/ai/trace ./internal/ai/runtime ./internal/ai/workflow \
   `PASS`；trace、runtime、workflow 均通过。
 
 - P35 目标与兼容回归：`PASS`。
-  - Trace 包覆盖 Attempt identity/model snapshot pricing/redaction/barrier timeout；runtime 覆盖 flush-before-completion、incomplete quality、stale generation、heartbeat lease loss 后仍 flush；workflow 覆盖 `trace.flushed` / `trace.incomplete` 先于 terminal Event，以及 legacy 无 Trace ID 不新增事件。
+  - Trace 包覆盖 Attempt identity/model snapshot pricing/redaction/barrier timeout；durable Attempt 缺少有效 Snapshot 时成本明确为 `0`，不再按 `model_name` 前缀回退；同 vendor Model ID 的 chat/embedding/rerank 通过节点 kind 解析各自 Snapshot。runtime 覆盖 flush-before-completion、incomplete quality、stale generation、heartbeat lease loss 后仍 flush；workflow 覆盖 `trace.flushed` / `trace.incomplete` 先于 terminal Event，以及 legacy 无 Trace ID 不新增事件。
+  - `trace_quality` 沿用 TraceRun `tags` JSON，不新增列；Trace DAO 的统计/成本/趋势聚合和 RAG dashboard 统一通过 JSON quality predicate 排除 `incomplete`，直接列表、详情和会话时间线仍可查询诊断 Trace。
+  - Stats、成本概览、每日/模型拆分和小时趋势 API 以兼容新增字段返回 cached input / reasoning Token；input/output 总量语义保持不变，不重复累计 breakdown。
   - 使用隔离 Compose 项目 `sentinelops-p35` 和 pinned goose v3.27.3 执行 `CompleteRunAndCommitSessionSucceededAtomic`、失败终态、P35 Trace/Attempt 集成用例；P08 原有 `LastEventSeq == 3` 契约通过。
-  - `go test ./internal/ai/trace ./internal/service/trace ./api/trace/v1 -count=1`：`PASS`。
+  - `go test ./internal/ai/trace ./internal/service/trace ./internal/service/rageval ./api/trace/v1 -count=1`：`PASS`。
+  - `go test ./internal/dao/mysql -run '^TestTraceIncompleteAggregateContract$' -count=1`：`PASS`。
+  - `go test -race ./internal/dao/mysql ./internal/service/rageval ./internal/service/trace ./api/trace/v1 -run 'Test(TraceIncomplete|TraceDTO)' -count=1`：`PASS`。
   - `go test -race ./internal/ai/trace ./internal/ai/runtime ./internal/ai/workflow -run '^$' -count=1`：`PASS`（全包编译 race gate）。
-  - `go vet ./internal/ai/trace ./internal/ai/runtime ./internal/ai/workflow ./internal/dao/mysql ./internal/service/trace ./api/trace/v1`：`PASS`。
+  - `go vet ./internal/ai/trace ./internal/ai/runtime ./internal/ai/workflow ./internal/dao/mysql ./internal/service/trace ./internal/service/rageval ./api/trace/v1`：`PASS`。
   - `goimports -l` 对全部 P35 Go 文件为空，`git diff --check`：`PASS`。
 
 - 禁止项/架构扫描：`PASS`。
   - 仍只有既有 `agent_trace_runs`、`agent_trace_nodes` 和 `NewCallbackHandler`；未新增 Trace 表、Migration、Queue、Backend、Callback Bus、Runtime 或完成路径。
+  - 未修改 `go.mod`、`go.sum` 或 `migrations/`；incomplete evidence 过滤复用既有 `tags.trace_quality`。
   - 生产 Trace 写均经过 `ActiveTrace.submit`；唯一 `context.Background()` 命中 `GetConfig` 配置读取，不是不可跟踪写入。
   - 未引入 `trace_incomplete` 下划线事件；仅使用 canonical `trace.incomplete`。
 

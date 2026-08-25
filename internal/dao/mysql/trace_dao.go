@@ -13,6 +13,9 @@ import (
 // TraceDAO trace 数据访问对象
 type TraceDAO struct{}
 
+// EvidenceTraceQualityPredicate 保留 incomplete Trace 的诊断查询能力，同时将其排除出 Eval、发布证据和指标聚合。
+const EvidenceTraceQualityPredicate = "COALESCE(CASE WHEN JSON_VALID(agent_trace_runs.tags) THEN JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.trace_quality')) ELSE NULL END, 'unknown') <> 'incomplete'"
+
 // NewTraceDAO 创建 DAO 实例
 func NewTraceDAO() *TraceDAO {
 	return &TraceDAO{}
@@ -28,6 +31,14 @@ func scopedTraceRuns(ctx context.Context, db *gorm.DB) (*gorm.DB, error) {
 		return query, nil
 	}
 	return query.Where("CASE WHEN JSON_VALID(agent_trace_runs.tags) THEN JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.server_user_id')) ELSE NULL END = ?", identity.UserID), nil
+}
+
+func scopedEvidenceTraceRuns(ctx context.Context, db *gorm.DB) (*gorm.DB, error) {
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	return query.Where(EvidenceTraceQualityPredicate), nil
 }
 
 // ListRuns 分页查询链路运行记录
@@ -110,7 +121,7 @@ func (d *TraceDAO) GetStatsAgg(ctx context.Context, since time.Time) (*StatsAggR
 	}
 
 	var result StatsAggResult
-	query, err := scopedTraceRuns(ctx, db)
+	query, err := scopedEvidenceTraceRuns(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +131,8 @@ func (d *TraceDAO) GetStatsAgg(ctx context.Context, since time.Time) (*StatsAggR
 			"SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) as success, " +
 			"SUM(CASE WHEN status='error' THEN 1 ELSE 0 END) as errors, " +
 			"AVG(duration_ms) as avg_dur, " +
-			"SUM(total_input_tokens) as total_in, " +
-			"SUM(total_output_tokens) as total_out, " +
+			"SUM(total_input_tokens) as total_in, SUM(cached_input_tokens) as total_cached_in, " +
+			"SUM(total_output_tokens) as total_out, SUM(reasoning_tokens) as total_reasoning, " +
 			"SUM(estimated_cost_cny) as total_cost").
 		Scan(&result)
 
@@ -136,7 +147,7 @@ func (d *TraceDAO) GetSuccessDurations(ctx context.Context, since time.Time) ([]
 	}
 
 	var durations []int64
-	query, err := scopedTraceRuns(ctx, db)
+	query, err := scopedEvidenceTraceRuns(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -212,14 +223,15 @@ func (d *TraceDAO) GetCostAgg(ctx context.Context, since, until time.Time) (*Cos
 	}
 
 	var result CostAggResult
-	query, err := scopedTraceRuns(ctx, db)
+	query, err := scopedEvidenceTraceRuns(ctx, db)
 	if err != nil {
 		return nil, err
 	}
 	query.
 		Where("created_at >= ? AND created_at < ? AND status != 'running'", since, until).
 		Select("SUM(estimated_cost_cny) as total_cost, SUM(total_input_tokens) as total_in, " +
-			"SUM(total_output_tokens) as total_out, COUNT(*) as total_reqs").
+			"SUM(cached_input_tokens) as total_cached_in, SUM(total_output_tokens) as total_out, " +
+			"SUM(reasoning_tokens) as total_reasoning, COUNT(*) as total_reqs").
 		Scan(&result)
 
 	return &result, nil
@@ -233,14 +245,15 @@ func (d *TraceDAO) GetDailyCostTrend(ctx context.Context, since, until time.Time
 	}
 
 	var rows []DailyCostRow
-	query, err := scopedTraceRuns(ctx, db)
+	query, err := scopedEvidenceTraceRuns(ctx, db)
 	if err != nil {
 		return nil, err
 	}
 	query.
 		Where("created_at >= ? AND created_at < ? AND status != 'running'", since, until).
 		Select("DATE(created_at) as day, SUM(estimated_cost_cny) as day_cost, " +
-			"SUM(total_input_tokens) as day_in, SUM(total_output_tokens) as day_out, " +
+			"SUM(total_input_tokens) as day_in, SUM(cached_input_tokens) as day_cached_in, " +
+			"SUM(total_output_tokens) as day_out, SUM(reasoning_tokens) as day_reasoning, " +
 			"COUNT(*) as day_requests").
 		Group("DATE(created_at)").Order("day ASC").Scan(&rows)
 
@@ -255,7 +268,7 @@ func (d *TraceDAO) GetModelCostBreakdown(ctx context.Context, since, until time.
 	}
 
 	var rows []ModelCostRow
-	allowedRuns, err := scopedTraceRuns(ctx, db)
+	allowedRuns, err := scopedEvidenceTraceRuns(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +277,8 @@ func (d *TraceDAO) GetModelCostBreakdown(ctx context.Context, since, until time.
 		Where("r.trace_id IN (?)", allowedRuns.Select("trace_id")).
 		Where("r.created_at >= ? AND r.created_at < ? AND agent_trace_nodes.node_type IN ('LLM', 'RERANK', 'EMBEDDING') AND agent_trace_nodes.model_name != ''", since, until).
 		Select("agent_trace_nodes.model_name, SUM(agent_trace_nodes.cost_cny) as node_cost, " +
-			"SUM(agent_trace_nodes.input_tokens) as node_in, SUM(agent_trace_nodes.output_tokens) as node_out, " +
+			"SUM(agent_trace_nodes.input_tokens) as node_in, SUM(agent_trace_nodes.cached_input_tokens) as node_cached_in, " +
+			"SUM(agent_trace_nodes.output_tokens) as node_out, SUM(agent_trace_nodes.reasoning_tokens) as node_reasoning, " +
 			"COUNT(DISTINCT r.trace_id) as node_reqs").
 		Group("agent_trace_nodes.model_name").Order("node_cost DESC").Scan(&rows)
 
@@ -279,7 +293,7 @@ func (d *TraceDAO) GetIntentCostBreakdown(ctx context.Context, since, until time
 	}
 
 	var rows []IntentCostRow
-	query, err := scopedTraceRuns(ctx, db)
+	query, err := scopedEvidenceTraceRuns(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -299,14 +313,15 @@ func (d *TraceDAO) GetHourlyTokenTrend(ctx context.Context, since time.Time) ([]
 	}
 
 	var rows []HourlyTokenRow
-	query, err := scopedTraceRuns(ctx, db)
+	query, err := scopedEvidenceTraceRuns(ctx, db)
 	if err != nil {
 		return nil, err
 	}
 	query.
 		Where("created_at >= ? AND status != 'running'", since).
 		Select("DATE_FORMAT(created_at, '%Y-%m-%d %H') as hour_str, " +
-			"SUM(total_input_tokens) as hour_in, SUM(total_output_tokens) as hour_out, " +
+			"SUM(total_input_tokens) as hour_in, SUM(cached_input_tokens) as hour_cached_in, " +
+			"SUM(total_output_tokens) as hour_out, SUM(reasoning_tokens) as hour_reasoning, " +
 			"COUNT(*) as hour_reqs").
 		Group("hour_str").Order("hour_str ASC").Scan(&rows)
 
@@ -315,36 +330,44 @@ func (d *TraceDAO) GetHourlyTokenTrend(ctx context.Context, since time.Time) ([]
 
 // DAO 查询结果结构体
 type StatsAggResult struct {
-	Total     int64
-	Success   int64
-	Errors    int64
-	AvgDur    float64
-	TotalIn   int64
-	TotalOut  int64
-	TotalCost float64
+	Total          int64
+	Success        int64
+	Errors         int64
+	AvgDur         float64
+	TotalIn        int64
+	TotalCachedIn  int64
+	TotalOut       int64
+	TotalReasoning int64
+	TotalCost      float64
 }
 
 type CostAggResult struct {
-	TotalCost float64
-	TotalIn   int64
-	TotalOut  int64
-	TotalReqs int64
+	TotalCost      float64
+	TotalIn        int64
+	TotalCachedIn  int64
+	TotalOut       int64
+	TotalReasoning int64
+	TotalReqs      int64
 }
 
 type DailyCostRow struct {
-	Day         string
-	DayCost     float64
-	DayIn       int64
-	DayOut      int64
-	DayRequests int64
+	Day          string
+	DayCost      float64
+	DayIn        int64
+	DayCachedIn  int64
+	DayOut       int64
+	DayReasoning int64
+	DayRequests  int64
 }
 
 type ModelCostRow struct {
-	ModelName string
-	NodeCost  float64
-	NodeIn    int64
-	NodeOut   int64
-	NodeReqs  int64
+	ModelName     string
+	NodeCost      float64
+	NodeIn        int64
+	NodeCachedIn  int64
+	NodeOut       int64
+	NodeReasoning int64
+	NodeReqs      int64
 }
 
 type IntentCostRow struct {
@@ -354,8 +377,10 @@ type IntentCostRow struct {
 }
 
 type HourlyTokenRow struct {
-	HourStr  string
-	HourIn   int64
-	HourOut  int64
-	HourReqs int64
+	HourStr       string
+	HourIn        int64
+	HourCachedIn  int64
+	HourOut       int64
+	HourReasoning int64
+	HourReqs      int64
 }

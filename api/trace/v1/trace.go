@@ -95,7 +95,9 @@ type StatsRes struct {
 	AvgDurationMs     float64 `json:"avgDurationMs"`
 	P95DurationMs     int64   `json:"p95DurationMs"`
 	TotalInputTokens  int64   `json:"totalInputTokens"`
+	CachedInputTokens int64   `json:"cachedInputTokens"`
 	TotalOutputTokens int64   `json:"totalOutputTokens"`
+	ReasoningTokens   int64   `json:"reasoningTokens"`
 	TotalCostCNY      float64 `json:"totalCostCny"`
 	AvgCostCNY        float64 `json:"avgCostCny"`
 	ErrorRate         float64 `json:"errorRate"` // 错误率范围：0~1
@@ -159,7 +161,9 @@ type CostOverviewRes struct {
 	// 汇总数字
 	TotalCostCNY      float64 `json:"totalCostCny"`
 	TotalInputTokens  int64   `json:"totalInputTokens"`
+	CachedInputTokens int64   `json:"cachedInputTokens"`
 	TotalOutputTokens int64   `json:"totalOutputTokens"`
+	ReasoningTokens   int64   `json:"reasoningTokens"`
 	TotalRequests     int64   `json:"totalRequests"`
 	AvgCostPerReq     float64 `json:"avgCostPerReq"`
 	// 同比（相同时长的上一周期）
@@ -175,21 +179,25 @@ type CostOverviewRes struct {
 
 // DailyCostPoint 每日成本数据点
 type DailyCostPoint struct {
-	Date         string  `json:"date"`
-	CostCNY      float64 `json:"costCny"`
-	InputTokens  int64   `json:"inputTokens"`
-	OutputTokens int64   `json:"outputTokens"`
-	RequestCount int64   `json:"requestCount"`
+	Date              string  `json:"date"`
+	CostCNY           float64 `json:"costCny"`
+	InputTokens       int64   `json:"inputTokens"`
+	CachedInputTokens int64   `json:"cachedInputTokens"`
+	OutputTokens      int64   `json:"outputTokens"`
+	ReasoningTokens   int64   `json:"reasoningTokens"`
+	RequestCount      int64   `json:"requestCount"`
 }
 
 // ModelCostItem 模型维度成本拆分
 type ModelCostItem struct {
-	ModelName    string  `json:"modelName"`
-	TotalCostCNY float64 `json:"totalCostCny"`
-	InputTokens  int64   `json:"inputTokens"`
-	OutputTokens int64   `json:"outputTokens"`
-	RequestCount int64   `json:"requestCount"`
-	CostPct      float64 `json:"costPct"` // 占总成本百分比
+	ModelName         string  `json:"modelName"`
+	TotalCostCNY      float64 `json:"totalCostCny"`
+	InputTokens       int64   `json:"inputTokens"`
+	CachedInputTokens int64   `json:"cachedInputTokens"`
+	OutputTokens      int64   `json:"outputTokens"`
+	ReasoningTokens   int64   `json:"reasoningTokens"`
+	RequestCount      int64   `json:"requestCount"`
+	CostPct           float64 `json:"costPct"` // 占总成本百分比
 }
 
 // IntentCostItem 意图/链路类型维度成本拆分
@@ -209,10 +217,12 @@ type TokenTrendReq struct {
 
 // TokenTrendPoint 小时粒度数据点
 type TokenTrendPoint struct {
-	Hour         string `json:"hour"` // 小时格式："YYYY-MM-DD HH"
-	InputTokens  int64  `json:"inputTokens"`
-	OutputTokens int64  `json:"outputTokens"`
-	RequestCount int64  `json:"requestCount"`
+	Hour              string `json:"hour"` // 小时格式："YYYY-MM-DD HH"
+	InputTokens       int64  `json:"inputTokens"`
+	CachedInputTokens int64  `json:"cachedInputTokens"`
+	OutputTokens      int64  `json:"outputTokens"`
+	ReasoningTokens   int64  `json:"reasoningTokens"`
+	RequestCount      int64  `json:"requestCount"`
 }
 
 // TokenTrendRes 实时 Token 趋势响应
