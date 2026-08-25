@@ -351,22 +351,35 @@ func (h *RuntimeHandler) prepareToolCall(ctx context.Context, toolContext *adk.T
 	if toolContext == nil || strings.TrimSpace(toolContext.Name) == "" || strings.TrimSpace(toolContext.CallID) == "" {
 		return nil, nil, BudgetReservation{}, fmt.Errorf("tool name and call ID are required")
 	}
+	dynamicCatalog, hasDynamicCatalog := DynamicToolCatalogFromContext(ctx)
+	dynamicEntry, isDynamic := dynamicCatalog.Lookup(toolContext.Name)
 	if err := policy.RequireExecutable(toolContext.Name); err != nil {
-		return nil, nil, BudgetReservation{}, err
+		if !isDynamic {
+			return nil, nil, BudgetReservation{}, err
+		}
+		if !dynamicEntry.ReadOnly {
+			return nil, nil, BudgetReservation{}, policy.ErrMutationDisabled
+		}
 	}
 	if err := validateToolSnapshot(attempt.Snapshot, toolContext.Name); err != nil {
-		return nil, nil, BudgetReservation{}, err
+		if !hasDynamicCatalog || !isDynamic || dynamicCatalog.Hash == "" || dynamicCatalog.Hash != attempt.Snapshot.document.MCPCatalogHash {
+			return nil, nil, BudgetReservation{}, err
+		}
 	}
 	reservationIdentity := toolReservationIdentity(attempt.Run.ID, toolContext.Name, toolContext.CallID)
+	callKind := BudgetCallKindL0Tool
+	if isDynamic {
+		callKind = BudgetCallKindMCP
+	}
 	call := BudgetCall{
-		ReservationIdentity: reservationIdentity, Kind: BudgetCallKindL0Tool,
+		ReservationIdentity: reservationIdentity, Kind: callKind,
 		Subject: toolContext.Name, Lease: attempt.Lease, TraceID: attempt.Trace.ID, Deadline: attempt.Deadline,
 	}
 	reservation, err := budget.ReserveCall(ctx, call)
 	if err != nil {
 		return nil, nil, BudgetReservation{}, err
 	}
-	metadata := runtimeCallMetadata(attempt, reservation.Identity, BudgetCallKindL0Tool, toolContext.Name, nil)
+	metadata := runtimeCallMetadata(attempt, reservation.Identity, callKind, toolContext.Name, nil)
 	return context.WithValue(ctx, callMetadataContextKey{}, metadata), budget, reservation, nil
 }
 

@@ -119,6 +119,7 @@ var catalog = map[string]CatalogEntry{
 	"solve_agent":           durableFramework("solve_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
 	"intelligence_agent":    durableFramework("intelligence_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
 	"ops_agent":             durableFramework("ops_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
+	"mcp_agent":             durableFramework("mcp_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
 }
 
 var durableInventories = map[string][]string{

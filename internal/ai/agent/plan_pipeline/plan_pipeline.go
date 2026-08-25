@@ -85,6 +85,8 @@ func workerFriendlyName(toolName string) string {
 		return "知识库检索"
 	case "get_current_time":
 		return "获取时间"
+	case "mcp_agent":
+		return "MCP 工具"
 	default:
 		if toolName != "" {
 			return toolName
