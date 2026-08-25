@@ -18,7 +18,7 @@ import (
 type AgentConfig struct {
 	// GraphName Eino DAG 图名称，用于链路追踪和日志定位
 	GraphName string
-	// SystemPrompt 系统提示词，须含 {date}、{documents}、{content}、{history} 占位符
+	// SystemPrompt 系统提示词，保留 {date}/{documents} 兼容占位符；documents 不进入 System 边界
 	SystemPrompt string
 	// ModelFactory 返回支持工具调用的 LLM 实例，单例初始化时调用一次
 	ModelFactory func(ctx context.Context) (model.ToolCallingChatModel, error)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"SentinelOps/internal/ai/budgetctx"
+	"SentinelOps/internal/ai/evidence"
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
@@ -206,6 +207,9 @@ func BuildAttemptContext(parent context.Context, claimed workflow.ClaimedRun, bu
 		History: append(json.RawMessage(nil), stored.History...), cancel: cancel, physicalCalls: &atomic.Uint64{},
 	}
 	leaseContext = budgetctx.WithProvider(leaseContext, newRAGBudgetProvider(attempt))
+	collector := evidence.NewCollector(run.ID)
+	collector.Scope = evidence.Scope{UserID: validatedIdentity.UserID, Role: string(validatedIdentity.Role), AccessScope: "user:" + validatedIdentity.UserID}
+	leaseContext = evidence.WithCollector(leaseContext, collector)
 	return context.WithValue(leaseContext, attemptContextKey{}, attempt), attempt, nil
 }
 

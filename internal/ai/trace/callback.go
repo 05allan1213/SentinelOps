@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	"SentinelOps/internal/ai/evidence"
 	dao "SentinelOps/internal/dao/mysql"
 	"SentinelOps/utility/stringutil"
 
@@ -343,30 +344,7 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 		}
 		update.MaxVectorScore = maxScore
 
-		// 序列化 top-3 检索结果（每条内容截断 500 字符，防止 LONGTEXT 字段过大）
-		type docInfo struct {
-			Content  string         `json:"content"`
-			Score    float64        `json:"score,omitempty"`
-			Metadata map[string]any `json:"metadata,omitempty"`
-		}
-		docs := make([]docInfo, 0, min(3, len(retrieverOut.Docs)))
-		for i, doc := range retrieverOut.Docs {
-			if i >= 3 {
-				break
-			}
-			di := docInfo{
-				Content:  stringutil.TruncateRunes(doc.Content, 500),
-				Metadata: doc.MetaData,
-			}
-			if doc.MetaData != nil {
-				if scoreVal, ok := doc.MetaData["score"]; ok {
-					if score, ok2 := scoreVal.(float64); ok2 {
-						di.Score = score
-					}
-				}
-			}
-			docs = append(docs, di)
-		}
+		docs := buildEvidenceTraceSummaries(retrieverOut.Docs)
 		if b, err := json.Marshal(docs); err == nil {
 			update.RetrievedDocs = string(b)
 		}
@@ -408,4 +386,33 @@ func buildNodeUpdate(ctx context.Context, info *callbacks.RunInfo, output callba
 		}
 	}
 	return update
+}
+
+type evidenceTraceSummary struct {
+	EvidenceID string  `json:"evidence_id"`
+	SourceID   string  `json:"source_id"`
+	Summary    string  `json:"summary,omitempty"`
+	Score      float64 `json:"score,omitempty"`
+}
+
+// buildEvidenceTraceSummaries 只保留可回查 ID、来源和有界摘要，禁止把 Evidence 全文写入 Trace。
+func buildEvidenceTraceSummaries(docs []*schema.Document) []evidenceTraceSummary {
+	result := make([]evidenceTraceSummary, 0, min(3, len(docs)))
+	for i, doc := range docs {
+		if i >= 3 {
+			break
+		}
+		if doc == nil {
+			continue
+		}
+		ref := evidence.EvidenceRefFromDocument(doc, time.Now().UTC())
+		item := evidenceTraceSummary{EvidenceID: ref.EvidenceID, SourceID: ref.SourceID, Summary: stringutil.TruncateRunes(doc.Content, 160)}
+		if doc.MetaData != nil {
+			if score, ok := doc.MetaData["score"].(float64); ok {
+				item.Score = score
+			}
+		}
+		result = append(result, item)
+	}
+	return result
 }

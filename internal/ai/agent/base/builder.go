@@ -5,6 +5,8 @@ import (
 	"io"
 	"time"
 
+	"SentinelOps/internal/ai/evidence"
+
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/components/tool"
@@ -17,7 +19,7 @@ import (
 // BuildConfig 公共 RAG+ReAct DAG 构建配置，由 agent.NewSingletonAgent 工厂调用。
 type BuildConfig struct {
 	GraphName      string                     // Eino 链路追踪和日志定位用
-	SystemPrompt   string                     // 须含 {date}、{documents}、{content}、{history} 占位符
+	SystemPrompt   string                     // 保留 {date}/{documents} 兼容占位符；documents 会被移到不受信任 User 数据消息
 	MaxStep        int                        // ReAct 最大步数，≤0 取默认值 15
 	Model          model.ToolCallingChatModel // 支持 Function Calling 的 LLM 实例
 	Tools          []tool.BaseTool            // ReAct 可调用的工具集
@@ -46,10 +48,11 @@ type BuildConfig struct {
 func BuildReactAgentGraph(ctx context.Context, cfg BuildConfig) (compose.Runnable[*UserMessage, *schema.Message], error) {
 	// 节点名称常量：用于 AddEdge 时引用
 	const (
-		InputToChat   = "InputToChat"   // 两种拓扑共用：构建 Prompt 变量 map
-		RetrievalNode = "RetrievalNode" // 两种拓扑共用：执行唯一检索阶段
-		Template      = "Template"      // 两种拓扑共用：FString 组装消息列表
-		ReactAgent    = "ReactAgent"    // 两种拓扑共用：ReAct 推理循环
+		InputToChat    = "InputToChat"    // 两种拓扑共用：构建 Prompt 变量 map
+		RetrievalNode  = "RetrievalNode"  // 两种拓扑共用：执行唯一检索阶段
+		EvidencePrompt = "EvidencePrompt" // 将检索结果放入不受信任的 User 数据边界
+		Template       = "Template"       // 两种拓扑共用：FString 组装消息列表
+		ReactAgent     = "ReactAgent"     // 两种拓扑共用：ReAct 推理循环
 	)
 
 	maxStep := cfg.MaxStep
@@ -87,23 +90,31 @@ func BuildReactAgentGraph(ctx context.Context, cfg BuildConfig) (compose.Runnabl
 			})
 		},
 	), compose.WithOutputKey("documents"), compose.WithNodeName(RetrievalNode))
+	_ = graph.AddLambdaNode(EvidencePrompt, compose.InvokableLambda(
+		func(_ context.Context, docs []*schema.Document) (string, error) {
+			formatted, _, err := evidence.FormatDocumentsContext(ctx, docs)
+			return formatted, err
+		},
+	), compose.WithOutputKey("documents"), compose.WithNodeName(EvidencePrompt))
 
 	_ = graph.AddEdge(compose.START, RetrievalNode)
 	_ = graph.AddEdge(compose.START, InputToChat)
 
 	// ── Template：两种拓扑共用 ─────────────────────────────────────────────
-	// FString 组装：SystemMessage(含 {date}/{documents}) + MessagesPlaceholder(history) + UserMessage({content})
+	// FString 组装：SystemMessage(仅安全规则) + UserMessage(不受信任 Evidence) + MessagesPlaceholder(history) + UserMessage({content})
 	// fan-in：InputToChat 输出的 map 与检索节点的 "documents" key 在此汇聚
 	// 注意：指向 Template 的边必须在节点加入 graph 之后才能添加
 	ctp := prompt.FromMessages(schema.FString,
-		schema.SystemMessage(cfg.SystemPrompt),
+		schema.SystemMessage(evidence.SafeInstruction(cfg.SystemPrompt)),
+		schema.UserMessage("{documents}"),
 		schema.MessagesPlaceholder("history", false),
 		schema.UserMessage("{content}"),
 	)
 	_ = graph.AddChatTemplateNode(Template, ctp)
 
 	// 指向 Template 的汇聚边（两种拓扑），在 Template 节点加入后添加
-	_ = graph.AddEdge(RetrievalNode, Template)
+	_ = graph.AddEdge(RetrievalNode, EvidencePrompt)
+	_ = graph.AddEdge(EvidencePrompt, Template)
 	_ = graph.AddEdge(InputToChat, Template)
 
 	// ── ReactAgent：两种拓扑共用 ───────────────────────────────────────────

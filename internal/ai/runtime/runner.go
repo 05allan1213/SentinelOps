@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"time"
 
+	"SentinelOps/internal/ai/evidence"
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
 
@@ -146,6 +148,28 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 	}
 	if strings.TrimSpace(finalOutput) == "" {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, fmt.Errorf("durable L0 Agent returned no final answer")
+	}
+	finalOutput, err = evidence.FinalizeCollectedAnswer(attemptCtx, finalOutput)
+	if err != nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+	}
+	if collector, ok := evidence.CollectorFromContext(attemptCtx); ok {
+		runEvidence := collector.RunEvidence()
+		if len(runEvidence.Refs) > 0 {
+			ids := make([]string, 0, len(runEvidence.Refs))
+			for id := range runEvidence.Refs {
+				ids = append(ids, id)
+			}
+			sort.Strings(ids)
+			if err := e.store.AppendRunEvent(attemptCtx, claimed.Token, workflow.WorkflowEventInput{Type: workflow.EventEvidenceRetrieved, TraceID: attempt.Trace.ID, Payload: workflow.EventPayload{Summary: "Evidence references retrieved", Attributes: map[string]any{"evidence_ids": ids, "count": len(ids)}}}); err != nil {
+				return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+			}
+			if len(evidence.ExtractCitations(finalOutput)) > 0 {
+				if err := e.store.AppendRunEvent(attemptCtx, claimed.Token, workflow.WorkflowEventInput{Type: workflow.EventEvidenceCited, TraceID: attempt.Trace.ID, Payload: workflow.EventPayload{Summary: "Evidence references cited", Attributes: map[string]any{"evidence_ids": ids}}}); err != nil {
+					return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+				}
+			}
+		}
 	}
 	outputPayload, err := json.Marshal(map[string]any{"answer": finalOutput, "trace_id": attempt.Trace.ID})
 	if err != nil {

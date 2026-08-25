@@ -34,13 +34,13 @@ func TestSpecialistGenModelInputRetrievesOnceAndInjectsCurrentQueryOnce(t *testi
 	if calls != 1 {
 		t.Fatalf("retrieval calls = %d, want 1", calls)
 	}
-	if len(messages) != 3 || messages[0].Role != schema.System || messages[1].Content != "history" || messages[2].Content != "current query" {
+	if len(messages) != 4 || messages[0].Role != schema.System || messages[1].Role != schema.User || !strings.Contains(messages[1].Content, "evidence") || messages[2].Content != "history" || messages[3].Content != "current query" {
 		t.Fatalf("messages = %#v", messages)
 	}
-	if got := messages[0].Content; !containsAll(got, "evidence") {
-		t.Fatalf("system input = %q", got)
+	if strings.Contains(messages[0].Content, "evidence\n") || strings.Contains(messages[0].Content, "Evidence ID:") {
+		t.Fatalf("Evidence must not be promoted to System input: %q", messages[0].Content)
 	}
-	if got := strings.Count(messages[0].Content+messages[1].Content+messages[2].Content, "current query"); got != 1 {
+	if got := strings.Count(messages[0].Content+messages[1].Content+messages[2].Content+messages[3].Content, "current query"); got != 1 {
 		t.Fatalf("current query occurrences = %d, want 1", got)
 	}
 }

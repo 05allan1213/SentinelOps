@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"SentinelOps/internal/ai/evidence"
 	"SentinelOps/internal/ai/intent/core"
 	"SentinelOps/internal/ai/memory"
 	aitrace "SentinelOps/internal/ai/trace"
@@ -78,12 +79,18 @@ func newExecutorLambda() *compose.Lambda {
 		// Go HTTP server 在客户端断连时自动取消 request context，若不隔离则会导致
 		// LLM streaming 中途收到 context canceled，使整个 ReAct 循环失败。
 		// WithoutCancel 保留所有 context value（trace、session 等），仅移除取消传播。
-		agentCtx := context.WithoutCancel(spanCtx)
+		agentCtx := evidence.WithCollector(context.WithoutCancel(spanCtx), evidence.NewCollector(task.ID))
 
 		// 执行子 Agent（内部通过 Callback 流式回传结果）
 		// Execute 内部的错误不向 Graph 上抛，而是封装在 IntentOutput.Error，
 		// 保证 DAG 始终正常结束（不会因 SubAgent 错误导致整个 DAG 异常终止）
 		result, err := agent.Execute(agentCtx, task, input.Input.Callback)
+		if err == nil && result != nil {
+			result.Content, err = evidence.FinalizeCollectedAnswer(agentCtx, result.Content)
+			if err != nil {
+				result.Error = err
+			}
+		}
 
 		aitrace.FinishSpan(spanCtx, spanID, err, map[string]any{
 			"intent":     string(input.IntentType),

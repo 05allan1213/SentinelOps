@@ -24,6 +24,7 @@ type EvidenceRef struct {
 	SourceVersion  string    `json:"source_version"`
 	ContentHash    string    `json:"content_hash"`
 	AccessScope    string    `json:"access_scope"`
+	IndexedVersion uint64    `json:"indexed_version,omitempty"`
 	RetrievedAt    time.Time `json:"retrieved_at"`
 	Quote          string    `json:"quote,omitempty"`
 	ContentPreview string    `json:"content_preview,omitempty"`

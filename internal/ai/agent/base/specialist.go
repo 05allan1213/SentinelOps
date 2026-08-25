@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"SentinelOps/internal/ai/evidence"
 	"SentinelOps/internal/ai/models"
 	"SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/ai/tools"
@@ -104,7 +105,8 @@ func NewSpecialistGenModelInput(cfg SpecialistPromptConfig) adk.GenModelInput {
 		retrieve = RetrieveDocuments
 	}
 	template := prompt.FromMessages(schema.FString,
-		schema.SystemMessage(cfg.Instruction),
+		schema.SystemMessage(evidence.SafeInstruction(cfg.Instruction)),
+		schema.UserMessage("{documents}"),
 		schema.MessagesPlaceholder("history", false),
 		schema.UserMessage("{content}"),
 	)
@@ -121,11 +123,22 @@ func NewSpecialistGenModelInput(cfg SpecialistPromptConfig) adk.GenModelInput {
 		if err != nil {
 			return nil, fmt.Errorf("specialist retrieval: %w", err)
 		}
-		return template.Format(ctx, map[string]any{
+		formatted, _, err := evidence.FormatDocumentsContext(ctx, docs)
+		if err != nil {
+			return nil, fmt.Errorf("format specialist evidence: %w", err)
+		}
+		messages, err := template.Format(ctx, map[string]any{
 			"content":   current.Content,
 			"history":   history,
 			"date":      time.Now().Format("2006-01-02 15:04:05"),
-			"documents": docs,
+			"documents": formatted,
 		})
+		if err != nil {
+			return nil, err
+		}
+		if len(messages) > 1 && messages[1].Role == schema.User {
+			messages[1] = evidence.UntrustedEvidenceMessage(messages[1].Content)
+		}
+		return messages, nil
 	}
 }

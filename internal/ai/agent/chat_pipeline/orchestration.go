@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	"SentinelOps/internal/ai/evidence"
+
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 )
@@ -40,6 +42,7 @@ func buildChatAgent(ctx context.Context) (r compose.Runnable[*UserMessage, *sche
 		ReactAgent      = "ReactAgent"
 		MilvusRetriever = "MilvusRetriever"
 		InputToChat     = "InputToChat"
+		EvidencePrompt  = "EvidencePrompt"
 	)
 
 	// compose.NewGraph 创建一个泛型有向无环图（DAG）。
@@ -97,6 +100,12 @@ func buildChatAgent(ctx context.Context) (r compose.Runnable[*UserMessage, *sche
 		return nil, err
 	}
 	_ = g.AddRetrieverNode(MilvusRetriever, milvusRetrieverKeyOfRetriever, compose.WithOutputKey("documents"))
+	_ = g.AddLambdaNode(EvidencePrompt, compose.InvokableLambda(
+		func(_ context.Context, docs []*schema.Document) (string, error) {
+			formatted, _, err := evidence.FormatDocumentsContext(ctx, docs)
+			return formatted, err
+		},
+	), compose.WithOutputKey("documents"), compose.WithNodeName(EvidencePrompt))
 
 	// newInputToChatLambda 将 *UserMessage 转换为 map[string]any：
 	//   "content" → 用户本轮提问，填充 Prompt 的 {content}
@@ -112,7 +121,8 @@ func buildChatAgent(ctx context.Context) (r compose.Runnable[*UserMessage, *sche
 	// RAG 支路：提取查询词 → 向量检索 → 文档结果送入 Prompt 渲染
 	_ = g.AddEdge(compose.START, InputToRag)
 	_ = g.AddEdge(InputToRag, MilvusRetriever)
-	_ = g.AddEdge(MilvusRetriever, ChatTemplate)
+	_ = g.AddEdge(MilvusRetriever, EvidencePrompt)
+	_ = g.AddEdge(EvidencePrompt, ChatTemplate)
 
 	// 对话历史支路：提取 Query/History/时间 → 送入 Prompt 渲染（与 RAG 支路并行执行）
 	// START 同时向 InputToRag 和 InputToChat 发出信号，两条支路在不同 goroutine 中并发运行。
