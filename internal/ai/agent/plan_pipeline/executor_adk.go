@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"SentinelOps/internal/ai/agent/base"
 	"SentinelOps/internal/ai/models"
 	airuntime "SentinelOps/internal/ai/runtime"
 	aitools "SentinelOps/internal/ai/tools"
@@ -26,6 +27,7 @@ type ExecutorBuilderConfig struct {
 	AgentTools          []tool.BaseTool
 	RuntimeHandler      *airuntime.RuntimeHandler
 	AdditionalHandlers  []adk.ChatModelAgentMiddleware
+	ContextGovernance   bool
 }
 
 // NewExecutorBuilder 创建可挂载唯一 RuntimeHandler 的薄 Eino Executor。
@@ -75,10 +77,24 @@ func newExecutorAgentConfig(ctx context.Context, cfg *ExecutorBuilderConfig) (*a
 		MaxIterations: executorMaxIterations,
 		Handlers:      handlers,
 	}
+	var reliability *models.Reliability
 	if cfg.Model != nil {
 		agentConfig.Model = cfg.Model
 	} else if err = models.ConfigureChatModelAgent(agentConfig, cfg.Reliability); err != nil {
 		return nil, fmt.Errorf("configure executor ChatModelAgent: %w", err)
+	} else {
+		reliability = cfg.Reliability
+	}
+	if cfg.ContextGovernance {
+		contextModel := cfg.Model
+		if contextModel == nil && reliability != nil {
+			contextModel = reliability.PrimaryModel()
+		}
+		contextHandlers, middlewareErr := base.NewContextGovernanceMiddleware(ctx, contextModel)
+		if middlewareErr != nil {
+			return nil, fmt.Errorf("configure executor context governance: %w", middlewareErr)
+		}
+		agentConfig.Handlers = append(agentConfig.Handlers, contextHandlers...)
 	}
 	return agentConfig, nil
 }

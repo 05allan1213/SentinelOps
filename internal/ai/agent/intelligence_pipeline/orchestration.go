@@ -47,8 +47,9 @@ func NewIntelligenceAgent(ctx context.Context, m model.ToolCallingChatModel, han
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "IntelligenceAgent", Description: "Call the Intelligence Agent to search and analyze the latest threat intelligence from the internet. Handles: CVE details lookup, vulnerability advisories, exploit PoC status, threat actor profiling, malicious IP/domain reputation. Automatically saves findings to the local knowledge base. Returns structured threat intelligence report.",
 		Instruction: agents.Intelligence, Model: m, Profile: "default", RuntimeHandler: handler, MaxIterations: intelligenceMaxIterations,
-		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
-		ToolNames:        intelligenceTools,
+		RetrievalOptions:  base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
+		ToolNames:         intelligenceTools,
+		ContextGovernance: m == nil,
 	})
 }
 

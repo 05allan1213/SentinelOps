@@ -25,6 +25,7 @@ type WorkerConfig struct {
 	Execute                func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
 	Transition             func(context.Context, workflow.RunTransition) error
 	Complete               func(context.Context, workflow.CompleteRunInput) error
+	ProjectRevision        func(context.Context, string, []byte) error
 }
 
 // Worker 只委派唯一 workflow.GORMStore，并承载 P20 唯一 durable poll loop。
@@ -36,6 +37,7 @@ type Worker struct {
 	execute         func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
 	transition      func(context.Context, workflow.RunTransition) error
 	complete        func(context.Context, workflow.CompleteRunInput) error
+	projectRevision func(context.Context, string, []byte) error
 	expireApprovals func(context.Context, string, int) (int, error)
 	reconciler      *effects.Reconciler
 }
@@ -104,7 +106,7 @@ func NewWorker(store *workflow.GORMStore, config WorkerConfig) (*Worker, error) 
 	}
 	worker := &Worker{
 		store: store, config: config, claimNext: config.ClaimNext, execute: config.Execute,
-		heartbeat: config.Heartbeat, transition: config.Transition, complete: config.Complete,
+		heartbeat: config.Heartbeat, transition: config.Transition, complete: config.Complete, projectRevision: config.ProjectRevision,
 	}
 	if worker.claimNext == nil {
 		worker.claimNext = worker.ClaimNext
@@ -180,7 +182,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		return true, executionErr
 	}
 	if executionErr == nil {
-		return true, w.complete(runCtx, workflow.CompleteRunInput{
+		return true, w.completeAndProject(runCtx, claimed.Run.ID, workflow.CompleteRunInput{
 			RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning,
 			TargetStatus: workflow.RunStatusSucceeded, Lease: claimed.Token,
 			OutputPayload: result.OutputPayload, RevisionStateJSON: result.RevisionStateJSON,
@@ -209,10 +211,20 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 	if errors.Is(executionErr, context.Canceled) {
 		target = workflow.RunStatusCanceled
 	}
-	return true, w.complete(runCtx, workflow.CompleteRunInput{
+	return true, w.completeAndProject(runCtx, claimed.Run.ID, workflow.CompleteRunInput{
 		RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning, TargetStatus: target,
 		Lease: claimed.Token, ErrorMessage: executionErr.Error(), TraceQuality: result.TraceQuality, TraceID: result.TraceID,
 	})
+}
+
+func (w *Worker) completeAndProject(ctx context.Context, runID string, input workflow.CompleteRunInput) error {
+	if err := w.complete(ctx, input); err != nil {
+		return err
+	}
+	if w.projectRevision != nil && input.TargetStatus == workflow.RunStatusSucceeded && len(input.RevisionStateJSON) > 0 {
+		_ = w.projectRevision(ctx, runID, append([]byte(nil), input.RevisionStateJSON...))
+	}
+	return nil
 }
 
 func (w *Worker) reconcileEffects(ctx context.Context) (bool, error) {

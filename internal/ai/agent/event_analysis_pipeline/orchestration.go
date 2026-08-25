@@ -50,8 +50,9 @@ func NewEventAnalysisAgent(ctx context.Context, m model.ToolCallingChatModel, ha
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "EventAnalysisAgent", Description: "Call the Event Analysis Agent to query, analyze and correlate security events. Handles: recent events listing, CVE analysis, severity distribution, event timeline, subscription status, threat correlation. Returns structured analysis results.",
 		Instruction: agents.EventAnalysis, Model: m, Profile: "default", RuntimeHandler: handler, MaxIterations: eventAnalysisMaxStep,
-		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: true, SplitEnabled: true},
-		ToolNames:        eventAnalysisL0Tools,
+		RetrievalOptions:  base.RetrievalOptions{RewriteEnabled: true, SplitEnabled: true},
+		ToolNames:         eventAnalysisL0Tools,
+		ContextGovernance: m == nil,
 	})
 }
 

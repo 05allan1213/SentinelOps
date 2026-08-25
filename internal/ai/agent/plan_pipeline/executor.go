@@ -46,5 +46,6 @@ func NewExecutorWithRuntimeHandler(ctx context.Context, handler *airuntime.Runti
 		RegisteredToolNames: []string{"query_internal_docs", "get_current_time"},
 		AgentTools:          newWorkerAgentTools(ctx, handler),
 		RuntimeHandler:      handler,
+		ContextGovernance:   true,
 	})
 }

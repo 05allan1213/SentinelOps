@@ -15,6 +15,51 @@ import (
 
 const SessionStateSchemaV1 = "fo/session-state/v1"
 
+// BuildSessionRevisionPayload 根据已提交 Revision 构建下一版不可变会话状态。
+// Query 和 Completion 只作为当前轮新增消息写入；调用方不得传入拼接后的历史。
+func BuildSessionRevisionPayload(base json.RawMessage, nextRevision uint64, query, output string) (json.RawMessage, error) {
+	if len(base) == 0 || !json.Valid(base) {
+		return nil, fmt.Errorf("base session revision must be valid JSON")
+	}
+	if nextRevision == 0 {
+		return nil, fmt.Errorf("next session revision must be greater than zero")
+	}
+	if strings.TrimSpace(query) == "" || strings.TrimSpace(output) == "" {
+		return nil, fmt.Errorf("current query and output are required")
+	}
+	var state map[string]any
+	decoder := json.NewDecoder(strings.NewReader(string(base)))
+	decoder.UseNumber()
+	if err := decoder.Decode(&state); err != nil {
+		return nil, fmt.Errorf("decode base session revision: %w", err)
+	}
+	if schema, _ := state["schema"].(string); schema != SessionStateSchemaV1 {
+		return nil, fmt.Errorf("unsupported session state schema %q", schema)
+	}
+	if revision, ok := state["revision"].(json.Number); ok {
+		previous, err := revision.Int64()
+		if err != nil || previous < 0 || uint64(previous)+1 != nextRevision {
+			return nil, fmt.Errorf("session revision must advance to %d", nextRevision)
+		}
+	}
+	history, ok := state["history"].([]any)
+	if !ok {
+		history = make([]any, 0)
+	}
+	history = append(history,
+		map[string]any{"role": "user", "content": query},
+		map[string]any{"role": "assistant", "content": output},
+	)
+	state["schema"] = SessionStateSchemaV1
+	state["revision"] = nextRevision
+	state["history"] = history
+	payload, err := json.Marshal(state)
+	if err != nil {
+		return nil, fmt.Errorf("marshal next session revision: %w", err)
+	}
+	return payload, nil
+}
+
 type revisionZeroPreference struct {
 	OutputStyle   string   `json:"output_style,omitempty"`
 	AnalysisDepth string   `json:"analysis_depth,omitempty"`

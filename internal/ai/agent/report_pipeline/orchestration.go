@@ -47,8 +47,9 @@ func NewReportAgent(ctx context.Context, m model.ToolCallingChatModel, handler *
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "ReportAgent", Description: "Call the Report Agent to generate structured security reports (weekly/monthly/custom). Handles: creating new reports, querying existing reports, fetching report templates, summarizing event trends. Returns report content or creation confirmation.",
 		Instruction: agents.Report, Model: m, Profile: "reasoning", RuntimeHandler: handler, MaxIterations: reportMaxIterations,
-		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: true, SplitEnabled: true},
-		ToolNames:        reportTools,
+		RetrievalOptions:  base.RetrievalOptions{RewriteEnabled: true, SplitEnabled: true},
+		ToolNames:         reportTools,
+		ContextGovernance: m == nil,
 	})
 }
 

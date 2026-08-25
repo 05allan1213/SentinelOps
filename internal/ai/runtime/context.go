@@ -20,6 +20,45 @@ import (
 	"github.com/google/uuid"
 )
 
+// HistoryMessagesFromRevision 将已提交 Session Revision 转换为一次性 Agent History。
+// 该函数只读取 durable JSON；Redis、进程内 Memory 和临时缓存不参与 durable Attempt。
+func HistoryMessagesFromRevision(stateJSON json.RawMessage) ([]*schema.Message, error) {
+	if len(stateJSON) == 0 || !json.Valid(stateJSON) {
+		return nil, fmt.Errorf("durable session revision is invalid")
+	}
+	var state struct {
+		Schema     string          `json:"schema"`
+		Revision   uint64          `json:"revision"`
+		Preference json.RawMessage `json:"preference"`
+		Summary    string          `json:"summary"`
+		History    []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"history"`
+	}
+	if err := json.Unmarshal(stateJSON, &state); err != nil {
+		return nil, fmt.Errorf("decode durable session revision: %w", err)
+	}
+	if state.Schema != workflow.SessionStateSchemaV1 {
+		return nil, fmt.Errorf("unsupported durable session revision schema %q", state.Schema)
+	}
+	messages := make([]*schema.Message, 0, len(state.History)+2)
+	if strings.TrimSpace(string(state.Preference)) != "" && string(state.Preference) != "null" && string(state.Preference) != "{}" {
+		messages = append(messages, schema.UserMessage("【用户偏好】\n"+string(state.Preference)))
+	}
+	if strings.TrimSpace(state.Summary) != "" {
+		messages = append(messages, schema.UserMessage("【历史对话摘要】\n"+state.Summary))
+	}
+	for index, item := range state.History {
+		role := schema.RoleType(item.Role)
+		if role != schema.User && role != schema.Assistant && role != schema.System && role != schema.Tool {
+			return nil, fmt.Errorf("durable history entry %d has unsupported role %q", index, item.Role)
+		}
+		messages = append(messages, &schema.Message{Role: role, Content: item.Content})
+	}
+	return messages, nil
+}
+
 const (
 	// SessionRunIDKey 保存 checkpoint-safe 的 immutable Run ID。
 	SessionRunIDKey = "sentinelops.run_id"

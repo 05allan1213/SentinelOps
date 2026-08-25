@@ -41,8 +41,9 @@ func NewOpsAgent(ctx context.Context, m model.ToolCallingChatModel, handler *run
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "OpsAgent", Description: "Call the Ops Agent to trigger automated incident response for a specific security event. Handles: IP blocking, multi-channel alert notifications (DingTalk/WeCom/Email), event status updates. Requires event_id in the query. Returns execution result.",
 		Instruction: agents.Ops, Model: m, Profile: "default", RuntimeHandler: handler, MaxIterations: opsMaxIterations,
-		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
-		ToolNames:        opsDurableTools,
+		RetrievalOptions:  base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
+		ToolNames:         opsDurableTools,
+		ContextGovernance: m == nil,
 	})
 }
 

@@ -49,7 +49,50 @@ func (a *namedWorkerAgent) Run(ctx context.Context, input *adk.AgentInput, opts 
 		generator.Close()
 		return iter
 	}
+	if attempt, attemptErr := airuntime.AttemptContextFromContext(ctx); attemptErr == nil {
+		history, historyErr := airuntime.HistoryMessagesFromRevision(attempt.History)
+		if historyErr != nil {
+			iter, generator := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
+			generator.Send(&adk.AgentEvent{Err: historyErr})
+			generator.Close()
+			return iter
+		}
+		return agent.Run(ctx, workerAgentInputWithHistory(input, history), opts...)
+	}
 	return agent.Run(ctx, workerAgentInput(ctx, input), opts...)
+}
+
+// workerAgentInputWithHistory 只接收 Attempt 的 immutable Revision History。
+// durable AgentTool 不从 Redis、进程内 Memory 或客户端 SessionValues 重建历史。
+func workerAgentInputWithHistory(input *adk.AgentInput, history []*schema.Message) *adk.AgentInput {
+	if input == nil {
+		return nil
+	}
+	if hasHistoryPrefix(input.Messages, history) {
+		return &adk.AgentInput{Messages: append([]adk.Message(nil), input.Messages...), EnableStreaming: input.EnableStreaming}
+	}
+	messages := make([]adk.Message, 0, len(history)+len(input.Messages))
+	for _, message := range history {
+		if message != nil {
+			copy := *message
+			messages = append(messages, &copy)
+		}
+	}
+	messages = append(messages, input.Messages...)
+	return &adk.AgentInput{Messages: messages, EnableStreaming: input.EnableStreaming}
+}
+
+func hasHistoryPrefix(messages []adk.Message, history []*schema.Message) bool {
+	if len(history) == 0 || len(messages) < len(history) {
+		return false
+	}
+	for index, expected := range history {
+		actual := messages[index]
+		if actual == nil || expected == nil || actual.Role != expected.Role || actual.Content != expected.Content {
+			return false
+		}
+	}
+	return true
 }
 
 func workerAgentInput(ctx context.Context, input *adk.AgentInput) *adk.AgentInput {

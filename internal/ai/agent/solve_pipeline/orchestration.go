@@ -48,8 +48,9 @@ func NewSolveAgent(ctx context.Context, m model.ToolCallingChatModel, handler *r
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "SolveAgent", Description: "Call the Solve Agent to generate emergency response plans for specific security incidents. Handles: incident containment steps, patch recommendations, remediation procedures, recovery guidance for a single event. Returns structured three-phase response plan.",
 		Instruction: agents.Solve, Model: m, Profile: "reasoning", RuntimeHandler: handler, MaxIterations: solveMaxIterations,
-		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
-		ToolNames:        solveL0Tools,
+		RetrievalOptions:  base.RetrievalOptions{RewriteEnabled: false, SplitEnabled: false},
+		ToolNames:         solveL0Tools,
+		ContextGovernance: m == nil,
 	})
 }
 

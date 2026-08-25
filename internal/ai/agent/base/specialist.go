@@ -19,15 +19,16 @@ import (
 // SpecialistConfig describes one durable read-only specialist. Tool names are
 // resolved through the strict Registry; callers never construct business tools.
 type SpecialistConfig struct {
-	Name             string
-	Description      string
-	Instruction      string
-	Model            model.BaseChatModel
-	Profile          string
-	ToolNames        []string
-	MaxIterations    int
-	RetrievalOptions RetrievalOptions
-	RuntimeHandler   *runtime.RuntimeHandler
+	Name              string
+	Description       string
+	Instruction       string
+	Model             model.BaseChatModel
+	Profile           string
+	ToolNames         []string
+	MaxIterations     int
+	RetrievalOptions  RetrievalOptions
+	RuntimeHandler    *runtime.RuntimeHandler
+	ContextGovernance bool
 }
 
 // SpecialistPromptConfig controls the explicit prompt assembly used by all
@@ -67,16 +68,29 @@ func NewSpecialistAgent(ctx context.Context, cfg SpecialistConfig) (adk.Agent, e
 		MaxIterations: cfg.MaxIterations,
 		Handlers:      handlers,
 	}
+	var reliability *models.Reliability
 	if cfg.Model != nil {
 		agentConfig.Model = cfg.Model
 	} else {
-		reliability, buildErr := models.BuildReliability(ctx, cfg.Profile, runtime.PhysicalModelBinder(cfg.RuntimeHandler))
+		var buildErr error
+		reliability, buildErr = models.BuildReliability(ctx, cfg.Profile, runtime.PhysicalModelBinder(cfg.RuntimeHandler))
 		if buildErr != nil {
 			return nil, fmt.Errorf("configure %s model reliability: %w", cfg.Name, buildErr)
 		}
 		if buildErr = models.ConfigureChatModelAgent(agentConfig, reliability); buildErr != nil {
 			return nil, fmt.Errorf("configure %s ChatModelAgent: %w", cfg.Name, buildErr)
 		}
+	}
+	if cfg.ContextGovernance {
+		contextModel := cfg.Model
+		if contextModel == nil && reliability != nil {
+			contextModel = reliability.PrimaryModel()
+		}
+		contextHandlers, middlewareErr := NewContextGovernanceMiddleware(ctx, contextModel)
+		if middlewareErr != nil {
+			return nil, fmt.Errorf("configure %s context governance: %w", cfg.Name, middlewareErr)
+		}
+		agentConfig.Handlers = append(agentConfig.Handlers, contextHandlers...)
 	}
 	return adk.NewChatModelAgent(ctx, agentConfig)
 }

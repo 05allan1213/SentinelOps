@@ -5,14 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"strings"
 	"time"
 
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
-	"SentinelOps/internal/dao/mysql"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
@@ -57,27 +55,14 @@ func NewDurableExecutor(store *workflow.GORMStore, resolver AgentResolver, curre
 	return &DurableExecutor{store: store, budgets: budgets, resolveAgent: resolver, currentCompatibilityHash: currentCompatibilityHash}, nil
 }
 
-type immutableRunInput struct {
-	Agent string `json:"agent"`
-	Query string `json:"query"`
-}
-
 // ExecuteClaimedRun 从 MySQL 快照重建 Context，并只通过 P12 StartRecovery 调用官方 Runner。
 func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workflow.ClaimedRun) (RunExecutionResult, error) {
 	if e == nil || claimed == nil || claimed.Run.ImmutableInputJSON == nil {
 		return RunExecutionResult{}, fmt.Errorf("claimed durable Run input is required")
 	}
-	var input immutableRunInput
-	decoder := json.NewDecoder(strings.NewReader(*claimed.Run.ImmutableInputJSON))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		return RunExecutionResult{}, fmt.Errorf("decode immutable durable input: %w", err)
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return RunExecutionResult{}, fmt.Errorf("decode immutable durable input: trailing JSON value")
-	}
-	if strings.TrimSpace(input.Agent) == "" || strings.TrimSpace(input.Query) == "" {
-		return RunExecutionResult{}, fmt.Errorf("immutable durable input requires agent and query")
+	input, err := BuildImmutableRunInput(claimed.Run)
+	if err != nil {
+		return RunExecutionResult{}, err
 	}
 	attemptCtx, attempt, err := BuildAttemptContext(ctx, *claimed, e.budgets)
 	if err != nil {
@@ -166,7 +151,14 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 	if err != nil {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
 	}
-	revision, err := buildP20Revision(claimed.Run, input.Query, finalOutput)
+	if claimed.Run.ContextSnapshotJSON == nil || claimed.Run.SessionRevision == nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, fmt.Errorf("durable Run Context Snapshot or Session Revision is missing")
+	}
+	var snapshot workflow.DurableContextSnapshot
+	if err := json.Unmarshal([]byte(*claimed.Run.ContextSnapshotJSON), &snapshot); err != nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, fmt.Errorf("decode durable Context Snapshot: %w", err)
+	}
+	revision, err := workflow.BuildSessionRevisionPayload(snapshot.History, *claimed.Run.SessionRevision+1, input.Query, finalOutput)
 	if err != nil {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
 	}
@@ -332,31 +324,6 @@ func truncateEventSummary(value string) string {
 		return string(runes[:500])
 	}
 	return string(runes)
-}
-
-func buildP20Revision(run mysql.WorkflowRun, query, output string) ([]byte, error) {
-	if run.ContextSnapshotJSON == nil {
-		return nil, fmt.Errorf("durable Run Context Snapshot is missing")
-	}
-	var snapshot workflow.DurableContextSnapshot
-	if err := json.Unmarshal([]byte(*run.ContextSnapshotJSON), &snapshot); err != nil {
-		return nil, err
-	}
-	state := map[string]any{}
-	if err := json.Unmarshal(snapshot.History, &state); err != nil {
-		return nil, err
-	}
-	history, _ := state["history"].([]any)
-	history = append(history,
-		map[string]any{"role": "user", "content": query},
-		map[string]any{"role": "assistant", "content": output},
-	)
-	state["schema"] = workflow.SessionStateSchemaV1
-	if run.SessionRevision != nil {
-		state["revision"] = *run.SessionRevision + 1
-	}
-	state["history"] = history
-	return json.Marshal(state)
 }
 
 func classifyRunnerError(err error) error {

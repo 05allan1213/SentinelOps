@@ -42,6 +42,14 @@ type Reliability struct {
 	failover *adk.ModelFailoverConfig[*schema.Message]
 }
 
+// PrimaryModel 返回已绑定 RuntimeHandler 的首个候选，仅供官方上下文 Middleware 复用。
+func (r *Reliability) PrimaryModel() model.BaseChatModel {
+	if r == nil {
+		return nil
+	}
+	return r.initial
+}
+
 var processHealth = struct {
 	sync.Mutex
 	settings breaker.Settings

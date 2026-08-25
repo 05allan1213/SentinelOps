@@ -48,8 +48,9 @@ func NewRiskAgent(ctx context.Context, m model.ToolCallingChatModel, handler *ru
 	return base.NewSpecialistAgent(ctx, base.SpecialistConfig{
 		Name: "RiskAgent", Description: "Call the Risk Assessment Agent to evaluate CVE severity, attack paths, and impact scope. Handles: CVE risk scoring, vulnerability assessment, CVSS analysis, attack surface analysis, mitigation priority ranking. Returns structured risk assessment.",
 		Instruction: agents.Risk, Model: m, Profile: "reasoning", RuntimeHandler: handler, MaxIterations: riskMaxIterations,
-		RetrievalOptions: base.RetrievalOptions{RewriteEnabled: true, SplitEnabled: true},
-		ToolNames:        riskL0Tools,
+		RetrievalOptions:  base.RetrievalOptions{RewriteEnabled: true, SplitEnabled: true},
+		ToolNames:         riskL0Tools,
+		ContextGovernance: m == nil,
 	})
 }
 
