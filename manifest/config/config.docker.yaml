@@ -123,6 +123,11 @@ mcp:
   enabled: false
   servers: {}
 
+skill:
+  enabled: true
+  base_dir: "/app/manifest/skills"
+  max_bytes: 65536
+
 agent_runtime:
   enabled: false
   accept_new_runs: false

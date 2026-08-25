@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"SentinelOps/internal/ai/agent/plan_pipeline"
+	"SentinelOps/internal/ai/agent/skill_pipeline"
 	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/indexer"
 	"SentinelOps/internal/ai/ops/actions"
@@ -53,7 +54,11 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 		return nil, err
 	}
 	store := workflow.NewGORMStore(db)
-	snapshot, err := airuntime.BuildDurableRuntimeSnapshot(config)
+	skillSnapshots, err := skill_pipeline.BuildConfiguredSkillSnapshots(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := airuntime.BuildDurableRuntimeSnapshotWithSkills(config, skillSnapshots)
 	if err != nil {
 		return nil, err
 	}

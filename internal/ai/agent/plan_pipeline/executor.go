@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"SentinelOps/internal/ai/agent/mcp_pipeline"
+	"SentinelOps/internal/ai/agent/skill_pipeline"
 	"SentinelOps/internal/ai/models"
 	airuntime "SentinelOps/internal/ai/runtime"
 
@@ -22,6 +23,7 @@ import (
 //   - intelligence_agent：威胁情报 Worker（联网搜索 + 情报沉淀）
 //   - ops_agent：智能运维 Worker（封禁/通知/状态更新）
 //   - mcp_agent：MCP Tool Search Worker（只读远端 MCP Tool）
+//   - skill_agent：Skill SOP Worker（只读版本化 Skill 与 L0 Tool）
 //   - query_internal_docs：内部知识库文档检索（跨域基础工具）
 //   - get_current_time：实时时间戳（时间范围查询辅助）
 //
@@ -46,7 +48,7 @@ func NewExecutorWithRuntimeHandler(ctx context.Context, handler *airuntime.Runti
 	return NewExecutorBuilder(ctx, &ExecutorBuilderConfig{
 		Reliability:         reliability,
 		RegisteredToolNames: []string{"query_internal_docs", "get_current_time"},
-		AgentTools:          append(newWorkerAgentTools(ctx, handler), mcp_pipeline.NewConfiguredMCPAgentTool(ctx, handler)),
+		AgentTools:          append(newWorkerAgentTools(ctx, handler), mcp_pipeline.NewConfiguredMCPAgentTool(ctx, handler), skill_pipeline.NewConfiguredSkillAgentTool(ctx, handler)),
 		RuntimeHandler:      handler,
 		ContextGovernance:   true,
 	})

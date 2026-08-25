@@ -139,6 +139,8 @@ services:
     dns:
       - 1.1.1.1
       - 8.8.8.8
+    volumes:
+      - ../../manifest/skills:/app/manifest/skills:ro
     restart: unless-stopped
 
   worker:
@@ -162,6 +164,7 @@ services:
       - 1.1.1.1
       - 8.8.8.8
     volumes:
+      - ../../manifest/skills:/app/manifest/skills:ro
       - ../../.runtime/nginx_blocklist:/app/nginx_blocklist
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped

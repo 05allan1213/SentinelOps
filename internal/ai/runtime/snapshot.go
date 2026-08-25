@@ -90,6 +90,12 @@ type SkillSnapshot struct {
 	ContentHash string `json:"content_hash"`
 }
 
+// SkillContentHash 计算不含 Secret、路径和 backend handle 的 Skill 内容身份。
+func SkillContentHash(content string) string {
+	digest := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(digest[:])
+}
+
 // RuntimeSnapshotInput 是 Run 创建时冻结的完整兼容输入。
 type RuntimeSnapshotInput struct {
 	Runtime        RuntimeVersionSnapshot `json:"runtime"`

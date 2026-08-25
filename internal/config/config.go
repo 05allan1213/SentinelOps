@@ -38,12 +38,20 @@ type Config struct {
 	ModelCatalog     map[string]Model    `yaml:"model_catalog" json:"model_catalog"`
 	Routing          Routing             `yaml:"routing" json:"routing"`
 	MCP              MCPConfig           `yaml:"mcp" json:"mcp"`
+	Skill            SkillConfig         `yaml:"skill" json:"skill"`
 }
 
 // MCPConfig 保存 MCP Server 的安全配置，不保存解析后的 Header Secret。
 type MCPConfig struct {
 	Enabled bool                 `yaml:"enabled" json:"enabled"`
 	Servers map[string]MCPServer `yaml:"servers" json:"servers"`
+}
+
+// SkillConfig 保存只读 SOP Backend 的非敏感路径和大小上限。
+type SkillConfig struct {
+	Enabled  bool   `yaml:"enabled" json:"enabled"`
+	BaseDir  string `yaml:"base_dir" json:"base_dir"`
+	MaxBytes int64  `yaml:"max_bytes" json:"max_bytes"`
 }
 
 // MCPServer 是配置层的 MCP Server 描述；Transport/Policy 由 MCP 包消费。

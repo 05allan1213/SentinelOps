@@ -120,6 +120,7 @@ var catalog = map[string]CatalogEntry{
 	"intelligence_agent":    durableFramework("intelligence_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
 	"ops_agent":             durableFramework("ops_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
 	"mcp_agent":             durableFramework("mcp_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
+	"skill_agent":           durableFramework("skill_agent", "309ed652cdc1b2290633f633f9f2efff36d6b647ed1a48a7e6b6a22dcf8f1a83"),
 }
 
 var durableInventories = map[string][]string{
@@ -270,7 +271,7 @@ func RequiredDurableToolNames() []string {
 // DurableFrameworkToolNames 返回 Executor 暴露的官方 AgentTool Catalog 名称。
 // framework Tool 只计量编排调用，不拥有 Effect step。
 func DurableFrameworkToolNames() []string {
-	names := make([]string, 0, 6)
+	names := make([]string, 0, 7)
 	for name, entry := range catalog {
 		if entry.Audience == AudienceDurable && entry.Policy == "framework_agent_tool_v1" {
 			names = append(names, name)

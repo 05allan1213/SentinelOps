@@ -22,6 +22,11 @@ const (
 // BuildDurableRuntimeSnapshot 从非敏感配置与完整的 Plan/专业 Agent Catalog
 // 构造 API/Worker 共用的精确快照。L1/L2 静态上限在 P42 前保持关闭。
 func BuildDurableRuntimeSnapshot(config *appconfig.Config) (FrozenRuntimeSnapshot, error) {
+	return BuildDurableRuntimeSnapshotWithSkills(config, nil)
+}
+
+// BuildDurableRuntimeSnapshotWithSkills 在同一 Runtime Snapshot 中冻结只读 Skill 内容身份。
+func BuildDurableRuntimeSnapshotWithSkills(config *appconfig.Config, skills []SkillSnapshot) (FrozenRuntimeSnapshot, error) {
 	if config == nil {
 		return FrozenRuntimeSnapshot{}, fmt.Errorf("application configuration is required")
 	}
@@ -79,7 +84,7 @@ func BuildDurableRuntimeSnapshot(config *appconfig.Config) (FrozenRuntimeSnapsho
 		Models:         models,
 		Tools:          tools,
 		MCPCatalogHash: mcpCatalogHash,
-		Skills:         []SkillSnapshot{},
+		Skills:         append([]SkillSnapshot(nil), skills...),
 		FeatureGates: map[string]bool{
 			"agent_runtime.enabled":                    config.AgentRuntime.Enabled,
 			"agent_runtime.accept_new_runs":            config.AgentRuntime.AcceptNewRuns,
@@ -88,7 +93,7 @@ func BuildDurableRuntimeSnapshot(config *appconfig.Config) (FrozenRuntimeSnapsho
 			"agent_runtime.l2_writes":                  false,
 			"agent_runtime.admin_query_database_debug": config.AgentRuntime.AdminQueryDatabaseDebug,
 			"mcp.enabled":                              config.MCP.Enabled,
-			"skill.enabled":                            false,
+			"skill.enabled":                            config.Skill.Enabled,
 			"langfuse.enabled":                         false,
 		},
 	})

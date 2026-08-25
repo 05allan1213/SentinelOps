@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 
+	"SentinelOps/internal/ai/agent/skill_pipeline"
 	airuntime "SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/ai/workflow"
 	appconfig "SentinelOps/internal/config"
@@ -81,7 +82,11 @@ func newDurableAPIService(ctx context.Context) (*chatsvc.DurableService, error) 
 	if err != nil {
 		return nil, err
 	}
-	snapshot, err := airuntime.BuildDurableRuntimeSnapshot(config)
+	skillSnapshots, err := skill_pipeline.BuildConfiguredSkillSnapshots(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := airuntime.BuildDurableRuntimeSnapshotWithSkills(config, skillSnapshots)
 	if err != nil {
 		return nil, err
 	}
