@@ -33,6 +33,7 @@ const (
 	ParkReasonEffectUnknown       = "effect_unknown"
 	ParkReasonCheckpointMissing   = "checkpoint_missing"
 	ParkReasonCheckpointCorrupt   = "checkpoint_corrupt"
+	ParkReasonApprovalInvalidated = "approval_invalidated"
 )
 
 var (
@@ -322,6 +323,45 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 
 		if input.TargetStatus == RunStatusSucceeded {
 			if err := insertNextSessionRevision(tx, run, input.RevisionStateJSON); err != nil {
+				return err
+			}
+		}
+		var preparingApprovals []mysql.AgentApproval
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("run_id = ? AND status = ?", run.ID, ApprovalStatusPreparing).
+			Order("created_at ASC, id ASC").Find(&preparingApprovals).Error; err != nil {
+			return fmt.Errorf("锁定终态 Run 遗留 preparing Approval: %w", err)
+		}
+		for index := range preparingApprovals {
+			approval := &preparingApprovals[index]
+			result := tx.Model(&mysql.AgentApproval{}).
+				Where("id = ? AND status = ?", approval.ID, ApprovalStatusPreparing).
+				Updates(map[string]any{
+					"status": ApprovalStatusInvalidated, "version": gorm.Expr("version + 1"),
+					"decision_reason": "run reached terminal state before Approval publication",
+					"decided_at":      gorm.Expr("CURRENT_TIMESTAMP(3)"),
+				})
+			if result.Error != nil {
+				return fmt.Errorf("失效终态 Run 遗留 preparing Approval: %w", result.Error)
+			}
+			if result.RowsAffected != 1 {
+				return ErrApprovalInvalidated
+			}
+			invalidatedEvent := WorkflowEventInput{Type: EventApprovalInvalidated, TraceID: input.TraceID, Payload: EventPayload{
+				Reference: approval.ID, Attributes: map[string]any{
+					"approval_id": approval.ID,
+					"reason":      "run_terminal_before_publication",
+				},
+			}}
+			invalidatedPayload, err := marshalDurableEvent(invalidatedEvent)
+			if err != nil {
+				return err
+			}
+			seq, err := updateFencedDurableRunAndAllocateSeq(tx, run.ID, run.Status, input.Lease, map[string]any{})
+			if err != nil {
+				return err
+			}
+			if err := insertDurableEvent(tx, run.ID, seq, invalidatedEvent, invalidatedPayload); err != nil {
 				return err
 			}
 		}

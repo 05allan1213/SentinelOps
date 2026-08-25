@@ -29,7 +29,8 @@ func SelectRecovery(facts workflow.RecoveryFacts, currentCompatibilityHash strin
 
 	if facts.Status == workflow.RunStatusParked {
 		switch facts.ParkReason {
-		case workflow.ParkReasonEffectUnknown, workflow.ParkReasonCheckpointMissing, workflow.ParkReasonCheckpointCorrupt:
+		case workflow.ParkReasonEffectUnknown, workflow.ParkReasonCheckpointMissing, workflow.ParkReasonCheckpointCorrupt,
+			workflow.ParkReasonApprovalInvalidated:
 			return RecoveryDecision{Mode: workflow.RecoveryModeParked, ParkReason: facts.ParkReason}, nil
 		case workflow.ParkReasonRuntimeIncompatible:
 			// exact Runtime 恢复后继续验证 checkpoint / dependency，不能只凭 hash 解锁。

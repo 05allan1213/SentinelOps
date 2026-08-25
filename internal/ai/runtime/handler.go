@@ -43,6 +43,7 @@ type CallMetadata struct {
 // 它只嵌入无状态官方基类，不保存任何请求可变状态。
 type RuntimeHandler struct {
 	*adk.BaseChatModelAgentMiddleware
+	approvalStore *workflow.GORMStore
 }
 
 var _ adk.ChatModelAgentMiddleware = (*RuntimeHandler)(nil)
@@ -50,6 +51,14 @@ var _ adk.ChatModelAgentMiddleware = (*RuntimeHandler)(nil)
 // NewRuntimeHandler 创建 P14/P22/P28 继续原位扩展的唯一共享 Handler。
 func NewRuntimeHandler() *RuntimeHandler {
 	return &RuntimeHandler{BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}}
+}
+
+// NewHITLRuntimeHandler 原位启用 P22 Approval 生命周期；生产 builder 尚未接线且写 Gate 继续关闭。
+func NewHITLRuntimeHandler(store *workflow.GORMStore) (*RuntimeHandler, error) {
+	if store == nil {
+		return nil, fmt.Errorf("workflow GORMStore is required for HITL")
+	}
+	return &RuntimeHandler{BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}, approvalStore: store}, nil
 }
 
 // RuntimeHandlerFirst 固定官方 Handlers 中第一个用户 Handler 为共享 RuntimeHandler。
@@ -112,6 +121,9 @@ func (h *RuntimeHandler) WrapInvokableToolCall(_ context.Context, endpoint adk.I
 		return nil, fmt.Errorf("runtime Handler and invokable Tool endpoint are required")
 	}
 	return func(ctx context.Context, arguments string, options ...tool.Option) (string, error) {
+		if handled, interruptErr := h.handleApprovalToolCall(ctx, toolContext, arguments); handled {
+			return "", interruptErr
+		}
 		callContext, budget, reservation, err := h.prepareToolCall(ctx, toolContext)
 		if err != nil {
 			return "", err
@@ -128,6 +140,9 @@ func (h *RuntimeHandler) WrapStreamableToolCall(_ context.Context, endpoint adk.
 		return nil, fmt.Errorf("runtime Handler and streamable Tool endpoint are required")
 	}
 	return func(ctx context.Context, arguments string, options ...tool.Option) (*schema.StreamReader[string], error) {
+		if handled, interruptErr := h.handleApprovalToolCall(ctx, toolContext, arguments); handled {
+			return nil, interruptErr
+		}
 		callContext, budget, reservation, err := h.prepareToolCall(ctx, toolContext)
 		if err != nil {
 			return nil, err
@@ -149,6 +164,13 @@ func (h *RuntimeHandler) WrapEnhancedInvokableToolCall(_ context.Context, endpoi
 		return nil, fmt.Errorf("runtime Handler and enhanced Tool endpoint are required")
 	}
 	return func(ctx context.Context, argument *schema.ToolArgument, options ...tool.Option) (*schema.ToolResult, error) {
+		rawArguments := ""
+		if argument != nil {
+			rawArguments = argument.Text
+		}
+		if handled, interruptErr := h.handleApprovalToolCall(ctx, toolContext, rawArguments); handled {
+			return nil, interruptErr
+		}
 		callContext, budget, reservation, err := h.prepareToolCall(ctx, toolContext)
 		if err != nil {
 			return nil, err
@@ -165,6 +187,13 @@ func (h *RuntimeHandler) WrapEnhancedStreamableToolCall(_ context.Context, endpo
 		return nil, fmt.Errorf("runtime Handler and enhanced streamable Tool endpoint are required")
 	}
 	return func(ctx context.Context, argument *schema.ToolArgument, options ...tool.Option) (*schema.StreamReader[*schema.ToolResult], error) {
+		rawArguments := ""
+		if argument != nil {
+			rawArguments = argument.Text
+		}
+		if handled, interruptErr := h.handleApprovalToolCall(ctx, toolContext, rawArguments); handled {
+			return nil, interruptErr
+		}
 		callContext, budget, reservation, err := h.prepareToolCall(ctx, toolContext)
 		if err != nil {
 			return nil, err

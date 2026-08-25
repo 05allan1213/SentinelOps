@@ -12,26 +12,28 @@ import (
 
 // WorkerConfig 是 P09 Worker 雏形所需的 lease 与有界空轮询参数。
 type WorkerConfig struct {
-	Owner          string
-	LeaseDuration  time.Duration
-	MinPollBackoff time.Duration
-	MaxPollBackoff time.Duration
-	ClaimNext      func(context.Context) (*workflow.ClaimedRun, bool, error)
-	Heartbeat      func(context.Context, workflow.LeaseToken) error
-	Execute        func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
-	Transition     func(context.Context, workflow.RunTransition) error
-	Complete       func(context.Context, workflow.CompleteRunInput) error
+	Owner               string
+	LeaseDuration       time.Duration
+	MinPollBackoff      time.Duration
+	MaxPollBackoff      time.Duration
+	ApprovalExpiryBatch int
+	ClaimNext           func(context.Context) (*workflow.ClaimedRun, bool, error)
+	Heartbeat           func(context.Context, workflow.LeaseToken) error
+	Execute             func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
+	Transition          func(context.Context, workflow.RunTransition) error
+	Complete            func(context.Context, workflow.CompleteRunInput) error
 }
 
 // Worker 只委派唯一 workflow.GORMStore，并承载 P20 唯一 durable poll loop。
 type Worker struct {
-	store      *workflow.GORMStore
-	config     WorkerConfig
-	claimNext  func(context.Context) (*workflow.ClaimedRun, bool, error)
-	heartbeat  func(context.Context, workflow.LeaseToken) error
-	execute    func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
-	transition func(context.Context, workflow.RunTransition) error
-	complete   func(context.Context, workflow.CompleteRunInput) error
+	store           *workflow.GORMStore
+	config          WorkerConfig
+	claimNext       func(context.Context) (*workflow.ClaimedRun, bool, error)
+	heartbeat       func(context.Context, workflow.LeaseToken) error
+	execute         func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
+	transition      func(context.Context, workflow.RunTransition) error
+	complete        func(context.Context, workflow.CompleteRunInput) error
+	expireApprovals func(context.Context, string, int) (int, error)
 }
 
 // RunExecutionResult 是 Worker 交给唯一完成 primitive 的基础结果。
@@ -84,6 +86,12 @@ func NewWorker(store *workflow.GORMStore, config WorkerConfig) (*Worker, error) 
 	if config.MinPollBackoff <= 0 || config.MaxPollBackoff < config.MinPollBackoff {
 		return nil, fmt.Errorf("worker poll backoff bounds are invalid")
 	}
+	if config.ApprovalExpiryBatch < 0 || config.ApprovalExpiryBatch > 1000 {
+		return nil, fmt.Errorf("approval expiry batch must be between 0 and 1000")
+	}
+	if config.ApprovalExpiryBatch == 0 {
+		config.ApprovalExpiryBatch = 100
+	}
 	worker := &Worker{
 		store: store, config: config, claimNext: config.ClaimNext, execute: config.Execute,
 		heartbeat: config.Heartbeat, transition: config.Transition, complete: config.Complete,
@@ -102,6 +110,9 @@ func NewWorker(store *workflow.GORMStore, config WorkerConfig) (*Worker, error) 
 	if worker.complete == nil {
 		worker.complete = store.CompleteRunAndCommitSession
 	}
+	if store != nil {
+		worker.expireApprovals = store.ExpireDueApprovals
+	}
 	return worker, nil
 }
 
@@ -117,9 +128,17 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 	if w == nil || w.execute == nil {
 		return false, fmt.Errorf("durable Run executor is required")
 	}
+	expired := 0
+	if w.expireApprovals != nil {
+		var err error
+		expired, err = w.expireApprovals(ctx, w.config.Owner, w.config.ApprovalExpiryBatch)
+		if err != nil {
+			return false, err
+		}
+	}
 	claimed, ok, err := w.claimNext(ctx)
 	if err != nil || !ok {
-		return ok, err
+		return ok || expired > 0, err
 	}
 	runCtx := ctx
 	if w.store != nil {
@@ -170,6 +189,14 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning, TargetStatus: target,
 		Lease: claimed.Token, ErrorMessage: executionErr.Error(), TraceQuality: result.TraceQuality, TraceID: result.TraceID,
 	})
+}
+
+// ExpireDueApprovals 复用同一 durable poll loop 执行一次有界到期扫描。
+func (w *Worker) ExpireDueApprovals(ctx context.Context) (int, error) {
+	if w == nil || w.expireApprovals == nil {
+		return 0, fmt.Errorf("approval expiry scan is not configured")
+	}
+	return w.expireApprovals(ctx, w.config.Owner, w.config.ApprovalExpiryBatch)
 }
 
 func (w *Worker) executeWithHeartbeat(ctx context.Context, claimed *workflow.ClaimedRun) (RunExecutionResult, error, error) {

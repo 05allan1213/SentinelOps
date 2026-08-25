@@ -154,6 +154,14 @@ func (s FrozenRuntimeSnapshot) Tools() []ToolSnapshot {
 	return append([]ToolSnapshot(nil), s.document.Tools...)
 }
 
+// PolicyHash 返回 Run 创建时冻结的 Policy identity。
+func (s FrozenRuntimeSnapshot) PolicyHash() string { return s.document.PolicyHash }
+
+// FeatureGate 返回 Run 创建时冻结的 Gate；未知键 fail-closed。
+func (s FrozenRuntimeSnapshot) FeatureGate(name string) bool {
+	return s.document.FeatureGates[name]
+}
+
 // WorkflowFields 将同一个 Frozen Snapshot 拆为 P03 已有列，不重复计算身份。
 func (s FrozenRuntimeSnapshot) WorkflowFields() workflow.RuntimeSnapshotFields {
 	runtimeVersion, _ := policy.CanonicalJSON(s.document.Runtime)

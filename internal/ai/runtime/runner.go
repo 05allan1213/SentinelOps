@@ -92,7 +92,14 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 	if err != nil {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
 	}
-	started, startErr := StartRecovery(attemptCtx, e.store, runner, attempt, e.currentCompatibilityHash, nil)
+	resumeParams, resumeErr := e.approvalResumeParams(attemptCtx, attempt)
+	if resumeErr != nil {
+		if errors.Is(resumeErr, workflow.ErrApprovalCheckpointMismatch) || errors.Is(resumeErr, workflow.ErrApprovalInvalidated) {
+			return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true}, resumeErr
+		}
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, resumeErr
+	}
+	started, startErr := StartRecovery(attemptCtx, e.store, runner, attempt, e.currentCompatibilityHash, resumeParams)
 	if started != nil && started.Decision.Mode == workflow.RecoveryModeParked {
 		return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true}, startErr
 	}
@@ -122,6 +129,12 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 				return result, cancelErr
 			}
 			return RunExecutionResult{TraceID: attempt.Trace.ID}, classifyRunnerError(event.Err)
+		}
+		if event.Action != nil && event.Action.Interrupted != nil {
+			if err := e.publishApprovalInterrupt(attemptCtx, attempt, event.Action.Interrupted.InterruptContexts); err != nil {
+				return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+			}
+			return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true}, nil
 		}
 		message, _, messageErr := adk.GetMessage(event)
 		if messageErr != nil {
@@ -161,6 +174,59 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 		OutputPayload: string(outputPayload), RevisionStateJSON: revision,
 		TraceQuality: "unknown", TraceID: attempt.Trace.ID,
 	}, nil
+}
+
+func (e *DurableExecutor) approvalResumeParams(ctx context.Context, attempt *AttemptContext) (*adk.ResumeParams, error) {
+	target, err := e.store.LoadApprovalResumeTarget(ctx, attempt.Lease)
+	if err != nil || target == nil {
+		return nil, err
+	}
+	params := &adk.ResumeParams{Targets: map[string]any{}}
+	if target.InterruptID != "" {
+		params.Targets[target.InterruptID] = ApprovalResumeData{ApprovalID: target.ApprovalID, Decision: target.Decision}
+	}
+	return params, nil
+}
+
+func (e *DurableExecutor) publishApprovalInterrupt(ctx context.Context, attempt *AttemptContext, contexts []*adk.InterruptCtx) error {
+	var selected *adk.InterruptCtx
+	var info ApprovalInterruptInfo
+	for _, interruptContext := range contexts {
+		if interruptContext == nil || !interruptContext.IsRootCause {
+			continue
+		}
+		candidate, ok := interruptContext.Info.(ApprovalInterruptInfo)
+		if !ok {
+			if pointer, pointerOK := interruptContext.Info.(*ApprovalInterruptInfo); pointerOK && pointer != nil {
+				candidate, ok = *pointer, true
+			}
+		}
+		if !ok {
+			continue
+		}
+		if selected != nil {
+			return fmt.Errorf("multiple Approval root interrupts require a new Spec decision")
+		}
+		selected, info = interruptContext, candidate
+	}
+	if selected == nil || info.ApprovalID == "" || info.ProposalHash == "" {
+		return fmt.Errorf("durable Interrupt did not contain one Approval root cause")
+	}
+	checkpointID, err := workflow.EinoCheckpointID(attempt.Run.ID)
+	if err != nil {
+		return err
+	}
+	fingerprint, err := e.store.LoadCheckpointFingerprint(ctx, attempt.Lease, checkpointID)
+	if err != nil {
+		return err
+	}
+	_, err = e.store.PublishApprovalAndWait(ctx, workflow.PublishApprovalInput{
+		Lease: attempt.Lease, ApprovalID: info.ApprovalID, ProposalHash: info.ProposalHash,
+		InterruptID: selected.ID, InterruptAddress: selected.Address.String(),
+		CheckpointID: checkpointID, CheckpointPayloadSHA256: fingerprint.PayloadSHA256,
+		CheckpointLeaseGeneration: fingerprint.LeaseGeneration, TraceID: attempt.Trace.ID,
+	})
+	return err
 }
 
 type executionCancelResult struct {
