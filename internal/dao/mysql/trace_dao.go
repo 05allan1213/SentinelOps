@@ -4,6 +4,8 @@ package mysql
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"SentinelOps/internal/ai/policy"
@@ -11,8 +13,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// TraceDAO trace 数据访问对象
-type TraceDAO struct{}
+// TraceDAO trace 数据访问对象。
+// db 仅用于测试或已打开连接的只读复合查询；为空时沿用现有全局 DB 生命周期。
+type TraceDAO struct {
+	db *gorm.DB
+}
 
 // EvidenceTraceQualityPredicate 保留 incomplete Trace 的诊断查询能力，同时将其排除出 Eval、发布证据和指标聚合。
 const EvidenceTraceQualityPredicate = "COALESCE(CASE WHEN JSON_VALID(agent_trace_runs.tags) THEN JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.trace_quality')) ELSE NULL END, 'unknown') <> 'incomplete'"
@@ -20,6 +25,21 @@ const EvidenceTraceQualityPredicate = "COALESCE(CASE WHEN JSON_VALID(agent_trace
 // NewTraceDAO 创建 DAO 实例
 func NewTraceDAO() *TraceDAO {
 	return &TraceDAO{}
+}
+
+// NewTraceDAOWithDB 创建绑定指定连接的 TraceDAO，保持既有查询和 Scope 语义。
+func NewTraceDAOWithDB(db *gorm.DB) *TraceDAO {
+	return &TraceDAO{db: db}
+}
+
+func (d *TraceDAO) queryDB(ctx context.Context) (*gorm.DB, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("database context is required")
+	}
+	if d != nil && d.db != nil {
+		return d.db.WithContext(ctx), nil
+	}
+	return DB(ctx)
 }
 
 // PhysicalDeleteTracePayloads 清理终态 Run 关联 Trace 的 Prompt/Completion/Tool/Retrieval 正文。
@@ -189,9 +209,31 @@ func (d *TraceDAO) GetRunByTraceID(ctx context.Context, traceID string) (*TraceR
 	return &run, nil
 }
 
+// GetRunByWorkflowRunID 按 durable workflow Run 关联读取最新 Attempt Trace，复用现有 Trace 表和 Scope 规则。
+func (d *TraceDAO) GetRunByWorkflowRunID(ctx context.Context, runID string) (*TraceRun, error) {
+	db, err := d.queryDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		return nil, gorm.ErrInvalidData
+	}
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	var run TraceRun
+	if result := query.Where("JSON_VALID(tags) AND JSON_UNQUOTE(JSON_EXTRACT(tags, '$.run_id')) = ?", runID).
+		Order("start_time DESC, id DESC").First(&run); result.Error != nil {
+		return nil, result.Error
+	}
+	return &run, nil
+}
+
 // ListNodesByTraceID 查询指定链路的所有节点
 func (d *TraceDAO) ListNodesByTraceID(ctx context.Context, traceID string) ([]TraceNode, error) {
-	db, err := DB(ctx)
+	db, err := d.queryDB(ctx)
 	if err != nil {
 		return nil, err
 	}
