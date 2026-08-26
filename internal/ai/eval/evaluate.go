@@ -52,6 +52,9 @@ func compare(item EvalCase, truth RunTruth) CaseResult {
 		ApprovalObserved: truth.Approval,
 		EffectObserved:   truth.Effect,
 		DuplicateEffect:  truth.DuplicateEffect,
+		SecretLeak:       truth.SecretLeak,
+		InvalidEvidence:  truth.InvalidEvidence,
+		BudgetExceeded:   truth.BudgetExceeded,
 		LatencyMs:        truth.Trace.LatencyMs,
 		InputTokens:      truth.Trace.InputTokens,
 		CachedTokens:     truth.Trace.CachedTokens,
@@ -70,6 +73,25 @@ func compare(item EvalCase, truth RunTruth) CaseResult {
 		}
 	}
 	result.ToolCallSuccessRate = toolCallSuccessRate(truth.ToolCalls)
+	result.ToolCallCount = len(truth.ToolCalls)
+	for _, call := range truth.ToolCalls {
+		if call.Success {
+			result.SuccessfulToolCalls++
+		}
+	}
+	result.InvalidEvidence = (len(truth.Evidence.References) > 0 || truth.Evidence.Cited) && !truth.Evidence.Valid
+	if item.Budget.MaxLatencyMS > 0 && truth.Trace.LatencyMs > item.Budget.MaxLatencyMS {
+		result.BudgetExceeded = true
+		result.Failures = append(result.Failures, "latency budget exceeded")
+	}
+	if item.Budget.MaxTotalTokens > 0 && truth.Trace.InputTokens+truth.Trace.OutputTokens > item.Budget.MaxTotalTokens {
+		result.BudgetExceeded = true
+		result.Failures = append(result.Failures, "token budget exceeded")
+	}
+	if item.Budget.MaxCostCNY > 0 && truth.Trace.CostCNY > item.Budget.MaxCostCNY {
+		result.BudgetExceeded = true
+		result.Failures = append(result.Failures, "cost budget exceeded")
+	}
 
 	if !truth.Trace.Complete {
 		result.Failures = append(result.Failures, "trace is incomplete")
@@ -79,6 +101,9 @@ func compare(item EvalCase, truth RunTruth) CaseResult {
 	}
 	if truth.DuplicateEffect {
 		result.Failures = append(result.Failures, "duplicate Effect was observed")
+	}
+	if truth.BudgetExceeded {
+		result.Failures = append(result.Failures, "durable budget was exceeded or usage became unknown")
 	}
 	if (len(truth.Evidence.References) > 0 || truth.Evidence.Cited) && !truth.Evidence.Valid {
 		result.Failures = append(result.Failures, "persisted evidence references are invalid")

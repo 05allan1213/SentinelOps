@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"testing"
@@ -15,6 +16,52 @@ func TestValidateCommandNeedsOnlyCases(t *testing.T) {
 	}
 	if opts.command != "validate" || opts.casesPath != "cases.yaml" {
 		t.Fatalf("options = %+v", opts)
+	}
+}
+
+func TestValidateCommandAcceptsDatasetDirectory(t *testing.T) {
+	opts, err := parseOptions([]string{"validate", "--cases", "manifest/eval/cases"})
+	if err != nil {
+		t.Fatalf("parse Dataset validate options: %v", err)
+	}
+	if opts.casesPath != "manifest/eval/cases" || opts.repeat != 1 {
+		t.Fatalf("options = %+v", opts)
+	}
+}
+
+func TestRunCommandSupportsRepresentativeSamplesAndRepeat(t *testing.T) {
+	opts, err := parseOptions([]string{
+		"run", "--cases", "manifest/eval/cases", "--base-url", "http://127.0.0.1:1",
+		"--dsn-ref", "env:EVAL_DSN", "--sample-per-category", "1", "--repeat", "3",
+	})
+	if err != nil {
+		t.Fatalf("parse representative run options: %v", err)
+	}
+	if opts.samplePerCategory != 1 || opts.repeat != 3 {
+		t.Fatalf("options = %+v", opts)
+	}
+}
+
+func TestCompareCommandRequiresOnlyReportAndBaseline(t *testing.T) {
+	if _, err := parseOptions([]string{"compare", "--baseline", "approved.yaml"}); err == nil {
+		t.Fatal("compare accepted a missing report")
+	}
+	opts, err := parseOptions([]string{"compare", "--baseline", "approved.yaml", "--report", "report.json"})
+	if err != nil {
+		t.Fatalf("parse compare options: %v", err)
+	}
+	if opts.baselinePath != "approved.yaml" || opts.reportPath != "report.json" {
+		t.Fatalf("options = %+v", opts)
+	}
+}
+
+func TestValidateDatasetDirectoryReportsAllCases(t *testing.T) {
+	var output bytes.Buffer
+	if err := run(context.Background(), []string{"validate", "--cases", "../../manifest/eval/cases"}, &output); err != nil {
+		t.Fatalf("validate Dataset: %v", err)
+	}
+	if !bytes.Contains(output.Bytes(), []byte(`"cases":40`)) || !bytes.Contains(output.Bytes(), []byte(`"dataset_schema":"sentinelops/eval-dataset/v1"`)) {
+		t.Fatalf("validation report = %s", output.String())
 	}
 }
 

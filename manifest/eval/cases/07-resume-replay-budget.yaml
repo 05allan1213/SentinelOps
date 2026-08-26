@@ -1,0 +1,53 @@
+schema: sentinelops/eval-dataset/v1
+version: "2026-08-26"
+repeat: 3
+category: resume_replay_budget
+default_budget: {max_latency_ms: 120000, max_total_tokens: 16000, max_cost_cny: 1}
+default_external_dependencies: [production-api, workflow-mysql, checkpoint-store, provider-contract]
+default_contracts: [approval_fingerprint_rejects_resume]
+default_snapshot:
+  models:
+    - kind: chat
+      candidate_order: 0
+      catalog_ref: aliyun_bailian/qwen3.7-max-2026-06-08
+      provider: aliyun_bailian
+      provider_revision: catalog-2026-08-24
+      driver: openai_compatible_chat
+      driver_revision: eino-openai-0.1.13
+      model_id: qwen3.7-max-2026-06-08
+      routing_profile: default
+      route_options: {enable_thinking: false}
+      pricing_revision: "2026-08-24"
+      pricing_currency: CNY
+      pricing_unit: per_million_tokens
+      input_price: 12
+      cached_input_price: 2.4
+      output_price: 36
+      model_snapshot_identity: a271cce88dabdf4b33b06bbd5b8a75f563719642cac04d6d8b54c69d42b6ddfc
+  prompt_snapshot: sentinelops-prompt-v2
+  tool_snapshot: sentinelops-tool-catalog-v1
+  skill_snapshot: sentinelops-skill-manifest-v1
+  mcp_snapshot: sentinelops-mcp-catalog-v1
+  kb_snapshot: sentinelops-kb-v1
+cases:
+  - id: recovery-01-resume-success
+    outcome: success
+    representative: true
+    query: resume a durable run with the exact checkpoint fingerprint
+    expected: {statuses: [succeeded], recovery_mode: resume}
+  - id: recovery-02-fingerprint-rejection
+    outcome: rejection
+    query: resume after the approval checkpoint fingerprint changed
+    expected: {statuses: [failed]}
+  - id: recovery-03-replay-success
+    outcome: recovery
+    query: replay an earlier attempt without changing its frozen snapshot
+    expected: {statuses: [succeeded], recovery_mode: replay}
+  - id: recovery-04-budget-rejection
+    outcome: rejection
+    query: continue after the durable model-call budget is exhausted
+    expected: {statuses: [failed]}
+  - id: recovery-05-parked-success
+    outcome: recovery
+    query: park safely when the checkpoint is missing or incompatible
+    expected: {statuses: [parked], recovery_mode: parked}

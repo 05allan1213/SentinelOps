@@ -162,6 +162,27 @@ func TestMetricReuseDoesNotConflateEffectParkingWithRecovery(t *testing.T) {
 	}
 }
 
+func TestMetricReuseDoesNotCountBudgetStopsAsActualOverrun(t *testing.T) {
+	truth := RunTruth{}
+	projectEvents(&truth, []mysql.WorkflowEvent{
+		{EventType: workflow.EventBudgetExhausted, Payload: `{"data":{"kind":"model_call"}}`},
+		{EventType: workflow.EventBudgetUsageUnknown, Payload: `{"data":{"kind":"model_call"}}`},
+	})
+	if truth.BudgetExceeded {
+		t.Fatalf("budget stop events were treated as actual overrun: %+v", truth)
+	}
+
+	result := compare(EvalCase{
+		ID: "budget-stop", Query: "safe", Expected: Expected{Statuses: []string{"parked"}},
+		Budget: EvalBudget{MaxLatencyMS: 100, MaxTotalTokens: 100, MaxCostCNY: 1},
+	}, RunTruth{
+		RunID: "run-budget-stop", Status: "parked", Trace: TraceTruth{Complete: true},
+	})
+	if result.BudgetExceeded || !result.Passed {
+		t.Fatalf("budget stop without measured overrun was not accepted: %+v", result)
+	}
+}
+
 func TestMetricReuseUsesExistingTraceToolStatus(t *testing.T) {
 	calls := projectTraceToolCalls([]mysql.TraceNode{
 		{NodeType: aitrace.NodeTypeLLM, NodeName: "ignored", Status: aitrace.StatusSuccess},

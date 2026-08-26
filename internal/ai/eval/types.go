@@ -21,12 +21,13 @@ const CaseSchema = "sentinelops/eval-case/v1"
 
 // EvalCase 描述一次通过生产 API 执行的最小评估输入和确定性期望。
 type EvalCase struct {
-	ID        string    `json:"id" yaml:"id"`
-	SessionID string    `json:"session_id,omitempty" yaml:"session_id,omitempty"`
-	Query     string    `json:"query" yaml:"query"`
-	Agent     string    `json:"agent,omitempty" yaml:"agent,omitempty"`
-	Expected  Expected  `json:"expected,omitempty" yaml:"expected,omitempty"`
-	Forbidden Forbidden `json:"forbidden,omitempty" yaml:"forbidden,omitempty"`
+	ID        string     `json:"id" yaml:"id"`
+	SessionID string     `json:"session_id,omitempty" yaml:"session_id,omitempty"`
+	Query     string     `json:"query" yaml:"query"`
+	Agent     string     `json:"agent,omitempty" yaml:"agent,omitempty"`
+	Expected  Expected   `json:"expected,omitempty" yaml:"expected,omitempty"`
+	Forbidden Forbidden  `json:"forbidden,omitempty" yaml:"forbidden,omitempty"`
+	Budget    EvalBudget `json:"budget,omitempty" yaml:"budget,omitempty"`
 }
 
 // Expected 保存当前 Case 必须满足的确定性事实。
@@ -75,6 +76,8 @@ type RunTruth struct {
 	Effect          bool
 	DuplicateEffect bool
 	SecretLeak      bool
+	InvalidEvidence bool
+	BudgetExceeded  bool
 }
 
 // TraceTruth 复用已有 agent_trace_runs 的审计指标，不复制 Dashboard KPI。
@@ -120,6 +123,11 @@ type CaseResult struct {
 	ApprovalObserved    bool     `json:"approval_observed"`
 	EffectObserved      bool     `json:"effect_observed"`
 	DuplicateEffect     bool     `json:"duplicate_effect"`
+	SecretLeak          bool     `json:"secret_leak"`
+	InvalidEvidence     bool     `json:"invalid_evidence"`
+	BudgetExceeded      bool     `json:"budget_exceeded"`
+	ToolCallCount       int      `json:"tool_call_count"`
+	SuccessfulToolCalls int      `json:"successful_tool_calls"`
 	LatencyMs           int64    `json:"latency_ms"`
 	InputTokens         int      `json:"input_tokens"`
 	CachedTokens        int      `json:"cached_tokens"`
@@ -157,6 +165,9 @@ func (c EvalCase) Validate() error {
 	}
 	if len(c.Expected.Statuses) == 0 {
 		return fmt.Errorf("at least one expected terminal status is required")
+	}
+	if c.Budget.MaxLatencyMS < 0 || c.Budget.MaxTotalTokens < 0 || c.Budget.MaxCostCNY < 0 {
+		return fmt.Errorf("eval case budget limits must not be negative")
 	}
 	seenStatuses := make(map[string]struct{}, len(c.Expected.Statuses))
 	for _, status := range c.Expected.Statuses {

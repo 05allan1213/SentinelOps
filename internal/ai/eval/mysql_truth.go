@@ -201,6 +201,7 @@ func projectEvents(truth *RunTruth, events []mysql.WorkflowEvent) {
 				invalidEvidence = true
 			}
 			truth.Evidence.Valid = len(truth.Evidence.References) > 0 && !invalidEvidence
+			truth.InvalidEvidence = invalidEvidence
 		}
 		code := strings.ToUpper(stringValue(data, "error_code", "code"))
 		if strings.Contains(code, "FORBIDDEN") || strings.Contains(code, "POLICY_MUTATION_DISABLED") {
