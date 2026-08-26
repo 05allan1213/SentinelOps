@@ -1,0 +1,252 @@
+schema: sentinelops/fault-matrix/v1
+version: 1
+outcomes:
+  - RESUME PASS
+  - REPLAY PASS
+  - PARKED AS DESIGNED
+
+# 所有故障都必须保留 durable 身份、预算和冻结快照；不确定的外部副作用只能停泊。
+invariants:
+  run_id_unchanged: true
+  attempt_rotates: true
+  trace_id_rotates: true
+  context_preserved: true
+  budget_preserved: true
+  runtime_snapshot_preserved: true
+  mutation_deduplicated: true
+
+cases:
+  - id: hitl_checkpoint
+    fault_point: HITL Interrupt 已成功保存 Checkpoint
+    injection: scripted StatefulInterrupt 在 Checkpoint Set 成功后暂停
+    expected_outcome: RESUME PASS
+    recovery_mode: resume
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [checkpoint, approval, resume_with_params]
+    assertions:
+      - 同一 run_id 使用新的 attempt 和 trace_id
+      - exact checkpoint fingerprint 与 Approval 决定保持不变
+      - ResumeWithParams 只调用一次批准的恢复目标
+
+  - id: sigterm_drain
+    fault_point: 仍持 lease 时 SIGTERM / drain
+    injection: 在 ChatModel 或 Tool safe-point 请求 recursive cancel
+    expected_outcome: RESUME PASS
+    recovery_mode: resume
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [lease, safe_point_cancel, checkpoint]
+    assertions:
+      - 仅当前 generation 成功写入 Checkpoint 后才交接
+      - 旧 Worker 不再写 Event、Budget 或 Effect
+
+  - id: sigkill_no_checkpoint
+    fault_point: SIGKILL / OOM 且从未产生 Checkpoint
+    injection: 在首次 Runner Query 前终止进程
+    expected_outcome: REPLAY PASS
+    recovery_mode: replay
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [immutable_input, no_checkpoint]
+    assertions:
+      - 只使用 immutable Run input 调用 Runner.Query
+      - Model / L0 read 允许 at-least-once，但不产生 Mutation Effect
+
+  - id: sigkill_valid_checkpoint
+    fault_point: SIGKILL / OOM 但已有兼容且完整 Checkpoint
+    injection: 在已提交 Checkpoint 后终止 Worker
+    expected_outcome: RESUME PASS
+    recovery_mode: resume
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [checkpoint, generation_fence]
+    assertions:
+      - 读取最近有效 Checkpoint，不重置 Context、Budget 或 Runtime Snapshot
+      - 重复的 Model / L0 read 不重复 Mutation Effect
+
+  - id: external_pending_crash
+    fault_point: 外部调用前、Effect 仍为 pending 时崩溃
+    injection: 在 StartExternalEffect 前后边界终止 Worker
+    expected_outcome: PARKED AS DESIGNED
+    recovery_mode: parked
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [effect_ledger, generation_fence, reconciliation]
+    assertions:
+      - 新 generation 可认领 Run，但遗留 running 外部 Effect 不得回到 pending
+      - 不能证明发送边界时转为 unknown 并保持 Session 占用
+
+  - id: external_result_persist_crash
+    fault_point: 外部调用后、结果持久化前崩溃
+    injection: endpoint 返回后故意跳过 FinishExternalEffectSucceeded
+    expected_outcome: PARKED AS DESIGNED
+    recovery_mode: parked
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [effect_ledger, reconciliation, admin_evidence]
+    assertions:
+      - 按 effect_type 对账，不能确认时保持 unknown + parked
+      - 禁止盲目重试或把 unknown 伪装成 succeeded
+
+  - id: effect_succeeded_tool_return_crash
+    fault_point: Effect succeeded 持久化后、Tool 返回前崩溃
+    injection: FinishExternalEffectSucceeded 成功后终止 Runner
+    expected_outcome: RESUME PASS
+    recovery_mode: resume
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [effect_ledger, idempotency_key, checkpoint]
+    assertions:
+      - Resume / Replay 复用已提交 Effect response
+      - 同一 effect_step 不再次调用外部系统
+
+  - id: lease_lost
+    fault_point: Worker 已失 lease
+    injection: heartbeat 返回 ErrLeaseLost 并触发 CancelImmediate + recursive
+    expected_outcome: RESUME PASS
+    recovery_mode: resume
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [lease, generation_fence, checkpoint]
+    assertions:
+      - 旧 generation 的 Checkpoint、Event、Budget、Effect 写入全部被拒绝
+      - 新 Worker 只能从新的 generation 恢复
+
+  - id: approval_checkpoint_invalid
+    fault_point: 已发布 Approval 所需 Checkpoint 缺失、Hash 损坏、generation 不符或版本不兼容
+    injection: 覆盖 opaque payload 或篡改 fingerprint 后调用 ResumeWithParams
+    expected_outcome: PARKED AS DESIGNED
+    recovery_mode: parked
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [approval, checkpoint, fingerprint, fail_closed]
+    assertions:
+      - Approval 变为 invalidated 或 Run 以 checkpoint_corrupt 停泊
+      - 稳定 approval_id 下的新 payload 不得继承旧决定
+
+  - id: no_checkpoint_no_dependency
+    fault_point: Checkpoint 从未发布且不存在 Approval / Effect 恢复依赖
+    injection: 只提供 immutable input，省略所有恢复依赖
+    expected_outcome: REPLAY PASS
+    recovery_mode: replay
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [immutable_input, no_checkpoint]
+    assertions:
+      - 允许安全 Replay immutable query
+      - Replay 不接受客户端覆盖的 Query、Session 或 Runtime snapshot
+
+  - id: mcp_init_disconnect
+    fault_point: MCP 初始化阶段断线
+    injection: officialmcp test server 在 handshake 后关闭连接
+    expected_outcome: PARKED AS DESIGNED
+    recovery_mode: parked
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [mcp_session, fail_closed]
+    assertions:
+      - 不注册未知工具，不绕过 allowed_tools
+      - 连接不确定性不产生 Mutation Effect
+
+  - id: mcp_call_disconnect
+    fault_point: MCP Tool 调用中断线
+    injection: 测试 Server 在发送结果前断开
+    expected_outcome: PARKED AS DESIGNED
+    recovery_mode: parked
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [mcp_session, effect_ledger]
+    assertions:
+      - 结果未知时记录脱敏证据并停泊
+      - 不自研 JSON-RPC 重试或第二套 MCP 协议
+
+  - id: model_stream_read_failure
+    fault_point: 模型流建立后读取失败
+    injection: scripted ChatModel 在部分 chunks 后返回错误
+    expected_outcome: REPLAY PASS
+    recovery_mode: replay
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [scripted_model, immutable_input]
+    assertions:
+      - 无完整 Checkpoint 时从 immutable input Replay
+      - 未完成的 Trace 不得成为成功证据
+
+  - id: mysql_checkpoint_transient
+    fault_point: MySQL 在 Checkpoint 写入时短暂不可用
+    injection: CheckPointStore.Set 返回可重试数据库错误
+    expected_outcome: RESUME PASS
+    recovery_mode: resume
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [checkpoint, retry, generation_fence]
+    assertions:
+      - 只允许当前 generation 重试，旧 payload 不覆盖新 payload
+      - reservation 和 Runtime snapshot 跨接管保留
+
+  - id: mysql_approval_publish_transient
+    fault_point: MySQL 在 Approval 发布事务中短暂不可用
+    injection: PublishApprovalAndWait 事务返回可观测错误
+    expected_outcome: PARKED AS DESIGNED
+    recovery_mode: parked
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [approval, transaction, fail_closed]
+    assertions:
+      - preparing 行不可见、不可决策且不得伪造 pending
+      - 事务回滚不留下半提交 Event
+
+  - id: mysql_effect_cas_transient
+    fault_point: MySQL 在 Effect CAS 中短暂不可用
+    injection: TransitionEffectWithEvent 返回事务错误
+    expected_outcome: PARKED AS DESIGNED
+    recovery_mode: parked
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [effect_ledger, transaction, generation_fence]
+    assertions:
+      - Primary / Derived identity 不重复且 parent 关系保留
+      - 不能把 CAS 未知结果当作成功
+
+  - id: mysql_completion_transient
+    fault_point: MySQL 在 Run 完成事务中短暂不可用
+    injection: CompleteRunAndCommitSession 返回可重试错误
+    expected_outcome: RESUME PASS
+    recovery_mode: resume
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [completion_primitive, transaction, checkpoint]
+    assertions:
+      - 只通过唯一 completion primitive 重试
+      - Session Revision 不重复提交，terminal Event 保持有序
+
+  - id: budget_exhausted_during_retry
+    fault_point: Retry / Failover 中预算耗尽
+    injection: scripted model 消耗 reservation 后触发预算硬停止
+    expected_outcome: PARKED AS DESIGNED
+    recovery_mode: parked
+    run_id_unchanged: true
+    attempt_rotates: true
+    trace_id_rotates: true
+    requires: [budget, reservation, fail_closed]
+    assertions:
+      - 未结算 reservation 跨接管保留，不进行额外调用
+      - 预算停止不被报告成供应商实际 usage 超限

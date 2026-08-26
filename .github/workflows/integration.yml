@@ -1,0 +1,51 @@
+name: Isolated integration and fault injection
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-sentinelops-e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    name: Compose, migration, runtime recovery and Playwright
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      SENTINELOPS_E2E_HTTP_PORT: "18080"
+      SENTINELOPS_E2E_MYSQL_PORT: "13306"
+      SENTINELOPS_P41_ARTIFACT_DIR: ${{ github.workspace }}/.artifacts/p41/integration
+    steps:
+      # actions/checkout v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # actions/setup-go v6.5.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      # actions/setup-node v6.5.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.19.0
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Run the isolated integration entrypoint
+        run: scripts/ci/integration.sh --project sentinelops-e2e --install-browser
+      # actions/upload-artifact v4.6.2
+      - name: Upload redacted integration evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sentinelops-integration-${{ github.run_id }}
+          path: .artifacts/p41/integration
+          if-no-files-found: error
+          retention-days: 14

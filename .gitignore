@@ -19,6 +19,7 @@ bin
 
 .runtime/
 .artifacts/implementation/
+.artifacts/p41/
 manifest/config/config.local.yaml
 manifest/config/.secrets/
 

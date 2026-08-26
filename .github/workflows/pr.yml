@@ -1,0 +1,103 @@
+name: Pull Request quality gates
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Go format, tidy, vet, static analysis, vulnerability and race
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      mysql:
+        image: mysql:8.0.43
+        env:
+          MYSQL_ROOT_PASSWORD: sentinelops-pr-root-password
+          MYSQL_DATABASE: sentinelops_p03
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -psentinelops-pr-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      SENTINELOPS_TEST_DSN: root:sentinelops-pr-root-password@tcp(127.0.0.1:3306)/sentinelops_p03?parseTime=true
+      STATICCHECK_VERSION: "2026.2.1"
+      GOVULNCHECK_MODULE_VERSION: v1.7.0
+    steps:
+      # actions/checkout v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # actions/setup-go v6.5.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Install pinned Go quality tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          tool_dir="${RUNNER_TEMP}/sentinelops-tools"
+          mkdir -p "${tool_dir}"
+          GOBIN="${tool_dir}" go install honnef.co/go/tools/cmd/staticcheck@v0.8.1
+          GOBIN="${tool_dir}" go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+          GOBIN="${tool_dir}" go install github.com/pressly/goose/v3/cmd/goose@v3.27.3
+          echo "${tool_dir}" >> "${GITHUB_PATH}"
+          echo "SENTINELOPS_GOOSE_BIN=${tool_dir}/goose" >> "${GITHUB_ENV}"
+      - name: Run backend hard gates
+        run: scripts/ci/pr.sh --lane backend
+
+  frontend:
+    name: Node install, lint and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      # actions/checkout v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # actions/setup-node v6.5.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.19.0
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Run frontend hard gates
+        run: scripts/ci/pr.sh --lane frontend
+
+  contracts:
+    name: Workflow, scripted Agent, MCP, Skill, Policy and Budget contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      # actions/checkout v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # actions/setup-go v6.5.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Install pinned workflow linter
+        shell: bash
+        run: |
+          set -euo pipefail
+          tool_dir="${RUNNER_TEMP}/sentinelops-tools"
+          mkdir -p "${tool_dir}"
+          GOBIN="${tool_dir}" go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          echo "${tool_dir}" >> "${GITHUB_PATH}"
+      - name: Validate workflow contracts
+        run: scripts/ci/workflow-contract.sh
+      - name: Run Agent runtime contracts
+        run: scripts/ci/pr.sh --lane contracts
