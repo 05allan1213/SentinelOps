@@ -46,7 +46,7 @@ type GetApprovalRes struct {
 type ApproveApprovalReq struct {
 	g.Meta          `path:"/ops/v1/approvals/{id}/approve" method:"post"`
 	ID              string `p:"id" v:"required"`
-	ProposalHash    string `json:"proposal_hash" v:"required|length:64"`
+	ProposalHash    string `json:"proposal_hash" v:"required|length:64,64"`
 	ExpectedVersion uint64 `json:"version" v:"required|min:1"`
 	Reason          string `json:"reason"`
 }
@@ -58,7 +58,7 @@ type ApproveApprovalRes struct {
 type RejectApprovalReq struct {
 	g.Meta          `path:"/ops/v1/approvals/{id}/reject" method:"post"`
 	ID              string `p:"id" v:"required"`
-	ProposalHash    string `json:"proposal_hash" v:"required|length:64"`
+	ProposalHash    string `json:"proposal_hash" v:"required|length:64,64"`
 	ExpectedVersion uint64 `json:"version" v:"required|min:1"`
 	Reason          string `json:"reason"`
 }

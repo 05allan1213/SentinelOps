@@ -2,9 +2,11 @@ package plan_pipeline
 
 import (
 	"context"
+	"fmt"
 
 	"SentinelOps/internal/ai/models"
 	"SentinelOps/internal/ai/prompt/agents"
+	airuntime "SentinelOps/internal/ai/runtime"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/planexecute"
@@ -38,6 +40,25 @@ func NewPlanner(ctx context.Context) (adk.Agent, error) {
 	}
 	// ToolCallingChatModel：Planner 通过 Tool Call 输出结构化 Plan，
 	// 比自由文本生成更稳定，JSON 解析成功率更高。
+	return planexecute.NewPlanner(ctx, &planexecute.PlannerConfig{
+		ToolCallingChatModel: planModel,
+		GenInputFn:           customPlannerGenInput,
+	})
+}
+
+// NewPlannerWithRuntimeHandler 构建 durable Planner，并复用已绑定的物理模型候选。
+func NewPlannerWithRuntimeHandler(ctx context.Context, handler *airuntime.RuntimeHandler) (adk.Agent, error) {
+	if handler == nil {
+		return nil, fmt.Errorf("durable Planner RuntimeHandler is required")
+	}
+	reliability, err := models.BuildReliability(ctx, "reasoning", airuntime.PhysicalModelBinder(handler))
+	if err != nil {
+		return nil, err
+	}
+	planModel, err := reliability.PrimaryToolCallingModel()
+	if err != nil {
+		return nil, err
+	}
 	return planexecute.NewPlanner(ctx, &planexecute.PlannerConfig{
 		ToolCallingChatModel: planModel,
 		GenInputFn:           customPlannerGenInput,

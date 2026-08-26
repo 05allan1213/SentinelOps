@@ -2,6 +2,8 @@ package plan_pipeline
 
 import (
 	"context"
+	"fmt"
+	"sync"
 
 	"SentinelOps/internal/ai/agent/event_analysis_pipeline"
 	"SentinelOps/internal/ai/agent/intelligence_pipeline"
@@ -30,19 +32,16 @@ type namedWorkerAgent struct {
 	getter      func(context.Context) (adk.Agent, error)
 	builder     func(context.Context, *airuntime.RuntimeHandler) (adk.Agent, error)
 	handler     *airuntime.RuntimeHandler
+	buildOnce   sync.Once
+	builtAgent  adk.Agent
+	buildErr    error
 }
 
 func (a *namedWorkerAgent) Name(context.Context) string        { return a.name }
 func (a *namedWorkerAgent) Description(context.Context) string { return a.description }
 
 func (a *namedWorkerAgent) Run(ctx context.Context, input *adk.AgentInput, opts ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
-	var agent adk.Agent
-	var err error
-	if a.handler != nil && a.builder != nil {
-		agent, err = a.builder(ctx, a.handler)
-	} else {
-		agent, err = a.getter(ctx)
-	}
+	agent, err := a.resolve(ctx)
 	if err != nil {
 		iter, generator := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 		generator.Send(&adk.AgentEvent{Err: err})
@@ -60,6 +59,35 @@ func (a *namedWorkerAgent) Run(ctx context.Context, input *adk.AgentInput, opts 
 		return agent.Run(ctx, workerAgentInputWithHistory(input, history), opts...)
 	}
 	return agent.Run(ctx, workerAgentInput(ctx, input), opts...)
+}
+
+// Resume forwards the official ADK checkpoint resume into the durable child
+// agent. AgentTool propagates nested interrupts through this interface; without
+// it the parent plan can publish approval but cannot continue after CAS.
+func (a *namedWorkerAgent) Resume(ctx context.Context, info *adk.ResumeInfo, opts ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
+	agent, err := a.resolve(ctx)
+	if err == nil {
+		resumable, ok := agent.(adk.ResumableAgent)
+		if !ok {
+			err = fmt.Errorf("worker agent %q does not support resume", a.name)
+		} else {
+			return resumable.Resume(ctx, info, opts...)
+		}
+	}
+	iter, generator := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
+	generator.Send(&adk.AgentEvent{Err: err})
+	generator.Close()
+	return iter
+}
+
+func (a *namedWorkerAgent) resolve(ctx context.Context) (adk.Agent, error) {
+	if a.handler != nil && a.builder != nil {
+		a.buildOnce.Do(func() {
+			a.builtAgent, a.buildErr = a.builder(ctx, a.handler)
+		})
+		return a.builtAgent, a.buildErr
+	}
+	return a.getter(ctx)
 }
 
 // workerAgentInputWithHistory 只接收 Attempt 的 immutable Revision History。

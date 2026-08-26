@@ -12,12 +12,14 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 
 	"SentinelOps/internal/ai/policy"
 
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/schema"
 )
 
 var (
@@ -107,12 +109,77 @@ func GetManyRequired(names []string) ([]tool.BaseTool, error) {
 		if hash != entry.SchemaHash {
 			return nil, fmt.Errorf("required tool %q schema hash = %s, want %s", name, hash, entry.SchemaHash)
 		}
-		result = append(result, instance)
+		result = append(result, stableInfoTool(instance))
 	}
 	if len(result) != len(names) {
 		return nil, fmt.Errorf("required tool count = %d, want %d", len(result), len(names))
 	}
 	return result, nil
+}
+
+// stableInfoTool isolates the Registry's canonical ToolInfo from framework
+// adapters. Eino model adapters may normalize JSON Schema in place (for
+// example, sorting nested required fields); returning a deep copy keeps the
+// registered schema and its catalog hash immutable across Agent lifecycles.
+func stableInfoTool(instance tool.BaseTool) tool.BaseTool {
+	switch typed := instance.(type) {
+	case tool.EnhancedStreamableTool:
+		return &stableEnhancedStreamableTool{EnhancedStreamableTool: typed}
+	case tool.EnhancedInvokableTool:
+		return &stableEnhancedInvokableTool{EnhancedInvokableTool: typed}
+	case tool.StreamableTool:
+		return &stableStreamableTool{StreamableTool: typed}
+	case tool.InvokableTool:
+		return &stableInvokableTool{InvokableTool: typed}
+	default:
+		return &stableBaseTool{BaseTool: instance}
+	}
+}
+
+func stableToolInfo(ctx context.Context, source tool.BaseTool) (*schema.ToolInfo, error) {
+	info, err := source.Info(ctx)
+	if err != nil || info == nil {
+		return info, err
+	}
+	raw, err := json.Marshal(info)
+	if err != nil {
+		return nil, fmt.Errorf("clone ToolInfo: %w", err)
+	}
+	var clone schema.ToolInfo
+	if err := json.Unmarshal(raw, &clone); err != nil {
+		return nil, fmt.Errorf("clone ToolInfo: %w", err)
+	}
+	return &clone, nil
+}
+
+type stableBaseTool struct{ tool.BaseTool }
+
+func (t *stableBaseTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return stableToolInfo(ctx, t.BaseTool)
+}
+
+type stableInvokableTool struct{ tool.InvokableTool }
+
+func (t *stableInvokableTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return stableToolInfo(ctx, t.InvokableTool)
+}
+
+type stableStreamableTool struct{ tool.StreamableTool }
+
+func (t *stableStreamableTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return stableToolInfo(ctx, t.StreamableTool)
+}
+
+type stableEnhancedInvokableTool struct{ tool.EnhancedInvokableTool }
+
+func (t *stableEnhancedInvokableTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return stableToolInfo(ctx, t.EnhancedInvokableTool)
+}
+
+type stableEnhancedStreamableTool struct{ tool.EnhancedStreamableTool }
+
+func (t *stableEnhancedStreamableTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return stableToolInfo(ctx, t.EnhancedStreamableTool)
 }
 
 // All 返回所有已注册工具的快照（调试用）。

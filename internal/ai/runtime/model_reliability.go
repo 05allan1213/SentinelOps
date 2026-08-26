@@ -34,6 +34,11 @@ type boundPhysicalModel struct {
 	identity models.CandidateIdentity
 }
 
+// DurablePhysicalModel marks an endpoint that already owns the per-call
+// RuntimeHandler reservation wrapper. Middleware must not wrap it a second
+// time before the physical identity is injected.
+func (*boundPhysicalModel) DurablePhysicalModel() {}
+
 func (m *boundPhysicalModel) Generate(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.Message, error) {
 	callContext, err := m.callContext(ctx)
 	if err != nil {
@@ -48,6 +53,19 @@ func (m *boundPhysicalModel) Stream(ctx context.Context, input []*schema.Message
 		return nil, err
 	}
 	return (&runtimeModelEndpoint{handler: m.handler, endpoint: m.endpoint}).Stream(callContext, input, options...)
+}
+
+// WithTools 在官方 Planner/Replanner 附加工具后继续保留同一物理候选身份。
+func (m *boundPhysicalModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+	toolModel, ok := m.endpoint.(model.ToolCallingChatModel)
+	if !ok {
+		return nil, fmt.Errorf("physical model does not support tool calling")
+	}
+	configured, err := toolModel.WithTools(tools)
+	if err != nil {
+		return nil, err
+	}
+	return &boundPhysicalModel{handler: m.handler, endpoint: configured, identity: m.identity}, nil
 }
 
 func (m *boundPhysicalModel) callContext(ctx context.Context) (context.Context, error) {

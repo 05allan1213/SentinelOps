@@ -101,7 +101,11 @@ func (s *DurableService) CreateRun(ctx context.Context, request CreateDurableRun
 	if err != nil {
 		return nil, fmt.Errorf("marshal immutable durable input: %w", err)
 	}
-	budgetLimits := json.RawMessage(`{"max_tokens":8192}`)
+	// P14 requires the three base hard limits on every durable Run.  Keep the
+	// API default bounded to the same fifteen-minute lifetime as the Run
+	// deadline; token limits are enforced by the model adapter, not by the
+	// durable base-budget contract.
+	budgetLimits := json.RawMessage(`{"max_model_calls":64,"max_l0_tool_calls":32,"max_duration_ms":900000}`)
 	input := workflow.CreateRunInput{
 		ID:                 uuid.NewString(),
 		WorkflowKey:        "chat.intent",

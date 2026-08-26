@@ -16,7 +16,7 @@ func NewDurablePlanAgent(ctx context.Context, handler *airuntime.RuntimeHandler)
 	if handler == nil {
 		return nil, fmt.Errorf("durable Plan RuntimeHandler is required")
 	}
-	planner, err := NewPlanner(ctx)
+	planner, err := NewPlannerWithRuntimeHandler(ctx, handler)
 	if err != nil {
 		return nil, fmt.Errorf("build durable Planner: %w", err)
 	}
@@ -24,7 +24,7 @@ func NewDurablePlanAgent(ctx context.Context, handler *airuntime.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("build durable Executor: %w", err)
 	}
-	replanner, err := NewRePlanAgent(ctx)
+	replanner, err := NewRePlanAgentWithRuntimeHandler(ctx, handler)
 	if err != nil {
 		return nil, fmt.Errorf("build durable Replanner: %w", err)
 	}

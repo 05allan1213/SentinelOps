@@ -106,6 +106,38 @@ func TestQueryDatabaseIsNotRegisteredForDurableUse(t *testing.T) {
 	}
 }
 
+func TestGetManyRequiredIsolatesToolInfoMutation(t *testing.T) {
+	entry, err := policy.LookupCatalog("trigger_ops")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := GetManyRequired([]string{"trigger_ops"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := got[0].Info(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	js, err := info.ParamsOneOf.ToJSONSchema()
+	if err != nil {
+		t.Fatal(err)
+	}
+	js.Required = append(js.Required, "framework_mutation_probe")
+
+	canonical, err := registry["trigger_ops"].Info(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash, err := policy.ToolSchemaHash(canonical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hash != entry.SchemaHash {
+		t.Fatalf("canonical ToolInfo changed through durable result: got %s want %s", hash, entry.SchemaHash)
+	}
+}
+
 func withRegistryMutation(t *testing.T, mutate func()) {
 	t.Helper()
 	mu.Lock()

@@ -135,6 +135,7 @@ func TestRoleMatrixHTTP(t *testing.T) {
 	}{
 		{"viewer scoped read", "viewer", http.MethodGet, "/api/trace/v1/list", http.StatusOK},
 		{"viewer read-only run", "viewer", http.MethodPost, "/api/chat/v1/chat", http.StatusOK},
+		{"viewer durable read-only run", "viewer", http.MethodPost, "/api/chat/v2/runs", http.StatusOK},
 		{"viewer business write", "viewer", http.MethodPost, "/api/event/v1/create", http.StatusForbidden},
 		{"operator business write", "operator", http.MethodPost, "/api/event/v1/create", http.StatusOK},
 		{"operator approval", "operator", http.MethodPost, "/api/approval/v1/decide", http.StatusForbidden},

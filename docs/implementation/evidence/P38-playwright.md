@@ -1,0 +1,16 @@
+# P38 Compose 下真实 Playwright 审批链
+
+- Status: BLOCKED
+- Started from: `78a3afd` (`feat(web): connect approval and effect states`)
+- Spec references: P38；真实浏览器→API→MySQL→Worker→Checkpoint/Approval→Resume→Effect→UI 刷新；单一 `sentinelops-e2e` Compose project。
+- Boundary Audit: 本单元增加隔离 Compose 覆盖、provider double、Playwright 浏览器/API 验证与脱敏证据，并为已定位的 Eino `ToolInfo` 原地变异补充严格 Registry 的稳定信息代理；不修改计划、生产 Compose、Runtime/Store 契约、P39+ Eval/CI 或完整浏览器矩阵。
+- Compatibility and security invariants: 测试通过生产 API/Worker 路径；浏览器不直接写数据库；viewer approve 必须 403；重复决策/Effect 不得重复执行；测试卷、网络、容器名与端口不得复用开发/生产栈；Secret、DSN、Authorization、Cookie、模型输入原文不进入证据。
+- Build-or-Reuse: 复用 P03/P04/P20 的 Compose 基础、现有 API/Worker/Approval/Effect 与前端 ActionQueue；仅新增官方 OpenAI-compatible HTTP provider double 和 nginx/Playwright 接线，不建设第二套 Runtime、Store 或模型网关。
+- Actual files: `manifest/docker/docker-compose.test.yml`, `manifest/docker/Dockerfile.backend.e2e`, `manifest/docker/Dockerfile.nginx.e2e`, `manifest/docker/Dockerfile.provider-double`, `manifest/test/provider-double/main.go`, `web/playwright.config.ts`, `web/tests/e2e/approval-flow.spec.ts`, `web/tests/e2e/unknown-effect.spec.ts`。
+- Red test and expected failure: 首次按计划执行真实 Compose 启动时，`migrate` 镜像因访问 `proxy.golang.org` 超时失败；使用本地缓存的 goose v3.27.3 构造等价迁移镜像后，先修复了 durable Worker 生命周期中的共享 `ToolInfo` schema 变异。干净卷复跑已成功创建 `waiting_approval`，Approval API 决策后 Worker 进入 Resume，但依据 P26 冻结的 `agent_runtime.l1_writes/l2_writes=false` 以 `write_gate_closed` 失效并 park。
+- Local commands: `docker compose -p sentinelops-e2e -f manifest/docker/docker-compose.yml -f manifest/docker/docker-compose.test.yml config --format json`（PASS）；`npm run lint`（PASS，既有 67 条 warning）；`npm run build`（PASS）；`go build ./manifest/test/provider-double`（PASS）；`go test ./internal/ai/tools ./internal/ai/agent/plan_pipeline ./internal/ai/agent/ops_pipeline`（PASS）；`go vet ./internal/ai/tools ./internal/ai/agent/plan_pipeline ./internal/ai/agent/ops_pipeline`（PASS）；`docker compose ... up -d --build --wait`（PASS）；`SENTINELOPS_E2E_BASE_URL=http://127.0.0.1:18080 npx playwright test tests/e2e/approval-flow.spec.ts tests/e2e/unknown-effect.spec.ts --project=chromium`（1 FAIL，1 PASS，1 SKIP）。
+- Results: BLOCKED；Compose 隔离结构 PASS，Registry/Worker 回归测试 PASS，前端 lint/build PASS，provider double 编译 PASS；真实 Approval→Resume 事件链已到达 `approval.invalidated(reason=write_gate_closed)` 与 `run.parked(park_reason=approval_invalidated)`。Playwright 的成功 effect 断言仍 FAIL，unknown-effect 因未设置 `SENTINELOPS_E2E_UNKNOWN_EFFECT_FIXTURE` 显式 SKIP。未通过修改生产 Runtime 或测试夹具绕过 Gate。
+- Key assertions: 合并配置无固定 `container_name`、无宿主机数据 bind mount、默认网络为 project-scoped、持久卷以 `sentinelops-e2e` 命名；mysql 不暴露宿主端口；nginx 仅暴露可配置的测试 HTTP 端口；失败时只清理 `sentinelops-e2e`。
+- Deviations from recommended route: 为修复 Compose 合并隔离，使用 Compose `!override` 替换基础 ports/volumes；未修改基础 Compose 或迁移 Dockerfile。
+- Raw artifact references: `.artifacts/implementation/P38/compose-failure.log`；`.artifacts/implementation/P38/playwright-test-results/`（包含失败 trace/error context；未将 Secret、完整 DSN 或 Authorization 写入摘要）。
+- Unfinished items: 需要后续单元明确测试环境如何合法开启 L1/L2 write Gate，或调整 P38 预期后，才能完成 mutation Effect succeeded、SSE replay/reconnect 与 unknown admin resolution；本单元不修改 P26/P42 的 Runtime Gate 契约。P39+ 保持 NOT RUN。

@@ -42,6 +42,19 @@ type Reliability struct {
 	failover *adk.ModelFailoverConfig[*schema.Message]
 }
 
+// PrimaryToolCallingModel 返回首个已绑定 RuntimeHandler 的 ToolCalling 模型。
+// Planner/Replanner 也必须复用同一物理候选绑定，不能绕过 durable invocation identity。
+func (r *Reliability) PrimaryToolCallingModel() (model.ToolCallingChatModel, error) {
+	if r == nil || r.initial == nil {
+		return nil, fmt.Errorf("reliability primary model is required")
+	}
+	toolModel, ok := r.initial.(model.ToolCallingChatModel)
+	if !ok {
+		return nil, fmt.Errorf("reliability primary model does not support tool calling")
+	}
+	return toolModel, nil
+}
+
 // PrimaryModel 返回已绑定 RuntimeHandler 的首个候选，仅供官方上下文 Middleware 复用。
 func (r *Reliability) PrimaryModel() model.BaseChatModel {
 	if r == nil {
@@ -184,6 +197,24 @@ type candidateModel struct {
 	endpoint model.BaseChatModel
 	health   *breaker.Health
 	order    int
+}
+
+// DurablePhysicalModel propagates the per-candidate reservation ownership to
+// the outer RuntimeHandler middleware when this candidate was bound by a
+// PhysicalModelBinder.
+func (m *candidateModel) DurablePhysicalModel() {}
+
+// WithTools 保留候选健康状态与物理 RuntimeHandler 绑定后再附加官方工具定义。
+func (m *candidateModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+	toolModel, ok := m.endpoint.(model.ToolCallingChatModel)
+	if !ok {
+		return nil, fmt.Errorf("model candidate does not support tool calling")
+	}
+	configured, err := toolModel.WithTools(tools)
+	if err != nil {
+		return nil, err
+	}
+	return &candidateModel{endpoint: configured, health: m.health, order: m.order}, nil
 }
 
 func (m *candidateModel) Generate(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.Message, error) {

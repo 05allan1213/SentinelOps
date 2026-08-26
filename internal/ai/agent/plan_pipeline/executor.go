@@ -41,15 +41,16 @@ func NewExecutor(ctx context.Context) (adk.Agent, error) {
 
 // NewExecutorWithRuntimeHandler 把同一个 RuntimeHandler 注入外层 Executor 和全部 AgentTool 叶子。
 func NewExecutorWithRuntimeHandler(ctx context.Context, handler *airuntime.RuntimeHandler) (adk.Agent, error) {
-	reliability, err := models.BuildReliability(ctx, "default", airuntime.PhysicalModelBinder(handler))
+	toolHandler := handler.ToolOnly()
+	reliability, err := models.BuildReliability(ctx, "default", airuntime.PhysicalModelBinder(toolHandler))
 	if err != nil {
 		return nil, err
 	}
 	return NewExecutorBuilder(ctx, &ExecutorBuilderConfig{
 		Reliability:         reliability,
 		RegisteredToolNames: []string{"query_internal_docs", "get_current_time"},
-		AgentTools:          append(newWorkerAgentTools(ctx, handler), mcp_pipeline.NewConfiguredMCPAgentTool(ctx, handler), skill_pipeline.NewConfiguredSkillAgentTool(ctx, handler)),
-		RuntimeHandler:      handler,
+		AgentTools:          append(newWorkerAgentTools(ctx, toolHandler), mcp_pipeline.NewConfiguredMCPAgentTool(ctx, toolHandler), skill_pipeline.NewConfiguredSkillAgentTool(ctx, toolHandler)),
+		RuntimeHandler:      toolHandler,
 		ContextGovernance:   true,
 	})
 }

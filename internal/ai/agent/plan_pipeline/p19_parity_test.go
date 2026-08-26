@@ -14,6 +14,7 @@ import (
 
 	"SentinelOps/internal/ai/cache"
 	"SentinelOps/internal/ai/policy"
+	airuntime "SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/ai/workflow"
 
 	"github.com/cloudwego/eino/adk"
@@ -96,6 +97,28 @@ func TestAgentToolWorkersPropagateNestedRun(t *testing.T) {
 		}
 	default:
 		t.Fatal("real wrapped Agent was not invoked")
+	}
+}
+
+func TestNamedWorkerAgentCachesBuilderAcrossLifecycle(t *testing.T) {
+	var builds atomic.Int32
+	worker := &namedWorkerAgent{
+		name: "cached_worker", description: "worker", handler: &airuntime.RuntimeHandler{},
+		builder: func(context.Context, *airuntime.RuntimeHandler) (adk.Agent, error) {
+			builds.Add(1)
+			return &p19RecordingAgent{name: "cached_worker"}, nil
+		},
+	}
+	first, err := worker.resolve(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := worker.resolve(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second || builds.Load() != 1 {
+		t.Fatalf("builder lifecycle = first=%p second=%p builds=%d, want one shared Agent", first, second, builds.Load())
 	}
 }
 

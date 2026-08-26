@@ -48,6 +48,20 @@ type RuntimeHandler struct {
 	*adk.BaseChatModelAgentMiddleware
 	approvalStore *workflow.GORMStore
 	effects       *effects.Executor
+	modelDisabled bool
+}
+
+// ToolOnly returns a stateless view that keeps tool approval/effect behavior
+// while leaving model wrapping to the physically bound candidate wrapper.
+// This is required for Eino agents whose middleware receives an opaque
+// endpoint wrapper and therefore cannot preserve per-candidate identity.
+func (h *RuntimeHandler) ToolOnly() *RuntimeHandler {
+	if h == nil {
+		return nil
+	}
+	copy := *h
+	copy.modelDisabled = true
+	return &copy
 }
 
 var _ adk.ChatModelAgentMiddleware = (*RuntimeHandler)(nil)
@@ -124,8 +138,16 @@ func (h *RuntimeHandler) WrapModel(_ context.Context, endpoint model.BaseChatMod
 	if h == nil || endpoint == nil {
 		return nil, fmt.Errorf("runtime Handler and Model endpoint are required")
 	}
+	if h.modelDisabled {
+		return endpoint, nil
+	}
 	if endpointType, ok := components.GetType(endpoint); ok && endpointType == "FailoverProxyModel" {
 		// P27 已把同一 Handler 绑定到每个真实候选；代理层不能再次 reserve/settle。
+		return endpoint, nil
+	}
+	if _, ok := endpoint.(interface{ DurablePhysicalModel() }); ok {
+		// Physical candidates already inject invocation identity and perform the
+		// durable reserve/settle around the endpoint call.
 		return endpoint, nil
 	}
 	return &runtimeModelEndpoint{handler: h, endpoint: endpoint}, nil

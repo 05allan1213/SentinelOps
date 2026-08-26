@@ -2,6 +2,7 @@ package chatsvc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync/atomic"
 	"testing"
@@ -13,11 +14,13 @@ import (
 
 func TestCreateRunCallsDurablePrimitiveOnceAndNeverExecutesAgent(t *testing.T) {
 	var creates atomic.Int32
+	var captured workflow.CreateRunInput
 	service, err := NewDurableService(DurableServiceConfig{
 		AcceptNewRuns: true,
 		Snapshot:      p20ServiceSnapshot(),
-		CreateRun: func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error) {
+		CreateRun: func(_ context.Context, input workflow.CreateRunInput) (*mysql.WorkflowRun, error) {
 			creates.Add(1)
+			captured = input
 			return &mysql.WorkflowRun{ID: "run-p20", Status: workflow.RunStatusPending}, nil
 		},
 		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
@@ -33,6 +36,13 @@ func TestCreateRunCallsDurablePrimitiveOnceAndNeverExecutesAgent(t *testing.T) {
 	}
 	if run.ID != "run-p20" || creates.Load() != 1 {
 		t.Fatalf("run=%+v creates=%d, want one durable create", run, creates.Load())
+	}
+	var limits workflow.BaseBudgetLimits
+	if err := json.Unmarshal(captured.BudgetLimitsJSON, &limits); err != nil {
+		t.Fatalf("decode budget limits: %v", err)
+	}
+	if limits.MaxModelCalls <= 0 || limits.MaxL0ToolCalls <= 0 || limits.MaxDurationMS <= 0 {
+		t.Fatalf("budget limits=%+v, want all P14 base limits positive", limits)
 	}
 }
 

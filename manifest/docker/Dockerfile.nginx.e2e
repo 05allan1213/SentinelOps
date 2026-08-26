@@ -1,0 +1,6 @@
+FROM nginx:1.27-alpine@sha256:ec0dfb306e19c90315e231a8c61b896693593fe766c131f9be54bae820cd3f02
+COPY manifest/docker/nginx/nginx.conf /etc/nginx/conf.d/default.conf
+COPY manifest/docker/nginx/docker-entrypoint.sh /custom-entrypoint.sh
+RUN chmod +x /custom-entrypoint.sh && mkdir -p /app/nginx_blocklist
+ENTRYPOINT ["/custom-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]

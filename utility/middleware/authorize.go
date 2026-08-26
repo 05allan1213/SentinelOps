@@ -59,7 +59,7 @@ func requestPermission(method, path string) (policy.Permission, bool) {
 		}
 		return policy.PermissionViewScoped, false
 	}
-	if path == "/api/chat/v1/chat" || path == "/api/event/v1/analyze/stream" || path == "/api/event/v1/pipeline/stream" {
+	if path == "/api/chat/v1/chat" || path == "/api/chat/v2/runs" || path == "/api/event/v1/analyze/stream" || path == "/api/event/v1/pipeline/stream" {
 		return policy.PermissionCreateReadOnlyRun, false
 	}
 	if path == "/api/knowledge/v1/search" {

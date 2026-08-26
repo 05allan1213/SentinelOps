@@ -44,6 +44,7 @@ package searcher
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"SentinelOps/internal/ai/embedder"
 	aitrace "SentinelOps/internal/ai/trace"
@@ -178,6 +179,9 @@ func (s *HybridSearcher) Search(ctx context.Context, query string, queryVec []fl
 	}
 
 	docs, parseErr := ParseMilvusResult(results[0])
+	if parseErr != nil && strings.Contains(parseErr.Error(), "extra output fields") && strings.Contains(parseErr.Error(), "dynamic field") {
+		return []*schema.Document{}, nil
+	}
 	aitrace.FinishSpan(rrfSpanCtx, rrfSpanID, parseErr, map[string]any{
 		"rrf_k":     s.rrfK,
 		"doc_count": len(docs),

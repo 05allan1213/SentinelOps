@@ -2,7 +2,9 @@ package plan_pipeline
 
 import (
 	"SentinelOps/internal/ai/models"
+	airuntime "SentinelOps/internal/ai/runtime"
 	"context"
+	"fmt"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/planexecute"
@@ -31,4 +33,20 @@ func NewRePlanAgent(ctx context.Context) (adk.Agent, error) {
 	return planexecute.NewReplanner(ctx, &planexecute.ReplannerConfig{
 		ChatModel: model,
 	})
+}
+
+// NewRePlanAgentWithRuntimeHandler 构建 durable Replanner，并复用已绑定的物理模型候选。
+func NewRePlanAgentWithRuntimeHandler(ctx context.Context, handler *airuntime.RuntimeHandler) (adk.Agent, error) {
+	if handler == nil {
+		return nil, fmt.Errorf("durable Replanner RuntimeHandler is required")
+	}
+	reliability, err := models.BuildReliability(ctx, "reasoning", airuntime.PhysicalModelBinder(handler))
+	if err != nil {
+		return nil, err
+	}
+	chatModel, err := reliability.PrimaryToolCallingModel()
+	if err != nil {
+		return nil, err
+	}
+	return planexecute.NewReplanner(ctx, &planexecute.ReplannerConfig{ChatModel: chatModel})
 }

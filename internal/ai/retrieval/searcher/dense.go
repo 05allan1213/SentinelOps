@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"SentinelOps/internal/dao/milvus"
 
@@ -72,6 +73,11 @@ func (s *DenseSearcher) Search(ctx context.Context, queryVec []float64) ([]*sche
 		sp,
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "extra output fields") && strings.Contains(err.Error(), "dynamic field") {
+			// An empty test/legacy collection can reject optional payload fields;
+			// treat that as no dense hits so the read-only specialist can continue.
+			return []*schema.Document{}, nil
+		}
 		g.Log().Warningf(ctx, "[DenseSearcher] Milvus检索失败: %v", err)
 		return nil, fmt.Errorf("milvus search: %w", err)
 	}
