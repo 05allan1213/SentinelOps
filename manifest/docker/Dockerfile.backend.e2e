@@ -19,8 +19,11 @@ RUN sed -i \
       -e 's#https://dashscope.aliyuncs.com/compatible-mode/v1#http://provider-double:8080/v1#g' \
       -e 's#https://dashscope.aliyuncs.com/compatible-api/v1#http://provider-double:8080/v1#g' \
       -e 's/nginx_container: "nginx"/nginx_container: "sentinelops-e2e-nginx-1"/' \
+      -e '/^skill:/,/^agent_runtime:/ s/enabled: false/enabled: true/' \
       -e '/^agent_runtime:/,/^observability:/ s/enabled: false/enabled: true/' \
       -e '/^agent_runtime:/,/^observability:/ s/accept_new_runs: false/accept_new_runs: true/' \
+      -e '/^agent_runtime:/,/^observability:/ s/l1_writes: false/l1_writes: true/' \
+      -e '/^agent_runtime:/,/^observability:/ s/l2_writes: false/l2_writes: true/' \
       manifest/config/config.yaml && \
     mkdir -p ./manifest/upload/knowledge && \
     mkdir -p ./nginx_blocklist && \

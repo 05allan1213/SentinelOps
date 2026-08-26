@@ -191,11 +191,13 @@ type Email struct {
 	LegacySMTPPassword *string   `yaml:"smtp_pass,omitempty" json:"-"`
 }
 
-// AgentRuntime 保存 durable Agent 的静态 Gate；P42 前生产环境禁止 accept_new_runs。
+// AgentRuntime 保存 durable Agent 的静态 Gate 上限。
 type AgentRuntime struct {
 	Enabled                 bool `yaml:"enabled" json:"enabled"`
 	AcceptNewRuns           bool `yaml:"accept_new_runs" json:"accept_new_runs"`
 	ShadowMode              bool `yaml:"shadow_mode" json:"shadow_mode"`
+	L1Writes                bool `yaml:"l1_writes" json:"l1_writes"`
+	L2Writes                bool `yaml:"l2_writes" json:"l2_writes"`
 	AdminQueryDatabaseDebug bool `yaml:"admin_query_database_debug" json:"admin_query_database_debug"`
 }
 

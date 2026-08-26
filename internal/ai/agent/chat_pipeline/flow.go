@@ -3,11 +3,14 @@ package chat_pipeline
 import (
 	"context"
 
+	airuntime "SentinelOps/internal/ai/runtime"
 	toolsevent "SentinelOps/internal/ai/tools/event"
 	toolsintelligence "SentinelOps/internal/ai/tools/intelligence"
 	toolsops "SentinelOps/internal/ai/tools/ops"
 	toolsreport "SentinelOps/internal/ai/tools/report"
 	toolssystem "SentinelOps/internal/ai/tools/system"
+	appconfig "SentinelOps/internal/config"
+	dao "SentinelOps/internal/dao/mysql"
 
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
@@ -49,7 +52,7 @@ func newReactAgentLambda(ctx context.Context) (lba *compose.Lambda, err error) {
 	//   - 执行函数（实际业务逻辑）
 
 	// 数据库只读查询：执行任意 SELECT 语句，覆盖专用工具未提供的聚合/跨表查询场景
-	config.ToolsConfig.Tools = append(config.ToolsConfig.Tools, toolssystem.NewQueryDatabaseTool())
+	config.ToolsConfig.Tools = append(config.ToolsConfig.Tools, toolssystem.NewQueryDatabaseTool(currentAdminQueryDatabaseGate))
 
 	// 当前时间：返回秒/毫秒/微秒时间戳，解决 LLM 不感知实时时间的问题。
 	// 尤其用于 SearchLog 工具的 From/To 时间范围计算（LLM 先调此工具获取 T，再计算时间窗口）
@@ -85,4 +88,20 @@ func newReactAgentLambda(ctx context.Context) (lba *compose.Lambda, err error) {
 		return nil, err
 	}
 	return lba, nil
+}
+
+func currentAdminQueryDatabaseGate(ctx context.Context) (bool, error) {
+	config, err := appconfig.Current()
+	if err != nil {
+		return false, err
+	}
+	evaluator, err := airuntime.NewGateEvaluator(airuntime.StaticGateCaps(config), dao.GetSettings)
+	if err != nil {
+		return false, err
+	}
+	current, err := evaluator.Current(ctx)
+	if err != nil {
+		return false, err
+	}
+	return current.Enabled(airuntime.GateAgentRuntimeAdminQueryDatabaseDebug), nil
 }

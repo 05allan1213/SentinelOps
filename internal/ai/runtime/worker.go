@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"SentinelOps/internal/ai/effects"
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
 )
 
@@ -27,6 +28,8 @@ type WorkerConfig struct {
 	Complete               func(context.Context, workflow.CompleteRunInput) error
 	ProjectRevision        func(context.Context, string, []byte) error
 	Retention              *RetentionCoordinator
+	RuntimeVersion         string
+	Gates                  *GateEvaluator
 }
 
 // Worker 只委派唯一 workflow.GORMStore，并承载 P20 唯一 durable poll loop。
@@ -113,6 +116,9 @@ func NewWorker(store *workflow.GORMStore, config WorkerConfig) (*Worker, error) 
 	if config.ReconciliationBatch == 0 {
 		config.ReconciliationBatch = 100
 	}
+	if config.Gates != nil && config.Execute != nil && strings.TrimSpace(config.RuntimeVersion) == "" {
+		return nil, fmt.Errorf("release-controlled Worker requires an exact runtime version")
+	}
 	worker := &Worker{
 		store: store, config: config, claimNext: config.ClaimNext, execute: config.Execute,
 		heartbeat: config.Heartbeat, transition: config.Transition, complete: config.Complete, projectRevision: config.ProjectRevision,
@@ -150,8 +156,17 @@ func NewWorker(store *workflow.GORMStore, config WorkerConfig) (*Worker, error) 
 
 // ClaimNext 尝试认领一个 Run；空结果由调用方使用 NextPollBackoff 退避。
 func (w *Worker) ClaimNext(ctx context.Context) (*workflow.ClaimedRun, bool, error) {
+	if w.config.Gates != nil {
+		current, err := w.config.Gates.Current(ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		if !current.Enabled(GateAgentRuntimeEnabled) {
+			return nil, false, nil
+		}
+	}
 	return w.store.ClaimNextRun(ctx, workflow.ClaimInput{
-		Owner: w.config.Owner, LeaseDuration: w.config.LeaseDuration,
+		Owner: w.config.Owner, LeaseDuration: w.config.LeaseDuration, RuntimeVersion: w.config.RuntimeVersion,
 	})
 }
 
@@ -266,8 +281,17 @@ func (w *Worker) reconcileEffects(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if w.config.Gates != nil {
+		current, gateErr := w.config.Gates.Current(ctx)
+		if gateErr != nil {
+			return reaped > 0, gateErr
+		}
+		if !current.Enabled(GateAgentRuntimeEnabled) {
+			return reaped > 0, nil
+		}
+	}
 	claim, ok, err := w.reconciler.Claim(ctx, workflow.ReconciliationClaimInput{
-		Owner: w.config.Owner, LeaseDuration: w.config.LeaseDuration,
+		Owner: w.config.Owner, LeaseDuration: w.config.LeaseDuration, RuntimeVersion: w.config.RuntimeVersion,
 	})
 	if err != nil || !ok {
 		return reaped > 0, err
@@ -287,12 +311,50 @@ func (w *Worker) queryReconciliationWithHeartbeat(ctx context.Context, claim *wo
 	var resolution workflow.ResolveEffectInput
 	var queryErr error
 	heartbeatErr := w.withLeaseHeartbeat(ctx, claim.Token, func(queryCtx context.Context) {
-		resolution, queryErr = w.reconciler.Query(queryCtx, claim, w.config.QueryEffectTargetState, w.config.Owner)
+		query := w.config.QueryEffectTargetState
+		if w.config.Gates != nil {
+			allowed, gateErr := w.reconciliationGateAllowed(queryCtx, claim)
+			if gateErr != nil || !allowed {
+				query = func(context.Context, effects.ReconciliationTarget) (effects.TargetState, error) {
+					if gateErr != nil {
+						return effects.TargetState{Known: false, Evidence: map[string]any{"gate": "unavailable"}}, gateErr
+					}
+					return effects.TargetState{Known: false, Evidence: map[string]any{"gate": "closed"}}, effects.ErrEffectGateClosed
+				}
+			}
+		}
+		resolution, queryErr = w.reconciler.Query(queryCtx, claim, query, w.config.Owner)
 	})
 	if heartbeatErr != nil {
 		return workflow.ResolveEffectInput{}, heartbeatErr
 	}
 	return resolution, queryErr
+}
+
+func (w *Worker) reconciliationGateAllowed(ctx context.Context, claim *workflow.ReconciliationClaim) (bool, error) {
+	if claim == nil || w.config.Gates == nil {
+		return false, fmt.Errorf("reconciliation claim and Gate evaluator are required")
+	}
+	snapshot, err := RuntimeSnapshotFromRun(claim.Run)
+	if err != nil {
+		return false, err
+	}
+	effective, err := w.config.Gates.Effective(ctx, snapshot)
+	if err != nil {
+		return false, err
+	}
+	if !effective.Enabled(GateAgentRuntimeEnabled) {
+		return false, nil
+	}
+	entry, err := policy.LookupCatalog(claim.Effect.ToolName)
+	if err != nil {
+		return false, err
+	}
+	gate := GateAgentRuntimeL1Writes
+	if entry.Risk == policy.RiskL2 {
+		gate = GateAgentRuntimeL2Writes
+	}
+	return effective.Enabled(gate), nil
 }
 
 // ExpireDueApprovals 复用同一 durable poll loop 执行一次有界到期扫描。

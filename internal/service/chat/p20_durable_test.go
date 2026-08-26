@@ -89,6 +89,34 @@ func TestCreateRunGateClosedDoesNotTouchStore(t *testing.T) {
 	}
 }
 
+func TestEffectiveGateCreateRunReloadsAndFreezesEachRequest(t *testing.T) {
+	var loads atomic.Int32
+	var creates atomic.Int32
+	service, err := NewDurableService(DurableServiceConfig{
+		SnapshotLoader: func(context.Context) (runtime.FrozenRuntimeSnapshot, error) {
+			return p20ServiceSnapshotWithAccept(loads.Add(1) == 1), nil
+		},
+		CreateRun: func(_ context.Context, input workflow.CreateRunInput) (*mysql.WorkflowRun, error) {
+			creates.Add(1)
+			return &mysql.WorkflowRun{ID: input.ID}, nil
+		},
+		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := CreateDurableRunRequest{SessionID: "session-p42", Query: "reload gates"}
+	if _, err := service.CreateRun(context.Background(), request); err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	if _, err := service.CreateRun(context.Background(), request); !errors.Is(err, ErrDurableRunGateClosed) {
+		t.Fatalf("second create error=%v, want closed Gate", err)
+	}
+	if loads.Load() != 2 || creates.Load() != 1 {
+		t.Fatalf("snapshot loads=%d creates=%d", loads.Load(), creates.Load())
+	}
+}
+
 func TestSSEReconnectOnlyReadsEventsAndChecksOwnerScope(t *testing.T) {
 	var reads atomic.Int32
 	service, err := NewDurableService(DurableServiceConfig{
@@ -116,6 +144,10 @@ func TestSSEReconnectOnlyReadsEventsAndChecksOwnerScope(t *testing.T) {
 }
 
 func p20ServiceSnapshot() runtime.FrozenRuntimeSnapshot {
+	return p20ServiceSnapshotWithAccept(true)
+}
+
+func p20ServiceSnapshotWithAccept(acceptNewRuns bool) runtime.FrozenRuntimeSnapshot {
 	frozen, err := runtime.FreezeRuntimeSnapshot(runtime.RuntimeSnapshotInput{
 		Runtime:       runtime.RuntimeVersionSnapshot{Go: "go1.27.0", Eino: "v0.9.15", App: "p20"},
 		AgentRevision: "agent-p20", PromptHash: p20ServiceHash('a'), PolicyHash: p20ServiceHash('b'),
@@ -123,7 +155,7 @@ func p20ServiceSnapshot() runtime.FrozenRuntimeSnapshot {
 		Models: []runtime.ModelSnapshot{{Kind: "chat", Profile: "default", CatalogRef: "test/chat", Provider: "test", Driver: "openai_compatible_chat", ModelID: "chat", Pricing: runtime.PricingSnapshot{Revision: "p20", Currency: "CNY", Unit: "per_million_tokens"}}},
 		Tools:  []runtime.ToolSnapshot{{Name: "query_events", Revision: "v1", SchemaHash: p20ServiceHash('e')}},
 		FeatureGates: map[string]bool{
-			"agent_runtime.enabled": true, "agent_runtime.accept_new_runs": true,
+			"agent_runtime.enabled": true, "agent_runtime.accept_new_runs": acceptNewRuns,
 			"agent_runtime.shadow_mode": false, "agent_runtime.l1_writes": false,
 			"agent_runtime.l2_writes": false, "agent_runtime.admin_query_database_debug": false,
 			"mcp.enabled": false, "skill.enabled": false, "langfuse.enabled": false,

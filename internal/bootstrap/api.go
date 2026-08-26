@@ -82,16 +82,29 @@ func newDurableAPIService(ctx context.Context) (*chatsvc.DurableService, error) 
 	if err != nil {
 		return nil, err
 	}
-	skillSnapshots, err := skill_pipeline.BuildConfiguredSkillSnapshots(ctx, config)
-	if err != nil {
-		return nil, err
-	}
-	snapshot, err := airuntime.BuildDurableRuntimeSnapshotWithSkills(config, skillSnapshots)
+	evaluator, err := airuntime.NewGateEvaluator(airuntime.StaticGateCaps(config), dao.GetSettings)
 	if err != nil {
 		return nil, err
 	}
 	return chatsvc.NewDurableService(chatsvc.DurableServiceConfig{
-		Store: workflow.NewGORMStore(db), AcceptNewRuns: config.AgentRuntime.AcceptNewRuns, Snapshot: snapshot,
+		Store: workflow.NewGORMStore(db),
+		SnapshotLoader: func(loadCtx context.Context) (airuntime.FrozenRuntimeSnapshot, error) {
+			gates, loadErr := evaluator.Current(loadCtx)
+			if loadErr != nil {
+				return airuntime.FrozenRuntimeSnapshot{}, loadErr
+			}
+			if !gates.Enabled(airuntime.GateAgentRuntimeEnabled) || !gates.Enabled(airuntime.GateAgentRuntimeAcceptNewRuns) {
+				return airuntime.FrozenRuntimeSnapshot{}, chatsvc.ErrDurableRunGateClosed
+			}
+			var skillSnapshots []airuntime.SkillSnapshot
+			if gates.Enabled(airuntime.GateSkillEnabled) {
+				skillSnapshots, loadErr = skill_pipeline.BuildConfiguredSkillSnapshots(loadCtx, config)
+				if loadErr != nil {
+					return airuntime.FrozenRuntimeSnapshot{}, loadErr
+				}
+			}
+			return airuntime.BuildDurableRuntimeSnapshotWithSkillsAndGates(config, skillSnapshots, gates)
+		},
 	})
 }
 

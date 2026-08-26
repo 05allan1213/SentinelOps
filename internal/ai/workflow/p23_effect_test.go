@@ -160,6 +160,37 @@ func TestReuseSucceededSkipsDomainWriteAndRejectsStaleGuards(t *testing.T) {
 	}
 }
 
+func TestShadowModeApprovedEffectCreatesNoLedgerOrMutation(t *testing.T) {
+	db := newP07Database(t, "p42_shadow_zero_effect")
+	store, ctx, run, lease, approval := p23ApprovedEffectFixture(t, db, "p42-shadow", "create_report")
+	input := p23EffectInput(run, lease, approval, "call-p42-shadow")
+	input.GateAllowed = false
+	endpointCalled := false
+	_, err := store.TransitionEffectWithEvent(ctx, input, func(callbackCtx context.Context) (string, error) {
+		endpointCalled = true
+		bound, bindErr := mysql.DB(callbackCtx)
+		if bindErr != nil {
+			return "", bindErr
+		}
+		return `{"report_id":"report-p42-shadow"}`, bound.Create(&mysql.Report{
+			ID: "report-p42-shadow", Title: "shadow", Type: "custom",
+		}).Error
+	})
+	if !errors.Is(err, policy.ErrForbidden) || endpointCalled {
+		t.Fatalf("shadow Effect err=%v endpoint_called=%t", err, endpointCalled)
+	}
+	var effectCount, reportCount int64
+	if err := db.Model(&mysql.AgentEffect{}).Where("run_id = ?", run.ID).Count(&effectCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&mysql.Report{}).Where("id = ?", "report-p42-shadow").Count(&reportCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if effectCount != 0 || reportCount != 0 {
+		t.Fatalf("shadow leaked effects=%d reports=%d", effectCount, reportCount)
+	}
+}
+
 func TestTransactionalEffectRejectsUnredactedRequest(t *testing.T) {
 	for name, request := range map[string]string{
 		"unredacted":     `{"password":"plaintext"}`,

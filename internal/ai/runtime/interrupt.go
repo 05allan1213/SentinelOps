@@ -106,11 +106,15 @@ func (h *RuntimeHandler) handleApprovalToolCall(
 		if entry.Risk == policy.RiskL2 {
 			gateName = "agent_runtime.l2_writes"
 		}
+		gateAllowed, gateErr := h.GateAllowed(ctx, gateName)
+		if gateErr != nil {
+			return nil, true, gateErr
+		}
 		_, err = h.approvalStore.AuthorizeApprovalResume(ctx, workflow.AuthorizeApprovalResumeInput{
 			Lease: attempt.Lease, ApprovalID: restored.ApprovalID, ProposalHash: restored.ProposalHash,
 			ToolName: restored.ToolName, ToolRevision: restored.ToolRevision, ToolSchemaHash: restored.ToolSchemaHash,
 			PolicyHash: restored.PolicyHash, RuntimeCompatibilityHash: restored.RuntimeCompatibilityHash,
-			ExplicitTarget: true, GateAllowed: attempt.Snapshot.FeatureGate(gateName),
+			ExplicitTarget: true, GateAllowed: gateAllowed,
 		})
 		if err != nil {
 			return nil, true, err
@@ -122,7 +126,10 @@ func (h *RuntimeHandler) handleApprovalToolCall(
 			ArgumentsJSON: restored.ArgumentsJSON, PolicyHash: restored.PolicyHash,
 			RuntimeCompatibilityHash: restored.RuntimeCompatibilityHash,
 			EffectSteps:              append([]string(nil), restored.EffectSteps...), Attempt: attempt.Run.Attempt,
-			TraceID: attempt.Trace.ID, GateAllowed: attempt.Snapshot.FeatureGate(gateName),
+			TraceID: attempt.Trace.ID, GateAllowed: gateAllowed,
+			GateCheck: func(checkCtx context.Context) (bool, error) {
+				return h.GateAllowed(checkCtx, gateName)
+			},
 			Deadline: attempt.Deadline, LeaseSafetyMargin: 5 * time.Second,
 		}}, true, nil
 	}

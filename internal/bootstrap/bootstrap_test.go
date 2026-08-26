@@ -3,10 +3,14 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"SentinelOps/internal/ai/agent/skill_pipeline"
+	airuntime "SentinelOps/internal/ai/runtime"
 	appconfig "SentinelOps/internal/config"
 )
 
@@ -271,17 +275,109 @@ func TestBootstrapLoadsConfigBeforeRetrievalWarmUp(t *testing.T) {
 	}
 }
 
-func TestProductionAcceptNewRunsGateRemainsClosed(t *testing.T) {
+func TestProductionAllowsStaticRuntimeCapsBehindDynamicGate(t *testing.T) {
 	var calls []string
+	t.Setenv(airuntime.RuntimeVersionEnv, "sha256:"+strings.Repeat("a", 64))
 	cfg := validBootstrapConfig("production")
 	cfg.AgentRuntime.Enabled = true
 	cfg.AgentRuntime.AcceptNewRuns = true
 	err := run(context.Background(), Options{Role: RoleAPI, Resolver: validResolver()}, recordingDependencies(cfg, &calls))
-	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "accept-new-runs") {
-		t.Fatalf("run() error = %v, want production accept-new-runs rejection", err)
+	if err != nil {
+		t.Fatalf("production static Runtime caps were rejected: %v", err)
 	}
-	if strings.Contains(strings.Join(calls, ","), "api") {
-		t.Fatalf("API started with production accept-new-runs enabled: %v", calls)
+	if !strings.Contains(strings.Join(calls, ","), "api") {
+		t.Fatalf("API did not start behind dynamic Runtime Gate: %v", calls)
+	}
+}
+
+func TestProductionRejectsAmbiguousRuntimeVersion(t *testing.T) {
+	var calls []string
+	t.Setenv(airuntime.RuntimeVersionEnv, "development")
+	cfg := validBootstrapConfig("production")
+	cfg.AgentRuntime.Enabled = true
+	err := run(context.Background(), Options{Role: RoleAPI, Resolver: validResolver()}, recordingDependencies(cfg, &calls))
+	if err == nil || !strings.Contains(err.Error(), "immutable Git SHA or sha256 digest") {
+		t.Fatalf("run() error = %v, want ambiguous runtime version rejection", err)
+	}
+}
+
+func TestRollbackCompatibilityUsesFrozenGateAndCurrentSkillContent(t *testing.T) {
+	t.Setenv(airuntime.RuntimeVersionEnv, strings.Repeat("a", 40))
+	baseDir := t.TempDir()
+	skillDir := filepath.Join(baseDir, "p42-skill")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	skillPath := filepath.Join(skillDir, "SKILL.md")
+	writeSkill := func(body string) {
+		t.Helper()
+		content := "---\nname: p42-skill\ndescription: P42 compatibility fixture.\n---\n\n" + body + "\n"
+		if err := os.WriteFile(skillPath, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeSkill("first content")
+
+	config := validBootstrapConfig("test")
+	config.Skill = appconfig.SkillConfig{Enabled: true, BaseDir: baseDir, MaxBytes: 4096}
+	skills, err := skill_pipeline.BuildConfiguredSkillSnapshots(context.Background(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frozen, err := airuntime.BuildDurableRuntimeSnapshotWithSkills(config, skills)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	openDynamic := func(context.Context, []string) (map[string]string, error) {
+		values := make(map[string]string, len(airuntime.CanonicalGateKeys()))
+		for _, key := range airuntime.CanonicalGateKeys() {
+			values[key] = "true"
+		}
+		return values, nil
+	}
+	closedStaticValues := make(map[string]bool, len(airuntime.CanonicalGateKeys()))
+	for _, key := range airuntime.CanonicalGateKeys() {
+		closedStaticValues[key] = true
+	}
+	closedStaticValues[airuntime.GateSkillEnabled] = false
+	closedStatic, err := airuntime.NewGateVector(closedStaticValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedEvaluator, err := airuntime.NewGateEvaluator(closedStatic, openDynamic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.Skill.BaseDir = filepath.Join(baseDir, "missing-skill-dir")
+	unchanged, err := expectedFrozenGateCompatibilityWithEvaluator(context.Background(), config, closedEvaluator, frozen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unchanged != frozen.CompatibilityHash() {
+		t.Fatalf("current static Skill cap rewrote frozen compatibility: got=%s want=%s", unchanged, frozen.CompatibilityHash())
+	}
+
+	writeSkill("changed content")
+	config.Skill.BaseDir = skillDir
+	openStaticValues := make(map[string]bool, len(airuntime.CanonicalGateKeys()))
+	for _, key := range airuntime.CanonicalGateKeys() {
+		openStaticValues[key] = true
+	}
+	openStatic, err := airuntime.NewGateVector(openStaticValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	openEvaluator, err := airuntime.NewGateEvaluator(openStatic, openDynamic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drifted, err := expectedFrozenGateCompatibilityWithEvaluator(context.Background(), config, openEvaluator, frozen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if drifted == frozen.CompatibilityHash() {
+		t.Fatal("current Worker Skill content drift was hidden by the frozen snapshot")
 	}
 }
 

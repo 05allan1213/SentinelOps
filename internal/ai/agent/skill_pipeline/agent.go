@@ -159,6 +159,13 @@ func buildConfiguredSkillAgent(ctx context.Context, handler *runtime.RuntimeHand
 	if handler == nil {
 		return nil, errors.New("skill agent RuntimeHandler is required")
 	}
+	allowed, err := handler.GateAllowed(ctx, runtime.GateSkillEnabled)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, errors.New("skill agent Gate is closed")
+	}
 	config, err := appconfig.Current()
 	if err != nil {
 		return nil, err
@@ -173,15 +180,56 @@ func buildConfiguredSkillAgent(ctx context.Context, handler *runtime.RuntimeHand
 			return nil, fmt.Errorf("resolve configured Skill BaseDir: %w", err)
 		}
 	}
+	allowed, err = handler.GateAllowed(ctx, runtime.GateSkillEnabled)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, errors.New("skill agent Gate is closed")
+	}
 	backend, err := NewSkillBackendFromFilesystem(ctx, baseDir)
 	if err != nil {
 		return nil, err
 	}
+	backend = &gateCheckedSkillBackend{delegate: backend, handler: handler}
 	return BuildSkillAgent(ctx, Config{
 		RuntimeHandler: handler, Backend: backend, BaseDir: baseDir,
 		MaxBytes: config.Skill.MaxBytes, Profile: defaultProfile,
 		ToolNames: append([]string(nil), DefaultToolNames...),
 	})
+}
+
+type gateCheckedSkillBackend struct {
+	delegate skill.Backend
+	handler  *runtime.RuntimeHandler
+}
+
+func (b *gateCheckedSkillBackend) List(ctx context.Context) ([]skill.FrontMatter, error) {
+	if err := b.require(ctx); err != nil {
+		return nil, err
+	}
+	return b.delegate.List(ctx)
+}
+
+func (b *gateCheckedSkillBackend) Get(ctx context.Context, name string) (skill.Skill, error) {
+	if err := b.require(ctx); err != nil {
+		return skill.Skill{}, err
+	}
+	return b.delegate.Get(ctx, name)
+}
+
+func (b *gateCheckedSkillBackend) require(ctx context.Context) error {
+	if b == nil || b.delegate == nil || b.handler == nil {
+		return errors.New("skill Gate backend is not initialized")
+	}
+	allowed, err := b.handler.GateAllowed(ctx, runtime.GateSkillEnabled)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return errors.New("skill agent Gate is closed")
+	}
+	return nil
 }
 
 // BuildConfiguredSkillSnapshots loads the configured read-only SOP catalog for

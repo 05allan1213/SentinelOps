@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"SentinelOps/internal/ai/retrieval"
+	airuntime "SentinelOps/internal/ai/runtime"
 	appconfig "SentinelOps/internal/config"
 	dao "SentinelOps/internal/dao/mysql"
 	authpkg "SentinelOps/utility/auth"
@@ -124,9 +125,6 @@ func run(ctx context.Context, options Options, deps dependencies) (runErr error)
 	if cfg.AgentRuntime.AcceptNewRuns && !cfg.AgentRuntime.Enabled {
 		return fmt.Errorf("durable accept-new-runs requires agent runtime enabled")
 	}
-	if cfg.AgentRuntime.AcceptNewRuns && cfg.App.Environment != "development" && cfg.App.Environment != "test" {
-		return fmt.Errorf("durable accept-new-runs must remain disabled outside development or test before P42")
-	}
 	resolver := options.Resolver
 	if resolver == nil {
 		resolver = appconfig.NewEnvironmentResolver()
@@ -134,6 +132,11 @@ func run(ctx context.Context, options Options, deps dependencies) (runErr error)
 	appconfig.SetSecretResolver(resolver)
 
 	production := cfg.App.Environment == "production"
+	if production && cfg.AgentRuntime.Enabled {
+		if err := airuntime.ValidateCurrentRuntimeVersion(); err != nil {
+			return fmt.Errorf("validate durable runtime version: %w", err)
+		}
+	}
 	if err := validateProductionSecrets(ctx, cfg, role, production); err != nil {
 		return err
 	}

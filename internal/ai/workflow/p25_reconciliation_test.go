@@ -113,6 +113,43 @@ func TestUnknownEffectOnlyReconcilableCanBeClaimed(t *testing.T) {
 	}
 }
 
+func TestRollbackCompatibilityReconciliationClaimsExactRuntimeVersion(t *testing.T) {
+	db := newP07Database(t, "p42_reconciliation_runtime_version")
+	store, ctx, run, lease, approval := p23ApprovedEffectFixture(t, db, "p42-reconcile-version", "block_ip")
+	input := p24ExternalInput(run, lease, approval)
+	if _, err := store.EnsureExternalEffectDAG(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	started, err := store.StartExternalEffect(ctx, StartExternalEffectInput{
+		Execution: input, EffectStep: EffectStepPrimary,
+		AttemptDeadline: time.Now().Add(time.Hour), LeaseSafetyMargin: time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkExternalEffectUnknownAndPark(ctx, FinishExternalEffectInput{
+		Execution: input, EffectID: started.Effect.ID, ExpectedVersion: started.Effect.Version,
+		LastErrorRedacted: "unknown", EvidenceRedacted: `{"outcome":"unknown"}`,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const compatibilityVersion = `{"app":"compatibility","eino":"v0.9.15","go":"go1.27.0"}`
+	if err := db.Model(&mysql.WorkflowRun{}).Where("id = ?", run.ID).Update("runtime_version", compatibilityVersion).Error; err != nil {
+		t.Fatal(err)
+	}
+	if claimed, ok, err := store.ClaimEffectReconciliation(context.Background(), ReconciliationClaimInput{
+		Owner: "p42-current-reconciler", LeaseDuration: time.Minute, RuntimeVersion: *run.RuntimeVersion,
+	}); err != nil || ok || claimed != nil {
+		t.Fatalf("mismatched reconciliation claim=%#v ok=%t err=%v", claimed, ok, err)
+	}
+	claimed, ok, err := store.ClaimEffectReconciliation(context.Background(), ReconciliationClaimInput{
+		Owner: "p42-compatibility-reconciler", LeaseDuration: time.Minute, RuntimeVersion: compatibilityVersion,
+	})
+	if err != nil || !ok || claimed.Run.ID != run.ID {
+		t.Fatalf("matching reconciliation claim=%#v ok=%t err=%v", claimed, ok, err)
+	}
+}
+
 func TestReconciliationResolutionsUseEffectCASAndRunTransitions(t *testing.T) {
 	tests := []struct {
 		name       string

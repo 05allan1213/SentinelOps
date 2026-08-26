@@ -143,3 +143,19 @@ func TestLangfuseOfficialLifecycleMetadataUsageAndRedaction(t *testing.T) {
 		t.Fatalf("shutdown calls=%d, want 1", exporter.shutdown.Load())
 	}
 }
+
+func TestLangfuseAttemptInitializationFailureShutsDownOwnedRuntime(t *testing.T) {
+	exporter := &p36CountingExporter{inner: tracetest.NewInMemoryExporter()}
+	runtime, err := NewLangfuseRuntime(context.Background(), LangfuseOptions{
+		StaticEnabled: true, DynamicEnabled: true, SpanExporter: exporter,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, barrier, err := StartAttempt(context.Background(), AttemptMetadata{}, runtime); err == nil || barrier != nil {
+		t.Fatalf("StartAttempt barrier=%v err=%v, want initialization failure", barrier, err)
+	}
+	if exporter.shutdown.Load() != 1 {
+		t.Fatalf("shutdown calls=%d, want 1", exporter.shutdown.Load())
+	}
+}

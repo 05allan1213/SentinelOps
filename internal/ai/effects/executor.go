@@ -37,9 +37,15 @@ type TransactionalRequest struct {
 	Attempt                  uint
 	TraceID                  string
 	GateAllowed              bool
+	GateCheck                func(context.Context) (bool, error)
 	Deadline                 time.Time
 	LeaseSafetyMargin        time.Duration
 }
+
+var (
+	// ErrEffectGateClosed 表示 frozen 或当前 Gate 已关闭，原 endpoint 未被调用。
+	ErrEffectGateClosed = errors.New("durable Effect Gate is closed")
+)
 
 // Endpoint 是 RuntimeHandler 传入的原 Eino Tool endpoint callback。
 type Endpoint func(context.Context) (string, error)
@@ -64,15 +70,18 @@ func (e *Executor) ExecuteTransactional(ctx context.Context, request Transaction
 	if endpoint == nil {
 		return workflow.TransitionEffectResult{}, fmt.Errorf("original Tool endpoint callback is required")
 	}
+	if err := requireEffectGate(ctx, request); err != nil {
+		return workflow.TransitionEffectResult{}, err
+	}
 	effectKey, err := policy.EffectKey(request.Lease.RunID, request.ProposalHash, workflow.EffectStepPrimary)
 	if err != nil {
 		return workflow.TransitionEffectResult{}, err
 	}
 	routedEndpoint := func(callbackCtx context.Context) (string, error) {
-		return endpoint(withExecutionMetadata(callbackCtx, ExecutionMetadata{
+		return invokeEffectEndpoint(withExecutionMetadata(callbackCtx, ExecutionMetadata{
 			EffectKey: effectKey, EffectStep: workflow.EffectStepPrimary, EffectRole: workflow.EffectRolePrimary,
 			EffectType: policy.EffectTransactionalDB,
-		}))
+		}), request, endpoint)
 	}
 	return e.store.TransitionEffectWithEvent(ctx, input, workflow.TransactionalEffectCallback(routedEndpoint))
 }
@@ -84,6 +93,9 @@ func (e *Executor) Execute(ctx context.Context, request TransactionalRequest, en
 	}
 	if endpoint == nil {
 		return workflow.TransitionEffectResult{}, fmt.Errorf("original Tool endpoint callback is required")
+	}
+	if err := requireEffectGate(ctx, request); err != nil {
+		return workflow.TransitionEffectResult{}, err
 	}
 	entry, execution, dag, err := buildExternalExecution(request)
 	if err != nil {
@@ -123,6 +135,9 @@ func (e *Executor) executeExternalStep(
 	primaryResponse string,
 	endpoint Endpoint,
 ) (workflow.TransitionEffectResult, error) {
+	if err := requireEffectGate(ctx, request); err != nil {
+		return workflow.TransitionEffectResult{}, err
+	}
 	margin := request.LeaseSafetyMargin
 	if margin <= 0 {
 		margin = 5 * time.Second
@@ -142,7 +157,10 @@ func (e *Executor) executeExternalStep(
 		EffectKey: step.Key, EffectStep: step.Step, EffectRole: step.Role,
 		ParentEffectID: step.ParentKey, EffectType: step.Type, PrimaryResponse: primaryResponse,
 	})
-	response, endpointErr := endpoint(callCtx)
+	response, endpointErr := invokeEffectEndpoint(callCtx, request, endpoint)
+	if endpointErr != nil && errors.Is(endpointErr, ErrEffectGateClosed) {
+		endpointErr = NewInvocationError(InvocationSafeNotSent, false, map[string]any{"phase": "gate_recheck"}, endpointErr)
+	}
 	outcome := classifyInvocation(response, endpointErr)
 	evidence, evidenceErr := encodeInvocationEvidence(outcome)
 	if evidenceErr != nil {
@@ -180,6 +198,35 @@ func (e *Executor) executeExternalStep(
 		}
 		return workflow.TransitionEffectResult{}, outcome.Err
 	}
+}
+
+func requireEffectGate(ctx context.Context, request TransactionalRequest) error {
+	if !request.GateAllowed {
+		return ErrEffectGateClosed
+	}
+	if request.GateCheck == nil {
+		return nil
+	}
+	allowed, err := request.GateCheck(ctx)
+	if err != nil {
+		return fmt.Errorf("recheck durable Effect Gate: %w", err)
+	}
+	if !allowed {
+		return ErrEffectGateClosed
+	}
+	return nil
+}
+
+func invokeEffectEndpoint(ctx context.Context, request TransactionalRequest, endpoint Endpoint) (string, error) {
+	if err := requireEffectGate(ctx, request); err != nil {
+		return "", err
+	}
+	return endpoint(ctx)
+}
+
+func callEffectEndpoint(ctx context.Context, request TransactionalRequest, endpoint Endpoint) error {
+	_, err := invokeEffectEndpoint(ctx, request, endpoint)
+	return err
 }
 
 func buildTransitionInput(request TransactionalRequest) (workflow.TransitionEffectInput, error) {

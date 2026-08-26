@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"SentinelOps/internal/ai/policy"
@@ -38,11 +37,6 @@ type LangfuseRuntime struct {
 	handler *langfuse.CallbackHandler
 }
 
-var installedLangfuse struct {
-	sync.RWMutex
-	runtime *LangfuseRuntime
-}
-
 // NewLangfuseRuntime 仅在静态配置和动态 Gate 同时开启时构造官方 Handler。
 func NewLangfuseRuntime(ctx context.Context, options LangfuseOptions) (*LangfuseRuntime, error) {
 	if !options.StaticEnabled || !options.DynamicEnabled {
@@ -72,7 +66,7 @@ func NewLangfuseRuntime(ctx context.Context, options LangfuseOptions) (*Langfuse
 	return &LangfuseRuntime{handler: handler}, nil
 }
 
-// Handler 返回应直接注册到 Eino Global Callback 链的官方 Handler。
+// Handler 返回应通过 Attempt 的 adk.WithCallbacks 挂载的官方 Handler。
 func (r *LangfuseRuntime) Handler() callbacks.Handler {
 	if r == nil {
 		return nil
@@ -136,33 +130,4 @@ func (r *LangfuseRuntime) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	return r.handler.Shutdown(ctx)
-}
-
-// InstallLangfuseRuntime 保存 bootstrap 构造的唯一可选官方 Handler。
-func InstallLangfuseRuntime(runtime *LangfuseRuntime) {
-	installedLangfuse.Lock()
-	defer installedLangfuse.Unlock()
-	installedLangfuse.runtime = runtime
-}
-
-func currentLangfuseRuntime() *LangfuseRuntime {
-	installedLangfuse.RLock()
-	defer installedLangfuse.RUnlock()
-	return installedLangfuse.runtime
-}
-
-// ShutdownInstalledLangfuse 在 bootstrap deadline 内 Flush 并 Shutdown 唯一官方 Handler。
-func ShutdownInstalledLangfuse(ctx context.Context) error {
-	installedLangfuse.Lock()
-	runtime := installedLangfuse.runtime
-	installedLangfuse.runtime = nil
-	installedLangfuse.Unlock()
-	if runtime == nil {
-		return nil
-	}
-	if err := runtime.Flush(ctx); err != nil {
-		_ = runtime.Shutdown(ctx)
-		return err
-	}
-	return runtime.Shutdown(ctx)
 }

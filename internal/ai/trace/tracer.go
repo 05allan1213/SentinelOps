@@ -3,6 +3,7 @@ package trace
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"SentinelOps/internal/ai/policy"
@@ -94,7 +95,26 @@ func StartRun(ctx context.Context, name, entryPoint, sessionID string, messageIn
 }
 
 // StartAttempt 为 Query/Resume/Replay 的每次实际执行创建独立 MySQL Trace 和 barrier。
-func StartAttempt(ctx context.Context, metadata AttemptMetadata) (context.Context, *AttemptBarrier, error) {
+func StartAttempt(ctx context.Context, metadata AttemptMetadata, runtimes ...*LangfuseRuntime) (context.Context, *AttemptBarrier, error) {
+	if len(runtimes) > 1 {
+		return ctx, nil, fmt.Errorf("at most one Attempt Langfuse runtime is accepted")
+	}
+	var langfuseRuntime *LangfuseRuntime
+	if len(runtimes) == 1 {
+		langfuseRuntime = runtimes[0]
+	}
+	initialized := false
+	if langfuseRuntime != nil {
+		defer func() {
+			if !initialized {
+				shutdownCtx := ctx
+				if shutdownCtx == nil {
+					shutdownCtx = context.Background()
+				}
+				_ = langfuseRuntime.Shutdown(shutdownCtx)
+			}
+		}()
+	}
 	at, err := newActiveTrace(ctx, metadata)
 	if err != nil {
 		return ctx, nil, err
@@ -118,13 +138,14 @@ func StartAttempt(ctx context.Context, metadata AttemptMetadata) (context.Contex
 		StartTime: at.StartTime, Tags: string(tagsJSON),
 	})
 	attemptCtx := Inject(ctx, at)
-	barrier := &AttemptBarrier{active: at}
-	if runtime := currentLangfuseRuntime(); runtime != nil {
+	barrier := &AttemptBarrier{active: at, langfuseOwned: langfuseRuntime != nil}
+	if langfuseRuntime != nil {
 		userID, _ := policy.UserID(ctx)
-		attemptCtx = runtime.StartAttempt(attemptCtx, metadata, userID)
-		barrier.langfuse = runtime
+		attemptCtx = langfuseRuntime.StartAttempt(attemptCtx, metadata, userID)
+		barrier.langfuse = langfuseRuntime
 		barrier.langfuseCtx = attemptCtx
 	}
+	initialized = true
 	return attemptCtx, barrier, nil
 }
 

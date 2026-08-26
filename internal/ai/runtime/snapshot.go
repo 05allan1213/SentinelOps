@@ -20,17 +20,7 @@ const (
 	modelSnapshotDomain   = "sentinelops/model-snapshot/v1\x00"
 )
 
-var requiredFeatureGates = []string{
-	"agent_runtime.enabled",
-	"agent_runtime.accept_new_runs",
-	"agent_runtime.shadow_mode",
-	"agent_runtime.l1_writes",
-	"agent_runtime.l2_writes",
-	"agent_runtime.admin_query_database_debug",
-	"mcp.enabled",
-	"skill.enabled",
-	"langfuse.enabled",
-}
+var requiredFeatureGates = CanonicalGateKeys()
 
 // RuntimeVersionSnapshot 将 Go、Eino 与应用 revision 固化为一个可持久化版本值。
 type RuntimeVersionSnapshot struct {
@@ -160,12 +150,33 @@ func (s FrozenRuntimeSnapshot) Tools() []ToolSnapshot {
 	return append([]ToolSnapshot(nil), s.document.Tools...)
 }
 
+// Skills 返回只包含名称与内容 Hash 的 frozen Skill 目录副本。
+func (s FrozenRuntimeSnapshot) Skills() []SkillSnapshot {
+	return append([]SkillSnapshot(nil), s.document.Skills...)
+}
+
 // PolicyHash 返回 Run 创建时冻结的 Policy identity。
 func (s FrozenRuntimeSnapshot) PolicyHash() string { return s.document.PolicyHash }
 
 // FeatureGate 返回 Run 创建时冻结的 Gate；未知键 fail-closed。
 func (s FrozenRuntimeSnapshot) FeatureGate(name string) bool {
 	return s.document.FeatureGates[name]
+}
+
+// Gates 返回精确九项 frozen Gate 值对象。
+func (s FrozenRuntimeSnapshot) Gates() GateVector {
+	return gateVectorFromTrustedMap(s.document.FeatureGates)
+}
+
+// RuntimeVersion 返回数据库 runtime_version 列使用的 canonical JSON。
+func (s FrozenRuntimeSnapshot) RuntimeVersion() string {
+	value, _ := policy.CanonicalJSON(s.document.Runtime)
+	return string(value)
+}
+
+// RecoveryCompatibilityHash 只使用 Run 自身重建的 frozen compatibility hash。
+func RecoveryCompatibilityHash(snapshot FrozenRuntimeSnapshot) string {
+	return snapshot.CompatibilityHash()
 }
 
 // WorkflowFields 将同一个 Frozen Snapshot 拆为 P03 已有列，不重复计算身份。

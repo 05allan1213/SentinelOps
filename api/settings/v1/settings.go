@@ -92,3 +92,48 @@ type RetentionAuditItem struct {
 type ListRetentionAuditRes struct {
 	Items []RetentionAuditItem `json:"items"`
 }
+
+// GetRuntimeGatesReq 请求当前 Runtime Gate 三层视图。
+type GetRuntimeGatesReq struct {
+	g.Meta `path:"/settings/v1/runtime-gates" method:"get" summary:"获取 Runtime Gates"`
+}
+
+// RuntimeGateVector 是精确九项 canonical Gate 的 HTTP 值对象。
+type RuntimeGateVector map[string]bool
+
+// GetRuntimeGatesRes 返回静态上限、动态开关与当前 effective 值。
+type GetRuntimeGatesRes struct {
+	StaticCaps       RuntimeGateVector `json:"static_caps"`
+	DynamicCaps      RuntimeGateVector `json:"dynamic_caps"`
+	CurrentEffective RuntimeGateVector `json:"current_effective"`
+}
+
+// SaveRuntimeGatesReq 提交完整动态 Gate 向量及审计理由。
+type SaveRuntimeGatesReq struct {
+	g.Meta      `path:"/settings/v1/runtime-gates" method:"post" summary:"修改 Runtime Gates"`
+	DynamicCaps RuntimeGateVector `json:"dynamic_caps"`
+	Reason      string            `json:"reason"`
+}
+
+// SaveRuntimeGatesRes 表示动态 Gate 已原子更新并写入审计。
+type SaveRuntimeGatesRes struct{}
+
+// ListRuntimeGateAuditReq 请求最近的 Runtime Gate 变更记录。
+type ListRuntimeGateAuditReq struct {
+	g.Meta `path:"/settings/v1/runtime-gates/audit" method:"get" summary:"查询 Runtime Gate 审计"`
+	Limit  int `json:"limit" d:"100"`
+}
+
+// RuntimeGateAuditItem 是一次动态 Gate 变更的脱敏审计事实。
+type RuntimeGateAuditItem struct {
+	ActorID   string            `json:"actor_id"`
+	OldValues RuntimeGateVector `json:"old_values"`
+	NewValues RuntimeGateVector `json:"new_values"`
+	Reason    string            `json:"reason"`
+	ChangedAt time.Time         `json:"changed_at"`
+}
+
+// ListRuntimeGateAuditRes 返回按时间倒序排列的 Gate 审计列表。
+type ListRuntimeGateAuditRes struct {
+	Items []RuntimeGateAuditItem `json:"items"`
+}

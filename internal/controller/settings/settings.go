@@ -10,6 +10,7 @@ import (
 
 	v1 "SentinelOps/api/settings/v1"
 	"SentinelOps/internal/ai/policy"
+	appconfig "SentinelOps/internal/config"
 	dao "SentinelOps/internal/dao/mysql"
 	settingssvc "SentinelOps/internal/service/settings"
 )
@@ -98,4 +99,45 @@ func (c *ControllerV1) ListRetentionAudit(ctx context.Context, req *v1.ListReten
 		})
 	}
 	return &v1.ListRetentionAuditRes{Items: items}, nil
+}
+
+// GetRuntimeGates 返回当前静态、动态和 effective Gate 向量。
+func (c *ControllerV1) GetRuntimeGates(ctx context.Context, _ *v1.GetRuntimeGatesReq) (*v1.GetRuntimeGatesRes, error) {
+	config, err := appconfig.Current()
+	if err != nil {
+		return nil, err
+	}
+	settings, err := settingssvc.GetRuntimeGates(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.GetRuntimeGatesRes{
+		StaticCaps:       v1.RuntimeGateVector(settings.StaticCaps.Map()),
+		DynamicCaps:      v1.RuntimeGateVector(settings.DynamicCaps.Map()),
+		CurrentEffective: v1.RuntimeGateVector(settings.CurrentEffective.Map()),
+	}, nil
+}
+
+// SaveRuntimeGates 原子保存完整动态 Gate 向量与审计理由。
+func (c *ControllerV1) SaveRuntimeGates(ctx context.Context, req *v1.SaveRuntimeGatesReq) (*v1.SaveRuntimeGatesRes, error) {
+	if _, err := settingssvc.SaveRuntimeGates(ctx, map[string]bool(req.DynamicCaps), req.Reason); err != nil {
+		return nil, err
+	}
+	return &v1.SaveRuntimeGatesRes{}, nil
+}
+
+// ListRuntimeGateAudit 返回最近的动态 Gate 变更记录。
+func (c *ControllerV1) ListRuntimeGateAudit(ctx context.Context, req *v1.ListRuntimeGateAuditReq) (*v1.ListRuntimeGateAuditRes, error) {
+	records, err := settingssvc.ListRuntimeGateAudit(ctx, req.Limit)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.RuntimeGateAuditItem, 0, len(records))
+	for _, record := range records {
+		items = append(items, v1.RuntimeGateAuditItem{
+			ActorID: record.ActorID, OldValues: v1.RuntimeGateVector(record.OldValues),
+			NewValues: v1.RuntimeGateVector(record.NewValues), Reason: record.Reason, ChangedAt: record.ChangedAt,
+		})
+	}
+	return &v1.ListRuntimeGateAuditRes{Items: items}, nil
 }

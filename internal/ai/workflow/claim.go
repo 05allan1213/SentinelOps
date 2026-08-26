@@ -17,8 +17,9 @@ const maxLeaseDuration = 24 * time.Hour
 
 // ClaimInput 描述一次 Worker 原子认领请求；租约时间统一由 MySQL 计算。
 type ClaimInput struct {
-	Owner         string
-	LeaseDuration time.Duration
+	Owner          string
+	LeaseDuration  time.Duration
+	RuntimeVersion string
 }
 
 // ClaimedRun 返回被认领的 Run 快照和唯一 fenced write token。
@@ -51,6 +52,9 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 			Order("priority DESC, available_at ASC, id ASC").
 			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 			Limit(1)
+		if strings.TrimSpace(input.RuntimeVersion) != "" {
+			query = query.Where("runtime_version = ?", input.RuntimeVersion)
+		}
 		result := query.Take(&run)
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil

@@ -1,0 +1,52 @@
+# P42 release overlay：只接受显式不可变 current/compatibility image 引用。
+services:
+  api:
+    image: "${SENTINELOPS_CURRENT_IMAGE:?set SENTINELOPS_CURRENT_IMAGE to an immutable digest}"
+    build: !reset null
+    environment:
+      SENTINELOPS_RUNTIME_VERSION: "${SENTINELOPS_CURRENT_RUNTIME_VERSION:?set SENTINELOPS_CURRENT_RUNTIME_VERSION to the current image digest}"
+    volumes:
+      - type: bind
+        source: "${SENTINELOPS_CURRENT_CONFIG:?set SENTINELOPS_CURRENT_CONFIG to an absolute complete config path}"
+        target: /app/manifest/config/config.local.yaml
+        read_only: true
+
+  worker:
+    image: "${SENTINELOPS_CURRENT_IMAGE:?set SENTINELOPS_CURRENT_IMAGE to an immutable digest}"
+    build: !reset null
+    environment:
+      SENTINELOPS_RUNTIME_VERSION: "${SENTINELOPS_CURRENT_RUNTIME_VERSION:?set SENTINELOPS_CURRENT_RUNTIME_VERSION to the current image digest}"
+    volumes:
+      - type: bind
+        source: "${SENTINELOPS_CURRENT_CONFIG:?set SENTINELOPS_CURRENT_CONFIG to an absolute complete config path}"
+        target: /app/manifest/config/config.local.yaml
+        read_only: true
+
+  compatibility-worker:
+    profiles: ["compatibility"]
+    image: "${SENTINELOPS_COMPATIBILITY_IMAGE:?set SENTINELOPS_COMPATIBILITY_IMAGE to an immutable digest}"
+    command: ["./server", "worker"]
+    environment:
+      SENTINELOPS_MYSQL_DSN: ${SENTINELOPS_MYSQL_DSN:-}
+      SENTINELOPS_MODEL_API_KEY: ${SENTINELOPS_MODEL_API_KEY:-}
+      SENTINELOPS_SMTP_PASSWORD: ${SENTINELOPS_SMTP_PASSWORD:-}
+      SENTINELOPS_RUNTIME_VERSION: "${SENTINELOPS_COMPATIBILITY_RUNTIME_VERSION:?set SENTINELOPS_COMPATIBILITY_RUNTIME_VERSION to the compatibility image digest}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      standalone:
+        condition: service_healthy
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    volumes:
+      - type: bind
+        source: "${SENTINELOPS_COMPATIBILITY_CONFIG:?set SENTINELOPS_COMPATIBILITY_CONFIG to an absolute complete config path}"
+        target: /app/manifest/config/config.local.yaml
+        read_only: true
+      - ../../manifest/skills:/app/manifest/skills:ro
+      - ../../.runtime/nginx_blocklist:/app/nginx_blocklist
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped

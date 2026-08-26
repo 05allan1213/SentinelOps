@@ -48,6 +48,7 @@ type RuntimeHandler struct {
 	*adk.BaseChatModelAgentMiddleware
 	approvalStore *workflow.GORMStore
 	effects       *effects.Executor
+	gates         *GateEvaluator
 	modelDisabled bool
 }
 
@@ -72,7 +73,7 @@ func NewRuntimeHandler() *RuntimeHandler {
 }
 
 // NewHITLRuntimeHandler 原位启用 Approval/Effect 生命周期；P26 生产 Worker 复用它，写 Gate 继续关闭。
-func NewHITLRuntimeHandler(store *workflow.GORMStore) (*RuntimeHandler, error) {
+func NewHITLRuntimeHandler(store *workflow.GORMStore, evaluators ...*GateEvaluator) (*RuntimeHandler, error) {
 	if store == nil {
 		return nil, fmt.Errorf("workflow GORMStore is required for HITL")
 	}
@@ -80,11 +81,38 @@ func NewHITLRuntimeHandler(store *workflow.GORMStore) (*RuntimeHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(evaluators) > 1 {
+		return nil, fmt.Errorf("at most one Gate evaluator is accepted")
+	}
+	var gates *GateEvaluator
+	if len(evaluators) == 1 {
+		gates = evaluators[0]
+	}
 	return &RuntimeHandler{
 		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{},
 		approvalStore:                store,
 		effects:                      executor,
+		gates:                        gates,
 	}, nil
+}
+
+// GateAllowed 在资源建立或 endpoint 调用前求 frozen AND current effective Gate。
+func (h *RuntimeHandler) GateAllowed(ctx context.Context, key string) (bool, error) {
+	if h == nil {
+		return false, fmt.Errorf("runtime Handler is required")
+	}
+	attempt, err := AttemptContextFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	if h.gates == nil {
+		return attempt.Snapshot.FeatureGate(key), nil
+	}
+	effective, err := h.gates.Effective(ctx, attempt.Snapshot)
+	if err != nil {
+		return false, err
+	}
+	return effective.Enabled(key), nil
 }
 
 // RuntimeHandlerFirst 固定官方 Handlers 中第一个用户 Handler 为共享 RuntimeHandler。
@@ -408,6 +436,15 @@ func (h *RuntimeHandler) prepareToolCall(ctx context.Context, toolContext *adk.T
 	}
 	dynamicCatalog, hasDynamicCatalog := DynamicToolCatalogFromContext(ctx)
 	dynamicEntry, isDynamic := dynamicCatalog.Lookup(toolContext.Name)
+	if isDynamic {
+		allowed, gateErr := h.GateAllowed(ctx, GateMCPEnabled)
+		if gateErr != nil {
+			return nil, nil, BudgetReservation{}, gateErr
+		}
+		if !allowed {
+			return nil, nil, BudgetReservation{}, policy.ErrForbidden
+		}
+	}
 	if err := policy.RequireExecutable(toolContext.Name); err != nil {
 		if !isDynamic {
 			return nil, nil, BudgetReservation{}, err

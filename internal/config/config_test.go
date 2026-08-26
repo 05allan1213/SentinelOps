@@ -246,8 +246,11 @@ func TestTrackedConfigurationsAreCompleteAndValid(t *testing.T) {
 			if err := cfg.Validate(); err != nil {
 				t.Fatal(err)
 			}
-			if cfg.AgentRuntime.Enabled {
-				t.Fatal("durable Agent gate must remain disabled in tracked configurations")
+			if cfg.AgentRuntime.Enabled || cfg.AgentRuntime.AcceptNewRuns || cfg.AgentRuntime.ShadowMode ||
+				cfg.AgentRuntime.L1Writes || cfg.AgentRuntime.L2Writes || cfg.AgentRuntime.AdminQueryDatabaseDebug ||
+				cfg.MCP.Enabled || cfg.Skill.Enabled || cfg.Observability.Langfuse.Enabled {
+				t.Fatalf("all tracked static Gate caps must remain fail-closed: agent=%+v mcp=%t skill=%t langfuse=%t",
+					cfg.AgentRuntime, cfg.MCP.Enabled, cfg.Skill.Enabled, cfg.Observability.Langfuse.Enabled)
 			}
 		})
 	}

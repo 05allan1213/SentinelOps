@@ -261,6 +261,13 @@ func buildConfiguredMCPAgent(ctx context.Context, handler *airuntime.RuntimeHand
 	if handler == nil {
 		return nil, errors.New("mcp agent RuntimeHandler is required")
 	}
+	allowed, err := handler.GateAllowed(ctx, airuntime.GateMCPEnabled)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, mcptools.ErrServerDisabled
+	}
 	app, err := appconfig.Current()
 	if err != nil {
 		return nil, err
@@ -287,7 +294,10 @@ func buildConfiguredMCPAgent(ctx context.Context, handler *airuntime.RuntimeHand
 	if err != nil {
 		return nil, err
 	}
-	inner, err := BuildMCPAgent(ctx, Config{Reliability: reliability, RuntimeHandler: handler, Profile: defaultProfile, Source: ownerToolSource{owners: owners}, CatalogHash: mustMCPConfigHash(mcpConfig)})
+	inner, err := BuildMCPAgent(ctx, Config{
+		Reliability: reliability, RuntimeHandler: handler, Profile: defaultProfile,
+		Source: ownerToolSource{owners: owners, handler: handler}, CatalogHash: mustMCPConfigHash(mcpConfig),
+	})
 	if err != nil {
 		for _, owner := range owners {
 			_ = owner.Close()
@@ -305,11 +315,24 @@ func mustMCPConfigHash(config mcptools.Config) string {
 	return hash
 }
 
-type ownerToolSource struct{ owners []*mcptools.SessionOwner }
+type ownerToolSource struct {
+	owners  []*mcptools.SessionOwner
+	handler *airuntime.RuntimeHandler
+}
 
 func (s ownerToolSource) Tools(ctx context.Context) ([]tool.BaseTool, error) {
+	if s.handler == nil {
+		return nil, errors.New("MCP RuntimeHandler is required")
+	}
 	var tools []tool.BaseTool
 	for _, owner := range s.owners {
+		allowed, err := s.handler.GateAllowed(ctx, airuntime.GateMCPEnabled)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, mcptools.ErrServerDisabled
+		}
 		loaded, err := owner.Tools(ctx)
 		if err != nil {
 			return nil, err

@@ -8,6 +8,7 @@ import (
 	goruntime "runtime"
 	"runtime/debug"
 	"sort"
+	"strings"
 
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/prompt/agents"
@@ -18,16 +19,23 @@ import (
 const (
 	einoVersion   = "v0.9.15"
 	agentRevision = "sentinelops-agent-contract-v2"
+	// RuntimeVersionEnv 为 release overlay 注入与镜像 digest 对齐的版本身份。
+	RuntimeVersionEnv       = "SENTINELOPS_RUNTIME_VERSION"
+	developmentBuildVersion = "development"
 )
 
-// BuildDurableRuntimeSnapshot 从非敏感配置与完整的 Plan/专业 Agent Catalog
-// 构造 API/Worker 共用的精确快照。L1/L2 静态上限在 P42 前保持关闭。
+// BuildDurableRuntimeSnapshot 从非敏感配置与完整的 Plan/专业 Agent Catalog 构造精确快照。
 func BuildDurableRuntimeSnapshot(config *appconfig.Config) (FrozenRuntimeSnapshot, error) {
 	return BuildDurableRuntimeSnapshotWithSkills(config, nil)
 }
 
 // BuildDurableRuntimeSnapshotWithSkills 在同一 Runtime Snapshot 中冻结只读 Skill 内容身份。
 func BuildDurableRuntimeSnapshotWithSkills(config *appconfig.Config, skills []SkillSnapshot) (FrozenRuntimeSnapshot, error) {
+	return BuildDurableRuntimeSnapshotWithSkillsAndGates(config, skills, StaticGateCaps(config))
+}
+
+// BuildDurableRuntimeSnapshotWithSkillsAndGates 冻结调用时已经求值的完整 Gate 向量。
+func BuildDurableRuntimeSnapshotWithSkillsAndGates(config *appconfig.Config, skills []SkillSnapshot, gates GateVector) (FrozenRuntimeSnapshot, error) {
 	if config == nil {
 		return FrozenRuntimeSnapshot{}, fmt.Errorf("application configuration is required")
 	}
@@ -61,20 +69,21 @@ func BuildDurableRuntimeSnapshotWithSkills(config *appconfig.Config, skills []Sk
 	sort.Slice(policyEntries, func(i, j int) bool { return policyEntries[i].Name < policyEntries[j].Name })
 
 	configIdentity := struct {
-		Models       []ModelSnapshot        `json:"models"`
-		AgentRuntime appconfig.AgentRuntime `json:"agent_runtime"`
-	}{Models: models, AgentRuntime: config.AgentRuntime}
+		Models []ModelSnapshot `json:"models"`
+	}{Models: models}
 	mcpConfig, err := mcptools.FromAppConfig(config)
 	if err != nil {
 		return FrozenRuntimeSnapshot{}, err
 	}
+	// MCP 的启用位已经独立冻结在 FeatureGates；重建恢复身份时必须使用
+	// Run 自身的 frozen 值，不能让当前静态 cap 改写历史 compatibility hash。
+	mcpConfig.Enabled = gates.MCPEnabled
 	mcpCatalogHash, err := mcptools.ConfigCatalogHash(mcpConfig)
 	if err != nil {
 		return FrozenRuntimeSnapshot{}, err
 	}
-	mutationGates := e2eMutationGatesEnabled(config)
 	return FreezeRuntimeSnapshot(RuntimeSnapshotInput{
-		Runtime:       RuntimeVersionSnapshot{Go: goruntime.Version(), Eino: einoVersion, App: buildRevision()},
+		Runtime:       CurrentRuntimeVersionSnapshot(),
 		AgentRevision: agentRevision,
 		PromptHash: hashSnapshotValue(map[string]string{
 			"event_analysis": agents.EventAnalysis, "risk": agents.Risk, "solve": agents.Solve,
@@ -87,24 +96,40 @@ func BuildDurableRuntimeSnapshotWithSkills(config *appconfig.Config, skills []Sk
 		Tools:          tools,
 		MCPCatalogHash: mcpCatalogHash,
 		Skills:         append([]SkillSnapshot(nil), skills...),
-		FeatureGates: map[string]bool{
-			"agent_runtime.enabled":                    config.AgentRuntime.Enabled,
-			"agent_runtime.accept_new_runs":            config.AgentRuntime.AcceptNewRuns,
-			"agent_runtime.shadow_mode":                config.AgentRuntime.ShadowMode,
-			"agent_runtime.l1_writes":                  mutationGates,
-			"agent_runtime.l2_writes":                  mutationGates,
-			"agent_runtime.admin_query_database_debug": config.AgentRuntime.AdminQueryDatabaseDebug,
-			"mcp.enabled":                              config.MCP.Enabled,
-			"skill.enabled":                            config.Skill.Enabled,
-			"langfuse.enabled":                         false,
-		},
+		FeatureGates:   gates.Map(),
 	})
 }
 
-// e2eMutationGatesEnabled 仅允许隔离测试环境显式开启 Mutation Gate。
-// 生产、开发及未声明测试开关的环境继续保持 P26 的 deny-only 默认值。
-func e2eMutationGatesEnabled(config *appconfig.Config) bool {
-	return config != nil && config.App.Environment == "test" && os.Getenv("SENTINELOPS_E2E_ENABLE_MUTATION_GATES") == "true"
+// CurrentRuntimeVersionSnapshot 返回 Worker claim 与 Run snapshot 共用的精确版本身份。
+func CurrentRuntimeVersionSnapshot() RuntimeVersionSnapshot {
+	revision := strings.TrimSpace(os.Getenv(RuntimeVersionEnv))
+	if revision == "" {
+		revision = buildRevision()
+	}
+	return RuntimeVersionSnapshot{Go: goruntime.Version(), Eino: einoVersion, App: revision}
+}
+
+// CurrentRuntimeVersion 返回 workflow_runs.runtime_version 使用的 canonical JSON。
+func CurrentRuntimeVersion() string {
+	value, _ := policy.CanonicalJSON(CurrentRuntimeVersionSnapshot())
+	return string(value)
+}
+
+// ValidateCurrentRuntimeVersion 拒绝 release Worker 共享 development 或可变版本身份。
+func ValidateCurrentRuntimeVersion() error {
+	revision := CurrentRuntimeVersionSnapshot().App
+	raw := revision
+	if strings.HasPrefix(raw, "sha256:") {
+		raw = strings.TrimPrefix(raw, "sha256:")
+	}
+	if revision == developmentBuildVersion || len(raw) != 40 && len(raw) != 64 || raw != strings.ToLower(raw) {
+		return fmt.Errorf("runtime version must be an immutable Git SHA or sha256 digest")
+	}
+	decoded, err := hex.DecodeString(raw)
+	if err != nil || len(decoded) != len(raw)/2 {
+		return fmt.Errorf("runtime version must be an immutable Git SHA or sha256 digest")
+	}
+	return nil
 }
 
 func hashSnapshotValue(value any) string {
@@ -119,14 +144,22 @@ func hashSnapshotValue(value any) string {
 func buildRevision() string {
 	info, ok := debug.ReadBuildInfo()
 	if ok {
+		revision := ""
+		modified := false
 		for _, setting := range info.Settings {
-			if setting.Key == "vcs.revision" && setting.Value != "" {
-				return setting.Value
+			switch setting.Key {
+			case "vcs.revision":
+				revision = setting.Value
+			case "vcs.modified":
+				modified = setting.Value == "true"
 			}
+		}
+		if revision != "" && !modified {
+			return revision
 		}
 		if info.Main.Version != "" && info.Main.Version != "(devel)" {
 			return info.Main.Version
 		}
 	}
-	return "development"
+	return developmentBuildVersion
 }

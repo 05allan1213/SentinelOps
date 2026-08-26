@@ -412,11 +412,12 @@ func estimateTokenCost(cost costConfig, inputTokens, cachedInputTokens, outputTo
 
 // AttemptBarrier 等待同一 ActiveTrace 的流式回调和全部异步 MySQL 写。
 type AttemptBarrier struct {
-	active       *ActiveTrace
-	skipFinalize bool
-	langfuse     *LangfuseRuntime
-	langfuseCtx  context.Context
-	langfuseEnd  sync.Once
+	active        *ActiveTrace
+	skipFinalize  bool
+	langfuse      *LangfuseRuntime
+	langfuseCtx   context.Context
+	langfuseEnd   sync.Once
+	langfuseOwned bool
 }
 
 // Finish 记录 Attempt 业务结果；真正的 TraceRun 终态写由 Flush 在节点落盘后执行。
@@ -454,6 +455,14 @@ func (b *AttemptBarrier) Flush(ctx context.Context) string {
 	if ctx == nil {
 		return TraceQualityIncomplete
 	}
+	if b.langfuse != nil {
+		defer func() {
+			_ = b.langfuse.Flush(ctx)
+			if b.langfuseOwned {
+				_ = b.langfuse.Shutdown(ctx)
+			}
+		}()
+	}
 	quality := TraceQualityComplete
 	streamsComplete := waitTraceGroup(ctx, &at.StreamWg)
 	if !streamsComplete {
@@ -482,9 +491,6 @@ func (b *AttemptBarrier) Flush(ctx context.Context) string {
 	}
 	if err := finalizeTraceRun(finalizeCtx, at, quality); err != nil {
 		return TraceQualityIncomplete
-	}
-	if b.langfuse != nil {
-		_ = b.langfuse.Flush(ctx)
 	}
 	return quality
 }

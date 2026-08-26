@@ -124,7 +124,7 @@ mcp:
   servers: {}
 
 skill:
-  enabled: true
+  enabled: false
   base_dir: "/app/manifest/skills"
   max_bytes: 65536
 
@@ -132,6 +132,8 @@ agent_runtime:
   enabled: false
   accept_new_runs: false
   shadow_mode: false
+  l1_writes: false
+  l2_writes: false
   admin_query_database_debug: false
 
 observability:

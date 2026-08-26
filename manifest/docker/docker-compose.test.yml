@@ -52,6 +52,31 @@ services:
       mysql:
         condition: service_healthy
 
+  runtime-gates:
+    image: mysql:8.0.43
+    environment:
+      MYSQL_PWD: sentinelops-e2e-root-password
+    command:
+      - sh
+      - -ec
+      - |
+        mysql -hmysql -uroot sentinelops_e2e <<'SQL'
+        INSERT INTO settings (`key`, `value`, updated_at) VALUES
+          ('agent_runtime.enabled', 'true', CURRENT_TIMESTAMP(3)),
+          ('agent_runtime.accept_new_runs', 'true', CURRENT_TIMESTAMP(3)),
+          ('agent_runtime.shadow_mode', 'false', CURRENT_TIMESTAMP(3)),
+          ('agent_runtime.l1_writes', 'true', CURRENT_TIMESTAMP(3)),
+          ('agent_runtime.l2_writes', 'true', CURRENT_TIMESTAMP(3)),
+          ('agent_runtime.admin_query_database_debug', 'false', CURRENT_TIMESTAMP(3)),
+          ('mcp.enabled', 'false', CURRENT_TIMESTAMP(3)),
+          ('skill.enabled', 'true', CURRENT_TIMESTAMP(3)),
+          ('langfuse.enabled', 'false', CURRENT_TIMESTAMP(3))
+        ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = CURRENT_TIMESTAMP(3);
+        SQL
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   provider-double:
     build:
       context: ../..
@@ -74,7 +99,6 @@ services:
       SENTINELOPS_JWT_SECRET: sentinelops-e2e-jwt-secret
       SENTINELOPS_ADMIN_PASSWORD: sentinelops-e2e-admin-password
       SENTINELOPS_MODEL_API_KEY: sentinelops-e2e-provider-key
-      SENTINELOPS_E2E_ENABLE_MUTATION_GATES: "true"
     depends_on:
       mysql:
         condition: service_healthy
@@ -85,6 +109,8 @@ services:
       provider-double:
         condition: service_healthy
       migrate:
+        condition: service_completed_successfully
+      runtime-gates:
         condition: service_completed_successfully
     dns: !reset []
     volumes: !reset []
@@ -101,7 +127,6 @@ services:
       SENTINELOPS_JWT_SECRET: sentinelops-e2e-jwt-secret
       SENTINELOPS_ADMIN_PASSWORD: sentinelops-e2e-admin-password
       SENTINELOPS_MODEL_API_KEY: sentinelops-e2e-provider-key
-      SENTINELOPS_E2E_ENABLE_MUTATION_GATES: "true"
     depends_on:
       mysql:
         condition: service_healthy
@@ -112,6 +137,8 @@ services:
       provider-double:
         condition: service_healthy
       migrate:
+        condition: service_completed_successfully
+      runtime-gates:
         condition: service_completed_successfully
     dns: !reset []
     volumes: !override

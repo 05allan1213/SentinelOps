@@ -32,21 +32,21 @@ type CreateDurableRunRequest struct {
 // DurableServiceConfig 描述 P20 API 所需的唯一 Store primitive。
 // CreateRun/ListEvents 只用于单元测试替换具体 GORMStore 方法，不是第二套 Store。
 type DurableServiceConfig struct {
-	Store         *workflow.GORMStore
-	AcceptNewRuns bool
-	Snapshot      runtime.FrozenRuntimeSnapshot
-	RunTimeout    time.Duration
-	CreateRun     func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error)
-	ListEvents    func(context.Context, string, int64) ([]workflow.StreamEvent, error)
+	Store          *workflow.GORMStore
+	AcceptNewRuns  bool
+	Snapshot       runtime.FrozenRuntimeSnapshot
+	SnapshotLoader func(context.Context) (runtime.FrozenRuntimeSnapshot, error)
+	RunTimeout     time.Duration
+	CreateRun      func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error)
+	ListEvents     func(context.Context, string, int64) ([]workflow.StreamEvent, error)
 }
 
 // DurableService 是 API 侧的单点入口：只创建 Run 或读取 Event，不持有 Agent 执行。
 type DurableService struct {
-	acceptNewRuns bool
-	snapshot      runtime.FrozenRuntimeSnapshot
-	runTimeout    time.Duration
-	createRun     func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error)
-	listEvents    func(context.Context, string, int64) ([]workflow.StreamEvent, error)
+	snapshotLoader func(context.Context) (runtime.FrozenRuntimeSnapshot, error)
+	runTimeout     time.Duration
+	createRun      func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error)
+	listEvents     func(context.Context, string, int64) ([]workflow.StreamEvent, error)
 }
 
 // NewDurableService 创建只拥有 API 读写 primitive 的服务。
@@ -61,11 +61,18 @@ func NewDurableService(config DurableServiceConfig) (*DurableService, error) {
 		config.RunTimeout = defaultDurableRunTimeout
 	}
 	service := &DurableService{
-		acceptNewRuns: config.AcceptNewRuns,
-		snapshot:      config.Snapshot,
-		runTimeout:    config.RunTimeout,
-		createRun:     config.CreateRun,
-		listEvents:    config.ListEvents,
+		snapshotLoader: config.SnapshotLoader,
+		runTimeout:     config.RunTimeout,
+		createRun:      config.CreateRun,
+		listEvents:     config.ListEvents,
+	}
+	if service.snapshotLoader == nil {
+		service.snapshotLoader = func(context.Context) (runtime.FrozenRuntimeSnapshot, error) {
+			if !config.AcceptNewRuns {
+				return runtime.FrozenRuntimeSnapshot{}, ErrDurableRunGateClosed
+			}
+			return config.Snapshot, nil
+		}
 	}
 	if service.createRun == nil {
 		service.createRun = config.Store.CreateRunWithSessionLock
@@ -80,9 +87,6 @@ func NewDurableService(config DurableServiceConfig) (*DurableService, error) {
 func (s *DurableService) CreateRun(ctx context.Context, request CreateDurableRunRequest) (*mysql.WorkflowRun, error) {
 	if s == nil || s.createRun == nil {
 		return nil, fmt.Errorf("durable API service is not initialized")
-	}
-	if !s.acceptNewRuns {
-		return nil, ErrDurableRunGateClosed
 	}
 	request.SessionID = strings.TrimSpace(request.SessionID)
 	request.Query = strings.TrimSpace(request.Query)
@@ -106,13 +110,20 @@ func (s *DurableService) CreateRun(ctx context.Context, request CreateDurableRun
 	// deadline; token limits are enforced by the model adapter, not by the
 	// durable base-budget contract.
 	budgetLimits := json.RawMessage(`{"max_model_calls":64,"max_l0_tool_calls":32,"max_duration_ms":900000}`)
+	snapshot, err := s.snapshotLoader(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !snapshot.FeatureGate(runtime.GateAgentRuntimeEnabled) || !snapshot.FeatureGate(runtime.GateAgentRuntimeAcceptNewRuns) {
+		return nil, ErrDurableRunGateClosed
+	}
 	input := workflow.CreateRunInput{
 		ID:                 uuid.NewString(),
 		WorkflowKey:        "chat.intent",
 		SessionID:          request.SessionID,
 		QueryText:          request.Query,
 		ImmutableInputJSON: immutableInput,
-		RuntimeSnapshot:    s.snapshot.WorkflowFields(),
+		RuntimeSnapshot:    snapshot.WorkflowFields(),
 		BudgetLimitsJSON:   budgetLimits,
 		DeadlineAt:         time.Now().Add(s.runTimeout),
 		CreatedEvent: workflow.WorkflowEventInput{

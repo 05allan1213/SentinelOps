@@ -18,6 +18,7 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/planexecute"
+	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
 )
@@ -124,6 +125,7 @@ type AttemptContext struct {
 
 	cancel        context.CancelFunc
 	physicalCalls *atomic.Uint64
+	callbacks     []callbacks.Handler
 }
 
 // Cancel 释放 Attempt deadline timer，并传播协作式取消。

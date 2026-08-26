@@ -37,25 +37,60 @@ type AgentResolver func(context.Context, string) (adk.Agent, error)
 
 // DurableExecutor 组合 P10-P14 primitive 与官方 Runner，不定义第二套 Agent Loop。
 type DurableExecutor struct {
-	store                    *workflow.GORMStore
-	budgets                  BudgetHandleFactory
-	resolveAgent             AgentResolver
-	currentCompatibilityHash string
+	store                 *workflow.GORMStore
+	budgets               BudgetHandleFactory
+	resolveAgent          AgentResolver
+	gates                 *GateEvaluator
+	loadLangfuse          func(context.Context) (*aitrace.LangfuseRuntime, error)
+	expectedCompatibility func(context.Context, FrozenRuntimeSnapshot) (string, error)
 }
 
 // NewDurableExecutor 创建 Worker 唯一执行入口。
-func NewDurableExecutor(store *workflow.GORMStore, resolver AgentResolver, currentCompatibilityHash string) (*DurableExecutor, error) {
+func NewDurableExecutor(store *workflow.GORMStore, resolver AgentResolver, compatibilityHash ...string) (*DurableExecutor, error) {
 	if store == nil || resolver == nil {
 		return nil, fmt.Errorf("durable Store and Agent resolver are required")
 	}
-	if err := validateSnapshotHash("current runtime compatibility hash", currentCompatibilityHash); err != nil {
-		return nil, err
+	if len(compatibilityHash) > 1 {
+		return nil, fmt.Errorf("at most one compatibility hash is accepted")
+	}
+	if len(compatibilityHash) == 1 {
+		if err := validateSnapshotHash("legacy constructor compatibility hash", compatibilityHash[0]); err != nil {
+			return nil, err
+		}
 	}
 	budgets, err := NewDurableBudget(store)
 	if err != nil {
 		return nil, err
 	}
-	return &DurableExecutor{store: store, budgets: budgets, resolveAgent: resolver, currentCompatibilityHash: currentCompatibilityHash}, nil
+	executor := &DurableExecutor{store: store, budgets: budgets, resolveAgent: resolver}
+	if len(compatibilityHash) == 1 {
+		legacyCompatibilityHash := compatibilityHash[0]
+		executor.expectedCompatibility = func(context.Context, FrozenRuntimeSnapshot) (string, error) {
+			return legacyCompatibilityHash, nil
+		}
+	}
+	return executor, nil
+}
+
+// NewDurableExecutorWithReleaseControls 为生产 Worker 接入当前 Gate 与 Attempt-scoped Langfuse factory。
+func NewDurableExecutorWithReleaseControls(
+	store *workflow.GORMStore,
+	resolver AgentResolver,
+	gates *GateEvaluator,
+	loadLangfuse func(context.Context) (*aitrace.LangfuseRuntime, error),
+	expectedCompatibility func(context.Context, FrozenRuntimeSnapshot) (string, error),
+) (*DurableExecutor, error) {
+	if gates == nil || expectedCompatibility == nil {
+		return nil, fmt.Errorf("Gate evaluator and compatibility resolver are required")
+	}
+	executor, err := NewDurableExecutor(store, resolver)
+	if err != nil {
+		return nil, err
+	}
+	executor.gates = gates
+	executor.loadLangfuse = loadLangfuse
+	executor.expectedCompatibility = expectedCompatibility
+	return executor, nil
 }
 
 // ExecuteClaimedRun 从 MySQL 快照重建 Context，并只通过 P12 StartRecovery 调用官方 Runner。
@@ -72,6 +107,13 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 		return RunExecutionResult{}, err
 	}
 	defer attempt.Cancel()
+	langfuseRuntime, err := e.attemptLangfuse(attemptCtx, attempt.Snapshot)
+	if err != nil {
+		return RunExecutionResult{}, err
+	}
+	if langfuseRuntime != nil {
+		attempt.callbacks = append(attempt.callbacks, langfuseRuntime.Handler())
+	}
 	models := make([]aitrace.ModelMetadata, 0, len(attempt.Snapshot.Models()))
 	for _, model := range attempt.Snapshot.Models() {
 		models = append(models, aitrace.ModelMetadata{
@@ -87,7 +129,7 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 		TraceID: attempt.Trace.ID, RunID: attempt.Run.ID, SessionID: attempt.Run.SessionID,
 		Attempt: attempt.Run.Attempt, LeaseGeneration: attempt.Run.LeaseGeneration,
 		RuntimeVersion: attempt.Run.RuntimeVersion, Query: input.Query, Models: models,
-	})
+	}, langfuseRuntime)
 	if err != nil {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
 	}
@@ -110,7 +152,14 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 		}
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, resumeErr
 	}
-	started, startErr := StartRecovery(attemptCtx, e.store, runner, attempt, e.currentCompatibilityHash, resumeParams)
+	expectedCompatibility := RecoveryCompatibilityHash(attempt.Snapshot)
+	if e.expectedCompatibility != nil {
+		expectedCompatibility, err = e.expectedCompatibility(attemptCtx, attempt.Snapshot)
+		if err != nil {
+			return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+		}
+	}
+	started, startErr := StartRecovery(attemptCtx, e.store, runner, attempt, expectedCompatibility, resumeParams)
 	if started != nil && started.Decision.Mode == workflow.RecoveryModeParked {
 		return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true}, startErr
 	}
@@ -214,6 +263,42 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 		OutputPayload: string(outputPayload), RevisionStateJSON: revision,
 		TraceQuality: "unknown", TraceID: attempt.Trace.ID, TraceBarrier: traceBarrier,
 	}, nil
+}
+
+func (e *DurableExecutor) attemptLangfuse(ctx context.Context, frozen FrozenRuntimeSnapshot) (*aitrace.LangfuseRuntime, error) {
+	if e == nil || e.gates == nil {
+		return nil, nil
+	}
+	effective, err := e.gates.Effective(ctx, frozen)
+	if err != nil {
+		return nil, err
+	}
+	if !effective.Enabled(GateLangfuseEnabled) {
+		return nil, nil
+	}
+	if e.loadLangfuse == nil {
+		return nil, fmt.Errorf("Langfuse Gate is open without an Attempt factory")
+	}
+	runtime, err := e.loadLangfuse(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if runtime == nil || runtime.Handler() == nil {
+		if runtime != nil {
+			_ = runtime.Shutdown(ctx)
+		}
+		return nil, fmt.Errorf("Langfuse Attempt factory returned no official handler")
+	}
+	effective, err = e.gates.Effective(ctx, frozen)
+	if err != nil {
+		_ = runtime.Shutdown(ctx)
+		return nil, err
+	}
+	if !effective.Enabled(GateLangfuseEnabled) {
+		_ = runtime.Shutdown(ctx)
+		return nil, nil
+	}
+	return runtime, nil
 }
 
 func (e *DurableExecutor) approvalResumeParams(ctx context.Context, attempt *AttemptContext) (*adk.ResumeParams, error) {
@@ -479,6 +564,9 @@ func InvokeRecoveryRunner(
 	}
 	cancelOption, cancel := adk.WithCancel()
 	commonOptions := []adk.AgentRunOption{cancelOption, adk.WithSessionValues(sessionValues)}
+	if len(attempt.callbacks) > 0 {
+		commonOptions = append(commonOptions, adk.WithCallbacks(attempt.callbacks...))
+	}
 
 	var events *adk.AsyncIterator[*adk.AgentEvent]
 	switch decision.Mode {

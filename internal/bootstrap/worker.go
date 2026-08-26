@@ -14,6 +14,7 @@ import (
 	"SentinelOps/internal/ai/ops/actions"
 	"SentinelOps/internal/ai/policy"
 	airuntime "SentinelOps/internal/ai/runtime"
+	aitrace "SentinelOps/internal/ai/trace"
 	"SentinelOps/internal/ai/workflow"
 	appconfig "SentinelOps/internal/config"
 	dao "SentinelOps/internal/dao/mysql"
@@ -55,6 +56,10 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 		return nil, err
 	}
 	store := workflow.NewGORMStore(db)
+	evaluator, err := airuntime.NewGateEvaluator(airuntime.StaticGateCaps(config), dao.GetSettings)
+	if err != nil {
+		return nil, err
+	}
 	owner, err := os.Hostname()
 	if err != nil || owner == "" {
 		owner = "sentinelops-worker"
@@ -82,26 +87,23 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 			Owner: owner, LeaseDuration: 30 * time.Second,
 			MinPollBackoff: 100 * time.Millisecond, MaxPollBackoff: 2 * time.Second,
 			Retention: retention,
+			Gates:     evaluator,
 		})
 	}
-	skillSnapshots, err := skill_pipeline.BuildConfiguredSkillSnapshots(ctx, config)
+	handler, err := airuntime.NewHITLRuntimeHandler(store, evaluator)
 	if err != nil {
 		return nil, err
 	}
-	snapshot, err := airuntime.BuildDurableRuntimeSnapshotWithSkills(config, skillSnapshots)
-	if err != nil {
-		return nil, err
-	}
-	handler, err := airuntime.NewHITLRuntimeHandler(store)
-	if err != nil {
-		return nil, err
-	}
-	executor, err := airuntime.NewDurableExecutor(store, func(agentCtx context.Context, name string) (adk.Agent, error) {
+	executor, err := airuntime.NewDurableExecutorWithReleaseControls(store, func(agentCtx context.Context, name string) (adk.Agent, error) {
 		if name != "plan_agent" {
 			return nil, fmt.Errorf("durable Agent %q is not enabled", name)
 		}
 		return plan_pipeline.NewDurablePlanAgent(agentCtx, handler)
-	}, snapshot.CompatibilityHash())
+	}, evaluator, func(attemptCtx context.Context) (*aitrace.LangfuseRuntime, error) {
+		return newAttemptLangfuseRuntime(attemptCtx, config)
+	}, func(compatibilityCtx context.Context, frozen airuntime.FrozenRuntimeSnapshot) (string, error) {
+		return expectedFrozenGateCompatibilityWithEvaluator(compatibilityCtx, config, evaluator, frozen)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +111,76 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 		Owner: owner, LeaseDuration: 30 * time.Second,
 		MinPollBackoff: 100 * time.Millisecond, MaxPollBackoff: 2 * time.Second,
 		Execute: executor.ExecuteClaimedRun, QueryEffectTargetState: queryEffectTargetState,
-		Retention: retention,
+		Retention: retention, RuntimeVersion: airuntime.CurrentRuntimeVersion(), Gates: evaluator,
 	})
+}
+
+func expectedFrozenGateCompatibility(
+	ctx context.Context,
+	config *appconfig.Config,
+	frozen airuntime.FrozenRuntimeSnapshot,
+) (string, error) {
+	return expectedFrozenGateCompatibilityWithEvaluator(ctx, config, nil, frozen)
+}
+
+func expectedFrozenGateCompatibilityWithEvaluator(
+	ctx context.Context,
+	config *appconfig.Config,
+	evaluator *airuntime.GateEvaluator,
+	frozen airuntime.FrozenRuntimeSnapshot,
+) (string, error) {
+	if config == nil {
+		return "", fmt.Errorf("application configuration is required")
+	}
+	frozenGates := frozen.Gates()
+	skills := frozen.Skills()
+	loadCurrentSkills := frozenGates.Enabled(airuntime.GateSkillEnabled)
+	if evaluator != nil {
+		effective, err := evaluator.Effective(ctx, frozen)
+		if err != nil {
+			return "", err
+		}
+		// 当前静态 cap 或动态开关关闭 Skill 时，不建立 Backend；保留 Run
+		// 自身 frozen catalog，避免关闭 Gate 改写历史 compatibility hash。
+		loadCurrentSkills = effective.Enabled(airuntime.GateSkillEnabled)
+	}
+	if loadCurrentSkills {
+		currentSkills, err := skill_pipeline.BuildConfiguredSkillSnapshots(ctx, config)
+		if err != nil {
+			return "", err
+		}
+		skills = currentSkills
+	}
+	compatibilityConfig := *config
+	expected, err := airuntime.BuildDurableRuntimeSnapshotWithSkillsAndGates(&compatibilityConfig, skills, frozenGates)
+	if err != nil {
+		return "", err
+	}
+	return expected.CompatibilityHash(), nil
+}
+
+func newAttemptLangfuseRuntime(ctx context.Context, config *appconfig.Config) (*aitrace.LangfuseRuntime, error) {
+	langfuseConfig := config.Observability.Langfuse
+	var runtime *aitrace.LangfuseRuntime
+	err := appconfig.UseSecret(ctx, langfuseConfig.PublicKeyRef, func(publicKey []byte) error {
+		return appconfig.UseSecret(ctx, langfuseConfig.SecretKeyRef, func(secretKey []byte) error {
+			created, createErr := aitrace.NewLangfuseRuntime(ctx, aitrace.LangfuseOptions{
+				StaticEnabled: true, DynamicEnabled: true,
+				Host: langfuseConfig.Host, PublicKey: string(publicKey), SecretKey: string(secretKey),
+				ServiceName: langfuseConfig.ServiceName, Environment: config.App.Environment,
+				Version: airuntime.CurrentRuntimeVersion(), SampleRate: langfuseConfig.SampleRate,
+				Timeout:                 time.Duration(langfuseConfig.TimeoutMS) * time.Millisecond,
+				MaxAttributeValueLength: langfuseConfig.MaxAttributeValueLength,
+				MaxSpanAttributeBytes:   langfuseConfig.MaxSpanAttributeBytes,
+			})
+			runtime = created
+			return createErr
+		})
+	})
+	if err != nil {
+		return nil, fmt.Errorf("initialize Attempt Langfuse: %w", err)
+	}
+	return runtime, nil
 }
 
 func queryEffectTargetState(ctx context.Context, target effects.ReconciliationTarget) (effects.TargetState, error) {

@@ -29,8 +29,9 @@ var (
 
 // ReconciliationClaimInput 是复用现有 Run lease 的对账认领请求。
 type ReconciliationClaimInput struct {
-	Owner         string
-	LeaseDuration time.Duration
+	Owner          string
+	LeaseDuration  time.Duration
+	RuntimeVersion string
 }
 
 // ReconciliationClaim 返回对账 Run、Effect 和新的 generation token。
@@ -234,6 +235,9 @@ func (s *GORMStore) claimEffectReconciliation(ctx context.Context, input Reconci
 			Where("workflow_runs.status = ? AND workflow_runs.park_reason = ? AND agent_effects.status = ? AND agent_effects.effect_type <> ? AND agent_effects.lease_generation = workflow_runs.lease_generation", RunStatusParked, ParkReasonEffectUnknown, EffectStatusUnknown, string(policy.EffectTransactionalDB))
 		if len(effectIDs) == 0 {
 			query = query.Where("agent_effects.next_reconcile_at IS NULL OR agent_effects.next_reconcile_at <= CURRENT_TIMESTAMP(3)")
+		}
+		if strings.TrimSpace(input.RuntimeVersion) != "" {
+			query = query.Where("workflow_runs.runtime_version = ?", input.RuntimeVersion)
 		}
 		if !allowNonReconcilable {
 			query = query.Where("agent_effects.effect_type IN ?", []string{string(policy.EffectReconcilable), string(policy.EffectProviderIdempotent)})

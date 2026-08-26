@@ -45,7 +45,6 @@ func SeedSettings(ctx context.Context) {
 		{"general.auto_mark_read", "true"},
 		{RetentionPayloadDaysKey, "30"},
 		{RetentionAuditDaysKey, "180"},
-		{"observability.langfuse.enabled", "false"},
 	}
 	for _, d := range defaults {
 		if existing, _ := GetSetting(ctx, d.key); existing == "" {

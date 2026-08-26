@@ -57,7 +57,7 @@ func TestDurableSnapshotContainsCatalogToolsAndFrozenWriteGates(t *testing.T) {
 	}
 }
 
-func TestTestOnlyMutationGatesRequireExplicitOptIn(t *testing.T) {
+func TestStaticMutationCapsRequireExplicitConfig(t *testing.T) {
 	config := &appconfig.Config{
 		App:          appconfig.App{Environment: "test"},
 		AgentRuntime: appconfig.AgentRuntime{Enabled: true, AcceptNewRuns: true},
@@ -72,7 +72,6 @@ func TestTestOnlyMutationGatesRequireExplicitOptIn(t *testing.T) {
 		},
 		Routing: appconfig.Routing{Chat: map[string]appconfig.ChatRoute{"default": {Candidates: []appconfig.Route{{Model: "test/chat"}}}}},
 	}
-	t.Setenv("SENTINELOPS_E2E_ENABLE_MUTATION_GATES", "false")
 	closed, err := BuildDurableRuntimeSnapshot(config)
 	if err != nil {
 		t.Fatal(err)
@@ -80,13 +79,14 @@ func TestTestOnlyMutationGatesRequireExplicitOptIn(t *testing.T) {
 	if closed.FeatureGate("agent_runtime.l1_writes") || closed.FeatureGate("agent_runtime.l2_writes") {
 		t.Fatalf("test gates opened without explicit opt-in: %+v", closed.document.FeatureGates)
 	}
-	t.Setenv("SENTINELOPS_E2E_ENABLE_MUTATION_GATES", "true")
+	config.AgentRuntime.L1Writes = true
+	config.AgentRuntime.L2Writes = true
 	open, err := BuildDurableRuntimeSnapshot(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !open.FeatureGate("agent_runtime.l1_writes") || !open.FeatureGate("agent_runtime.l2_writes") {
-		t.Fatalf("explicit test opt-in did not open gates: %+v", open.document.FeatureGates)
+		t.Fatalf("explicit static caps did not open gates: %+v", open.document.FeatureGates)
 	}
 }
 
