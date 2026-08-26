@@ -68,10 +68,12 @@ services:
       dockerfile: manifest/docker/Dockerfile.backend.e2e
     command: ["./server", "api"]
     environment:
+      TZ: UTC
       SENTINELOPS_MYSQL_DSN: root:sentinelops-e2e-root-password@tcp(mysql:3306)/sentinelops_e2e?parseTime=true
       SENTINELOPS_JWT_SECRET: sentinelops-e2e-jwt-secret
       SENTINELOPS_ADMIN_PASSWORD: sentinelops-e2e-admin-password
       SENTINELOPS_MODEL_API_KEY: sentinelops-e2e-provider-key
+      SENTINELOPS_E2E_ENABLE_MUTATION_GATES: "true"
     depends_on:
       mysql:
         condition: service_healthy
@@ -93,10 +95,12 @@ services:
       dockerfile: manifest/docker/Dockerfile.backend.e2e
     command: ["./server", "worker"]
     environment:
+      TZ: UTC
       SENTINELOPS_MYSQL_DSN: root:sentinelops-e2e-root-password@tcp(mysql:3306)/sentinelops_e2e?parseTime=true
       SENTINELOPS_JWT_SECRET: sentinelops-e2e-jwt-secret
       SENTINELOPS_ADMIN_PASSWORD: sentinelops-e2e-admin-password
       SENTINELOPS_MODEL_API_KEY: sentinelops-e2e-provider-key
+      SENTINELOPS_E2E_ENABLE_MUTATION_GATES: "true"
     depends_on:
       mysql:
         condition: service_healthy
@@ -109,7 +113,9 @@ services:
       migrate:
         condition: service_completed_successfully
     dns: !reset []
-    volumes: !reset []
+    volumes: !override
+      - sentinelops_e2e_nginx_blocklist:/app/nginx_blocklist
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
   frontend:
     container_name: !reset null

@@ -175,7 +175,10 @@ func (h *RuntimeHandler) WrapInvokableToolCall(_ context.Context, endpoint adk.I
 		}
 		result, endpointErr := endpoint(callContext, arguments, options...)
 		actual, quality := toolBudgetActual(result)
-		settleErr := settleRuntimeCallWithUsage(callContext, budget, reservation, endpointErr == nil, actual, quality)
+		var settleErr error
+		if !isInterruptError(endpointErr) {
+			settleErr = settleRuntimeCallWithUsage(callContext, budget, reservation, endpointErr == nil, actual, quality)
+		}
 		return result, errors.Join(endpointErr, settleErr)
 	}, nil
 }
@@ -200,6 +203,9 @@ func (h *RuntimeHandler) WrapStreamableToolCall(_ context.Context, endpoint adk.
 		}
 		result, endpointErr := endpoint(callContext, arguments, options...)
 		if endpointErr != nil {
+			if isInterruptError(endpointErr) {
+				return nil, endpointErr
+			}
 			return nil, errors.Join(endpointErr, settleRuntimeCall(callContext, budget, reservation, false))
 		}
 		if result == nil {
@@ -233,7 +239,10 @@ func (h *RuntimeHandler) WrapEnhancedInvokableToolCall(_ context.Context, endpoi
 		}
 		result, endpointErr := endpoint(callContext, argument, options...)
 		actual, quality := toolResultBudgetActual(result)
-		settleErr := settleRuntimeCallWithUsage(callContext, budget, reservation, endpointErr == nil, actual, quality)
+		var settleErr error
+		if !isInterruptError(endpointErr) {
+			settleErr = settleRuntimeCallWithUsage(callContext, budget, reservation, endpointErr == nil, actual, quality)
+		}
 		return result, errors.Join(endpointErr, settleErr)
 	}, nil
 }
@@ -262,6 +271,9 @@ func (h *RuntimeHandler) WrapEnhancedStreamableToolCall(_ context.Context, endpo
 		}
 		result, endpointErr := endpoint(callContext, argument, options...)
 		if endpointErr != nil {
+			if isInterruptError(endpointErr) {
+				return nil, endpointErr
+			}
 			return nil, errors.Join(endpointErr, settleRuntimeCall(callContext, budget, reservation, false))
 		}
 		if result == nil {
@@ -511,6 +523,17 @@ func settleRuntimeCallWithUsage(ctx context.Context, budget CallBudget, reservat
 	})
 }
 
+// isInterruptError keeps a durable tool reservation pending across an official
+// Stateful/CompositeInterrupt. The same physical tool call is replayed on
+// Resume and must settle only after its resumed endpoint returns.
+func isInterruptError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var signal *adk.InterruptSignal
+	return errors.As(err, &signal)
+}
+
 func modelBudgetActual(message *schema.Message) (*workflow.BaseBudgetActual, string) {
 	if message == nil || message.ResponseMeta == nil || message.ResponseMeta.Usage == nil {
 		return nil, "unknown"
@@ -544,6 +567,10 @@ func settlingStreamWithUsage[T any](ctx context.Context, source *schema.StreamRe
 			}
 			if receiveErr != nil {
 				var zero T
+				if isInterruptError(receiveErr) {
+					writer.Send(zero, receiveErr)
+					return
+				}
 				writer.Send(zero, errors.Join(receiveErr, settleRuntimeCallWithUsage(ctx, budget, reservation, false, actual, quality)))
 				return
 			}

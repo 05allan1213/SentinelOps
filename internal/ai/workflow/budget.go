@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -536,7 +537,11 @@ func validBaseBudgetTruth(usage BaseBudgetUsage, reservations BaseBudgetReservat
 			expected.RAGContextChars += actual.ContextChars
 		}
 	}
-	return usage.ModelCalls == expected.ModelCalls && usage.L0ToolCalls == expected.L0ToolCalls && usage.PlannerRounds == expected.PlannerRounds && usage.ExecutorRounds == expected.ExecutorRounds && usage.ReplannerRounds == expected.ReplannerRounds && usage.RetryCalls == expected.RetryCalls && usage.FailoverCalls == expected.FailoverCalls && usage.MCPCalls == expected.MCPCalls && usage.InputTokens == expected.InputTokens && usage.CachedInputTokens == expected.CachedInputTokens && usage.OutputTokens == expected.OutputTokens && usage.ReasoningTokens == expected.ReasoningTokens && usage.CostCNY == expected.CostCNY && usage.MCPResultChars == expected.MCPResultChars && usage.MCPResultBytes == expected.MCPResultBytes && usage.RAGDocuments == expected.RAGDocuments && usage.RAGContextChars == expected.RAGContextChars
+	return usage.ModelCalls == expected.ModelCalls && usage.L0ToolCalls == expected.L0ToolCalls && usage.PlannerRounds == expected.PlannerRounds && usage.ExecutorRounds == expected.ExecutorRounds && usage.ReplannerRounds == expected.ReplannerRounds && usage.RetryCalls == expected.RetryCalls && usage.FailoverCalls == expected.FailoverCalls && usage.MCPCalls == expected.MCPCalls && usage.InputTokens == expected.InputTokens && usage.CachedInputTokens == expected.CachedInputTokens && usage.OutputTokens == expected.OutputTokens && usage.ReasoningTokens == expected.ReasoningTokens && budgetFloatEqual(usage.CostCNY, expected.CostCNY) && usage.MCPResultChars == expected.MCPResultChars && usage.MCPResultBytes == expected.MCPResultBytes && usage.RAGDocuments == expected.RAGDocuments && usage.RAGContextChars == expected.RAGContextChars
+}
+
+func budgetFloatEqual(left, right float64) bool {
+	return math.Abs(left-right) <= 1e-12*math.Max(1, math.Max(math.Abs(left), math.Abs(right)))
 }
 
 func encodeBaseBudgetState(usage BaseBudgetUsage, reservations BaseBudgetReservations) (string, string, error) {

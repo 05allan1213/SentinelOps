@@ -1,111 +1,117 @@
 import { expect, test } from '@playwright/test'
-import crypto from 'node:crypto'
-
-const adminPassword = process.env.SENTINELOPS_E2E_ADMIN_PASSWORD ?? 'sentinelops-e2e-admin-password'
-const requesterUsername = 'p38-requester'
-const requesterPassword = 'p38-requester-password'
-
-function signIdentityToken(userID: string, username: string, role: string) {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
-  const payload = Buffer.from(JSON.stringify({
-    uid: userID, username, role,
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  })).toString('base64url')
-  const input = `${header}.${payload}`
-  const signature = crypto.createHmac('sha256', process.env.SENTINELOPS_E2E_JWT_SECRET ?? 'sentinelops-e2e-jwt-secret').update(input).digest('base64url')
-  return `${input}.${signature}`
-}
-
-function signViewerToken() {
-  return signIdentityToken('e2e-viewer', 'e2e-viewer', 'viewer')
-}
-
-async function loginAdmin(page: import('@playwright/test').Page): Promise<string> {
-  const response = await page.request.post('/api/auth/v1/login', { data: { username: 'admin', password: adminPassword } })
-  expect(response.ok()).toBeTruthy()
-  const body = await response.json()
-  const data = body.data ?? body
-  await page.goto('/login')
-  await page.evaluate((auth) => {
-    localStorage.setItem('token', auth.token)
-    localStorage.setItem('auth-storage', JSON.stringify({ state: auth, version: 0 }))
-  }, {
-    token: data.token, userID: data.user_id, role: data.role, username: data.username,
-  })
-  return data.token
-}
-
-async function loginRequester(page: import('@playwright/test').Page, adminToken: string): Promise<string> {
-  const register = await page.request.post('/api/auth/v1/register', {
-    headers: { Authorization: `Bearer ${adminToken}` },
-    data: { username: requesterUsername, password: requesterPassword },
-  })
-  if (register.ok()) {
-    const body = await register.json()
-    const data = body.data ?? body
-    // GoFrame returns HTTP 200 for a duplicate registration with no usable
-    // identity payload; only treat a response with a real user id as a new
-    // registration. Otherwise log in and sign the operator test identity.
-    if (data?.user_id && data?.username) {
-      return signIdentityToken(data.user_id, data.username, 'operator')
-    }
-  }
-  const response = await page.request.post('/api/auth/v1/login', {
-    data: { username: requesterUsername, password: requesterPassword },
-  })
-  expect(response.ok()).toBeTruthy()
-  const body = await response.json()
-  const data = body.data ?? body
-  return signIdentityToken(data.user_id, data.username, 'operator')
-}
-
-async function createApprovalRun(page: import('@playwright/test').Page, adminToken: string) {
-  const token = await loginRequester(page, adminToken)
-  const response = await page.request.post('/api/chat/v2/runs', {
-    headers: { Authorization: `Bearer ${token}` },
-    data: { session_id: `p38-${crypto.randomUUID()}`, query: '请执行一次需要审批的封禁动作', agent: 'plan_agent' },
-  })
-  expect(response.ok()).toBeTruthy()
-  return (await response.json()).data
-}
+import {
+  createDurableRun,
+  eventAttributes,
+  loginAdmin,
+  loginRequester,
+  readSSESegment,
+  readSSEUntilTerminal,
+  signViewerToken,
+  waitForPendingApproval,
+} from './p38-helpers'
 
 test.describe('real Compose approval recovery chain', () => {
-  test('pending -> approve -> worker resume -> effect success survives refresh and reconnect', async ({ page }) => {
-    const token = await loginAdmin(page)
-    const run = await createApprovalRun(page, token)
+  test('pending -> approve -> worker resume -> primary/derived effects succeed and SSE replay is read-only', async ({ page }) => {
+    const admin = await loginAdmin(page)
+    const requester = await loginRequester(page, admin.token)
+    const run = await createDurableRun(page, requester, '请执行一次需要审批的封禁动作')
+    const approval = await waitForPendingApproval(page.request, admin.token, run.run_id)
 
     await page.goto('/dashboard')
-    const approval = page.locator('[data-testid^="approval-"]').first()
-    await expect(approval).toBeVisible({ timeout: 60_000 })
-    await expect(approval).toContainText('block_ip')
-    await approval.getByRole('button', { name: '批准' }).click()
+    const card = page.getByTestId(`approval-${approval.id}`)
+    await expect(card).toBeVisible({ timeout: 90_000 })
+    await expect(card).toContainText('block_ip')
+    await card.getByRole('button', { name: '批准' }).click()
     await page.getByLabel('审批理由').fill('P38 e2e approval')
     await page.getByRole('button', { name: '确认批准' }).click()
-    await page.getByRole('button', { name: '确认批准' }).click({ trial: true }).catch(() => undefined)
+    await expect(card).toHaveCount(0, { timeout: 90_000 })
 
-    await expect(page.locator('[data-testid^="approval-"]')).toHaveCount(0, { timeout: 60_000 })
+    const events = await readSSESegment(page.request, admin.token, run.run_id, 0)
+    const types = events.map(event => event.type)
+    expect(types.filter(type => type === 'approval.decided')).toHaveLength(1)
+    expect(types.filter(type => type === 'run.resumed')).toHaveLength(1)
+    expect(types.filter(type => type === 'effect.started')).toHaveLength(2)
+    expect(types.filter(type => type === 'effect.succeeded')).toHaveLength(2)
+    expect(types).toContain('run.completed')
+
+    const succeededSteps = events
+      .filter(event => event.type === 'effect.succeeded')
+      .map(event => eventAttributes(event).effect_step)
+    expect(succeededSteps).toEqual(expect.arrayContaining(['primary', 'nginx_reload']))
+    expect(new Set(succeededSteps).size).toBe(2)
+
+    const terminal = events.find(event => event.type === 'run.completed')
+    expect(terminal).toBeTruthy()
+    expect(eventAttributes(terminal!).to_status).toBe('succeeded')
+
+    // Reconnect from the terminal boundary. It must replay only the terminal
+    // event and cannot create another model call or Effect row.
+    const replay = await readSSESegment(page.request, admin.token, run.run_id, terminal!.id - 1)
+    expect(replay.map(event => event.id)).toEqual([terminal!.id])
+    expect(replay.some(event => event.type === 'agent.tool_call' || event.type === 'effect.started')).toBe(false)
+
     await page.reload()
-    await expect(page.getByText('全部完成')).toBeVisible({ timeout: 60_000 })
-
-    const events = await page.request.get(`/api/chat/v2/runs/${run.run_id}/events?after_seq=0`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    expect(events.ok()).toBeTruthy()
+    await expect(page.getByTestId(`approval-${approval.id}`)).toHaveCount(0)
   })
 
-  test('viewer HTTP approval is forbidden and duplicate decisions do not execute twice', async ({ page }) => {
-    const token = await loginAdmin(page)
-    await createApprovalRun(page, token)
-    await page.goto('/dashboard')
-    const approval = page.locator('[data-testid^="approval-"]').first()
-    await expect(approval).toBeVisible({ timeout: 60_000 })
-    const approvalID = (await approval.getAttribute('data-testid'))?.replace('approval-', '')
-    expect(approvalID).toBeTruthy()
-    const hash = await approval.locator('p.font-mono').textContent()
-    const viewer = await page.request.post(`/api/ops/v1/approvals/${approvalID}/approve`, {
+  test('viewer HTTP approval is forbidden and duplicate CAS decision never adds a second event', async ({ page }) => {
+    const admin = await loginAdmin(page)
+    const requester = await loginRequester(page, admin.token)
+    const run = await createDurableRun(page, requester, '请执行一次需要审批的封禁动作')
+    const approval = await waitForPendingApproval(page.request, admin.token, run.run_id)
+    const viewer = await page.request.post(`/api/ops/v1/approvals/${approval.id}/approve`, {
       headers: { Authorization: `Bearer ${signViewerToken()}` },
-      data: { proposal_hash: hash, version: 1, reason: 'viewer must fail' },
+      data: { proposal_hash: approval.proposal_hash, version: approval.version, reason: 'viewer must fail' },
     })
     expect(viewer.status()).toBe(403)
+
+    const decided = await page.request.post(`/api/ops/v1/approvals/${approval.id}/approve`, {
+      headers: { Authorization: `Bearer ${admin.token}` },
+      data: { proposal_hash: approval.proposal_hash, version: approval.version, reason: 'P38 CAS decision' },
+    })
+    expect(decided.ok()).toBeTruthy()
+    const duplicate = await page.request.post(`/api/ops/v1/approvals/${approval.id}/approve`, {
+      headers: { Authorization: `Bearer ${admin.token}` },
+      data: { proposal_hash: approval.proposal_hash, version: approval.version, reason: 'duplicate must conflict' },
+    })
+    expect(duplicate.ok()).toBeTruthy()
+    const conflictingDecision = await page.request.post(`/api/ops/v1/approvals/${approval.id}/reject`, {
+      headers: { Authorization: `Bearer ${admin.token}` },
+      data: { proposal_hash: approval.proposal_hash, version: approval.version, reason: 'opposite decision must conflict' },
+    })
+    expect(conflictingDecision.status()).toBe(409)
+
+    const events = await readSSESegment(page.request, admin.token, run.run_id, 0)
+    expect(events.filter(event => event.type === 'approval.decided')).toHaveLength(1)
+  })
+
+  test('proposal hash mismatch is rejected and an explicit reject never starts an Effect', async ({ page }) => {
+    const admin = await loginAdmin(page)
+    const requester = await loginRequester(page, admin.token)
+    const run = await createDurableRun(page, requester, '请执行一次需要审批的封禁动作')
+    const approval = await waitForPendingApproval(page.request, admin.token, run.run_id)
+
+    const mismatched = await page.request.post(`/api/ops/v1/approvals/${approval.id}/approve`, {
+      headers: { Authorization: `Bearer ${admin.token}` },
+      data: {
+        proposal_hash: '0000000000000000000000000000000000000000000000000000000000000000',
+        version: approval.version,
+        reason: 'hash mismatch must fail closed',
+      },
+    })
+    expect(mismatched.status()).toBe(409)
+
+    const rejected = await page.request.post(`/api/ops/v1/approvals/${approval.id}/reject`, {
+      headers: { Authorization: `Bearer ${admin.token}` },
+      data: { proposal_hash: approval.proposal_hash, version: approval.version, reason: 'P38 explicit rejection' },
+    })
+    expect(rejected.ok()).toBeTruthy()
+
+    const events = await readSSEUntilTerminal(page.request, admin.token, run.run_id)
+    const types = events.map(event => event.type)
+    expect(types.filter(type => type === 'approval.decided')).toHaveLength(1)
+    expect(types.filter(type => type === 'effect.started')).toHaveLength(0)
+    expect(types).toContain('run.failed')
+    expect(eventAttributes(events.find(event => event.type === 'approval.decided')!).decision).toBe('rejected')
   })
 })

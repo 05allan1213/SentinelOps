@@ -105,6 +105,115 @@ func TestRuntimeHandlerCoversAllEndpoints(t *testing.T) {
 	p14RequireAllEndpointsRejectMissingContext(t, handler)
 }
 
+func TestRuntimeHandlerInterruptKeepsToolReservationUntilResume(t *testing.T) {
+	handler := NewRuntimeHandler()
+	budget := newP14RecordingBudget()
+	ctx, _ := p14InvocationContext(t, "run-interrupt-reservation", "user-interrupt-reservation", budget)
+	interrupt := func() error {
+		return fmt.Errorf("wrapped StatefulInterrupt: %w", &adk.InterruptSignal{ID: "p38-interrupt"})
+	}
+	assertInterrupt := func(name string, err error) {
+		t.Helper()
+		var signal *adk.InterruptSignal
+		if !errors.As(err, &signal) {
+			t.Fatalf("%s error=%v, want InterruptSignal", name, err)
+		}
+	}
+
+	invokableContext := &adk.ToolContext{Name: "query_events", CallID: "interrupt-invokable"}
+	invokable, err := handler.WrapInvokableToolCall(ctx, func(context.Context, string, ...tool.Option) (string, error) {
+		return "", interrupt()
+	}, invokableContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, callErr := invokable(ctx, `{}`)
+	assertInterrupt("invokable", callErr)
+
+	streamableContext := &adk.ToolContext{Name: "query_events", CallID: "interrupt-streamable"}
+	streamable, err := handler.WrapStreamableToolCall(ctx, func(context.Context, string, ...tool.Option) (*schema.StreamReader[string], error) {
+		return nil, interrupt()
+	}, streamableContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, callErr = streamable(ctx, `{}`)
+	assertInterrupt("streamable endpoint", callErr)
+
+	enhancedContext := &adk.ToolContext{Name: "query_events", CallID: "interrupt-enhanced"}
+	enhanced, err := handler.WrapEnhancedInvokableToolCall(ctx, func(context.Context, *schema.ToolArgument, ...tool.Option) (*schema.ToolResult, error) {
+		return nil, interrupt()
+	}, enhancedContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, callErr = enhanced(ctx, &schema.ToolArgument{Text: `{}`})
+	assertInterrupt("enhanced invokable", callErr)
+
+	enhancedStreamContext := &adk.ToolContext{Name: "query_events", CallID: "interrupt-enhanced-streamable"}
+	enhancedStream, err := handler.WrapEnhancedStreamableToolCall(ctx, func(context.Context, *schema.ToolArgument, ...tool.Option) (*schema.StreamReader[*schema.ToolResult], error) {
+		return nil, interrupt()
+	}, enhancedStreamContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, callErr = enhancedStream(ctx, &schema.ToolArgument{Text: `{}`})
+	assertInterrupt("enhanced streamable endpoint", callErr)
+
+	streamReceiveContext := &adk.ToolContext{Name: "query_events", CallID: "interrupt-stream-receive"}
+	streamReceive, err := handler.WrapStreamableToolCall(ctx, func(context.Context, string, ...tool.Option) (*schema.StreamReader[string], error) {
+		reader, writer := schema.Pipe[string](1)
+		writer.Send("", interrupt())
+		writer.Close()
+		return reader, nil
+	}, streamReceiveContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := streamReceive(ctx, `{}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, receiveErr := stream.Recv()
+	assertInterrupt("stream receive", receiveErr)
+	stream.Close()
+
+	enhancedReceiveContext := &adk.ToolContext{Name: "query_events", CallID: "interrupt-enhanced-stream-receive"}
+	enhancedReceive, err := handler.WrapEnhancedStreamableToolCall(ctx, func(context.Context, *schema.ToolArgument, ...tool.Option) (*schema.StreamReader[*schema.ToolResult], error) {
+		reader, writer := schema.Pipe[*schema.ToolResult](1)
+		writer.Send(nil, interrupt())
+		writer.Close()
+		return reader, nil
+	}, enhancedReceiveContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enhancedReader, err := enhancedReceive(ctx, &schema.ToolArgument{Text: `{}`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, receiveErr = enhancedReader.Recv()
+	assertInterrupt("enhanced stream receive", receiveErr)
+	enhancedReader.Close()
+
+	if reserved, settled := budget.counts(); reserved != 6 || settled != 0 {
+		t.Fatalf("after interrupt reserved=%d settled=%d, want 6/0", reserved, settled)
+	}
+
+	resumed, err := handler.WrapInvokableToolCall(ctx, func(context.Context, string, ...tool.Option) (string, error) {
+		return "resumed", nil
+	}, invokableContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result, err := resumed(ctx, `{}`); err != nil || result != "resumed" {
+		t.Fatalf("resumed result=%q err=%v", result, err)
+	}
+	if reserved, settled := budget.counts(); reserved != 6 || settled != 1 {
+		t.Fatalf("after resume reserved=%d settled=%d, want 6/1", reserved, settled)
+	}
+}
+
 func TestRuntimeHandlerRejectsPolicyScopeDeadlineBeforeEndpoint(t *testing.T) {
 	handler := NewRuntimeHandler()
 	endpointCalls := 0

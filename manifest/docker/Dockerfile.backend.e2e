@@ -18,6 +18,7 @@ RUN sed -i \
       -e 's/aliyun_bailian/e2e_double/g' \
       -e 's#https://dashscope.aliyuncs.com/compatible-mode/v1#http://provider-double:8080/v1#g' \
       -e 's#https://dashscope.aliyuncs.com/compatible-api/v1#http://provider-double:8080/v1#g' \
+      -e 's/nginx_container: "nginx"/nginx_container: "sentinelops-e2e-nginx-1"/' \
       -e '/^agent_runtime:/,/^observability:/ s/enabled: false/enabled: true/' \
       -e '/^agent_runtime:/,/^observability:/ s/accept_new_runs: false/accept_new_runs: true/' \
       manifest/config/config.yaml && \

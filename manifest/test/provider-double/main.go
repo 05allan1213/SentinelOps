@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"sync/atomic"
 )
@@ -186,9 +187,29 @@ func writeStream(w http.ResponseWriter, model, toolName, arguments, content stri
 
 func nextResponse(request chatRequest) (string, string, string) {
 	unknown := false
+	blockIPResultSeen := false
+	opsAgentResultSeen := false
+	webhookResultSeen := false
+	markerCounts := map[string]int{}
 	for _, message := range request.Messages {
-		if strings.Contains(strings.ToLower(fmt.Sprint(message["content"])), "unknown") {
+		content := strings.ToLower(contentText(message["content"]))
+		role := fmt.Sprint(message["role"])
+		for _, marker := range []string{"unknown", "未知", "外部", "封禁", "webhook"} {
+			if strings.Contains(content, marker) {
+				markerCounts[role+":"+marker]++
+			}
+		}
+		if role == "user" && (strings.Contains(content, "unknown") || strings.Contains(content, "未知")) {
 			unknown = true
+		}
+		if message["role"] == "tool" && (message["name"] == "block_ip" || strings.Contains(content, "192.0.2.38")) {
+			blockIPResultSeen = true
+		}
+		if message["role"] == "tool" && (message["name"] == "ops_agent" || strings.Contains(content, "ops_agent")) {
+			opsAgentResultSeen = true
+		}
+		if message["role"] == "tool" && (message["name"] == "webhook_out" || strings.Contains(content, "webhook_out")) {
+			webhookResultSeen = true
 		}
 	}
 	toolNames := make(map[string]bool)
@@ -199,31 +220,104 @@ func nextResponse(request chatRequest) (string, string, string) {
 			}
 		}
 	}
-	if toolNames["plan"] {
-		return "plan", `{"steps":["调用 ops_agent 规划并执行一次需要审批的封禁动作"]}`, ""
-	}
-	if toolNames["webhook_out"] && unknown {
-		return "webhook_out", `{"url":"http://provider-double:8080/unknown","payload":"{}","method":"POST"}`, ""
-	}
-	if toolNames["block_ip"] {
-		return "block_ip", `{"ip":"192.0.2.38","reason":"P38 deterministic approval fixture"}`, ""
-	}
-	if toolNames["ops_agent"] {
-		if unknown {
-			return "ops_agent", `{"query":"执行一次 unknown 外部 Effect"}`, ""
-		}
-		return "ops_agent", `{"query":"对事件 e2e-event 执行一次需要审批的封禁动作"}`, ""
-	}
+	log.Printf("e2e response tools=%v markers=%v unknown=%t block_result_seen=%t ops_result_seen=%t webhook_result_seen=%t prior_block=%t prior_ops=%t prior_webhook=%t", sortedToolNames(toolNames), markerCounts, unknown, blockIPResultSeen, opsAgentResultSeen, webhookResultSeen, priorToolCall(request, "block_ip"), priorToolCall(request, "ops_agent"), priorToolCall(request, "webhook_out"))
+	// Replanner exposes both tools. A completed child result is terminal for
+	// this deterministic fixture, so prefer the response tool before planning.
 	if toolNames["respond"] {
 		return "respond", `{"response":"approval effect completed"}`, ""
+	}
+	if toolNames["plan"] {
+		plan := "调用 ops_agent 规划并执行一次需要审批的封禁动作"
+		if unknown {
+			plan = "调用 ops_agent 执行一次 unknown 外部 Effect"
+		}
+		return "plan", fmt.Sprintf(`{"steps":[%q]}`, plan), ""
+	}
+	if toolNames["webhook_out"] && unknown && !webhookResultSeen && !priorToolCall(request, "webhook_out") {
+		return "webhook_out", `{"url":"http://provider-double:8080/unknown","payload":"{}","method":"POST"}`, ""
+	}
+	if toolNames["block_ip"] && !blockIPResultSeen && !priorToolCall(request, "block_ip") {
+		return "block_ip", `{"ip":"192.0.2.38","reason":"P38 deterministic approval fixture"}`, ""
+	}
+	if blockIPResultSeen {
+		if toolNames["respond"] {
+			return "respond", `{"response":"approval effect completed"}`, ""
+		}
+		return "", "", "approval effect completed"
+	}
+	if toolNames["ops_agent"] && !opsAgentResultSeen && !priorToolCall(request, "ops_agent") {
+		if unknown {
+			return "ops_agent", `{"request":"执行一次 unknown 外部 Effect"}`, ""
+		}
+		return "ops_agent", `{"request":"对事件 e2e-event 执行一次需要审批的封禁动作"}`, ""
+	}
+	if opsAgentResultSeen {
+		return "", "", "approval effect completed"
 	}
 	if toolNames["replan"] {
 		return "replan", `{"steps":[]}`, ""
 	}
 	for _, message := range request.Messages {
-		if strings.Contains(fmt.Sprint(message["content"]), "approval") {
+		if strings.Contains(strings.ToLower(contentText(message["content"])), "approval") {
 			return "", "", "approval effect completed"
 		}
 	}
 	return "", "", "e2e provider double response"
+}
+
+func sortedToolNames(toolNames map[string]bool) []string {
+	result := make([]string, 0, len(toolNames))
+	for name := range toolNames {
+		result = append(result, name)
+	}
+	sort.Strings(result)
+	return result
+}
+
+// contentText 兼容 OpenAI-compatible 消息的 string 与 content-part 两种编码。
+// Provider double 只读取控制标记，不把模型输入原文写入日志或证据。
+func contentText(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case []any:
+		var parts []string
+		for _, part := range typed {
+			parts = append(parts, contentText(part))
+		}
+		return strings.Join(parts, " ")
+	case map[string]any:
+		var parts []string
+		for _, key := range []string{"text", "content", "value"} {
+			if part, ok := typed[key]; ok {
+				parts = append(parts, contentText(part))
+			}
+		}
+		return strings.Join(parts, " ")
+	default:
+		return fmt.Sprint(value)
+	}
+}
+
+// priorToolCall 判断本轮对话是否已经生成过指定 Tool call；Tool result
+// 消息在 OpenAI 兼容请求中不携带 Eino ToolName，assistant tool_calls 才是
+// provider double 可稳定观察且不会混淆嵌套 Agent 的事实。
+func priorToolCall(request chatRequest, name string) bool {
+	for _, message := range request.Messages {
+		calls, ok := message["tool_calls"].([]any)
+		if !ok {
+			continue
+		}
+		for _, raw := range calls {
+			call, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			function, ok := call["function"].(map[string]any)
+			if ok && function["name"] == name {
+				return true
+			}
+		}
+	}
+	return false
 }

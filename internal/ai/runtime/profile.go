@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"os"
 	goruntime "runtime"
 	"runtime/debug"
 	"sort"
@@ -71,6 +72,7 @@ func BuildDurableRuntimeSnapshotWithSkills(config *appconfig.Config, skills []Sk
 	if err != nil {
 		return FrozenRuntimeSnapshot{}, err
 	}
+	mutationGates := e2eMutationGatesEnabled(config)
 	return FreezeRuntimeSnapshot(RuntimeSnapshotInput{
 		Runtime:       RuntimeVersionSnapshot{Go: goruntime.Version(), Eino: einoVersion, App: buildRevision()},
 		AgentRevision: agentRevision,
@@ -89,14 +91,20 @@ func BuildDurableRuntimeSnapshotWithSkills(config *appconfig.Config, skills []Sk
 			"agent_runtime.enabled":                    config.AgentRuntime.Enabled,
 			"agent_runtime.accept_new_runs":            config.AgentRuntime.AcceptNewRuns,
 			"agent_runtime.shadow_mode":                config.AgentRuntime.ShadowMode,
-			"agent_runtime.l1_writes":                  false,
-			"agent_runtime.l2_writes":                  false,
+			"agent_runtime.l1_writes":                  mutationGates,
+			"agent_runtime.l2_writes":                  mutationGates,
 			"agent_runtime.admin_query_database_debug": config.AgentRuntime.AdminQueryDatabaseDebug,
 			"mcp.enabled":                              config.MCP.Enabled,
 			"skill.enabled":                            config.Skill.Enabled,
 			"langfuse.enabled":                         false,
 		},
 	})
+}
+
+// e2eMutationGatesEnabled 仅允许隔离测试环境显式开启 Mutation Gate。
+// 生产、开发及未声明测试开关的环境继续保持 P26 的 deny-only 默认值。
+func e2eMutationGatesEnabled(config *appconfig.Config) bool {
+	return config != nil && config.App.Environment == "test" && os.Getenv("SENTINELOPS_E2E_ENABLE_MUTATION_GATES") == "true"
 }
 
 func hashSnapshotValue(value any) string {

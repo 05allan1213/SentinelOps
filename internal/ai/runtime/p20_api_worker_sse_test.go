@@ -57,6 +57,39 @@ func TestDurableSnapshotContainsCatalogToolsAndFrozenWriteGates(t *testing.T) {
 	}
 }
 
+func TestTestOnlyMutationGatesRequireExplicitOptIn(t *testing.T) {
+	config := &appconfig.Config{
+		App:          appconfig.App{Environment: "test"},
+		AgentRuntime: appconfig.AgentRuntime{Enabled: true, AcceptNewRuns: true},
+		Providers: map[string]appconfig.Provider{
+			"test": {Endpoints: map[string]string{appconfig.DriverOpenAICompatibleChat: "https://example.invalid/v1"}},
+		},
+		ModelCatalog: map[string]appconfig.Model{
+			"test/chat": {
+				ModelID: "test-chat", Driver: appconfig.DriverOpenAICompatibleChat,
+				Pricing: appconfig.Pricing{Revision: "p38", Currency: "CNY", Unit: "per_million_tokens", Input: 1, Output: 2},
+			},
+		},
+		Routing: appconfig.Routing{Chat: map[string]appconfig.ChatRoute{"default": {Candidates: []appconfig.Route{{Model: "test/chat"}}}}},
+	}
+	t.Setenv("SENTINELOPS_E2E_ENABLE_MUTATION_GATES", "false")
+	closed, err := BuildDurableRuntimeSnapshot(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if closed.FeatureGate("agent_runtime.l1_writes") || closed.FeatureGate("agent_runtime.l2_writes") {
+		t.Fatalf("test gates opened without explicit opt-in: %+v", closed.document.FeatureGates)
+	}
+	t.Setenv("SENTINELOPS_E2E_ENABLE_MUTATION_GATES", "true")
+	open, err := BuildDurableRuntimeSnapshot(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !open.FeatureGate("agent_runtime.l1_writes") || !open.FeatureGate("agent_runtime.l2_writes") {
+		t.Fatalf("explicit test opt-in did not open gates: %+v", open.document.FeatureGates)
+	}
+}
+
 func TestWorkerRunsAfterAPIContextIsGone(t *testing.T) {
 	var executions, completions atomic.Int32
 	claimed := &workflow.ClaimedRun{Run: mysql.WorkflowRun{
