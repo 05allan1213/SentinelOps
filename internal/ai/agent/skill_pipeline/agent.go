@@ -25,6 +25,9 @@ const (
 	agentDescription = "Call the Skill Agent to load approved read-only SOP instructions."
 	defaultProfile   = "default"
 	defaultSkillDir  = "manifest/skills"
+	// configuredMaxIterations 是已批准 Skill Agent 的固定迭代上界；只读 SOP 流程
+	// 不应进入无界工具循环，避免真实模型调用预算失控。
+	configuredMaxIterations = 5
 )
 
 // DefaultToolNames 是 Skill Agent 可调用的最小 L0 Tool 集。
@@ -194,7 +197,7 @@ func buildConfiguredSkillAgent(ctx context.Context, handler *runtime.RuntimeHand
 	backend = &gateCheckedSkillBackend{delegate: backend, handler: handler}
 	return BuildSkillAgent(ctx, Config{
 		RuntimeHandler: handler, Backend: backend, BaseDir: baseDir,
-		MaxBytes: config.Skill.MaxBytes, Profile: defaultProfile,
+		MaxBytes: config.Skill.MaxBytes, Profile: defaultProfile, MaxIterations: configuredMaxIterations,
 		ToolNames: append([]string(nil), DefaultToolNames...),
 	})
 }

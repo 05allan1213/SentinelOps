@@ -28,6 +28,9 @@ const (
 	agentDescription    = "Call the MCP Agent to search and invoke approved read-only tools from configured MCP servers."
 	defaultProfile      = "default"
 	dynamicToolRevision = "mcp_tool_v1"
+	// configuredMaxIterations 是已批准 MCP Agent 的固定迭代上界；只读文档检索
+	// 不应进入无界工具循环，避免真实模型调用预算失控。
+	configuredMaxIterations = 5
 )
 
 // ToolSource 在每次 mcp_agent 构建时读取当前 MCP Session 的官方 Tool。
@@ -297,6 +300,7 @@ func buildConfiguredMCPAgent(ctx context.Context, handler *airuntime.RuntimeHand
 	inner, err := BuildMCPAgent(ctx, Config{
 		Reliability: reliability, RuntimeHandler: handler, Profile: defaultProfile,
 		Source: ownerToolSource{owners: owners, handler: handler}, CatalogHash: mustMCPConfigHash(mcpConfig),
+		MaxIterations: configuredMaxIterations,
 	})
 	if err != nil {
 		for _, owner := range owners {
