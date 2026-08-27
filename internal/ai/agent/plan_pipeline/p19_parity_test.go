@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"SentinelOps/internal/ai/agent/mcp_pipeline"
+	"SentinelOps/internal/ai/agent/skill_pipeline"
 	"SentinelOps/internal/ai/cache"
 	"SentinelOps/internal/ai/policy"
 	airuntime "SentinelOps/internal/ai/runtime"
@@ -168,6 +170,50 @@ func TestPlannerDelegatesAnalysisAndPersistenceExplicitly(t *testing.T) {
 		if !strings.Contains(text, phrase) {
 			t.Errorf("Planner prompt missing explicit delegation phrase %q", phrase)
 		}
+	}
+}
+
+func TestPlannerPromptCoversExecutorCapabilityInventory(t *testing.T) {
+	ctx := context.Background()
+	handler := airuntime.NewRuntimeHandler()
+	agentTools := newWorkerAgentTools(ctx, handler)
+	agentTools = append(agentTools,
+		mcp_pipeline.NewAgentTool(ctx, handler),
+		skill_pipeline.NewAgentTool(ctx, handler),
+	)
+	cfg, err := newExecutorAgentConfig(ctx, &ExecutorBuilderConfig{
+		Model:               &p15Model{},
+		RegisteredToolNames: []string{"query_internal_docs", "get_current_time"},
+		AgentTools:          agentTools,
+		RuntimeHandler:      handler,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plannerInput, err := customPlannerGenInput(ctx, []adk.Message{schema.UserMessage("query internal documentation")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prompt := plannerInput[0].Content
+	want := []string{
+		"query_internal_docs", "get_current_time", "event_analysis_agent", "report_agent",
+		"risk_assessment_agent", "solve_agent", "intelligence_agent", "ops_agent",
+		"mcp_agent", "skill_agent",
+	}
+	got := make([]string, 0, len(cfg.ToolsConfig.Tools))
+	for _, current := range cfg.ToolsConfig.Tools {
+		info, infoErr := current.Info(ctx)
+		if infoErr != nil {
+			t.Fatal(infoErr)
+		}
+		got = append(got, info.Name)
+		if !strings.Contains(prompt, info.Name) {
+			t.Errorf("Planner prompt missing executable capability %q", info.Name)
+		}
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Executor capability inventory = %#v, want %#v", got, want)
 	}
 }
 
