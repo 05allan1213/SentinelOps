@@ -583,7 +583,7 @@ func modelBudgetActual(message *schema.Message) (*workflow.BaseBudgetActual, str
 }
 
 func settlingStreamWithUsage[T any](ctx context.Context, source *schema.StreamReader[T], budget CallBudget, reservation BudgetReservation, usage func(T) (*workflow.BaseBudgetActual, string)) *schema.StreamReader[T] {
-	reader, writer := schema.Pipe[T](1)
+	reader, writer := schema.Pipe[T](0)
 	go func() {
 		defer source.Close()
 		defer writer.Close()
