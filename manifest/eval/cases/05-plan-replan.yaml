@@ -11,21 +11,21 @@ default_snapshot:
   models:
     - kind: chat
       candidate_order: 0
-      catalog_ref: aliyun_bailian/qwen3.6-plus
+      catalog_ref: aliyun_bailian/qwen-plus
       provider: aliyun_bailian
       provider_revision: catalog-2026-08-28
       driver: openai_compatible_chat
       driver_revision: eino-openai-0.1.13
-      model_id: qwen3.6-plus
+      model_id: qwen-plus
       routing_profile: reasoning
       route_options: {enable_thinking: false}
       pricing_revision: "2026-08-28"
       pricing_currency: CNY
       pricing_unit: per_million_tokens
-      input_price: 2
-      cached_input_price: 0.2
-      output_price: 12
-      model_snapshot_identity: fade8e9a296abf9ccae53ce0c01d83e65c60df0e759c49c2f35ded68b11eee36
+      input_price: 0.8
+      cached_input_price: 0.16
+      output_price: 2
+      model_snapshot_identity: a0720de45843522ac10982f61b45b67d05828997825543cb66c74b3f9c6ebb04
   prompt_snapshot: sentinelops-prompt-v3
   tool_snapshot: sentinelops-tool-catalog-v1
   skill_snapshot: sentinelops-skill-manifest-v1
