@@ -138,9 +138,15 @@ func (a *BlockIPAction) Execute(ctx context.Context, params map[string]string) (
 				map[string]any{"database": "confirmed", "blocklist_file": "unknown", "nginx_reload": "not_sent"},
 				fmt.Errorf("block_ip: local target state is partially applied"))
 		}
+		// backend 禁用时不存在 nginx reload 动作；若仍返回 pending 会诱导模型
+		// 追加第二个审批提案，造成真实 Eval 的重复规划和预算膨胀。
+		nginxState := "pending"
+		if mgr.backend == "" || mgr.backend == "none" {
+			nginxState = "not_required"
+		}
 		return ActionResult{Success: true, Message: fmt.Sprintf("IP %s 已加入封禁名单", ip), Output: map[string]string{
 			"ip": ip, "blocked": "true", "database": "confirmed", "blocklist_file": "confirmed",
-			"blocklist_changed": fmt.Sprint(changed), "nginx_reload": "pending", "backend": mgr.backend,
+			"blocklist_changed": fmt.Sprint(changed), "nginx_reload": nginxState, "backend": mgr.backend,
 		}}, nil
 	}
 
