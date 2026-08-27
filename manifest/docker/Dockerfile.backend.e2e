@@ -8,17 +8,21 @@ RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -o /app/server main.go
 FROM golang:1.27.0-alpine
 ENV TZ=Asia/Shanghai
 RUN apk add --no-cache docker-cli
+ARG SENTINELOPS_E2E_PROJECT=sentinelops-e2e
 WORKDIR /app
 COPY --from=builder /app/server ./server
 COPY docs/ ./docs/
 COPY manifest/config/config.docker.yaml ./manifest/config/config.yaml
 COPY manifest/skills/ ./manifest/skills/
-RUN sed -i \
+RUN case "${SENTINELOPS_E2E_PROJECT}" in \
+      ''|*[!a-z0-9_-]*) echo "invalid Compose project name" >&2; exit 1 ;; \
+    esac && \
+    sed -i \
       -e 's/environment: "production"/environment: "test"/' \
       -e 's/aliyun_bailian/e2e_double/g' \
       -e 's#https://dashscope.aliyuncs.com/compatible-mode/v1#http://provider-double:8080/v1#g' \
       -e 's#https://dashscope.aliyuncs.com/compatible-api/v1#http://provider-double:8080/v1#g' \
-      -e 's/nginx_container: "nginx"/nginx_container: "sentinelops-e2e-nginx-1"/' \
+      -e "s/nginx_container: \"nginx\"/nginx_container: \"${SENTINELOPS_E2E_PROJECT}-nginx-1\"/" \
       -e '/^skill:/,/^agent_runtime:/ s/enabled: false/enabled: true/' \
       -e '/^agent_runtime:/,/^observability:/ s/enabled: false/enabled: true/' \
       -e '/^agent_runtime:/,/^observability:/ s/accept_new_runs: false/accept_new_runs: true/' \

@@ -98,6 +98,8 @@ services:
     build:
       context: ../..
       dockerfile: manifest/docker/Dockerfile.backend.e2e
+      args:
+        SENTINELOPS_E2E_PROJECT: ${COMPOSE_PROJECT_NAME:-sentinelops-e2e}
     command: ["./server", "api"]
     environment:
       TZ: UTC
@@ -126,6 +128,8 @@ services:
     build:
       context: ../..
       dockerfile: manifest/docker/Dockerfile.backend.e2e
+      args:
+        SENTINELOPS_E2E_PROJECT: ${COMPOSE_PROJECT_NAME:-sentinelops-e2e}
     command: ["./server", "worker"]
     environment:
       TZ: UTC
