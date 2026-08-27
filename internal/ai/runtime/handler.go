@@ -582,10 +582,6 @@ func modelBudgetActual(message *schema.Message) (*workflow.BaseBudgetActual, str
 	}, "reliable"
 }
 
-func settlingStream[T any](ctx context.Context, source *schema.StreamReader[T], budget CallBudget, reservation BudgetReservation) *schema.StreamReader[T] {
-	return settlingStreamWithUsage(ctx, source, budget, reservation, func(T) (*workflow.BaseBudgetActual, string) { return nil, "unknown" })
-}
-
 func settlingStreamWithUsage[T any](ctx context.Context, source *schema.StreamReader[T], budget CallBudget, reservation BudgetReservation, usage func(T) (*workflow.BaseBudgetActual, string)) *schema.StreamReader[T] {
 	reader, writer := schema.Pipe[T](1)
 	go func() {

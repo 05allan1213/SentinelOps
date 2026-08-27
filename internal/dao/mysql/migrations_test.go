@@ -195,7 +195,7 @@ func requireCurrentSchemaSnapshot(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	models := []any{
 		&Event{}, &Subscription{}, &Report{}, &User{}, &Setting{}, &QueryTermMapping{},
-		&TraceRun{}, &TraceNode{}, &KnowledgeBase{}, &KnowledgeDocument{}, &KnowledgeChunk{},
+		&TraceRun{}, &TraceNode{}, &p03KnowledgeBase{}, &p03KnowledgeDocument{}, &p03KnowledgeChunk{},
 		&MessageFeedback{}, &UserPreference{}, &OpsPlaybook{}, &OpsRun{}, &OpsRunStep{},
 		&OpsProtectedAsset{}, &p03WorkflowRun{}, &p03WorkflowEvent{}, &p03WorkflowCheckpoint{},
 		&p03SessionStateRevision{},
@@ -218,6 +218,57 @@ func requireCurrentSchemaSnapshot(t *testing.T, db *gorm.DB) {
 
 // 下列冻结模型只用于重建 P03 开始前的旧 Schema。生产 GORM 模型会随
 // 后续单元映射 Expand 列，不能反向改变“从旧 Schema Up”的 contract test。
+type p03KnowledgeBase struct {
+	ID          string         `gorm:"column:id;primaryKey;size:64"`
+	Name        string         `gorm:"column:name;size:128;not null"`
+	Description string         `gorm:"column:description;type:text"`
+	DocCount    int            `gorm:"column:doc_count;default:0"`
+	ChunkCount  int            `gorm:"column:chunk_count;default:0"`
+	CreatedAt   time.Time      `gorm:"column:created_at;type:datetime;autoCreateTime"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;type:datetime;autoUpdateTime"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index"`
+}
+
+func (p03KnowledgeBase) TableName() string { return "knowledge_bases" }
+
+type p03KnowledgeDocument struct {
+	ID              string         `gorm:"column:id;primaryKey;size:64"`
+	BaseID          string         `gorm:"column:base_id;size:64;not null;index"`
+	Name            string         `gorm:"column:name;size:256;not null"`
+	FilePath        string         `gorm:"column:file_path;size:512;not null"`
+	FileSize        int64          `gorm:"column:file_size;not null"`
+	FileType        string         `gorm:"column:file_type;size:32;not null;index"`
+	FileHash        string         `gorm:"column:file_hash;size:64;index"`
+	ChunkStrategy   string         `gorm:"column:chunk_strategy;size:32;not null"`
+	ChunkConfig     string         `gorm:"column:chunk_config;type:json"`
+	ChunkCount      int            `gorm:"column:chunk_count;default:0"`
+	IndexedChunks   int            `gorm:"column:indexed_chunks;default:0"`
+	IndexedAt       *time.Time     `gorm:"column:indexed_at;type:datetime"`
+	IndexDurationMs int64          `gorm:"column:index_duration_ms;default:0"`
+	IndexStatus     string         `gorm:"column:index_status;size:32;default:pending;index"`
+	IndexError      string         `gorm:"column:index_error;type:text"`
+	Enabled         bool           `gorm:"column:enabled;default:true"`
+	CreatedAt       time.Time      `gorm:"column:created_at;type:datetime;autoCreateTime"`
+	UpdatedAt       time.Time      `gorm:"column:updated_at;type:datetime;autoUpdateTime"`
+	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at;index"`
+}
+
+func (p03KnowledgeDocument) TableName() string { return "knowledge_documents" }
+
+type p03KnowledgeChunk struct {
+	ID             string    `gorm:"column:id;primaryKey;size:64"`
+	DocID          string    `gorm:"column:doc_id;size:64;not null;index"`
+	ChunkIndex     int       `gorm:"column:chunk_index;not null"`
+	ContentPreview string    `gorm:"column:content_preview;type:text"`
+	SectionTitle   string    `gorm:"column:section_title;size:256"`
+	CharCount      int       `gorm:"column:char_count;not null"`
+	Enabled        bool      `gorm:"column:enabled;default:true"`
+	CreatedAt      time.Time `gorm:"column:created_at;type:datetime;autoCreateTime"`
+	UpdatedAt      time.Time `gorm:"column:updated_at;type:datetime;autoUpdateTime"`
+}
+
+func (p03KnowledgeChunk) TableName() string { return "knowledge_chunks" }
+
 type p03WorkflowRun struct {
 	ID            string         `gorm:"column:id;primaryKey;size:64"`
 	WorkflowKey   string         `gorm:"column:workflow_key;size:128;not null;index"`

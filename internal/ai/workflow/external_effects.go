@@ -433,14 +433,7 @@ func validateExternalRunAndApproval(tx *gorm.DB, run *mysql.WorkflowRun, input E
 }
 
 func externalTransitionInput(input ExternalEffectExecutionInput) TransitionEffectInput {
-	return TransitionEffectInput{
-		Lease: input.Lease, ApprovalID: input.ApprovalID, ProposalHash: input.ProposalHash,
-		ToolCallIDObserved: input.ToolCallIDObserved, ToolName: input.ToolName, ToolRevision: input.ToolRevision,
-		ToolSchemaHash: input.ToolSchemaHash, TargetHash: input.TargetHash, RequestRedacted: input.RequestRedacted,
-		PolicyHash: input.PolicyHash, RuntimeCompatibilityHash: input.RuntimeCompatibilityHash,
-		EffectType: input.EffectType, Attempt: input.Attempt, TraceID: input.TraceID,
-		GateAllowed: input.GateAllowed, Derived: input.Derived,
-	}
+	return TransitionEffectInput(input)
 }
 
 func lockRunningExternalEffect(tx *gorm.DB, input FinishExternalEffectInput) (mysql.AgentEffect, error) {

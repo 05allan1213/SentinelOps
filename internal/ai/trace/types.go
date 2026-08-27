@@ -91,7 +91,7 @@ func (m ModelMetadata) metadata() map[string]any {
 	}
 }
 
-func (m ModelMetadata) cost(input, cachedInput, output, reasoning int64) float64 {
+func (m ModelMetadata) cost(input, cachedInput, output, _ int64) float64 {
 	if input < 0 {
 		input = 0
 	}
@@ -99,7 +99,6 @@ func (m ModelMetadata) cost(input, cachedInput, output, reasoning int64) float64
 		output = 0
 	}
 	cachedInput = max(min(cachedInput, input), 0)
-	reasoning = max(min(reasoning, output), 0)
 	regularInput := input - cachedInput
 	value := (float64(regularInput)*m.InputPrice + float64(cachedInput)*m.CachedInputPrice + float64(output)*m.OutputPrice) / 1_000_000
 	return math.Round(value*1e9) / 1e9

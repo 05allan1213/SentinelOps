@@ -428,7 +428,7 @@ func IndexDocuments(ctx context.Context, events []dao.Event) error {
 		return err
 	}
 	if len(ids) != len(events) {
-		return fmt.Errorf("Milvus 索引结果不完整: succeeded=%d total=%d", len(ids), len(events))
+		return fmt.Errorf("milvus 索引结果不完整: succeeded=%d total=%d", len(ids), len(events))
 	}
 	return nil
 }

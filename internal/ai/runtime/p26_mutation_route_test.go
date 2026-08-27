@@ -63,8 +63,8 @@ func TestNoDirectWriteDurableContextIsIdentified(t *testing.T) {
 	if !IsDurableV1Context(ctx) {
 		t.Fatal("typed durable_v1 Attempt context was not identified")
 	}
-	if IsDurableV1Context(nil) {
-		t.Fatal("nil context was identified as durable_v1")
+	if IsDurableV1Context(context.TODO()) {
+		t.Fatal("context without Attempt was identified as durable_v1")
 	}
 }
 

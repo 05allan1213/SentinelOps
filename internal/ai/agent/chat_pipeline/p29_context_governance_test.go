@@ -1,6 +1,7 @@
 package chat_pipeline
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -9,7 +10,7 @@ import (
 )
 
 func TestRetrieverQueryUsesCurrentTaskOnly(t *testing.T) {
-	query, err := newInputToRagLambda(nil, &UserMessage{Query: "current task", History: []*schema.Message{schema.UserMessage("old history")}})
+	query, err := newInputToRagLambda(context.TODO(), &UserMessage{Query: "current task", History: []*schema.Message{schema.UserMessage("old history")}})
 	if err != nil {
 		t.Fatalf("build retriever query: %v", err)
 	}

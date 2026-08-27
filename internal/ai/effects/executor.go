@@ -61,7 +61,7 @@ func NewExecutor(store *workflow.GORMStore) (*Executor, error) {
 // ExecuteTransactional 只允许 Catalog 已登记的 transactional_db Primary。
 func (e *Executor) ExecuteTransactional(ctx context.Context, request TransactionalRequest, endpoint Endpoint) (workflow.TransitionEffectResult, error) {
 	if e == nil || e.store == nil {
-		return workflow.TransitionEffectResult{}, fmt.Errorf("Effect Executor is not initialized")
+		return workflow.TransitionEffectResult{}, fmt.Errorf("effect Executor is not initialized")
 	}
 	input, err := buildTransitionInput(request)
 	if err != nil {
@@ -89,7 +89,7 @@ func (e *Executor) ExecuteTransactional(ctx context.Context, request Transaction
 // Execute 按 Catalog DAG 执行同一原 endpoint；derived step 通过 ctx metadata 进入原业务实现。
 func (e *Executor) Execute(ctx context.Context, request TransactionalRequest, endpoint Endpoint) (workflow.TransitionEffectResult, error) {
 	if e == nil || e.store == nil {
-		return workflow.TransitionEffectResult{}, fmt.Errorf("Effect Executor is not initialized")
+		return workflow.TransitionEffectResult{}, fmt.Errorf("effect Executor is not initialized")
 	}
 	if endpoint == nil {
 		return workflow.TransitionEffectResult{}, fmt.Errorf("original Tool endpoint callback is required")

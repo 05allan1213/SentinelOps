@@ -1,5 +1,7 @@
 # P42 双层 Gate、Shadow、Cutover 与回滚证据
 
+- Status: `PASS`（P42 机制与本次兼容 Gate 收尾复核通过；P43 外部门禁仍 `NOT RUN`）
+
 ## Boundary Audit
 
 - 目标：实现九项 canonical Gate 的 `frozen AND current static cap AND current dynamic switch` deny-only 语义，并覆盖 durable Run 创建、按版本认领/恢复、Approval/Effect、MCP、Skill、admin query 与 Langfuse Attempt 导出边界；提供可执行的发布/回滚 Compose 与 Runbook。
@@ -90,8 +92,14 @@ go vet ./api/settings/v1 ./internal/controller/settings ./internal/service/setti
 
 ### 宽回归诊断
 
-- 带隔离 MySQL 的宽 affected-package 回归仍有两个已知基线失败：`TestNestedLedgerAgentToolLeafCreatesOnePrimary` 报 `budget reservation identity conflict`；`TestMigrationsUpFromCurrentSchemaSnapshot` 的旧 Schema fixture 已含后续 `content_hash`，迁移时报 duplicate column。P42 未删除测试、未弱化断言，也未越界修复 P26/旧 fixture。
+- 早期带隔离 MySQL 的宽 affected-package 回归曾暴露两个夹具问题：`TestNestedLedgerAgentToolLeafCreatesOnePrimary` 的重复模型包装造成 `budget reservation identity conflict`，以及 current-schema fixture 使用生产后续模型导致 `content_hash` duplicate column；本次 P43 前收尾分别改为 `ToolOnly`/生产 `PhysicalModelBinder` 夹具和冻结 `00001` 历史模型后，两个精确 Case 均复跑 `PASS`。生产预算 identity 算法、migration SQL 和既有断言均未放宽。
 - 未注入 `SENTINELOPS_TEST_DSN` 的 `go test ./internal/ai/runtime ./internal/dao/mysql -count=1` 也按夹具前置条件 `FAIL`；该命令不是 P42 门禁，不能替代上述隔离 MySQL 结果。
+
+### P43 前兼容 Gate 收尾复核
+
+- `go test ./internal/ai/runtime -run '^(TestLegacyCompatibilityGateRequiresEnabledAndShadow|TestEffectiveGate|TestFrozenSnapshot|TestShadowMode|TestRollbackCompatibility)' -count=1`：`PASS`。
+- `go test -race ./internal/controller/event ./internal/controller/ops ./internal/ai/agent/ops_pipeline ./internal/ai/ops/engine -run '^(Test(PipelineStreamClosedGateSkipsLegacyAgentInitialization|AnalyzeSingleStreamClosedGateSkipsModelInitialization|ControllerPassesLegacyWriteGateAndDefaultsClosed|NoDirectWriteDurableContextRejectsOpenLegacyGate|NoDirectWriteLegacyGateIsExplicitAndClosedByDefault))$' -count=1`：`PASS`；关闭 Gate 时 Event 不初始化 Agent/模型，Ops 默认关闭且 durable context 永拒绝。
+- 隔离 MySQL runtime 相关 P22～P26 Case 的普通与 `-race` 执行：`PASS`；完整 P43、真实供应商、Hosted CI、灰度、回滚仍未运行。
 
 ## Contract Migration 审计
 

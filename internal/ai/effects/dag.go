@@ -95,7 +95,7 @@ func NewInvocationError(class InvocationClass, retryable bool, evidence any, err
 func ExecutionMetadataFromContext(ctx context.Context) (ExecutionMetadata, error) {
 	metadata, ok := ctx.Value(executionMetadataContextKey{}).(ExecutionMetadata)
 	if !ok || metadata.EffectKey == "" || metadata.EffectStep == "" || metadata.EffectRole == "" || metadata.EffectType == policy.EffectNone {
-		return ExecutionMetadata{}, fmt.Errorf("Effect execution metadata is missing")
+		return ExecutionMetadata{}, fmt.Errorf("effect execution metadata is missing")
 	}
 	return metadata, nil
 }
@@ -106,7 +106,7 @@ func withExecutionMetadata(ctx context.Context, metadata ExecutionMetadata) cont
 
 func buildDAG(runID, proposalHash string, entry policy.CatalogEntry) ([]DAGStep, error) {
 	if len(entry.EffectSteps) == 0 || entry.EffectSteps[0] != workflow.EffectStepPrimary || entry.EffectType == policy.EffectNone {
-		return nil, fmt.Errorf("Catalog entry %q has no Effect DAG", entry.Name)
+		return nil, fmt.Errorf("catalog entry %q has no Effect DAG", entry.Name)
 	}
 	primaryKey, err := policy.EffectKey(runID, proposalHash, workflow.EffectStepPrimary)
 	if err != nil {

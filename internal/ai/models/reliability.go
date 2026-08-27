@@ -120,8 +120,10 @@ func buildReliability(ctx context.Context, cfg *appconfig.Config, profile string
 		candidates = append(candidates, &candidateModel{endpoint: physical, health: health, order: index})
 	}
 	retry := &adk.ModelRetryConfig{
-		MaxRetries:  cfg.ModelReliability.Retry.MaxRetries,
-		IsRetryAble: func(_ context.Context, callErr error) bool { return isRetryable(callErr) },
+		MaxRetries: cfg.ModelReliability.Retry.MaxRetries,
+		ShouldRetry: func(_ context.Context, retryCtx *adk.RetryContext) *adk.RetryDecision {
+			return &adk.RetryDecision{Retry: retryCtx != nil && isRetryable(retryCtx.Err)}
+		},
 		BackoffFunc: func(_ context.Context, attempt int) time.Duration {
 			if attempt < 1 {
 				attempt = 1

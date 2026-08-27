@@ -33,7 +33,15 @@ func FrontendHostingEnabled(ctx context.Context) bool {
 }
 
 func bindAPI(ctx context.Context) error {
-	durableService, err := newDurableAPIService(ctx)
+	config, err := appconfig.Current()
+	if err != nil {
+		return err
+	}
+	evaluator, err := airuntime.NewGateEvaluator(airuntime.StaticGateCaps(config), dao.GetSettings)
+	if err != nil {
+		return err
+	}
+	durableService, err := newDurableAPIService(ctx, config, evaluator)
 	if err != nil {
 		return err
 	}
@@ -53,7 +61,7 @@ func bindAPI(ctx context.Context) error {
 		group.Bind(chat.NewV1(durableService))
 		group.Bind(chat.NewV2(durableService))
 		group.Bind(auth.NewV1())
-		group.Bind(event.NewV1())
+		group.Bind(event.NewV1(evaluator))
 		group.Bind(subscription.NewV1())
 		group.Bind(report.NewV1())
 		group.Bind(settingsctrl.NewV1())
@@ -61,7 +69,7 @@ func bindAPI(ctx context.Context) error {
 		group.Bind(tracectrl.NewV1())
 		group.Bind(knowledgectrl.NewV1())
 		group.Bind(ragevalctrl.NewV1())
-		group.Bind(opsctrl.NewV1())
+		group.Bind(opsctrl.NewV1(evaluator))
 	})
 	s.Group("/api", func(group *ghttp.RouterGroup) {
 		group.Middleware(middleware.CORSMiddleware)
@@ -73,16 +81,8 @@ func bindAPI(ctx context.Context) error {
 	return nil
 }
 
-func newDurableAPIService(ctx context.Context) (*chatsvc.DurableService, error) {
-	config, err := appconfig.Current()
-	if err != nil {
-		return nil, err
-	}
+func newDurableAPIService(ctx context.Context, config *appconfig.Config, evaluator *airuntime.GateEvaluator) (*chatsvc.DurableService, error) {
 	db, err := dao.DB(ctx)
-	if err != nil {
-		return nil, err
-	}
-	evaluator, err := airuntime.NewGateEvaluator(airuntime.StaticGateCaps(config), dao.GetSettings)
 	if err != nil {
 		return nil, err
 	}

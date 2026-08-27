@@ -148,7 +148,7 @@ func StoreEvents(ctx context.Context, events []dao.Event, batchSize int) ([]stri
 		if storeErr != nil {
 			g.Log().Warningf(ctx, "[indexer] 第 %d/%d 批向量写入失败（%d~%d）: %v",
 				i/batchSize+1, totalBatches, i, end, storeErr)
-			batchErrors = append(batchErrors, fmt.Errorf("Milvus batch %d/%d: %w", i/batchSize+1, totalBatches, storeErr))
+			batchErrors = append(batchErrors, fmt.Errorf("milvus batch %d/%d: %w", i/batchSize+1, totalBatches, storeErr))
 			continue
 		}
 		successIDs = append(successIDs, batchIDs...)
@@ -171,7 +171,7 @@ func finalizeStoreResult(successIDs []string, total int, batchErrors []error) ([
 		return successIDs, err
 	}
 	if len(successIDs) != total {
-		return successIDs, fmt.Errorf("Milvus 索引结果不完整: succeeded=%d total=%d", len(successIDs), total)
+		return successIDs, fmt.Errorf("milvus 索引结果不完整: succeeded=%d total=%d", len(successIDs), total)
 	}
 	return successIDs, nil
 }

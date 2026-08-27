@@ -466,12 +466,12 @@ func (m ModelCandidate) Validate() error {
 		switch key {
 		case "enable_thinking":
 			if _, ok := value.(bool); !ok {
-				return fmt.Errorf("Route Option %q has unsupported value", key)
+				return fmt.Errorf("route Option %q has unsupported value", key)
 			}
 		case "instruct":
 			typed, ok := value.(string)
 			if !ok || looksLikeSecret(typed) {
-				return fmt.Errorf("Route Option %q has unsupported or secret value", key)
+				return fmt.Errorf("route Option %q has unsupported or secret value", key)
 			}
 		}
 	}

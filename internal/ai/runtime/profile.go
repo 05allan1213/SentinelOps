@@ -118,10 +118,7 @@ func CurrentRuntimeVersion() string {
 // ValidateCurrentRuntimeVersion 拒绝 release Worker 共享 development 或可变版本身份。
 func ValidateCurrentRuntimeVersion() error {
 	revision := CurrentRuntimeVersionSnapshot().App
-	raw := revision
-	if strings.HasPrefix(raw, "sha256:") {
-		raw = strings.TrimPrefix(raw, "sha256:")
-	}
+	raw := strings.TrimPrefix(revision, "sha256:")
 	if revision == developmentBuildVersion || len(raw) != 40 && len(raw) != 64 || raw != strings.ToLower(raw) {
 		return fmt.Errorf("runtime version must be an immutable Git SHA or sha256 digest")
 	}

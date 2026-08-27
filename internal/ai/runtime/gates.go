@@ -70,6 +70,11 @@ type GateEvaluator struct {
 	read   DynamicGateReader
 }
 
+// LegacyCompatibilityGate 统一控制仍保留的旧 Event/Ops 入口。
+type LegacyCompatibilityGate interface {
+	AllowLegacyCompatibility(context.Context) bool
+}
+
 // CurrentGateState 是一次动态读取对应的静态、动态和当前 effective 三层视图。
 type CurrentGateState struct {
 	StaticCaps       GateVector
@@ -178,6 +183,20 @@ func (e *GateEvaluator) CurrentState(ctx context.Context) (CurrentGateState, err
 		DynamicCaps:      dynamic,
 		CurrentEffective: closeWritesInShadow(e.static.And(dynamic)),
 	}, nil
+}
+
+// AllowLegacyCompatibility 仅在 durable Runtime 已启用且处于 shadow 时开放旧只读兼容入口。
+func (e *GateEvaluator) AllowLegacyCompatibility(ctx context.Context) bool {
+	if e == nil {
+		return false
+	}
+	current, err := e.Current(ctx)
+	return err == nil && current.Enabled(GateAgentRuntimeEnabled) && current.Enabled(GateAgentRuntimeShadowMode)
+}
+
+// AllowLegacyOpsWrites 实现旧 Ops 已有的兼容 Gate；durable Context 仍由调用方优先拒绝。
+func (e *GateEvaluator) AllowLegacyOpsWrites(ctx context.Context) bool {
+	return e.AllowLegacyCompatibility(ctx)
 }
 
 // Effective 返回历史 frozen Gate 与当前 Gate 的交集；任何一层都只能关闭能力。

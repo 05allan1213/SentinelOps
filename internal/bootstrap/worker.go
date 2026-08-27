@@ -115,14 +115,6 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 	})
 }
 
-func expectedFrozenGateCompatibility(
-	ctx context.Context,
-	config *appconfig.Config,
-	frozen airuntime.FrozenRuntimeSnapshot,
-) (string, error) {
-	return expectedFrozenGateCompatibilityWithEvaluator(ctx, config, nil, frozen)
-}
-
 func expectedFrozenGateCompatibilityWithEvaluator(
 	ctx context.Context,
 	config *appconfig.Config,

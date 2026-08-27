@@ -44,12 +44,3 @@ func TestSpecialistGenModelInputRetrievesOnceAndInjectsCurrentQueryOnce(t *testi
 		t.Fatalf("current query occurrences = %d, want 1", got)
 	}
 }
-
-func containsAll(value string, parts ...string) bool {
-	for _, part := range parts {
-		if !strings.Contains(value, part) {
-			return false
-		}
-	}
-	return true
-}

@@ -89,8 +89,6 @@ func (p *GORMPlugin) Initialize(db *gorm.DB) error {
 	return nil
 }
 
-type dbStartTimeKey struct{}
-
 func (p *GORMPlugin) makeBeforeCallback() func(*gorm.DB) {
 	return func(db *gorm.DB) {
 		db.InstanceSet("trace:start_time", time.Now())

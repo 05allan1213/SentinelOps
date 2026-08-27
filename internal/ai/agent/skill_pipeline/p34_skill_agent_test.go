@@ -14,7 +14,6 @@ import (
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/middlewares/skill"
 	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -48,16 +47,6 @@ func (*p34Model) Stream(context.Context, []*schema.Message, ...model.Option) (*s
 }
 
 func (*p34Model) BindTools([]*schema.ToolInfo) error { return nil }
-
-type p34Tool struct{ name string }
-
-func (t *p34Tool) Info(context.Context) (*schema.ToolInfo, error) {
-	return &schema.ToolInfo{Name: t.name, Desc: t.name}, nil
-}
-
-func (*p34Tool) InvokableRun(context.Context, string, ...tool.Option) (string, error) {
-	return "ok", nil
-}
 
 func TestSkillBackendListGetAndValidatorLoadLegalSkill(t *testing.T) {
 	backend := &p34Backend{

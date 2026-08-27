@@ -2,9 +2,11 @@ package runtime
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	aimodels "SentinelOps/internal/ai/models"
 	"SentinelOps/internal/ai/policy"
 	aitools "SentinelOps/internal/ai/tools"
 	"SentinelOps/internal/ai/workflow"
@@ -29,12 +31,32 @@ func TestNestedLedgerAgentToolLeafCreatesOnePrimary(t *testing.T) {
 	if leaf == nil {
 		t.Fatal("create_report Tool is not registered")
 	}
-	handlers, err := RuntimeHandlerFirst(handler)
+	attempt, err := AttemptContextFromContext(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempt.physicalCalls = &atomic.Uint64{}
+	modelSnapshot := attempt.Snapshot.Models()[0]
+	identity := aimodels.CandidateIdentity{
+		CatalogRef: modelSnapshot.CatalogRef, Provider: modelSnapshot.Provider, Driver: modelSnapshot.Driver,
+		ModelID: modelSnapshot.ModelID, Profile: modelSnapshot.Profile, Order: modelSnapshot.CandidateOrder,
+	}
+	binder := PhysicalModelBinder(handler)
+	innerModel, err := binder(identity, &p26UsageModel{endpoint: &p23CreateReportModel{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootModel, err := binder(identity, &p26UsageModel{endpoint: &p26RootAgentToolModel{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	toolHandler := handler.ToolOnly()
+	handlers, err := RuntimeHandlerFirst(toolHandler)
 	if err != nil {
 		t.Fatal(err)
 	}
 	inner, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name: "report_agent", Description: "P26 nested report specialist", Model: &p23CreateReportModel{},
+		Name: "report_agent", Description: "P26 nested report specialist", Model: innerModel,
 		GenModelInput: LiteralGenModelInput, Handlers: handlers, MaxIterations: 2,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: []tool.BaseTool{leaf}}},
 	})
@@ -42,7 +64,7 @@ func TestNestedLedgerAgentToolLeafCreatesOnePrimary(t *testing.T) {
 		t.Fatal(err)
 	}
 	root, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name: "p26_root", Description: "P26 AgentTool root", Model: &p26RootAgentToolModel{},
+		Name: "p26_root", Description: "P26 AgentTool root", Model: rootModel,
 		GenModelInput: LiteralGenModelInput, Handlers: handlers, MaxIterations: 2,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: []tool.BaseTool{adk.NewAgentTool(ctx, inner)}}},
 	})
@@ -50,10 +72,6 @@ func TestNestedLedgerAgentToolLeafCreatesOnePrimary(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner, err := NewDurableRunner(ctx, root, store, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	attempt, err := AttemptContextFromContext(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,15 +125,6 @@ func TestNestedLedgerAgentToolLeafCreatesOnePrimary(t *testing.T) {
 		t.Fatal(err)
 	}
 	resumeCtx, resumeAttempt, err := BuildAttemptContext(context.Background(), *claimed, budgets)
-	if err != nil {
-		t.Fatal(err)
-	}
-	modelSnapshot := resumeAttempt.Snapshot.Models()[0]
-	resumeCtx, err = WithModelInvocation(resumeCtx, ModelInvocation{
-		ReservationIdentity: "p26-nested-resume-model", CatalogRef: modelSnapshot.CatalogRef,
-		Provider: modelSnapshot.Provider, Driver: modelSnapshot.Driver, ModelID: modelSnapshot.ModelID,
-		Profile: modelSnapshot.Profile, SnapshotIdentity: modelSnapshot.Identity(),
-	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,3 +189,35 @@ func (m *p26RootAgentToolModel) Stream(ctx context.Context, input []*schema.Mess
 }
 
 func (*p26RootAgentToolModel) BindTools([]*schema.ToolInfo) error { return nil }
+
+type p26UsageModel struct {
+	endpoint model.BaseChatModel
+}
+
+func (m *p26UsageModel) Generate(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.Message, error) {
+	message, err := m.endpoint.Generate(ctx, input, options...)
+	if message != nil && err == nil {
+		message.ResponseMeta = &schema.ResponseMeta{Usage: &schema.TokenUsage{
+			PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2,
+		}}
+	}
+	return message, err
+}
+
+func (m *p26UsageModel) Stream(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	message, err := m.Generate(ctx, input, options...)
+	if err != nil {
+		return nil, err
+	}
+	return schema.StreamReaderFromArray([]*schema.Message{message}), nil
+}
+
+func (m *p26UsageModel) BindTools(tools []*schema.ToolInfo) error {
+	toolModel, ok := m.endpoint.(interface {
+		BindTools([]*schema.ToolInfo) error
+	})
+	if !ok {
+		return nil
+	}
+	return toolModel.BindTools(tools)
+}

@@ -15,9 +15,16 @@ import (
 type ControllerV1 struct {
 	approvals      approvalRepository
 	reconciliation reconciliationRepository
+	legacyWrites   engine.LegacyWriteGate
 }
 
-func NewV1() *ControllerV1 { return &ControllerV1{} }
+func NewV1(gates ...engine.LegacyWriteGate) *ControllerV1 {
+	var gate engine.LegacyWriteGate
+	if len(gates) > 0 {
+		gate = gates[0]
+	}
+	return &ControllerV1{legacyWrites: gate}
+}
 
 func requireBusinessWrite(ctx context.Context) error {
 	return policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{})
@@ -142,11 +149,18 @@ func (c *ControllerV1) DirectRunForEvent(ctx context.Context, req *soarv1.Direct
 	if err != nil {
 		return nil, gerror.New("事件不存在")
 	}
-	runID, err := engine.DirectRunForEvent(ctx, nil, event)
+	runID, err := c.directRunForEvent(ctx, event)
 	if err != nil {
 		return nil, err
 	}
 	return &soarv1.DirectRunForEventRes{RunID: runID}, nil
+}
+
+func (c *ControllerV1) directRunForEvent(ctx context.Context, event *dao.Event) (string, error) {
+	if c == nil {
+		return engine.DirectRunForEvent(ctx, nil, event)
+	}
+	return engine.DirectRunForEvent(ctx, c.legacyWrites, event)
 }
 
 func toRunItem(r dao.OpsRun, steps []dao.OpsRunStep) soarv1.RunItem {

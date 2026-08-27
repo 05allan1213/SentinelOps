@@ -5,12 +5,12 @@
 - Spec references: 上位 Spec `3.1`～`3.4`、`6.3`～`6.4`、Task 4“旧 Ops 改造”；执行 Plan `P26`、`2.1`～`2.7`
 - Actual files: `internal/ai/runtime/{context.go,profile.go,handler.go,p20_api_worker_sse_test.go,p22_hitl_test.go,p26_mutation_route_test.go,p26_nested_agent_tool_test.go}`；`internal/ai/agent` 下六个专业 Agent orchestration、Ops legacy Gate/run/tests、Plan durable builder/Worker/Executor/tests 与 migration manifest test；`internal/ai/{effects,policy,prompt/agents,tools,ops}` 的 P26 接线与测试；`internal/{bootstrap,controller,service}` 的 durable 默认路由、legacy 入口关闭与人工 CRUD 测试；`manifest/agent/{migration-contract-v1.yaml,tool-inventory-v1.yaml}`；本证据文件
 - Results: `PASS`
-- Unfinished items: 无 P26 未完成项；P27 及后续单元均未开始
+- Unfinished items: 无 P26 未完成项；P27～P42 已分别完成并有独立证据/提交；P43 全量验证、真实供应商、Hosted CI、灰度、回滚仍为 `NOT RUN`
 
 ## Boundary Audit
 
 - 目标：把新建 `durable_v1` Run 的 Report、Intelligence、Ops 叶子 Mutation 接到同一个 `RuntimeHandler -> Approval -> effects.Executor -> 原 Tool endpoint`；把旧 Ops 异步直写入口置于显式且默认关闭的兼容边界，并保证 `durable_v1` 即使拿到兼容许可也不能进入；保持普通人工 HTTP CRUD 的 Service 事务路径。
-- 明确非目标：不物理删除 legacy Graph/Ops 实现，不开放生产 L1/L2 Gate，不实现 P27 Retry/Failover、P28 预算扩展、P29 上下文治理、P37 前端或 P42 动态 Gate；不新增 Tool/Action/Effect Registry、Store、Runtime、Worker loop、MQ、Outbox 或动作实现。
+- 明确非目标：不物理删除 legacy Graph/Ops 实现，不开放生产 L1/L2 Gate；P27、P28、P29、P37、P42 等后续语义不在本单元实现范围（各自结果见对应证据）；不新增 Tool/Action/Effect Registry、Store、Runtime、Worker loop、MQ、Outbox 或动作实现。
 - 兼容契约：复用 P13 Catalog 与 strict Registry、P14 唯一无状态 Handler、P19 官方 AgentTool/Plan 拓扑、P20 API/Worker/Runner、P21-P22 Approval、P23-P25 Effect/对账以及现有 `ops/actions`、Service/DAO、Indexer 和 protected asset 检查；legacy Artifact 保留到 P42/P43 发布检查点。
 - 安全不变量：所有 Agent Mutation 必须先中断审批；批准后仍重新校验 exact Checkpoint、Proposal/Policy/runtime/Gate/lease；外层 AgentTool 不创建 Effect，只有内层叶子 Tool 创建一条 Primary Ledger；生产 L1/L2 frozen Gate 继续为 false；普通人工 CRUD 不创建 Approval/Effect；旧直写对 `durable_v1` 永远拒绝。
 - 验证方式：P26 命名 Red；计划原文 race 门禁；直接受影响包未过滤测试与补充 race；`go vet`、`goimports -l`、manifest/hash、源码唯一性和禁止直写扫描；现有 Compose test fixture 的隔离 MySQL。
@@ -85,6 +85,17 @@ SENTINELOPS_GOOSE_BIN=<goose-v3.27.3> SENTINELOPS_TEST_DSN=<redacted> \
 
 结果：四个 package 均 `PASS`，race detector 无报告；`ops_pipeline` 直接证明 typed `durable_v1` Context 即使配 open legacy Gate 仍在 Gate evaluator 前拒绝。
 
+P43 前缺口复核补充：以下 nested Case 在隔离 MySQL 上的普通与 `-race` 执行均 `PASS`：
+
+```bash
+SENTINELOPS_GOOSE_BIN=<goose-v3.27.3> SENTINELOPS_TEST_DSN=<redacted> \
+  go test ./internal/ai/runtime -run '^TestNestedLedgerAgentToolLeafCreatesOnePrimary$' -count=1
+SENTINELOPS_GOOSE_BIN=<goose-v3.27.3> SENTINELOPS_TEST_DSN=<redacted> \
+  go test -race ./internal/ai/runtime -run '^TestNestedLedgerAgentToolLeafCreatesOnePrimary$' -count=1
+```
+
+测试夹具从 frozen snapshot 构造 provider-qualified `CandidateIdentity`，使用生产 `PhysicalModelBinder`，并以 `ToolOnly` 避免重复包装；生产预算 identity 算法未修改。Event 两个流式入口的关闭 Gate 零初始化测试、Ops Controller Gate 传递/默认拒绝测试及 legacy Ops durable-context 拒绝测试也均 `PASS`。
+
 直接受影响包未过滤回归：
 
 ```bash
@@ -144,7 +155,6 @@ docker compose -p sentinelops-p26 -f manifest/docker/docker-compose.test.yml ps 
 
 - 与推荐路线无架构偏差。为跨 package 验证人工 CRUD，测试内复用了 P12 一次性数据库模式；它只存在于 `_test.go`，没有新增生产 Store/fixture abstraction。
 - `NOT RUN`：全仓测试、应用镜像构建、前端、完整 E2E、在线模型/通知供应商、Eval、Chaos、Hosted CI、共享数据库、发布与 P43 全量门禁；均不属于 P26 局部门禁。
-- `NOT RUN`：P27 Retry/Failover/breaker/limiter 以及任何后续单元。
 
 ## Raw Artifact References
 

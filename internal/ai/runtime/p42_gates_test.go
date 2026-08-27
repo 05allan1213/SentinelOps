@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -153,6 +154,55 @@ func TestShadowModeClosesL1AndL2Writes(t *testing.T) {
 	}
 	if !current.Enabled(GateAgentRuntimeShadowMode) || current.Enabled(GateAgentRuntimeL1Writes) || current.Enabled(GateAgentRuntimeL2Writes) {
 		t.Fatalf("shadow vector permits mutation: %v", current.Map())
+	}
+}
+
+func TestLegacyCompatibilityGateRequiresEnabledAndShadow(t *testing.T) {
+	cases := []struct {
+		name          string
+		staticEnabled bool
+		staticShadow  bool
+		dynamic       map[string]string
+		readErr       error
+		want          bool
+	}{
+		{name: "enabled shadow", staticEnabled: true, staticShadow: true, dynamic: p42DynamicValues("true"), want: true},
+		{name: "enabled closed", staticEnabled: true, staticShadow: true, dynamic: p42DynamicValues("true")},
+		{name: "shadow closed", staticEnabled: true, staticShadow: true, dynamic: p42DynamicValues("true")},
+		{name: "static enabled closed", staticShadow: true, dynamic: p42DynamicValues("true")},
+		{name: "static shadow closed", staticEnabled: true, dynamic: p42DynamicValues("true")},
+		{name: "missing", staticEnabled: true, staticShadow: true, dynamic: p42DynamicValues("true")},
+		{name: "illegal", staticEnabled: true, staticShadow: true, dynamic: p42DynamicValues("true")},
+		{name: "read error", staticEnabled: true, staticShadow: true, dynamic: p42DynamicValues("true"), readErr: errors.New("read failed")},
+	}
+	cases[1].dynamic[GateAgentRuntimeEnabled] = "false"
+	cases[2].dynamic[GateAgentRuntimeShadowMode] = "false"
+	delete(cases[5].dynamic, GateAgentRuntimeEnabled)
+	cases[6].dynamic[GateAgentRuntimeShadowMode] = "1"
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			static := allOpenP42StaticCaps()
+			static.AgentRuntimeEnabled = tc.staticEnabled
+			static.AgentRuntimeShadowMode = tc.staticShadow
+			evaluator, err := NewGateEvaluator(static, func(context.Context, []string) (map[string]string, error) {
+				return tc.dynamic, tc.readErr
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := evaluator.AllowLegacyCompatibility(context.Background()); got != tc.want {
+				t.Fatalf("AllowLegacyCompatibility=%t, want %t", got, tc.want)
+			}
+			if got := evaluator.AllowLegacyOpsWrites(context.Background()); got != tc.want {
+				t.Fatalf("AllowLegacyOpsWrites=%t, want %t", got, tc.want)
+			}
+		})
+	}
+
+	var evaluator *GateEvaluator
+	if evaluator.AllowLegacyCompatibility(context.Background()) || evaluator.AllowLegacyOpsWrites(context.Background()) {
+		t.Fatal("nil Gate evaluator opened legacy compatibility")
 	}
 }
 

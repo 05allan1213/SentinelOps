@@ -67,7 +67,7 @@ func NewClient(ctx context.Context) (cli.Client, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("Milvus 连接超时（已重试 %d 次）: %w", maxRetries, lastErr)
+	return nil, fmt.Errorf("milvus 连接超时（已重试 %d 次）: %w", maxRetries, lastErr)
 }
 
 func newClientOnce(ctx context.Context) (cli.Client, error) {

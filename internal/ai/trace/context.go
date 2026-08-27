@@ -154,7 +154,7 @@ type traceFinish struct {
 
 func newActiveTrace(ctx context.Context, metadata AttemptMetadata) (*ActiveTrace, error) {
 	if ctx == nil || metadata.TraceID == "" {
-		return nil, fmt.Errorf("Trace context and trace_id are required")
+		return nil, fmt.Errorf("trace context and trace_id are required")
 	}
 	if metadata.RunID != "" && (metadata.Attempt == 0 || metadata.LeaseGeneration == 0 || metadata.RuntimeVersion == "") {
 		return nil, fmt.Errorf("durable Attempt Trace identity is incomplete")

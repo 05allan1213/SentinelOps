@@ -43,7 +43,7 @@ func NewLangfuseRuntime(ctx context.Context, options LangfuseOptions) (*Langfuse
 		return nil, nil
 	}
 	if ctx == nil {
-		return nil, fmt.Errorf("Langfuse startup context is required")
+		return nil, fmt.Errorf("langfuse startup context is required")
 	}
 	if options.SpanExporter == nil && (options.Host == "" || options.PublicKey == "" || options.SecretKey == "") {
 		return nil, fmt.Errorf("enabled Langfuse requires host, public key and secret key")

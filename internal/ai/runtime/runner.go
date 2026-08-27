@@ -81,7 +81,7 @@ func NewDurableExecutorWithReleaseControls(
 	expectedCompatibility func(context.Context, FrozenRuntimeSnapshot) (string, error),
 ) (*DurableExecutor, error) {
 	if gates == nil || expectedCompatibility == nil {
-		return nil, fmt.Errorf("Gate evaluator and compatibility resolver are required")
+		return nil, fmt.Errorf("gate evaluator and compatibility resolver are required")
 	}
 	executor, err := NewDurableExecutor(store, resolver)
 	if err != nil {
@@ -277,7 +277,7 @@ func (e *DurableExecutor) attemptLangfuse(ctx context.Context, frozen FrozenRunt
 		return nil, nil
 	}
 	if e.loadLangfuse == nil {
-		return nil, fmt.Errorf("Langfuse Gate is open without an Attempt factory")
+		return nil, fmt.Errorf("langfuse Gate is open without an Attempt factory")
 	}
 	runtime, err := e.loadLangfuse(ctx)
 	if err != nil {
@@ -287,7 +287,7 @@ func (e *DurableExecutor) attemptLangfuse(ctx context.Context, frozen FrozenRunt
 		if runtime != nil {
 			_ = runtime.Shutdown(ctx)
 		}
-		return nil, fmt.Errorf("Langfuse Attempt factory returned no official handler")
+		return nil, fmt.Errorf("langfuse Attempt factory returned no official handler")
 	}
 	effective, err = e.gates.Effective(ctx, frozen)
 	if err != nil {

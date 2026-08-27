@@ -17,7 +17,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	dao "SentinelOps/internal/dao/mysql"
 	"SentinelOps/internal/service/pipeline"
@@ -38,11 +37,6 @@ func Ingest(ctx context.Context, alert *NormalizedAlert) (id string, isNew bool,
 	}
 	if existing != nil {
 		return existing.ID, false, nil
-	}
-
-	occurredAt := alert.OccurredAt
-	if occurredAt.IsZero() {
-		occurredAt = time.Now()
 	}
 
 	// 构造扩展 metadata

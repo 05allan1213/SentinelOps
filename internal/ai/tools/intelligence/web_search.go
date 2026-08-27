@@ -66,7 +66,7 @@ func NewWebSearchTool() tool.InvokableTool {
 
 			tavilyKey, _ := g.Cfg().Get(ctx, "tools.web_search.tavily_api_key")
 			if tavilyKey.String() == "" {
-				return "", fmt.Errorf("Tavily API Key 未配置（tools.web_search.tavily_api_key）")
+				return "", fmt.Errorf("tavily API Key 未配置（tools.web_search.tavily_api_key）")
 			}
 
 			g.Log().Infof(ctx, "[Tool] web_search | query=%s | max=%d", input.Query, maxResults)

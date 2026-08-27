@@ -8,7 +8,7 @@
 - Local commands: 见“执行记录”
 - Results: P03 局部门禁 `PASS`；完整后端/前端、Eval、Hosted CI、共享/真实数据库 Migration 与 P43 全量门禁 `NOT RUN`
 - Key assertions: 空库和当前 GORM Schema snapshot 均从版本 0 Up 到 6；Spec `7.3～7.9` 全部 contract 通过；旧模型读写兼容；legacy Run 为 `runtime_mode=legacy`；Trace cached/reasoning Token 保留；应用启动不执行 DDL且版本差异 fail-fast；独立 migrate 镜像为 goose v3.27.3；Down 只在 throwaway 数据库验证；同 project 完整清理
-- Deviations from recommended route: 测试通过本地锁定版 goose CLI 驱动同一 SQL，而不把 migration runner 链接进应用模块；当前 GORM snapshot 的 legacy `TEXT`、nullable/default 语义原样保留；Expand 未采用 foreign key，以避免给既有数据增加破坏性约束，ID/事务语义留给既定 Store 单元
+- Deviations from recommended route: 测试通过本地锁定版 goose CLI 驱动同一 SQL，而不把 migration runner 链接进应用模块；current-schema migration fixture 使用只包含 `00001` 字段的冻结 `p03KnowledgeBase`/`p03KnowledgeDocument`/`p03KnowledgeChunk`，生产 GORM 模型保持后续 Expand 字段；legacy `TEXT`、nullable/default 语义原样保留；Expand 未采用 foreign key，以避免给既有数据增加破坏性约束，ID/事务语义留给既定 Store 单元
 - Raw artifact references: 无；Compose config 与 Down 短日志只写入 `/tmp`，验证后未保留；未创建 `.artifacts` 内容
 - Unfinished items: P03 无未完成项；P04 启动角色/Secret、P07 cutover/backfill、P08 及后续 runtime/DAO 接线不属于本单元
 
@@ -59,6 +59,15 @@ FAIL SentinelOps/internal/dao/mysql [build failed]
 - 当前 Trace Run/Node 的 `cached_input_tokens` 和 `reasoning_tokens` 类型、nullable/default 与旧值不变。
 
 旧 GORM model contract 在 Expand 空库中实际创建并读回 Workflow Run/Event/Checkpoint、Knowledge Base、Trace Run/Node；current-snapshot fixture 在 Up 后仍存在，`runtime_mode` 精确为 `legacy`。没有为后续 P07/P08 添加 backfill、claim 或 Store 运行时逻辑。
+
+本次 P43 前缺口复核使用冻结历史模型重新执行：
+
+```bash
+SENTINELOPS_GOOSE_BIN=<goose-v3.27.3> SENTINELOPS_TEST_DSN=<redacted> \
+  go test ./internal/dao/mysql -run '^(TestMigrationsUpFromCurrentSchemaSnapshot|TestRuntimeSchemaContract)$' -count=1 -v
+```
+
+两个 Case 均 `PASS`；没有修改六个 goose migration SQL。
 
 ## 启动、migrate Job 与安全边界
 

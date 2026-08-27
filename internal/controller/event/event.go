@@ -15,18 +15,44 @@ import (
 	v1 "SentinelOps/api/event/v1"
 	"SentinelOps/internal/ai/agent/event_analysis_pipeline"
 	"SentinelOps/internal/ai/models"
+	airuntime "SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/ai/trace"
 	eventsvc "SentinelOps/internal/service/event"
 	"SentinelOps/utility/sse"
 
+	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	"github.com/gogf/gf/v2/frame/g"
 )
 
-type ControllerV1 struct{}
+const legacyCompatibilityDisabledMessage = "legacy compatibility is disabled"
 
-func NewV1() *ControllerV1 {
-	return &ControllerV1{}
+type streamClient interface {
+	Send(string, string)
+	Done()
+}
+
+type ControllerV1 struct {
+	legacyGate airuntime.LegacyCompatibilityGate
+	loadAgent  func(context.Context) (compose.Runnable[*event_analysis_pipeline.UserMessage, *schema.Message], error)
+	loadModel  func(context.Context) (model.ToolCallingChatModel, error)
+	newStream  func(context.Context) streamClient
+}
+
+func NewV1(gates ...airuntime.LegacyCompatibilityGate) *ControllerV1 {
+	var gate airuntime.LegacyCompatibilityGate
+	if len(gates) > 0 {
+		gate = gates[0]
+	}
+	return &ControllerV1{
+		legacyGate: gate,
+		loadAgent:  event_analysis_pipeline.GetEventAnalysisAgent,
+		loadModel:  models.ChatDefault,
+		newStream: func(ctx context.Context) streamClient {
+			return sse.NewClient(g.RequestFromCtx(ctx))
+		},
+	}
 }
 
 // List 返回事件列表，委托 eventsvc.List 查询，结果映射为 API DTO。
@@ -143,16 +169,19 @@ func (c *ControllerV1) BatchUpdateStatus(ctx context.Context, req *v1.BatchUpdat
 
 // PipelineStream 触发 Event Analysis Agent（ReAct 智能体）进行流式事件分析，SSE 逐 chunk 推送结果。
 func (c *ControllerV1) PipelineStream(ctx context.Context, req *v1.PipelineStreamReq) (*v1.PipelineStreamRes, error) {
+	client := c.stream(ctx)
+	if !c.allowLegacyCompatibility(ctx, client) {
+		return nil, nil
+	}
+
 	// 启动链路追踪（标记为独立事件分析，非会话内操作）
 	tags := map[string]any{"context": "standalone_event_analysis"}
 	ctx = trace.StartRun(ctx, "event.pipeline", "/api/event/v1/pipeline/stream", "", 0, req.Query, tags)
 	var pipelineErr error
 	defer func() { trace.FinishRun(ctx, pipelineErr) }()
 
-	client := sse.NewClient(g.RequestFromCtx(ctx))
-
 	// 获取事件分析 Agent 单例（内含 RAG 管道 + ReAct 推理循环）
-	runner, err := event_analysis_pipeline.GetEventAnalysisAgent(ctx)
+	runner, err := c.agent(ctx)
 	if err != nil {
 		pipelineErr = err
 		client.Send("error", err.Error())
@@ -209,11 +238,14 @@ func (c *ControllerV1) PipelineStream(ctx context.Context, req *v1.PipelineStrea
 // 直接调用模型（无 ReAct 工具调用），避免多步工具循环导致的延迟或步数耗尽问题，
 // 响应更快，可靠性更高。
 func (c *ControllerV1) AnalyzeSingleStream(ctx context.Context, req *v1.AnalyzeSingleStreamReq) (*v1.AnalyzeSingleStreamRes, error) {
-	client := sse.NewClient(g.RequestFromCtx(ctx))
+	client := c.stream(ctx)
+	if !c.allowLegacyCompatibility(ctx, client) {
+		return nil, nil
+	}
 
 	g.Log().Infof(ctx, "[AnalyzeSingleStream] 收到请求 | event_id=%s | title=%s | severity=%s", req.EventID, req.Title, req.Severity)
 
-	m, err := models.ChatDefault(ctx)
+	m, err := c.model(ctx)
 	if err != nil {
 		g.Log().Errorf(ctx, "[AnalyzeSingleStream] 模型初始化失败 | err=%v", err)
 		client.Send("error", err.Error())
@@ -290,4 +322,34 @@ func (c *ControllerV1) AnalyzeSingleStream(ctx context.Context, req *v1.AnalyzeS
 	}
 	client.Done()
 	return nil, nil
+}
+
+func (c *ControllerV1) allowLegacyCompatibility(ctx context.Context, client streamClient) bool {
+	if c != nil && c.legacyGate != nil && c.legacyGate.AllowLegacyCompatibility(ctx) {
+		return true
+	}
+	client.Send("error", legacyCompatibilityDisabledMessage)
+	client.Done()
+	return false
+}
+
+func (c *ControllerV1) stream(ctx context.Context) streamClient {
+	if c != nil && c.newStream != nil {
+		return c.newStream(ctx)
+	}
+	return sse.NewClient(g.RequestFromCtx(ctx))
+}
+
+func (c *ControllerV1) agent(ctx context.Context) (compose.Runnable[*event_analysis_pipeline.UserMessage, *schema.Message], error) {
+	if c != nil && c.loadAgent != nil {
+		return c.loadAgent(ctx)
+	}
+	return event_analysis_pipeline.GetEventAnalysisAgent(ctx)
+}
+
+func (c *ControllerV1) model(ctx context.Context) (model.ToolCallingChatModel, error) {
+	if c != nil && c.loadModel != nil {
+		return c.loadModel(ctx)
+	}
+	return models.ChatDefault(ctx)
 }
