@@ -30,21 +30,21 @@ providers:
 
 # 价格：中国内地（北京）地域，人民币/百万 Token，仅按付费价估算。
 # 来源：https://help.aliyun.com/zh/model-studio/model-pricing
-# 核对日期：2026-08-28；不计入免费额度。glm-5 免费额度耗尽后按用户要求
-# 切换到 qwen3.6-plus（列表价输入 2 元、缓存命中 0.2 元、输出 12 元）。
-# 流式响应固定 enable_thinking=false 以保证工具调用稳定。
+# 核对日期：2026-08-28；不计入免费额度。glm-5、qwen3.6-plus 免费额度先后耗尽后
+# 按用户要求切换到 qwen-plus（列表价输入 0.8 元、缓存命中 0.16 元、输出 2 元，
+# 北京地域输入 <=128K 档）。流式响应固定 enable_thinking=false 以保证工具调用稳定。
 model_catalog:
-  aliyun_bailian/qwen3.6-plus:
-    model_id: "qwen3.6-plus"
+  aliyun_bailian/qwen-plus:
+    model_id: "qwen-plus"
     driver: "openai_compatible_chat"
     capabilities: ["chat", "tool_calling"]
     pricing:
       revision: "2026-08-28"
       currency: "CNY"
       unit: "per_million_tokens"
-      input: 2
-      cached_input: 0.2
-      output: 12
+      input: 0.8
+      cached_input: 0.16
+      output: 2
   aliyun_bailian/qwen3.7-text-embedding:
     model_id: "qwen3.7-text-embedding"
     driver: "openai_compatible_embedding"
@@ -69,12 +69,12 @@ routing:
   chat:
     default:
       candidates:
-        - model: "aliyun_bailian/qwen3.6-plus"
+        - model: "aliyun_bailian/qwen-plus"
           options:
             enable_thinking: false
     reasoning:
       candidates:
-        - model: "aliyun_bailian/qwen3.6-plus"
+        - model: "aliyun_bailian/qwen-plus"
           options:
             enable_thinking: false
   embedding:
