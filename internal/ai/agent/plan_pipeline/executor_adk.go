@@ -54,6 +54,10 @@ func newExecutorAgentConfig(ctx context.Context, cfg *ExecutorBuilderConfig) (*a
 	}
 	toolList := make([]tool.BaseTool, 0, len(registeredTools)+len(cfg.AgentTools))
 	toolList = append(toolList, registeredTools...)
+	toolNames, err := aitools.ToolNames(ctx, toolList)
+	if err != nil {
+		return nil, fmt.Errorf("resolve executor tool names: %w", err)
+	}
 	returnDirectly := make(map[string]bool, len(cfg.AgentTools))
 	for i, agentTool := range cfg.AgentTools {
 		if agentTool == nil {
@@ -82,8 +86,12 @@ func newExecutorAgentConfig(ctx context.Context, cfg *ExecutorBuilderConfig) (*a
 		Name:        "executor",
 		Description: "an executor agent",
 		ToolsConfig: adk.ToolsConfig{
-			ToolsNodeConfig: compose.ToolsNodeConfig{Tools: toolList},
-			ReturnDirectly:  returnDirectly,
+			ToolsNodeConfig: compose.ToolsNodeConfig{
+				Tools:                toolList,
+				UnknownToolsHandler:  aitools.UnknownToolHandler(toolNames),
+				ToolArgumentsHandler: aitools.NormalizeTriggerOpsArguments,
+			},
+			ReturnDirectly: returnDirectly,
 		},
 		GenModelInput: executorGenModelInput,
 		OutputKey:     planexecute.ExecutedStepSessionKey,

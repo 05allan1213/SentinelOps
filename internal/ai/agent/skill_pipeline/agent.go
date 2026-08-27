@@ -95,6 +95,10 @@ func newAgentConfig(ctx context.Context, cfg Config) (*adk.ChatModelAgentConfig,
 	if err != nil {
 		return nil, fmt.Errorf("resolve skill agent Tools: %w", err)
 	}
+	toolNames, err = tools.ToolNames(ctx, registered)
+	if err != nil {
+		return nil, fmt.Errorf("resolve skill agent tool names: %w", err)
+	}
 	handler, err := skill.NewMiddleware(ctx, &skill.Config{Backend: cfg.Backend})
 	if err != nil {
 		return nil, fmt.Errorf("configure official Skill middleware: %w", err)
@@ -105,7 +109,11 @@ func newAgentConfig(ctx context.Context, cfg Config) (*adk.ChatModelAgentConfig,
 	}
 	agentConfig := &adk.ChatModelAgentConfig{
 		Name: AgentName, Description: agentDescription,
-		ToolsConfig:   adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: registered}},
+		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
+			Tools:                registered,
+			UnknownToolsHandler:  tools.UnknownToolHandler(toolNames),
+			ToolArgumentsHandler: tools.NormalizeTriggerOpsArguments,
+		}},
 		MaxIterations: cfg.MaxIterations,
 		Handlers:      handlers,
 	}

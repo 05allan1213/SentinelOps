@@ -56,15 +56,23 @@ func NewSpecialistAgent(ctx context.Context, cfg SpecialistConfig) (adk.Agent, e
 	if err != nil {
 		return nil, fmt.Errorf("resolve %s tools: %w", cfg.Name, err)
 	}
+	toolNames, err := tools.ToolNames(ctx, registered)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s tool names: %w", cfg.Name, err)
+	}
 	handlers, err := runtime.RuntimeHandlerFirst(cfg.RuntimeHandler)
 	if err != nil {
 		return nil, err
 	}
 	agentConfig := &adk.ChatModelAgentConfig{
-		Name:          cfg.Name,
-		Description:   cfg.Description,
-		Instruction:   cfg.Instruction,
-		ToolsConfig:   adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: registered}},
+		Name:        cfg.Name,
+		Description: cfg.Description,
+		Instruction: cfg.Instruction,
+		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
+			Tools:                registered,
+			UnknownToolsHandler:  tools.UnknownToolHandler(toolNames),
+			ToolArgumentsHandler: tools.NormalizeTriggerOpsArguments,
+		}},
 		GenModelInput: NewSpecialistGenModelInput(SpecialistPromptConfig{Instruction: cfg.Instruction, RetrievalOptions: cfg.RetrievalOptions}),
 		MaxIterations: cfg.MaxIterations,
 		Handlers:      handlers,

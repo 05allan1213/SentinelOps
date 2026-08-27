@@ -12,6 +12,7 @@ import (
 	"SentinelOps/internal/ai/models"
 	"SentinelOps/internal/ai/policy"
 	airuntime "SentinelOps/internal/ai/runtime"
+	aitools "SentinelOps/internal/ai/tools"
 	mcptools "SentinelOps/internal/ai/tools/mcp"
 	appconfig "SentinelOps/internal/config"
 
@@ -120,6 +121,10 @@ func newAgentConfig(ctx context.Context, cfg Config) (*adk.ChatModelAgentConfig,
 	if err != nil {
 		return nil, err
 	}
+	toolNames, err := aitools.ToolNames(ctx, dynamicTools)
+	if err != nil {
+		return nil, fmt.Errorf("resolve MCP tool names: %w", err)
+	}
 	handlers := []adk.ChatModelAgentMiddleware{&dynamicCatalogMiddleware{BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}, catalog: catalog}}
 	if cfg.DisableToolSearch {
 		if cfg.UseModelToolSearch {
@@ -127,7 +132,11 @@ func newAgentConfig(ctx context.Context, cfg Config) (*adk.ChatModelAgentConfig,
 		}
 		agentConfig := &adk.ChatModelAgentConfig{
 			Name: AgentName, Description: agentDescription,
-			ToolsConfig:   adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: dynamicTools}},
+			ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
+				Tools:                dynamicTools,
+				UnknownToolsHandler:  aitools.UnknownToolHandler(toolNames),
+				ToolArgumentsHandler: aitools.NormalizeTriggerOpsArguments,
+			}},
 			MaxIterations: cfg.MaxIterations,
 			Handlers:      handlers,
 		}
