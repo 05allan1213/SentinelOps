@@ -10,7 +10,6 @@ require (
 	github.com/cloudwego/eino-ext/components/document/loader/file v0.0.0-20260820123736-6752ff8da9b1
 	github.com/cloudwego/eino-ext/components/indexer/milvus v0.0.0-20260820123736-6752ff8da9b1
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
-	github.com/cloudwego/eino-ext/components/tool/duckduckgo/v2 v2.0.0-20260820123736-6752ff8da9b1
 	github.com/cloudwego/eino-ext/components/tool/mcp/officialmcp v0.1.1
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17
 	github.com/dslipak/pdf v0.0.2
@@ -50,7 +49,6 @@ require (
 	github.com/cockroachdb/errors v1.9.1 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20211118104740-dabe8e521a4f // indirect
 	github.com/cockroachdb/redact v1.1.3 // indirect
-	github.com/corpix/uarand v0.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eino-contrib/jsonschema v1.0.3 // indirect
