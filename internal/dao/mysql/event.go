@@ -112,6 +112,9 @@ func BatchUpdateEventStatus(ctx context.Context, ids []string, status string) er
 
 // CreateEvent 将事件持久化到数据库。
 func CreateEvent(ctx context.Context, e *Event) error {
+	if strings.TrimSpace(e.Metadata) == "" {
+		e.Metadata = `{}`
+	}
 	db, err := DB(ctx)
 	if err != nil {
 		return err
