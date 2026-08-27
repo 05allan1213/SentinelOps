@@ -26,7 +26,7 @@ default_snapshot:
       cached_input_price: 0.8
       output_price: 18
       model_snapshot_identity: 8815078013416518caf211f55aefe81b92ba15fd569559ed20ec5e2a66920c69
-  prompt_snapshot: sentinelops-prompt-v2
+  prompt_snapshot: sentinelops-prompt-v3
   tool_snapshot: sentinelops-tool-catalog-v1
   skill_snapshot: sentinelops-skill-manifest-v1
   mcp_snapshot: sentinelops-mcp-catalog-v1

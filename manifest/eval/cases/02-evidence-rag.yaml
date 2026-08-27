@@ -56,7 +56,7 @@ default_snapshot:
       pricing_unit: per_million_tokens
       input_price: 0.5
       model_snapshot_identity: ea0c8227d3a5e8aba062b0f80e83e7d77fc69bb3c19ccb7d073f672b7fa6578a
-  prompt_snapshot: sentinelops-prompt-v2
+  prompt_snapshot: sentinelops-prompt-v3
   tool_snapshot: sentinelops-tool-catalog-v1
   skill_snapshot: sentinelops-skill-manifest-v1
   mcp_snapshot: sentinelops-mcp-catalog-v1
