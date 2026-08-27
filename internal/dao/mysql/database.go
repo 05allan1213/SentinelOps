@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
+	driver "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -67,15 +67,11 @@ func InitWithDSN(ctx context.Context, dsn []byte) error {
 
 // openAndCheckSchema 打开连接并执行只读版本检查，供启动路径与 contract test 复用。
 func openAndCheckSchema(ctx context.Context, rawDSN string) (*gorm.DB, error) {
-	// 若 DSN 未指定 loc，追加 loc=Local 确保 Go 与 MySQL 时区一致（autoCreateTime 使用本地时间）。
-	if !strings.Contains(rawDSN, "loc=") {
-		if strings.Contains(rawDSN, "?") {
-			rawDSN += "&loc=Local"
-		} else {
-			rawDSN += "?loc=Local"
-		}
+	normalizedDSN, err := normalizeApplicationDSN(rawDSN)
+	if err != nil {
+		return nil, err
 	}
-	db, err := gorm.Open(mysql.Open(rawDSN), &gorm.Config{
+	db, err := gorm.Open(mysql.Open(normalizedDSN), &gorm.Config{
 		Logger: logger.New(
 			log.New(os.Stdout, "\r\n", log.LstdFlags),
 			logger.Config{
@@ -94,6 +90,24 @@ func openAndCheckSchema(ctx context.Context, rawDSN string) (*gorm.DB, error) {
 		return nil, err
 	}
 	return db, nil
+}
+
+// normalizeApplicationDSN 将应用与 MySQL 连接统一到 UTC，避免 DATETIME 在不同会话时区间发生偏移。
+func normalizeApplicationDSN(rawDSN string) (string, error) {
+	cfg, err := driver.ParseDSN(rawDSN)
+	if err != nil {
+		return "", fmt.Errorf("parse mysql DSN: %w", err)
+	}
+	if !cfg.ParseTime {
+		return "", fmt.Errorf("mysql DSN must enable parseTime")
+	}
+	cfg.Loc = time.UTC
+	if cfg.Params == nil {
+		cfg.Params = make(map[string]string)
+	}
+	// go-sql-driver/mysql 会在每条新连接上用 SET 应用 Params；数字 offset 不依赖 MySQL 时区表。
+	cfg.Params["time_zone"] = "'+00:00'"
+	return cfg.FormatDSN(), nil
 }
 
 // DB 返回全局 DB 实例，Init 成功后使用
