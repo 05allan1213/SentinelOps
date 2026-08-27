@@ -51,30 +51,33 @@ func (a *HTTPRuntimeAdapter) DriveScenario(
 		if err != nil {
 			return nil, err
 		}
-		if err := a.decideApproval(ctx, item.Scenario, approval); err != nil {
+		if err := a.decideApprovalsUntilTerminal(ctx, item, handle, probe, approval); err != nil {
 			return nil, err
 		}
 		return noScenarioCleanup, nil
 	case ScenarioCheckpointResume:
-		if a.Faults == nil {
-			return nil, fmt.Errorf("checkpoint resume requires an explicit local fault controller")
-		}
 		attempt, err := probe.WaitForCheckpoint(ctx, handle.RunID)
-		if err != nil {
-			return nil, err
-		}
-		restore, err := a.Faults.SuspendWorker(ctx, attempt)
 		if err != nil {
 			return nil, err
 		}
 		if item.Scenario.Decision != "" {
 			approval, approvalErr := probe.WaitForApproval(ctx, handle.RunID)
-			if approvalErr == nil {
-				approvalErr = a.decideApproval(ctx, item.Scenario, approval)
-			}
 			if approvalErr != nil {
-				return nil, restoreAfterError(restore, approvalErr)
+				return nil, approvalErr
 			}
+			if err := a.decideApprovalsUntilTerminal(ctx, item, handle, probe, approval); err != nil {
+				return nil, err
+			}
+			// 审批类 Checkpoint 恢复由 Worker 池完成：Approval 发布后 Worker
+			// 已释放租约，无需（也不应）挂起仍持有租约的发布中 Worker。
+			return noScenarioCleanup, nil
+		}
+		if a.Faults == nil {
+			return nil, fmt.Errorf("checkpoint resume requires an explicit local fault controller")
+		}
+		restore, err := a.Faults.SuspendWorker(ctx, attempt)
+		if err != nil {
+			return nil, err
 		}
 		return nonNilCleanup(restore), nil
 	case ScenarioPreCheckpointReplay:
@@ -97,6 +100,36 @@ func (a *HTTPRuntimeAdapter) DriveScenario(
 		return a.Faults.SuspendDependency(ctx, item.Scenario.Dependency, attempt)
 	default:
 		return nil, fmt.Errorf("unsupported eval scenario %q", item.Scenario.Kind)
+	}
+}
+
+// decideApprovalsUntilTerminal 同一 approver 决策首个及后续合法提案（例如
+// block_ip 的 derived nginx 步骤）；Run 到达终态时 WaitForApproval 返回错误
+// 即停止，整体受 Eval 调用方 ctx 超时约束；同一提案 ID 去重避免重复决策。
+func (a *HTTPRuntimeAdapter) decideApprovalsUntilTerminal(
+	ctx context.Context,
+	item EvalCase,
+	handle RunHandle,
+	probe ScenarioProbe,
+	first ApprovalTruth,
+) error {
+	decided := map[string]bool{first.ID: true}
+	if err := a.decideApproval(ctx, item.Scenario, first); err != nil {
+		return err
+	}
+	for {
+		next, waitErr := probe.WaitForApproval(ctx, handle.RunID)
+		if waitErr != nil {
+			return nil
+		}
+		if decided[next.ID] {
+			// 同一提案已决策（探测桩或提交竞态），视为没有新提案。
+			return nil
+		}
+		if decideErr := a.decideApproval(ctx, item.Scenario, next); decideErr != nil {
+			return decideErr
+		}
+		decided[next.ID] = true
 	}
 }
 
