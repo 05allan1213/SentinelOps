@@ -54,11 +54,23 @@ func newExecutorAgentConfig(ctx context.Context, cfg *ExecutorBuilderConfig) (*a
 	}
 	toolList := make([]tool.BaseTool, 0, len(registeredTools)+len(cfg.AgentTools))
 	toolList = append(toolList, registeredTools...)
+	returnDirectly := make(map[string]bool, len(cfg.AgentTools))
 	for i, agentTool := range cfg.AgentTools {
 		if agentTool == nil {
 			return nil, fmt.Errorf("executor AgentTool %d is nil", i)
 		}
+		info, infoErr := agentTool.Info(ctx)
+		if infoErr != nil {
+			return nil, fmt.Errorf("resolve executor AgentTool %d: %w", i, infoErr)
+		}
+		if info == nil || strings.TrimSpace(info.Name) == "" {
+			return nil, fmt.Errorf("executor AgentTool %d has no name", i)
+		}
 		toolList = append(toolList, agentTool)
+		// 一个执行步骤由一个嵌套 AgentTool 完成；子 Agent 返回后立即
+		// 结束本轮 Executor，让官方 Replanner 判断下一步，避免 Resume
+		// 后外层模型把已完成的步骤再次规划成新的调用。
+		returnDirectly[info.Name] = true
 	}
 
 	handlers, err := airuntime.RuntimeHandlerFirst(cfg.RuntimeHandler, cfg.AdditionalHandlers...)
@@ -71,6 +83,7 @@ func newExecutorAgentConfig(ctx context.Context, cfg *ExecutorBuilderConfig) (*a
 		Description: "an executor agent",
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{Tools: toolList},
+			ReturnDirectly:  returnDirectly,
 		},
 		GenModelInput: executorGenModelInput,
 		OutputKey:     planexecute.ExecutedStepSessionKey,

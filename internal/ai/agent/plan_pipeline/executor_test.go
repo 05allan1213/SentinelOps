@@ -38,8 +38,8 @@ func TestExecutorBuilder(t *testing.T) {
 	if cfg.MaxIterations != 20 {
 		t.Fatalf("MaxIterations = %d, want 20", cfg.MaxIterations)
 	}
-	if len(cfg.ToolsConfig.ReturnDirectly) != 0 {
-		t.Fatalf("ReturnDirectly = %#v, want empty legacy semantics", cfg.ToolsConfig.ReturnDirectly)
+	if !reflect.DeepEqual(cfg.ToolsConfig.ReturnDirectly, map[string]bool{"specialist": true}) {
+		t.Fatalf("ReturnDirectly = %#v, want nested AgentTool only", cfg.ToolsConfig.ReturnDirectly)
 	}
 	if len(cfg.Handlers) != 1 || cfg.Handlers[0] != handler {
 		t.Fatalf("Handlers 未保持唯一 RuntimeHandler 最外层: %#v", cfg.Handlers)
