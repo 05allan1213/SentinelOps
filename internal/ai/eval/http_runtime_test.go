@@ -181,6 +181,57 @@ func TestProductionRuntimeAdapterUsesExplicitFaultController(t *testing.T) {
 	}
 }
 
+func TestProductionRuntimeAdapterCorruptsCheckpointBeforeApprovalResume(t *testing.T) {
+	var getCalls, decisionCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer "+evalBearerToken("approver-user", "approver") {
+			t.Fatal("Approval API did not use the approver identity")
+		}
+		switch {
+		case request.Method == http.MethodGet && request.URL.Path == "/api/ops/v1/approvals/approval-corrupt":
+			getCalls++
+			_, _ = writer.Write([]byte(`{"data":{"item":{"id":"approval-corrupt","run_id":"run-corrupt","proposal_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","requested_by":"operator-user","status":"pending","version":1}}}`))
+		case request.Method == http.MethodPost && request.URL.Path == "/api/ops/v1/approvals/approval-corrupt/approve":
+			decisionCalls++
+			_, _ = writer.Write([]byte(`{"data":{"item":{"id":"approval-corrupt","status":"approved"}}}`))
+		default:
+			t.Fatalf("unexpected Approval request %s %s", request.Method, request.URL.Path)
+		}
+	}))
+	defer server.Close()
+	adapter, err := NewHTTPRuntimeAdapterWithIdentities(server.URL, server.Client(), map[ExecutionIdentity]http.Header{
+		ExecutionIdentityApprover: {"Authorization": []string{"Bearer " + evalBearerToken("approver-user", "approver")}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe := &checkpointCorruptorStub{
+		scenarioProbeStub: scenarioProbeStub{
+			attempt: AttemptTruth{RunID: "run-corrupt", LeaseOwner: "worker-a", Attempt: 1, CheckpointCount: 1},
+			approval: ApprovalTruth{
+				ID: "approval-corrupt", RunID: "run-corrupt",
+				ProposalHash: strings.Repeat("a", 64), Version: 1, RequestedBy: "operator-user",
+			},
+		},
+	}
+	cleanup, err := adapter.DriveScenario(t.Context(), EvalCase{Scenario: Scenario{
+		Kind: ScenarioCheckpointResume, Decision: "approve", DecisionIdentity: ExecutionIdentityApprover,
+		CorruptCheckpoint: true,
+	}}, RunHandle{RunID: "run-corrupt"}, probe)
+	if err != nil {
+		t.Fatalf("DriveScenario() error = %v", err)
+	}
+	if probe.removed != "run-corrupt" {
+		t.Fatalf("checkpoint removal run id = %q, want run-corrupt", probe.removed)
+	}
+	if getCalls == 0 || decisionCalls == 0 {
+		t.Fatalf("Approval API calls = get:%d decide:%d", getCalls, decisionCalls)
+	}
+	if err := cleanup(); err != nil {
+		t.Fatalf("cleanup() error = %v", err)
+	}
+}
+
 type scenarioProbeStub struct {
 	approval ApprovalTruth
 	attempt  AttemptTruth
@@ -200,6 +251,16 @@ func (s *scenarioProbeStub) WaitForRunningWithoutCheckpoint(context.Context, str
 
 func (s *scenarioProbeStub) WaitForDependencyCall(context.Context, string, string) (AttemptTruth, error) {
 	return s.attempt, nil
+}
+
+type checkpointCorruptorStub struct {
+	scenarioProbeStub
+	removed string
+}
+
+func (s *checkpointCorruptorStub) RemoveCheckpoints(_ context.Context, runID string) error {
+	s.removed = runID
+	return nil
 }
 
 type scenarioFaultStub struct {

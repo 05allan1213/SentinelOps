@@ -115,7 +115,7 @@ func compare(item EvalCase, truth RunTruth) CaseResult {
 		result.Failures = append(result.Failures, "cost budget exceeded")
 	}
 
-	if !truth.Trace.Complete {
+	if !truth.Trace.Complete && isSuccessfulStatus(truth.Status) {
 		result.Failures = append(result.Failures, "trace is incomplete")
 	}
 	if truth.SecretLeak {

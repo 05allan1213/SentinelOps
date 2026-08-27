@@ -60,6 +60,15 @@ func (a *HTTPRuntimeAdapter) DriveScenario(
 		if err != nil {
 			return nil, err
 		}
+		if item.Scenario.CorruptCheckpoint {
+			corruptor, ok := probe.(checkpointCorruptor)
+			if !ok {
+				return nil, fmt.Errorf("checkpoint corruption requires a MySQL truth reader probe")
+			}
+			if err := corruptor.RemoveCheckpoints(ctx, handle.RunID); err != nil {
+				return nil, err
+			}
+		}
 		if item.Scenario.Decision != "" {
 			approval, approvalErr := probe.WaitForApproval(ctx, handle.RunID)
 			if approvalErr != nil {
@@ -101,6 +110,12 @@ func (a *HTTPRuntimeAdapter) DriveScenario(
 	default:
 		return nil, fmt.Errorf("unsupported eval scenario %q", item.Scenario.Kind)
 	}
+}
+
+// checkpointCorruptor 是 checkpoint_resume 场景的受控破坏接口，由
+// MySQLTruthReader 实现；只删除当前 Eval Run 的 Checkpoint 行。
+type checkpointCorruptor interface {
+	RemoveCheckpoints(ctx context.Context, runID string) error
 }
 
 // decideApprovalsUntilTerminal 同一 approver 决策首个及后续合法提案（例如

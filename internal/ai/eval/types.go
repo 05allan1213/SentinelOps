@@ -43,10 +43,11 @@ const (
 
 // Scenario 描述需要在 Run 提交后通过公开 API 或本地进程信号驱动的步骤。
 type Scenario struct {
-	Kind             ScenarioKind      `json:"kind" yaml:"kind"`
-	Decision         string            `json:"decision,omitempty" yaml:"decision,omitempty"`
-	DecisionIdentity ExecutionIdentity `json:"decision_identity,omitempty" yaml:"decision_identity,omitempty"`
-	Dependency       string            `json:"dependency,omitempty" yaml:"dependency,omitempty"`
+	Kind              ScenarioKind      `json:"kind" yaml:"kind"`
+	Decision          string            `json:"decision,omitempty" yaml:"decision,omitempty"`
+	DecisionIdentity  ExecutionIdentity `json:"decision_identity,omitempty" yaml:"decision_identity,omitempty"`
+	Dependency        string            `json:"dependency,omitempty" yaml:"dependency,omitempty"`
+	CorruptCheckpoint bool              `json:"corrupt_checkpoint,omitempty" yaml:"corrupt_checkpoint,omitempty"`
 }
 
 // EvalCase 描述一次通过生产 API 执行的最小评估输入和确定性期望。
@@ -308,10 +309,16 @@ func (s Scenario) Validate(executionIdentity ExecutionIdentity) error {
 	}
 	switch kind {
 	case ScenarioNormal:
+		if s.CorruptCheckpoint {
+			return fmt.Errorf("normal eval scenario must not corrupt checkpoints")
+		}
 		if s.Decision != "" || s.DecisionIdentity != "" || s.Dependency != "" {
 			return fmt.Errorf("normal eval scenario must not define decision or dependency fields")
 		}
 	case ScenarioApprovalDecision:
+		if s.CorruptCheckpoint {
+			return fmt.Errorf("approval decision scenario must not corrupt checkpoints")
+		}
 		if s.Decision != "approve" && s.Decision != "reject" {
 			return fmt.Errorf("eval scenario %q requires an approve or reject decision", kind)
 		}
@@ -328,6 +335,9 @@ func (s Scenario) Validate(executionIdentity ExecutionIdentity) error {
 		if (s.Decision == "") != (s.DecisionIdentity == "") {
 			return fmt.Errorf("checkpoint resume decision and decision identity must be set together")
 		}
+		if s.CorruptCheckpoint && s.Decision != "approve" {
+			return fmt.Errorf("checkpoint corruption requires an approve decision to trigger resume")
+		}
 		if s.Decision != "" {
 			if s.Decision != "approve" && s.Decision != "reject" {
 				return fmt.Errorf("eval scenario %q requires an approve or reject decision", kind)
@@ -343,10 +353,16 @@ func (s Scenario) Validate(executionIdentity ExecutionIdentity) error {
 			return fmt.Errorf("eval scenario %q must not define a dependency", kind)
 		}
 	case ScenarioPreCheckpointReplay:
+		if s.CorruptCheckpoint {
+			return fmt.Errorf("pre-checkpoint replay must not corrupt checkpoints")
+		}
 		if s.Decision != "" || s.DecisionIdentity != "" || s.Dependency != "" {
 			return fmt.Errorf("pre-checkpoint replay must not define decision or dependency fields")
 		}
 	case ScenarioDependencyParked:
+		if s.CorruptCheckpoint {
+			return fmt.Errorf("dependency parked scenario must not corrupt checkpoints")
+		}
 		if s.Decision != "" || s.DecisionIdentity != "" {
 			return fmt.Errorf("dependency parked scenario must not define an Approval decision")
 		}

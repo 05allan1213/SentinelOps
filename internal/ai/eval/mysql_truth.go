@@ -58,6 +58,23 @@ func (r *MySQLTruthReader) WaitForCheckpoint(ctx context.Context, runID string) 
 	})
 }
 
+// RemoveCheckpoints 是依赖注入场景的受控破坏操作：删除指定 Run 的已提交
+// Checkpoint，使真实运行时在恢复时按 CheckpointMissing 进入 PARKED。
+// 只允许作用于 Eval 在 throwaway 数据库中创建的 Run，不触碰其他 Run。
+func (r *MySQLTruthReader) RemoveCheckpoints(ctx context.Context, runID string) error {
+	if r == nil || r.DB == nil {
+		return fmt.Errorf("mysql truth reader is not initialized")
+	}
+	if strings.TrimSpace(runID) == "" {
+		return fmt.Errorf("run id is required")
+	}
+	if err := r.DB.WithContext(ctx).Where("run_id = ?", strings.TrimSpace(runID)).
+		Delete(&mysql.WorkflowCheckpoint{}).Error; err != nil {
+		return fmt.Errorf("remove scenario checkpoints: %w", err)
+	}
+	return nil
+}
+
 // WaitForRunningWithoutCheckpoint 等待 Worker 已认领 Run 且尚未提交 Checkpoint。
 func (r *MySQLTruthReader) WaitForRunningWithoutCheckpoint(ctx context.Context, runID string) (AttemptTruth, error) {
 	return r.waitForAttempt(ctx, runID, "pre-Checkpoint running Attempt", func(run *mysql.WorkflowRun, checkpoints int64) bool {

@@ -104,6 +104,28 @@ func TestDatasetCaseRequiresStrictExecutionIdentityAndScenario(t *testing.T) {
 	if err := item.Validate(); err == nil {
 		t.Fatal("DatasetCase.Validate() accepted dependency_parked without a dependency")
 	}
+
+	item = makeDatasetCases(1, 1)[0]
+	item.Scenario = Scenario{Kind: ScenarioCheckpointResume, CorruptCheckpoint: true}
+	if err := item.Validate(); err == nil {
+		t.Fatal("DatasetCase.Validate() accepted checkpoint corruption without an approve decision")
+	}
+
+	item = makeDatasetCases(1, 1)[0]
+	item.ExecutionIdentity = ExecutionIdentityOperator
+	item.Scenario = Scenario{
+		Kind: ScenarioCheckpointResume, Decision: "approve", DecisionIdentity: ExecutionIdentityApprover,
+		CorruptCheckpoint: true,
+	}
+	if err := item.Validate(); err != nil {
+		t.Fatalf("DatasetCase.Validate() rejected a valid corrupt-checkpoint resume scenario: %v", err)
+	}
+
+	item = makeDatasetCases(1, 1)[0]
+	item.Scenario = Scenario{Kind: ScenarioDependencyParked, Dependency: "checkpoint", CorruptCheckpoint: true}
+	if err := item.Validate(); err == nil {
+		t.Fatal("DatasetCase.Validate() accepted checkpoint corruption on dependency_parked")
+	}
 }
 
 func TestLoadDatasetDirectoryRejectsUnknownFieldsAndAggregatesSortedFiles(t *testing.T) {
