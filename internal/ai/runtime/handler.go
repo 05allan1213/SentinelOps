@@ -25,6 +25,18 @@ import (
 
 const toolReservationDomain = "sentinelops/tool-call-reservation/v1\x00"
 
+// toolSearchToolName 是官方 dynamictool/toolsearch 中间件注入的客户端搜索元工具；
+// 它只作为 MCP Agent 动态目录上下文内的框架工具存在，不属于业务 Tool Catalog。
+const toolSearchToolName = "tool_search"
+
+// frameworkSkillToolName 是官方 adk/middlewares/skill 中间件注入的 Skill 加载
+// 元工具；业务 Tool Catalog 中没有同名工具，只会在 Skill Agent 内被注入。
+const frameworkSkillToolName = "skill"
+
+func isFrameworkMetaTool(name string, hasDynamicCatalog bool) bool {
+	return name == frameworkSkillToolName || (hasDynamicCatalog && name == toolSearchToolName)
+}
+
 type modelInvocationContextKey struct{}
 type callMetadataContextKey struct{}
 
@@ -436,6 +448,7 @@ func (h *RuntimeHandler) prepareToolCall(ctx context.Context, toolContext *adk.T
 	}
 	dynamicCatalog, hasDynamicCatalog := DynamicToolCatalogFromContext(ctx)
 	dynamicEntry, isDynamic := dynamicCatalog.Lookup(toolContext.Name)
+	frameworkMetaTool := isFrameworkMetaTool(toolContext.Name, hasDynamicCatalog)
 	if isDynamic {
 		allowed, gateErr := h.GateAllowed(ctx, GateMCPEnabled)
 		if gateErr != nil {
@@ -446,16 +459,18 @@ func (h *RuntimeHandler) prepareToolCall(ctx context.Context, toolContext *adk.T
 		}
 	}
 	if err := policy.RequireExecutable(toolContext.Name); err != nil {
-		if !isDynamic {
+		if !isDynamic && !frameworkMetaTool {
 			return nil, nil, BudgetReservation{}, err
 		}
-		if !dynamicEntry.ReadOnly {
+		if isDynamic && !dynamicEntry.ReadOnly {
 			return nil, nil, BudgetReservation{}, policy.ErrMutationDisabled
 		}
 	}
-	if err := validateToolSnapshot(attempt.Snapshot, toolContext.Name); err != nil {
-		if !hasDynamicCatalog || !isDynamic || dynamicCatalog.Hash == "" || dynamicCatalog.Hash != attempt.Snapshot.document.MCPCatalogHash {
-			return nil, nil, BudgetReservation{}, err
+	if !frameworkMetaTool {
+		if err := validateToolSnapshot(attempt.Snapshot, toolContext.Name); err != nil {
+			if !hasDynamicCatalog || !isDynamic || dynamicCatalog.Hash == "" || dynamicCatalog.Hash != attempt.Snapshot.document.MCPCatalogHash {
+				return nil, nil, BudgetReservation{}, err
+			}
 		}
 	}
 	reservationIdentity := toolReservationIdentity(attempt.Run.ID, toolContext.Name, toolContext.CallID)
