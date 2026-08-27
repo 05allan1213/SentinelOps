@@ -21,11 +21,17 @@ func main() {
 	if err != nil {
 		g.Log().Fatalf(context.Background(), "bootstrap role check failed: %v", err)
 	}
+	// 允许通过环境变量选择配置目录：仓库内 config.local.yaml 保持 fail-closed
+	// 本地替换契约，P43 等隔离验证可用独立目录显式打开测试 Gate。
+	configDir := os.Getenv("SENTINELOPS_CONFIG_DIR")
+	if configDir == "" {
+		configDir = "manifest/config"
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := bootstrap.Run(ctx, bootstrap.Options{
 		Role:      role,
-		ConfigDir: "manifest/config",
+		ConfigDir: configDir,
 	}); err != nil {
 		g.Log().Fatalf(ctx, "application bootstrap failed: %v", err)
 	}
