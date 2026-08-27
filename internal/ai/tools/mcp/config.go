@@ -108,6 +108,7 @@ func FromAppConfig(cfg *appconfig.Config) (Config, error) {
 			AllowedTools: append([]string(nil), stored.AllowedTools...), ToolNamespace: stored.ToolNamespace, AllowedHosts: append([]string(nil), stored.AllowedHosts...), AllowedCIDRs: append([]string(nil), stored.AllowedCIDRs...), AllowedPorts: append([]int(nil), stored.AllowedPorts...),
 			ListToolsMode: officialmcp.ListToolsMode(stored.ListToolsMode), MetadataMode: officialmcp.MetadataMode(stored.MetadataMode), MaxToolPages: stored.MaxToolPages, Description: officialmcp.DescriptionPolicy{MaxChars: stored.DescriptionMaxChars}, Result: officialmcp.ResultPolicy{MaxChars: stored.MaxResultChars, PreserveTailChars: stored.PreserveTailChars, IncludeStructuredContent: stored.IncludeStructuredContent, IncludeMeta: stored.IncludeMeta, ErrorAsError: cloneBool(stored.ErrorAsError)}, MaxResultBytes: stored.MaxResultBytes,
 			ConnectAttempts: stored.ConnectAttempts, Backoff: time.Duration(stored.BackoffMS) * time.Millisecond, Timeout: time.Duration(stored.TimeoutMS) * time.Millisecond, ToolTimeout: time.Duration(stored.ToolTimeoutMS) * time.Millisecond,
+			AllowInsecureTLSForTest: stored.AllowInsecureTLSForTest,
 		}
 		if server.ToolNamespace == "" {
 			server.ToolNamespace = name

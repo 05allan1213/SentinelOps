@@ -115,6 +115,7 @@ type MCPServer struct {
 	BackoffMS                int               `yaml:"backoff_ms" json:"backoff_ms"`
 	TimeoutMS                int               `yaml:"timeout_ms" json:"timeout_ms"`
 	ToolTimeoutMS            int               `yaml:"tool_timeout_ms" json:"tool_timeout_ms"`
+	AllowInsecureTLSForTest  bool              `yaml:"allow_insecure_tls_for_test" json:"allow_insecure_tls_for_test"`
 }
 
 // App 描述不含 Secret 的进程环境元数据。

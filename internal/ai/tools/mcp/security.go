@@ -35,8 +35,11 @@ func ValidateEndpoint(ctx context.Context, rawURL string, policy EndpointPolicy)
 	if u.User != nil {
 		return fmt.Errorf("mcp endpoint URL must not contain userinfo")
 	}
-	if u.Scheme != "https" && !(policy.InsecureTLSForTest && u.Scheme == "https") {
-		return fmt.Errorf("mcp endpoint must use HTTPS")
+	if u.Scheme != "https" {
+		// 显式测试开关只允许回环地址的明文 MCP；生产配置仍强制 HTTPS。
+		if !policy.InsecureTLSForTest || !isLoopbackHost(u.Hostname()) {
+			return fmt.Errorf("mcp endpoint must use HTTPS")
+		}
 	}
 	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
 	if isMetadataHost(host) {
@@ -90,6 +93,15 @@ func validateResolvedIP(ip net.IP, host string, policy EndpointPolicy) error {
 
 func isMetadataHost(host string) bool {
 	return host == "metadata.google.internal" || host == "metadata.google" || host == "169.254.169.254" || host == "fd00:ec2::254"
+}
+
+func isLoopbackHost(host string) bool {
+	switch strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), ".")) {
+	case "localhost", "127.0.0.1", "::1", "0:0:0:0:0:0:0:1":
+		return true
+	default:
+		return false
+	}
 }
 
 func isMetadataIP(ip net.IP) bool {
