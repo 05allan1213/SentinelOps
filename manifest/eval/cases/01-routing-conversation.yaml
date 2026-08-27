@@ -12,38 +12,38 @@ default_snapshot:
   models:
     - kind: chat
       candidate_order: 0
-      catalog_ref: aliyun_bailian/qwen3.7-plus
+      catalog_ref: aliyun_bailian/glm-5
       provider: aliyun_bailian
-      provider_revision: catalog-2026-08-27
+      provider_revision: catalog-2026-08-28
       driver: openai_compatible_chat
       driver_revision: eino-openai-0.1.13
-      model_id: qwen3.7-plus
+      model_id: glm-5
       routing_profile: default
       route_options: {enable_thinking: false}
-      pricing_revision: "2026-08-27"
+      pricing_revision: "2026-08-28"
       pricing_currency: CNY
       pricing_unit: per_million_tokens
-      input_price: 2
-      cached_input_price: 0.4
-      output_price: 8
-      model_snapshot_identity: 458ba657893d6860ddb124f353e13d5c92c4aa5df5b4edb275fbfd8f7ed4a061
+      input_price: 4
+      cached_input_price: 0.8
+      output_price: 18
+      model_snapshot_identity: 795682fd433173c230c5e990ab309d4ca761423593a114ecac1b4292e1d6be0c
     - kind: chat
       candidate_order: 1
-      catalog_ref: provider-shadow/qwen3.7-plus
+      catalog_ref: provider-shadow/glm-5
       provider: provider-shadow
-      provider_revision: catalog-shadow-2026-08-27
+      provider_revision: catalog-shadow-2026-08-28
       driver: openai_compatible_chat
       driver_revision: eino-openai-0.1.13
-      model_id: qwen3.7-plus
+      model_id: glm-5
       routing_profile: default
       route_options: {enable_thinking: false}
-      pricing_revision: "2026-08-27"
+      pricing_revision: "2026-08-28"
       pricing_currency: CNY
       pricing_unit: per_million_tokens
-      input_price: 2
-      cached_input_price: 0.4
-      output_price: 8
-      model_snapshot_identity: 69fa2e493c1fa4e0fe45d264e762047c7b3430765d0f5bc9faaf59cce79ee3b1
+      input_price: 4
+      cached_input_price: 0.8
+      output_price: 18
+      model_snapshot_identity: 1d3579800ece58580721a0b7a5c0ceeecbc74e4409c0239ebb5b8bb665205a60
   prompt_snapshot: sentinelops-prompt-v2
   tool_snapshot: sentinelops-tool-catalog-v1
   skill_snapshot: sentinelops-skill-manifest-v1
