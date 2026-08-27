@@ -64,7 +64,7 @@ agents:
     name: ops_agent
     description: "Call the Ops Agent to trigger automated incident response for a specific security event. Handles: IP blocking, multi-channel alert notifications (DingTalk/WeCom/Email), event status updates. Requires event_id in the query. Returns execution result."
     instruction_ref: agents.Ops
-    instruction_sha256: f0bd06aa6b567a0ff5816b5f978d32085d115c038a42435553ebdfb16c5bd8e3
+    instruction_sha256: 3005c06e250b101633b3f4ea1f1c837ae128d1fc9dd352ebcabcdc019b50c73a
     instruction_inputs: [date]
     legacy_tool_inventory: [query_events, trigger_ops, update_event_status, block_ip, notify_dingtalk, notify_wecom, notify_email, get_current_time]
     tool_inventory: [query_events, trigger_ops, update_event_status, block_ip, notify_dingtalk, notify_wecom, notify_email, webhook_out, get_current_time]
