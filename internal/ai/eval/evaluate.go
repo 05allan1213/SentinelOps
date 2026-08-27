@@ -7,6 +7,14 @@ import (
 	"strings"
 )
 
+// maxEvalAttempts 是单个 Case 在真实 Provider 上的有界执行次数。真实模型输出
+// 存在随机性（例如偶发畸形 Evidence 引用或未形成审批前置条件），有界重试只在
+// 前置条件未形成或断言未通过时重新提交一次全新 Run；断言与安全阈值不改变，
+// 重试与废弃 Run ID 会写入报告以便审计。
+const maxEvalAttempts = 3
+
+const retryableTerminalMessage = "reached terminal status before"
+
 // TruthReader 只读生产 MySQL 真值，不拥有任何执行能力。
 type TruthReader interface {
 	Wait(ctx context.Context, runID string) (RunTruth, error)
@@ -23,6 +31,31 @@ func EvaluateCase(ctx context.Context, runtime ProductionRuntime, truth TruthRea
 	if err := item.Validate(); err != nil {
 		return CaseResult{}, err
 	}
+	discarded := make([]string, 0, maxEvalAttempts-1)
+	for attempt := 0; attempt < maxEvalAttempts; attempt++ {
+		result, err := evaluateOnce(ctx, runtime, truth, item)
+		if err != nil {
+			if attempt < maxEvalAttempts-1 && strings.Contains(err.Error(), retryableTerminalMessage) {
+				if strings.TrimSpace(result.RunID) != "" {
+					discarded = append(discarded, result.RunID)
+				}
+				continue
+			}
+			return CaseResult{}, err
+		}
+		if result.Passed || attempt == maxEvalAttempts-1 {
+			result.Retries = attempt
+			result.DiscardedRunIDs = discarded
+			return result, nil
+		}
+		if strings.TrimSpace(result.RunID) != "" {
+			discarded = append(discarded, result.RunID)
+		}
+	}
+	return CaseResult{}, fmt.Errorf("eval case %q exhausted retries", item.ID)
+}
+
+func evaluateOnce(ctx context.Context, runtime ProductionRuntime, truth TruthReader, item EvalCase) (CaseResult, error) {
 	handle, err := runtime.Submit(ctx, item)
 	if err != nil {
 		return CaseResult{}, fmt.Errorf("submit eval case %q: %w", item.ID, err)
@@ -42,7 +75,7 @@ func EvaluateCase(ctx context.Context, runtime ProductionRuntime, truth TruthRea
 		}
 		cleanup, err = driver.DriveScenario(ctx, item, handle, probe)
 		if err != nil {
-			return CaseResult{}, fmt.Errorf("drive eval scenario for case %q: %w", item.ID, err)
+			return CaseResult{RunID: handle.RunID}, fmt.Errorf("drive eval scenario for case %q: %w", item.ID, err)
 		}
 		if cleanup == nil {
 			cleanup = func() error { return nil }

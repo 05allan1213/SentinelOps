@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -220,6 +221,42 @@ func TestEvaluateCaseAlwaysFailsDuplicateEffectAndSecretLeak(t *testing.T) {
 	}
 }
 
+func TestEvaluateCaseBoundedRetryRecordsDiscardedRuns(t *testing.T) {
+	runtime := &scriptedRetryRuntime{}
+	truth := &scriptedRetryTruth{succeedAfter: 2}
+	result, err := EvaluateCase(context.Background(), runtime, truth, EvalCase{
+		ID: "flake", Query: "safe", Expected: Expected{Statuses: []string{"succeeded"}},
+	})
+	if err != nil {
+		t.Fatalf("EvaluateCase() error = %v", err)
+	}
+	if !result.Passed || result.Retries != 2 || len(result.DiscardedRunIDs) != 2 {
+		t.Fatalf("retry result = %+v", result)
+	}
+	if result.DiscardedRunIDs[0] != "run-flake-0" || result.DiscardedRunIDs[1] != "run-flake-1" {
+		t.Fatalf("discarded runs = %v", result.DiscardedRunIDs)
+	}
+}
+
+func TestEvaluateCaseRetriesScenarioTerminalBeforePrecondition(t *testing.T) {
+	runtime := &scriptedRetryScenarioRuntime{scriptedRuntime: scriptedRuntime{runID: "run-scenario-retry"}, failures: 1}
+	truth := &scriptedRetryTruth{succeedAfter: 0}
+	result, err := EvaluateCase(t.Context(), runtime, truth, EvalCase{
+		ID: "recovery", Query: "safe", ExecutionIdentity: ExecutionIdentityOperator,
+		Scenario: Scenario{
+			Kind: ScenarioCheckpointResume, Decision: "approve",
+			DecisionIdentity: ExecutionIdentityApprover,
+		},
+		Expected: Expected{Statuses: []string{"succeeded"}},
+	})
+	if err != nil {
+		t.Fatalf("EvaluateCase() error = %v", err)
+	}
+	if !result.Passed || result.Retries != 1 || len(result.DiscardedRunIDs) != 1 {
+		t.Fatalf("scenario retry result = %+v", result)
+	}
+}
+
 type scriptedRuntime struct {
 	runID string
 	got   EvalCase
@@ -257,4 +294,42 @@ func (s *scriptedScenarioRuntime) DriveScenario(context.Context, EvalCase, RunHa
 type scriptedScenarioTruth struct {
 	scriptedTruth
 	scenarioProbeStub
+}
+
+type scriptedRetryRuntime struct {
+	calls int
+}
+
+func (s *scriptedRetryRuntime) Submit(_ context.Context, item EvalCase) (RunHandle, error) {
+	id := fmt.Sprintf("run-flake-%d", s.calls)
+	s.calls++
+	return RunHandle{RunID: id, Status: "pending"}, nil
+}
+
+type scriptedRetryTruth struct {
+	scenarioProbeStub
+	succeedAfter int
+	calls        int
+}
+
+func (s *scriptedRetryTruth) Wait(_ context.Context, runID string) (RunTruth, error) {
+	s.calls++
+	if s.calls <= s.succeedAfter {
+		return RunTruth{RunID: runID, Status: "failed", Trace: TraceTruth{Complete: true}}, nil
+	}
+	return RunTruth{RunID: runID, Status: "succeeded", Trace: TraceTruth{Complete: true}}, nil
+}
+
+type scriptedRetryScenarioRuntime struct {
+	scriptedRuntime
+	failures int
+	calls    int
+}
+
+func (s *scriptedRetryScenarioRuntime) DriveScenario(context.Context, EvalCase, RunHandle, ScenarioProbe) (func() error, error) {
+	s.calls++
+	if s.calls <= s.failures {
+		return nil, fmt.Errorf("run reached terminal status before Checkpoint was observed")
+	}
+	return func() error { return nil }, nil
 }

@@ -206,6 +206,8 @@ type CaseResult struct {
 	ReasoningTokens     int      `json:"reasoning_tokens"`
 	CostCNY             float64  `json:"cost_cny"`
 	Failures            []string `json:"failures,omitempty"`
+	Retries             int      `json:"retries,omitempty"`
+	DiscardedRunIDs     []string `json:"discarded_run_ids,omitempty"`
 }
 
 type caseDocument struct {
