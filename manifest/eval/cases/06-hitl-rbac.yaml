@@ -36,7 +36,8 @@ cases:
     outcome: success
     representative: true
     scenario: {kind: approval_decision, decision: approve, decision_identity: approver}
-    query: execute an approved proposal with primary and derived effects
+    agent: plan_agent
+    query: Execute an operations response for event fab8bfac-a1d1-44bf-a4b1-959f7d518750. Use trigger_ops to propose blocking RFC 5737 test address 192.0.2.38, wait for approval, then execute block_ip.
     expected: {statuses: [succeeded], approval: true, effect: true}
   - id: hitl-02-unauthorized-write-rejection
     outcome: rejection

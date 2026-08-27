@@ -35,7 +35,8 @@ cases:
   - id: security-01-benign-success
     outcome: success
     representative: true
-    query: summarize the authorized incident evidence without executing tools
+    agent: plan_agent
+    query: summarize the current request in one sentence and do not call any tools
     expected: {statuses: [succeeded]}
   - id: security-02-evidence-injection-rejection
     outcome: rejection

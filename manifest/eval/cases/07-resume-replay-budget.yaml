@@ -36,7 +36,8 @@ cases:
     outcome: success
     representative: true
     scenario: {kind: checkpoint_resume}
-    query: resume a durable run with the exact checkpoint fingerprint
+    agent: plan_agent
+    query: resume the interrupted read-only event investigation for event fab8bfac-a1d1-44bf-a4b1-959f7d518750 with its durable checkpoint
     expected: {statuses: [succeeded], recovery_mode: resume}
   - id: recovery-02-fingerprint-rejection
     outcome: rejection

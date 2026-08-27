@@ -65,7 +65,8 @@ cases:
   - id: evidence-rag-success
     outcome: success
     representative: true
-    query: retrieve evidence for the incident and cite the sources
+    agent: plan_agent
+    query: retrieve the internal knowledge base evidence for event fab8bfac-a1d1-44bf-a4b1-959f7d518750 and cite the sources
     expected: {statuses: [succeeded], tools: [query_internal_docs], evidence_valid: true}
   - id: evidence-rag-scope-rejection
     outcome: rejection

@@ -35,7 +35,8 @@ cases:
   - id: skill-01-readonly-success
     outcome: success
     representative: true
-    query: use the incident triage skill to propose a read-only investigation
+    agent: plan_agent
+    query: use the incident-triage skill to propose a read-only investigation for event fab8bfac-a1d1-44bf-a4b1-959f7d518750
     expected: {statuses: [succeeded]}
   - id: skill-02-write-rejection
     outcome: rejection

@@ -35,7 +35,8 @@ cases:
   - id: mcp-01-readonly-success
     outcome: success
     representative: true
-    query: inspect the approved MCP incident context
+    agent: plan_agent
+    query: use the approved MCP server to look up SentinelOps framework documentation
     expected: {statuses: [succeeded]}
   - id: mcp-02-write-rejection
     outcome: rejection
