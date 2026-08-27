@@ -5,9 +5,11 @@ import (
 	airuntime "SentinelOps/internal/ai/runtime"
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/planexecute"
+	"github.com/cloudwego/eino/schema"
 )
 
 // NewRePlanAgent 构建重构规划器，在 Executor 完成一个步骤后决策：继续执行还是终止输出。
@@ -48,5 +50,55 @@ func NewRePlanAgentWithRuntimeHandler(ctx context.Context, handler *airuntime.Ru
 	if err != nil {
 		return nil, err
 	}
-	return planexecute.NewReplanner(ctx, &planexecute.ReplannerConfig{ChatModel: chatModel})
+	return planexecute.NewReplanner(ctx, &planexecute.ReplannerConfig{
+		ChatModel:  chatModel,
+		GenInputFn: durableReplannerInput,
+	})
+}
+
+// durableReplannerInput 复用官方 Replanner 模板，并追加一条终止指令：
+// 当最近一个执行步骤的结果已经是用户问题的完整答案时，Replanner 必须
+// 立即调用 Respond 工具，避免简单任务反复追加“输出最终答案”的空步骤，
+// 从而压缩真实 Eval 的 Token 与延迟。
+func durableReplannerInput(ctx context.Context, in *planexecute.ExecutionContext) ([]adk.Message, error) {
+	if in == nil || in.Plan == nil {
+		return nil, fmt.Errorf("replanner execution context and plan are required")
+	}
+	planContent, err := in.Plan.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("marshal replanner plan: %w", err)
+	}
+	msgs, err := planexecute.ReplannerPrompt.Format(ctx, map[string]any{
+		"plan":           string(planContent),
+		"input":          formatReplannerInput(in.UserInput),
+		"executed_steps": formatReplannerSteps(in.ExecutedSteps),
+		"plan_tool":      planexecute.PlanToolInfo.Name,
+		"respond_tool":   planexecute.RespondToolInfo.Name,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("format replanner prompt: %w", err)
+	}
+	msgs = append(msgs, schema.UserMessage(
+		"If the most recent executed step result is already a complete answer to the user request, "+
+			"you MUST call the Respond tool immediately with that answer and return an empty plan. "+
+			"Do not add any more steps.",
+	))
+	return msgs, nil
+}
+
+func formatReplannerInput(input []adk.Message) string {
+	var builder strings.Builder
+	for _, message := range input {
+		builder.WriteString(message.Content)
+		builder.WriteString("\n")
+	}
+	return builder.String()
+}
+
+func formatReplannerSteps(results []planexecute.ExecutedStep) string {
+	var builder strings.Builder
+	for _, result := range results {
+		builder.WriteString(fmt.Sprintf("Step: %s\nResult: %s\n\n", result.Step, result.Result))
+	}
+	return builder.String()
 }
