@@ -49,6 +49,7 @@ fi
 mkdir -p "${OUTPUT_DIR}"
 COMPOSE_JSON="${OUTPUT_DIR}/compose-config.json"
 BUILD_LOG="${OUTPUT_DIR}/build.log"
+VENDOR_LOG="${OUTPUT_DIR}/vendor.log"
 INVENTORY="${OUTPUT_DIR}/image-inventory.json"
 
 COMPOSE=(docker compose -p "${PROJECT}" -f manifest/docker/docker-compose.yml -f manifest/docker/docker-compose.test.yml)
@@ -119,7 +120,30 @@ if grep -En '^FROM (golang|node):' manifest/docker/Dockerfile.* | grep -Ev 'gola
   exit 1
 fi
 
+ensure_vendor_tree() {
+  if [[ -f vendor/modules.txt ]]; then
+    printf '%s\n' 'vendor/modules.txt already exists; skipped go mod vendor' >"${VENDOR_LOG}"
+    return 0
+  fi
+
+  command -v go >/dev/null 2>&1 || {
+    echo "FAIL: go is required to generate the vendor tree; see ${VENDOR_LOG}" >&2
+    return 1
+  }
+
+  if [[ -n "${GO_PROXY}" ]]; then
+    if ! GOPROXY="${GO_PROXY}" go mod vendor >"${VENDOR_LOG}" 2>&1; then
+      echo "FAIL: go mod vendor failed; see ${VENDOR_LOG}" >&2
+      return 1
+    fi
+  elif ! go mod vendor >"${VENDOR_LOG}" 2>&1; then
+    echo "FAIL: go mod vendor failed; see ${VENDOR_LOG}" >&2
+    return 1
+  fi
+}
+
 if ((DO_BUILD)); then
+  ensure_vendor_tree || exit 1
   build_args=()
   if [[ -n "${GO_PROXY}" ]]; then
     build_args+=(--build-arg "GOPROXY=${GO_PROXY}")

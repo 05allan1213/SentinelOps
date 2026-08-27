@@ -38,6 +38,12 @@ services:
       MYSQL_DATABASE: sentinelops_e2e
     volumes:
       - sentinelops_e2e_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$${MYSQL_ROOT_PASSWORD} mysqladmin ping -h 127.0.0.1 -P 3306 -uroot --protocol=tcp --silent"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
 
   migrate:
     profiles: !reset []
