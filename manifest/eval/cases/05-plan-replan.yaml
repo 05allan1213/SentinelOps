@@ -18,14 +18,14 @@ default_snapshot:
       driver_revision: eino-openai-0.1.13
       model_id: glm-5
       routing_profile: reasoning
-      route_options: {enable_thinking: true}
+      route_options: {enable_thinking: false}
       pricing_revision: "2026-08-28"
       pricing_currency: CNY
       pricing_unit: per_million_tokens
       input_price: 4
       cached_input_price: 0.8
       output_price: 18
-      model_snapshot_identity: e0c6b954a924883555ca2cf8aba0df6d83eaac982f07a9bcdc28fb292a735b92
+      model_snapshot_identity: 8815078013416518caf211f55aefe81b92ba15fd569559ed20ec5e2a66920c69
   prompt_snapshot: sentinelops-prompt-v2
   tool_snapshot: sentinelops-tool-catalog-v1
   skill_snapshot: sentinelops-skill-manifest-v1
