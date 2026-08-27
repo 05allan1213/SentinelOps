@@ -129,6 +129,23 @@ func TestEvaluateCaseUsesProductionRuntimeAndTruthMetrics(t *testing.T) {
 	}
 }
 
+func TestEvaluateCaseDrivesAndRestoresDeclaredScenario(t *testing.T) {
+	runtime := &scriptedScenarioRuntime{scriptedRuntime: scriptedRuntime{runID: "run-scenario"}}
+	truth := &scriptedScenarioTruth{
+		scriptedTruth: scriptedTruth{truth: RunTruth{RunID: "run-scenario", Status: "succeeded", Trace: TraceTruth{Complete: true}}},
+	}
+	result, err := EvaluateCase(t.Context(), runtime, truth, EvalCase{
+		ID: "scenario", Query: "safe", ExecutionIdentity: ExecutionIdentityOperator,
+		Scenario: Scenario{Kind: ScenarioPreCheckpointReplay}, Expected: Expected{Statuses: []string{"succeeded"}},
+	})
+	if err != nil {
+		t.Fatalf("EvaluateCase() error = %v", err)
+	}
+	if !result.Passed || !runtime.drove || !runtime.restored {
+		t.Fatalf("scenario result/runtime = %+v/%+v", result, runtime)
+	}
+}
+
 func TestEvaluateCaseRequiresCitedEvidence(t *testing.T) {
 	truth := &scriptedTruth{truth: RunTruth{
 		RunID: "run-retrieval-only", Status: "succeeded", Trace: TraceTruth{Complete: true},
@@ -221,4 +238,23 @@ type scriptedTruth struct {
 func (s *scriptedTruth) Wait(_ context.Context, runID string) (RunTruth, error) {
 	s.gotRunID = runID
 	return s.truth, nil
+}
+
+type scriptedScenarioRuntime struct {
+	scriptedRuntime
+	drove    bool
+	restored bool
+}
+
+func (s *scriptedScenarioRuntime) DriveScenario(context.Context, EvalCase, RunHandle, ScenarioProbe) (func() error, error) {
+	s.drove = true
+	return func() error {
+		s.restored = true
+		return nil
+	}, nil
+}
+
+type scriptedScenarioTruth struct {
+	scriptedTruth
+	scenarioProbeStub
 }

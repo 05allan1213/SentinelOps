@@ -4,6 +4,8 @@ repeat: 3
 category: evidence_rag
 default_budget: {max_latency_ms: 120000, max_total_tokens: 16000, max_cost_cny: 1}
 default_external_dependencies: [production-api, workflow-mysql, milvus, redis, provider-contract]
+default_execution_identity: operator
+default_scenario: {kind: normal}
 default_contracts: [l0_event_analysis_read_only]
 default_snapshot:
   models:

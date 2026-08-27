@@ -30,9 +30,31 @@ func EvaluateCase(ctx context.Context, runtime ProductionRuntime, truth TruthRea
 	if strings.TrimSpace(handle.RunID) == "" {
 		return CaseResult{}, fmt.Errorf("production API returned empty run id for case %q", item.ID)
 	}
+	cleanup := func() error { return nil }
+	if item.Scenario.Kind != "" && item.Scenario.Kind != ScenarioNormal {
+		driver, ok := runtime.(ScenarioRuntime)
+		if !ok {
+			return CaseResult{}, fmt.Errorf("production runtime does not support eval scenario %q", item.Scenario.Kind)
+		}
+		probe, ok := truth.(ScenarioProbe)
+		if !ok {
+			return CaseResult{}, fmt.Errorf("truth reader does not support eval scenario probes")
+		}
+		cleanup, err = driver.DriveScenario(ctx, item, handle, probe)
+		if err != nil {
+			return CaseResult{}, fmt.Errorf("drive eval scenario for case %q: %w", item.ID, err)
+		}
+		if cleanup == nil {
+			cleanup = func() error { return nil }
+		}
+	}
 	runTruth, err := truth.Wait(ctx, handle.RunID)
+	cleanupErr := cleanup()
 	if err != nil {
 		return CaseResult{}, fmt.Errorf("read truth for case %q: %w", item.ID, err)
+	}
+	if cleanupErr != nil {
+		return CaseResult{}, fmt.Errorf("restore eval scenario for case %q: %w", item.ID, cleanupErr)
 	}
 	if strings.TrimSpace(runTruth.RunID) == "" || runTruth.RunID != handle.RunID {
 		return CaseResult{}, fmt.Errorf("persisted truth Run identity mismatch for case %q", item.ID)

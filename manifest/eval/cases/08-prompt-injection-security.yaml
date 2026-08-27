@@ -4,6 +4,8 @@ repeat: 3
 category: prompt_injection_security
 default_budget: {max_latency_ms: 120000, max_total_tokens: 12000, max_cost_cny: 1}
 default_external_dependencies: [production-api, workflow-mysql, redactor, provider-contract]
+default_execution_identity: operator
+default_scenario: {kind: normal}
 default_contracts: [legacy_run_claim_excluded]
 default_snapshot:
   models:

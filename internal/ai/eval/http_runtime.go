@@ -15,9 +15,11 @@ import (
 
 // HTTPRuntimeAdapter 只调用生产 durable Run API，不直接接触 Agent 或 Worker。
 type HTTPRuntimeAdapter struct {
-	BaseURL string
-	Client  *http.Client
-	Header  http.Header
+	BaseURL         string
+	Client          *http.Client
+	Header          http.Header
+	IdentityHeaders map[ExecutionIdentity]http.Header
+	Faults          ScenarioFaultController
 }
 
 type createRunRequest struct {
@@ -35,6 +37,15 @@ type createRunResponse struct {
 
 // NewHTTPRuntimeAdapter 创建生产 API adapter。
 func NewHTTPRuntimeAdapter(baseURL string, client *http.Client, header http.Header) (*HTTPRuntimeAdapter, error) {
+	return newHTTPRuntimeAdapter(baseURL, client, header, nil)
+}
+
+// NewHTTPRuntimeAdapterWithIdentities 为固定 Eval 身份分别绑定请求 Header。
+func NewHTTPRuntimeAdapterWithIdentities(baseURL string, client *http.Client, headers map[ExecutionIdentity]http.Header) (*HTTPRuntimeAdapter, error) {
+	return newHTTPRuntimeAdapter(baseURL, client, nil, headers)
+}
+
+func newHTTPRuntimeAdapter(baseURL string, client *http.Client, header http.Header, headers map[ExecutionIdentity]http.Header) (*HTTPRuntimeAdapter, error) {
 	parsed, err := url.Parse(strings.TrimSpace(baseURL))
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return nil, fmt.Errorf("invalid production API base URL")
@@ -42,7 +53,16 @@ func NewHTTPRuntimeAdapter(baseURL string, client *http.Client, header http.Head
 	if client == nil {
 		client = http.DefaultClient
 	}
-	return &HTTPRuntimeAdapter{BaseURL: strings.TrimRight(parsed.String(), "/"), Client: client, Header: cloneHeader(header)}, nil
+	identityHeaders := make(map[ExecutionIdentity]http.Header, len(headers))
+	for identity, identityHeader := range headers {
+		if !identity.valid() {
+			return nil, fmt.Errorf("unsupported eval execution identity %q", identity)
+		}
+		identityHeaders[identity] = cloneHeader(identityHeader)
+	}
+	return &HTTPRuntimeAdapter{
+		BaseURL: strings.TrimRight(parsed.String(), "/"), Client: client, Header: cloneHeader(header), IdentityHeaders: identityHeaders,
+	}, nil
 }
 
 // Submit 创建一个 durable Run；SessionID 缺省时生成长度受限的隔离 Session。
@@ -63,7 +83,11 @@ func (a *HTTPRuntimeAdapter) Submit(ctx context.Context, item EvalCase) (RunHand
 		return RunHandle{}, fmt.Errorf("build production Run request: %w", err)
 	}
 	request.Header.Set("Content-Type", "application/json")
-	for key, values := range a.Header {
+	header, err := a.headerFor(item.ExecutionIdentity)
+	if err != nil {
+		return RunHandle{}, err
+	}
+	for key, values := range header {
 		for _, value := range values {
 			request.Header.Add(key, value)
 		}
@@ -102,6 +126,24 @@ func (a *HTTPRuntimeAdapter) Close() {
 		a.Header.Del(key)
 	}
 	a.Header = nil
+	for identity, header := range a.IdentityHeaders {
+		for key := range header {
+			header.Del(key)
+		}
+		delete(a.IdentityHeaders, identity)
+	}
+	a.IdentityHeaders = nil
+}
+
+func (a *HTTPRuntimeAdapter) headerFor(identity ExecutionIdentity) (http.Header, error) {
+	if identity == "" || len(a.IdentityHeaders) == 0 {
+		return a.Header, nil
+	}
+	header, ok := a.IdentityHeaders[identity]
+	if !ok {
+		return nil, fmt.Errorf("authorization header is not configured for eval identity %q", identity)
+	}
+	return header, nil
 }
 
 func cloneHeader(header http.Header) http.Header {

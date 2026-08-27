@@ -4,6 +4,8 @@ repeat: 3
 category: hitl_rbac
 default_budget: {max_latency_ms: 120000, max_total_tokens: 12000, max_cost_cny: 1}
 default_external_dependencies: [production-api, workflow-mysql, approval-ledger, provider-contract]
+default_execution_identity: operator
+default_scenario: {kind: normal}
 default_contracts: [primary_derived_effect_keys]
 default_snapshot:
   models:
@@ -33,6 +35,7 @@ cases:
   - id: hitl-01-approved-effect-success
     outcome: success
     representative: true
+    scenario: {kind: approval_decision, decision: approve, decision_identity: approver}
     query: execute an approved proposal with primary and derived effects
     expected: {statuses: [succeeded], approval: true, effect: true}
   - id: hitl-02-unauthorized-write-rejection

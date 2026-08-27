@@ -4,6 +4,8 @@ repeat: 3
 category: skill
 default_budget: {max_latency_ms: 120000, max_total_tokens: 12000, max_cost_cny: 1}
 default_external_dependencies: [production-api, workflow-mysql, readonly-skill-manifest, provider-contract]
+default_execution_identity: operator
+default_scenario: {kind: normal}
 default_contracts: [policy_mutation_disabled]
 default_snapshot:
   models:

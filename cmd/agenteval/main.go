@@ -20,17 +20,22 @@ import (
 )
 
 type options struct {
-	command           string
-	casesPath         string
-	baseURL           string
-	baselinePath      string
-	reportPath        string
-	dsnRef            config.SecretRef
-	authorizationRef  config.SecretRef
-	timeout           time.Duration
-	interval          time.Duration
-	samplePerCategory int
-	repeat            int
+	command                  string
+	casesPath                string
+	baseURL                  string
+	baselinePath             string
+	reportPath               string
+	dsnRef                   config.SecretRef
+	authorizationRef         config.SecretRef
+	viewerAuthorizationRef   config.SecretRef
+	operatorAuthorizationRef config.SecretRef
+	approverAuthorizationRef config.SecretRef
+	adminAuthorizationRef    config.SecretRef
+	scenarioProcessesPath    string
+	timeout                  time.Duration
+	interval                 time.Duration
+	samplePerCategory        int
+	repeat                   int
 }
 
 type report = aieval.EvaluationReport
@@ -50,8 +55,14 @@ func parseOptions(args []string) (options, error) {
 	flags.StringVar(&opts.baselinePath, "baseline", "", "approved baseline YAML file")
 	flags.StringVar(&opts.reportPath, "report", "", "Eval report JSON file")
 	var dsnRef, authorizationRef string
+	var viewerAuthorizationRef, operatorAuthorizationRef, approverAuthorizationRef, adminAuthorizationRef string
 	flags.StringVar(&dsnRef, "dsn-ref", "", "SecretRef containing the MySQL DSN")
 	flags.StringVar(&authorizationRef, "authorization-ref", "", "SecretRef containing a bearer token")
+	flags.StringVar(&viewerAuthorizationRef, "viewer-authorization-ref", "", "SecretRef containing the viewer bearer token")
+	flags.StringVar(&operatorAuthorizationRef, "operator-authorization-ref", "", "SecretRef containing the operator bearer token")
+	flags.StringVar(&approverAuthorizationRef, "approver-authorization-ref", "", "SecretRef containing the approver bearer token")
+	flags.StringVar(&adminAuthorizationRef, "admin-authorization-ref", "", "SecretRef containing the admin bearer token")
+	flags.StringVar(&opts.scenarioProcessesPath, "scenario-processes", "", "strict JSON manifest of local P43 scenario processes")
 	flags.DurationVar(&opts.timeout, "timeout", opts.timeout, "maximum duration for all cases")
 	flags.DurationVar(&opts.interval, "poll-interval", opts.interval, "MySQL truth polling interval")
 	flags.IntVar(&opts.samplePerCategory, "sample-per-category", 0, "number of representative Dataset cases per category")
@@ -64,6 +75,11 @@ func parseOptions(args []string) (options, error) {
 	}
 	opts.dsnRef = config.SecretRef(strings.TrimSpace(dsnRef))
 	opts.authorizationRef = config.SecretRef(strings.TrimSpace(authorizationRef))
+	opts.viewerAuthorizationRef = config.SecretRef(strings.TrimSpace(viewerAuthorizationRef))
+	opts.operatorAuthorizationRef = config.SecretRef(strings.TrimSpace(operatorAuthorizationRef))
+	opts.approverAuthorizationRef = config.SecretRef(strings.TrimSpace(approverAuthorizationRef))
+	opts.adminAuthorizationRef = config.SecretRef(strings.TrimSpace(adminAuthorizationRef))
+	opts.scenarioProcessesPath = strings.TrimSpace(opts.scenarioProcessesPath)
 	if opts.timeout <= 0 || opts.interval <= 0 || opts.repeat <= 0 || opts.samplePerCategory < 0 {
 		return options{}, fmt.Errorf("timeout, poll interval and repeat must be positive; sample-per-category must not be negative")
 	}
@@ -72,7 +88,7 @@ func parseOptions(args []string) (options, error) {
 		if strings.TrimSpace(opts.casesPath) == "" {
 			return options{}, fmt.Errorf("--cases is required")
 		}
-		if opts.baseURL != "" || dsnRef != "" || authorizationRef != "" || opts.baselinePath != "" || opts.reportPath != "" || opts.samplePerCategory != 0 || opts.repeat != 1 {
+		if opts.baseURL != "" || dsnRef != "" || authorizationRef != "" || hasIdentityAuthorizationRefs(opts) || opts.scenarioProcessesPath != "" || opts.baselinePath != "" || opts.reportPath != "" || opts.samplePerCategory != 0 || opts.repeat != 1 {
 			return options{}, fmt.Errorf("validate only accepts --cases")
 		}
 		return opts, nil
@@ -94,12 +110,22 @@ func parseOptions(args []string) (options, error) {
 				return options{}, fmt.Errorf("invalid --authorization-ref: %w", err)
 			}
 		}
+		if authorizationRef != "" && hasIdentityAuthorizationRefs(opts) {
+			return options{}, fmt.Errorf("--authorization-ref cannot be combined with identity-specific authorization refs")
+		}
+		for identity, ref := range identityAuthorizationRefs(opts) {
+			if ref != "" {
+				if err := ref.Validate(); err != nil {
+					return options{}, fmt.Errorf("invalid --%s-authorization-ref: %w", identity, err)
+				}
+			}
+		}
 		return opts, nil
 	case "compare":
 		if strings.TrimSpace(opts.baselinePath) == "" || strings.TrimSpace(opts.reportPath) == "" {
 			return options{}, fmt.Errorf("--baseline and --report are required for compare")
 		}
-		if opts.casesPath != "" || opts.baseURL != "" || dsnRef != "" || authorizationRef != "" || opts.samplePerCategory != 0 || opts.repeat != 1 {
+		if opts.casesPath != "" || opts.baseURL != "" || dsnRef != "" || authorizationRef != "" || hasIdentityAuthorizationRefs(opts) || opts.scenarioProcessesPath != "" || opts.samplePerCategory != 0 || opts.repeat != 1 {
 			return options{}, fmt.Errorf("compare only accepts --baseline and --report")
 		}
 		return opts, nil
@@ -134,12 +160,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	}
 	deadline, cancel := context.WithTimeout(ctx, opts.timeout)
 	defer cancel()
-	return withAuthorization(deadline, opts.authorizationRef, func(header http.Header) error {
-		adapter, err := aieval.NewHTTPRuntimeAdapter(opts.baseURL, http.DefaultClient, header)
-		if err != nil {
-			return err
-		}
-		defer adapter.Close()
+	return withRuntimeAdapter(deadline, opts, cases, func(adapter *aieval.HTTPRuntimeAdapter) error {
 		return config.UseSecret(deadline, opts.dsnRef, func(dsn []byte) error {
 			if err := mysql.InitWithDSN(deadline, dsn); err != nil {
 				return err
@@ -178,8 +199,8 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 			if err := json.NewEncoder(output).Encode(result); err != nil {
 				return err
 			}
-			if result.Passed != result.Cases {
-				return fmt.Errorf("eval failed: %d/%d cases passed", result.Passed, result.Cases)
+			if err := aieval.ValidateReleaseThresholds(result.Summary); err != nil {
+				return err
 			}
 			return nil
 		})
@@ -284,6 +305,145 @@ func withAuthorization(ctx context.Context, ref config.SecretRef, use func(http.
 		defer header.Del("Authorization")
 		return use(header)
 	})
+}
+
+func withRuntimeAdapter(
+	ctx context.Context,
+	opts options,
+	cases []aieval.EvalCase,
+	use func(*aieval.HTTPRuntimeAdapter) error,
+) error {
+	if use == nil {
+		return fmt.Errorf("runtime adapter consumer is required")
+	}
+	if casesRequireFaultController(cases) && opts.scenarioProcessesPath == "" {
+		return fmt.Errorf("recovery and dependency scenarios require --scenario-processes")
+	}
+	configure := func(adapter *aieval.HTTPRuntimeAdapter) error {
+		defer adapter.Close()
+		if opts.scenarioProcessesPath != "" {
+			file, err := os.Open(opts.scenarioProcessesPath)
+			if err != nil {
+				return fmt.Errorf("open local scenario process manifest: %w", err)
+			}
+			controller, loadErr := aieval.LoadLocalProcessFaultController(file)
+			closeErr := file.Close()
+			if loadErr != nil {
+				return loadErr
+			}
+			if closeErr != nil {
+				return fmt.Errorf("close local scenario process manifest: %w", closeErr)
+			}
+			adapter.Faults = controller
+		}
+		return use(adapter)
+	}
+	if hasIdentityAuthorizationRefs(opts) {
+		refs := identityAuthorizationRefs(opts)
+		if err := validateRequiredIdentityRefs(cases, refs); err != nil {
+			return err
+		}
+		return withIdentityAuthorization(ctx, refs, func(headers map[aieval.ExecutionIdentity]http.Header) error {
+			adapter, err := aieval.NewHTTPRuntimeAdapterWithIdentities(opts.baseURL, http.DefaultClient, headers)
+			if err != nil {
+				return err
+			}
+			return configure(adapter)
+		})
+	}
+	if casesRequireSeparateDecisionIdentity(cases) {
+		return fmt.Errorf("Approval scenarios require identity-specific authorization refs")
+	}
+	return withAuthorization(ctx, opts.authorizationRef, func(header http.Header) error {
+		adapter, err := aieval.NewHTTPRuntimeAdapter(opts.baseURL, http.DefaultClient, header)
+		if err != nil {
+			return err
+		}
+		return configure(adapter)
+	})
+}
+
+func identityAuthorizationRefs(opts options) map[aieval.ExecutionIdentity]config.SecretRef {
+	return map[aieval.ExecutionIdentity]config.SecretRef{
+		aieval.ExecutionIdentityViewer: opts.viewerAuthorizationRef, aieval.ExecutionIdentityOperator: opts.operatorAuthorizationRef,
+		aieval.ExecutionIdentityApprover: opts.approverAuthorizationRef, aieval.ExecutionIdentityAdmin: opts.adminAuthorizationRef,
+	}
+}
+
+func hasIdentityAuthorizationRefs(opts options) bool {
+	for _, ref := range identityAuthorizationRefs(opts) {
+		if ref != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func validateRequiredIdentityRefs(cases []aieval.EvalCase, refs map[aieval.ExecutionIdentity]config.SecretRef) error {
+	for _, item := range cases {
+		if item.ExecutionIdentity == "" {
+			return fmt.Errorf("identity-specific authorization requires every Case to declare execution_identity")
+		}
+		if refs[item.ExecutionIdentity] == "" {
+			return fmt.Errorf("authorization ref is missing for required eval identity %q", item.ExecutionIdentity)
+		}
+		if item.Scenario.DecisionIdentity != "" && refs[item.Scenario.DecisionIdentity] == "" {
+			return fmt.Errorf("authorization ref is missing for required eval identity %q", item.Scenario.DecisionIdentity)
+		}
+	}
+	return nil
+}
+
+func casesRequireSeparateDecisionIdentity(cases []aieval.EvalCase) bool {
+	for _, item := range cases {
+		if item.Scenario.DecisionIdentity != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func casesRequireFaultController(cases []aieval.EvalCase) bool {
+	for _, item := range cases {
+		switch item.Scenario.Kind {
+		case aieval.ScenarioCheckpointResume, aieval.ScenarioPreCheckpointReplay, aieval.ScenarioDependencyParked:
+			return true
+		}
+	}
+	return false
+}
+
+func withIdentityAuthorization(
+	ctx context.Context,
+	refs map[aieval.ExecutionIdentity]config.SecretRef,
+	use func(map[aieval.ExecutionIdentity]http.Header) error,
+) error {
+	identities := []aieval.ExecutionIdentity{
+		aieval.ExecutionIdentityViewer, aieval.ExecutionIdentityOperator, aieval.ExecutionIdentityApprover, aieval.ExecutionIdentityAdmin,
+	}
+	headers := make(map[aieval.ExecutionIdentity]http.Header, len(refs))
+	var resolve func(int) error
+	resolve = func(index int) error {
+		if index == len(identities) {
+			return use(headers)
+		}
+		identity := identities[index]
+		ref := refs[identity]
+		if ref == "" {
+			return resolve(index + 1)
+		}
+		return config.UseSecret(ctx, ref, func(value []byte) error {
+			header := make(http.Header)
+			header.Set("Authorization", "Bearer "+string(value))
+			headers[identity] = header
+			defer func() {
+				header.Del("Authorization")
+				delete(headers, identity)
+			}()
+			return resolve(index + 1)
+		})
+	}
+	return resolve(0)
 }
 
 func main() {

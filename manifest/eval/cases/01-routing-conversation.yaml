@@ -4,6 +4,8 @@ repeat: 3
 category: routing_conversation
 default_budget: {max_latency_ms: 120000, max_total_tokens: 12000, max_cost_cny: 1}
 default_external_dependencies: [production-api, workflow-mysql, provider-contract]
+default_execution_identity: operator
+default_scenario: {kind: normal}
 default_contracts: [query_database_denied, l0_event_analysis_read_only, l0_risk_read_only, l0_solve_read_only, cross_provider_same_model_identity]
 default_identity_dimensions: [trace, budget, cost, breaker, eval]
 default_snapshot:

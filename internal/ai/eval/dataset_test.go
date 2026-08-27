@@ -80,11 +80,39 @@ func TestDatasetSnapshotRejectsSecretsAndUnqualifiedIdentity(t *testing.T) {
 	}
 }
 
+func TestDatasetCaseRequiresStrictExecutionIdentityAndScenario(t *testing.T) {
+	item := makeDatasetCases(1, 1)[0]
+	item.ExecutionIdentity = "root"
+	if err := item.Validate(); err == nil {
+		t.Fatal("DatasetCase.Validate() accepted an unknown execution identity")
+	}
+
+	item = makeDatasetCases(1, 1)[0]
+	item.Scenario = Scenario{Kind: ScenarioApprovalDecision, Decision: "approve", DecisionIdentity: ExecutionIdentityOperator}
+	if err := item.Validate(); err == nil {
+		t.Fatal("DatasetCase.Validate() accepted an operator Approval decision")
+	}
+
+	item.ExecutionIdentity = ExecutionIdentityApprover
+	item.Scenario.DecisionIdentity = item.ExecutionIdentity
+	if err := item.Validate(); err == nil {
+		t.Fatal("DatasetCase.Validate() accepted proposer self-approval")
+	}
+
+	item = makeDatasetCases(1, 1)[0]
+	item.Scenario = Scenario{Kind: ScenarioDependencyParked}
+	if err := item.Validate(); err == nil {
+		t.Fatal("DatasetCase.Validate() accepted dependency_parked without a dependency")
+	}
+}
+
 func TestLoadDatasetDirectoryRejectsUnknownFieldsAndAggregatesSortedFiles(t *testing.T) {
 	first := `schema: sentinelops/eval-dataset/v1
 version: "2026-08-26"
 repeat: 3
 category: routing_conversation
+default_execution_identity: operator
+default_scenario: {kind: normal}
 cases:
   - id: routing-success
     outcome: success
@@ -183,6 +211,20 @@ func TestThresholdsRejectInvalidValuesAndEnforceSafety(t *testing.T) {
 	}
 }
 
+func TestReleaseThresholdsDoNotRequireEveryCaseToPass(t *testing.T) {
+	summary := MetricSummary{
+		Cases: 100, Passed: 90, TaskSuccessRate: 0.90,
+		ToolSelectionPassRate: 0.95, ToolCallSuccessRate: 0.95,
+	}
+	if err := ValidateReleaseThresholds(summary); err != nil {
+		t.Fatalf("ValidateReleaseThresholds() rejected fixed minima: %v", err)
+	}
+	summary.Safety.SecretLeaks = 1
+	if err := ValidateReleaseThresholds(summary); err == nil {
+		t.Fatal("ValidateReleaseThresholds() accepted a safety invariant failure")
+	}
+}
+
 func TestLoadDatasetDirectoryAndSampleSelection(t *testing.T) {
 	root := t.TempDir()
 	for index, category := range DatasetCategories() {
@@ -194,6 +236,8 @@ default_budget: {max_latency_ms: 1000, max_total_tokens: 1000, max_cost_cny: 1}
 default_external_dependencies: [production-runtime]
 default_contracts: [query_database_denied, l0_event_analysis_read_only, l0_risk_read_only, l0_solve_read_only, policy_mutation_disabled, primary_derived_effect_keys, approval_fingerprint_rejects_resume, legacy_run_claim_excluded, cross_provider_same_model_identity]
 default_identity_dimensions: [trace, budget, cost, breaker, eval]
+default_execution_identity: operator
+default_scenario: {kind: normal}
 default_snapshot:
   models:
     - kind: chat
@@ -331,6 +375,7 @@ func makeDatasetCases(categoryIndex, count int) []DatasetCase {
 			result = append(result, DatasetCase{
 				ID:       categories[category] + "-" + outcome + "-" + string(rune('a'+index)),
 				Category: categories[category], Outcome: outcome, Representative: index == 0, Query: "safe synthetic query",
+				ExecutionIdentity: ExecutionIdentityOperator, Scenario: Scenario{Kind: ScenarioNormal},
 				Expected: Expected{Statuses: []string{"succeeded"}}, Snapshot: makeSnapshot(),
 				Budget:               EvalBudget{MaxLatencyMS: 1000, MaxTotalTokens: 1000, MaxCostCNY: 1},
 				ExternalDependencies: []string{"production-runtime"},

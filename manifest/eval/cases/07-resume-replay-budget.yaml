@@ -4,6 +4,8 @@ repeat: 3
 category: resume_replay_budget
 default_budget: {max_latency_ms: 120000, max_total_tokens: 16000, max_cost_cny: 1}
 default_external_dependencies: [production-api, workflow-mysql, checkpoint-store, provider-contract]
+default_execution_identity: operator
+default_scenario: {kind: normal}
 default_contracts: [approval_fingerprint_rejects_resume]
 default_snapshot:
   models:
@@ -33,6 +35,7 @@ cases:
   - id: recovery-01-resume-success
     outcome: success
     representative: true
+    scenario: {kind: checkpoint_resume}
     query: resume a durable run with the exact checkpoint fingerprint
     expected: {statuses: [succeeded], recovery_mode: resume}
   - id: recovery-02-fingerprint-rejection
@@ -41,6 +44,7 @@ cases:
     expected: {statuses: [failed]}
   - id: recovery-03-replay-success
     outcome: recovery
+    scenario: {kind: pre_checkpoint_replay}
     query: replay an earlier attempt without changing its frozen snapshot
     expected: {statuses: [succeeded], recovery_mode: replay}
   - id: recovery-04-budget-rejection
@@ -49,5 +53,6 @@ cases:
     expected: {statuses: [failed]}
   - id: recovery-05-parked-success
     outcome: recovery
+    scenario: {kind: dependency_parked, dependency: checkpoint}
     query: park safely when the checkpoint is missing or incompatible
     expected: {statuses: [parked], recovery_mode: parked}

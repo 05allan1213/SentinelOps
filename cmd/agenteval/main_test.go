@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	aieval "SentinelOps/internal/ai/eval"
 	"SentinelOps/internal/config"
 )
 
@@ -87,6 +88,45 @@ func TestRunCommandRequiresSecretReferenceAndBaseURL(t *testing.T) {
 	}
 }
 
+func TestRunCommandAcceptsSeparateIdentitySecretReferences(t *testing.T) {
+	opts, err := parseOptions([]string{
+		"run", "--cases", "cases.yaml", "--base-url", "http://127.0.0.1:1", "--dsn-ref", "env:EVAL_DSN",
+		"--operator-authorization-ref", "env:EVAL_OPERATOR_TOKEN", "--approver-authorization-ref", "env:EVAL_APPROVER_TOKEN",
+		"--scenario-processes", "processes.json",
+	})
+	if err != nil {
+		t.Fatalf("parse identity options: %v", err)
+	}
+	if opts.operatorAuthorizationRef == "" || opts.approverAuthorizationRef == "" || opts.scenarioProcessesPath != "processes.json" {
+		t.Fatalf("options = %+v", opts)
+	}
+	if _, err := parseOptions([]string{
+		"run", "--cases", "cases.yaml", "--base-url", "http://127.0.0.1:1", "--dsn-ref", "env:EVAL_DSN",
+		"--authorization-ref", "env:EVAL_TOKEN", "--operator-authorization-ref", "env:EVAL_OPERATOR_TOKEN",
+	}); err == nil {
+		t.Fatal("legacy and identity-specific authorization refs were accepted together")
+	}
+}
+
+func TestRunPrerequisitesRequireDecisionIdentityAndProcessManifest(t *testing.T) {
+	approval := []aieval.EvalCase{{
+		ExecutionIdentity: aieval.ExecutionIdentityOperator,
+		Scenario:          aieval.Scenario{Kind: aieval.ScenarioApprovalDecision, Decision: "approve", DecisionIdentity: aieval.ExecutionIdentityApprover},
+	}}
+	refs := map[aieval.ExecutionIdentity]config.SecretRef{aieval.ExecutionIdentityOperator: "env:EVAL_OPERATOR"}
+	if err := validateRequiredIdentityRefs(approval, refs); err == nil {
+		t.Fatal("Approval scenario accepted a missing approver SecretRef")
+	}
+	recovery := []aieval.EvalCase{{
+		ExecutionIdentity: aieval.ExecutionIdentityOperator,
+		Scenario:          aieval.Scenario{Kind: aieval.ScenarioCheckpointResume},
+	}}
+	err := withRuntimeAdapter(context.Background(), options{baseURL: "http://127.0.0.1:1"}, recovery, func(*aieval.HTTPRuntimeAdapter) error { return nil })
+	if err == nil {
+		t.Fatal("recovery scenario accepted a missing process manifest")
+	}
+}
+
 func TestAuthorizationReferenceIsClearedAfterUse(t *testing.T) {
 	config.SetSecretResolver(staticSecretResolver{value: []byte("temporary-token")})
 	t.Cleanup(func() { config.SetSecretResolver(config.NewEnvironmentResolver()) })
@@ -104,6 +144,29 @@ func TestAuthorizationReferenceIsClearedAfterUse(t *testing.T) {
 	}
 	if observed.Get("Authorization") != "" {
 		t.Fatalf("authorization header was retained after use")
+	}
+}
+
+func TestIdentityAuthorizationReferencesAreClearedAfterUse(t *testing.T) {
+	config.SetSecretResolver(staticSecretResolver{value: []byte("temporary-token")})
+	t.Cleanup(func() { config.SetSecretResolver(config.NewEnvironmentResolver()) })
+	refs := map[aieval.ExecutionIdentity]config.SecretRef{
+		aieval.ExecutionIdentityOperator: "env:EVAL_OPERATOR_TOKEN",
+		aieval.ExecutionIdentityApprover: "env:EVAL_APPROVER_TOKEN",
+	}
+	var observed map[aieval.ExecutionIdentity]http.Header
+	err := withIdentityAuthorization(context.Background(), refs, func(headers map[aieval.ExecutionIdentity]http.Header) error {
+		observed = headers
+		if len(headers) != 2 {
+			t.Fatalf("identity headers = %#v", headers)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("withIdentityAuthorization() error = %v", err)
+	}
+	if len(observed) != 0 {
+		t.Fatalf("identity authorization headers were retained: %#v", observed)
 	}
 }
 

@@ -77,19 +77,21 @@ type Dataset struct {
 
 // DatasetCase 是带可复现输入快照和外部预算标签的生产 Runtime Eval Case。
 type DatasetCase struct {
-	ID                   string           `json:"id" yaml:"id"`
-	Category             string           `json:"category" yaml:"-"`
-	Outcome              string           `json:"outcome" yaml:"outcome"`
-	Representative       bool             `json:"representative,omitempty" yaml:"representative,omitempty"`
-	Query                string           `json:"query" yaml:"query"`
-	Agent                string           `json:"agent,omitempty" yaml:"agent,omitempty"`
-	Expected             Expected         `json:"expected" yaml:"expected"`
-	Forbidden            Forbidden        `json:"forbidden,omitempty" yaml:"forbidden,omitempty"`
-	Budget               EvalBudget       `json:"budget" yaml:"budget"`
-	ExternalDependencies []string         `json:"external_dependencies" yaml:"external_dependencies"`
-	Contracts            []string         `json:"contracts" yaml:"contracts"`
-	IdentityDimensions   []string         `json:"identity_dimensions,omitempty" yaml:"identity_dimensions,omitempty"`
-	Snapshot             SnapshotIdentity `json:"snapshot" yaml:"snapshot"`
+	ID                   string            `json:"id" yaml:"id"`
+	Category             string            `json:"category" yaml:"-"`
+	Outcome              string            `json:"outcome" yaml:"outcome"`
+	Representative       bool              `json:"representative,omitempty" yaml:"representative,omitempty"`
+	Query                string            `json:"query" yaml:"query"`
+	Agent                string            `json:"agent,omitempty" yaml:"agent,omitempty"`
+	ExecutionIdentity    ExecutionIdentity `json:"execution_identity" yaml:"execution_identity"`
+	Scenario             Scenario          `json:"scenario" yaml:"scenario"`
+	Expected             Expected          `json:"expected" yaml:"expected"`
+	Forbidden            Forbidden         `json:"forbidden,omitempty" yaml:"forbidden,omitempty"`
+	Budget               EvalBudget        `json:"budget" yaml:"budget"`
+	ExternalDependencies []string          `json:"external_dependencies" yaml:"external_dependencies"`
+	Contracts            []string          `json:"contracts" yaml:"contracts"`
+	IdentityDimensions   []string          `json:"identity_dimensions,omitempty" yaml:"identity_dimensions,omitempty"`
+	Snapshot             SnapshotIdentity  `json:"snapshot" yaml:"snapshot"`
 }
 
 // EvalBudget 只标记单个真实模型 Case 的上界，不替代 durable Run Budget 真值。
@@ -211,16 +213,18 @@ type BaselineComparison struct {
 }
 
 type datasetDocument struct {
-	Schema              string           `json:"schema" yaml:"schema"`
-	Version             string           `json:"version" yaml:"version"`
-	Repeat              int              `json:"repeat" yaml:"repeat"`
-	Category            string           `json:"category" yaml:"category"`
-	DefaultBudget       EvalBudget       `json:"default_budget" yaml:"default_budget"`
-	DefaultDependencies []string         `json:"default_external_dependencies" yaml:"default_external_dependencies"`
-	DefaultContracts    []string         `json:"default_contracts" yaml:"default_contracts"`
-	DefaultDimensions   []string         `json:"default_identity_dimensions" yaml:"default_identity_dimensions"`
-	DefaultSnapshot     SnapshotIdentity `json:"default_snapshot" yaml:"default_snapshot"`
-	Cases               []DatasetCase    `json:"cases" yaml:"cases"`
+	Schema                   string            `json:"schema" yaml:"schema"`
+	Version                  string            `json:"version" yaml:"version"`
+	Repeat                   int               `json:"repeat" yaml:"repeat"`
+	Category                 string            `json:"category" yaml:"category"`
+	DefaultBudget            EvalBudget        `json:"default_budget" yaml:"default_budget"`
+	DefaultDependencies      []string          `json:"default_external_dependencies" yaml:"default_external_dependencies"`
+	DefaultContracts         []string          `json:"default_contracts" yaml:"default_contracts"`
+	DefaultDimensions        []string          `json:"default_identity_dimensions" yaml:"default_identity_dimensions"`
+	DefaultExecutionIdentity ExecutionIdentity `json:"default_execution_identity" yaml:"default_execution_identity"`
+	DefaultScenario          Scenario          `json:"default_scenario" yaml:"default_scenario"`
+	DefaultSnapshot          SnapshotIdentity  `json:"default_snapshot" yaml:"default_snapshot"`
+	Cases                    []DatasetCase     `json:"cases" yaml:"cases"`
 }
 
 // DatasetCategories 返回不可修改的八类名称，调用方不能添加第九类绕开覆盖门禁。
@@ -245,6 +249,31 @@ func DefaultThresholds() Thresholds {
 		MaxTaskSuccessRateRegression: 0.03, MaxP95LatencyRegression: 0.20,
 		MaxAverageTokensRegression: 0.15, MaxAverageCostRegression: 0.15,
 	}
+}
+
+// ValidateReleaseThresholds 校验不依赖 baseline 的固定发布门槛；回归比例仍由 compare 校验。
+func ValidateReleaseThresholds(summary MetricSummary) error {
+	if err := summary.Validate(); err != nil {
+		return err
+	}
+	thresholds := DefaultThresholds()
+	failures := make([]string, 0, 4)
+	if !summary.Safety.Passed() {
+		failures = append(failures, "safety invariants failed")
+	}
+	if summary.TaskSuccessRate < thresholds.MinTaskSuccessRate {
+		failures = append(failures, "task success rate is below minimum")
+	}
+	if summary.ToolSelectionPassRate < thresholds.MinToolSelectionPassRate {
+		failures = append(failures, "tool selection pass rate is below minimum")
+	}
+	if summary.ToolCallSuccessRate < thresholds.MinToolCallSuccessRate {
+		failures = append(failures, "tool call success rate is below minimum")
+	}
+	if len(failures) > 0 {
+		return fmt.Errorf("eval release thresholds failed: %s", strings.Join(failures, "; "))
+	}
+	return nil
 }
 
 // Validate 校验完整聚合 Dataset 的八类、数量、结果类型、核心契约和跨 Provider 身份覆盖。
@@ -335,6 +364,12 @@ func (c DatasetCase) Validate() error {
 	if c.Representative && c.Outcome != "success" {
 		return fmt.Errorf("representative eval dataset case must be a success case")
 	}
+	if !c.ExecutionIdentity.valid() {
+		return fmt.Errorf("eval dataset execution_identity is required and must be viewer, operator, approver or admin")
+	}
+	if c.Scenario.Kind == "" {
+		return fmt.Errorf("eval dataset scenario kind is required")
+	}
 	if err := c.toEvalCase().Validate(); err != nil {
 		return err
 	}
@@ -382,7 +417,8 @@ func (c DatasetCase) ToEvalCase() EvalCase {
 
 func (c DatasetCase) toEvalCase() EvalCase {
 	return EvalCase{
-		ID: c.ID, Query: c.Query, Agent: c.Agent, Expected: c.Expected, Forbidden: c.Forbidden, Budget: c.Budget,
+		ID: c.ID, Query: c.Query, Agent: c.Agent, ExecutionIdentity: c.ExecutionIdentity, Scenario: c.Scenario,
+		Expected: c.Expected, Forbidden: c.Forbidden, Budget: c.Budget,
 	}
 }
 
@@ -557,6 +593,12 @@ func LoadDataset(reader io.Reader) (Dataset, error) {
 		return Dataset{}, err
 	}
 	for index := range dataset.Cases {
+		if dataset.Cases[index].ExecutionIdentity == "" {
+			dataset.Cases[index].ExecutionIdentity = document.DefaultExecutionIdentity
+		}
+		if dataset.Cases[index].Scenario.Kind == "" {
+			dataset.Cases[index].Scenario = document.DefaultScenario
+		}
 		if dataset.Cases[index].Budget == (EvalBudget{}) {
 			dataset.Cases[index].Budget = document.DefaultBudget
 		}
