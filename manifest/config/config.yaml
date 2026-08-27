@@ -32,6 +32,8 @@ providers:
 # 来源：https://help.aliyun.com/zh/model-studio/model-pricing
 # 核对日期：2026-08-28；不计入免费额度。qwen3.7-plus 免费额度耗尽后按用户
 # 要求切换到 glm-5（列表价输入 4 元、缓存命中 0.8 元、输出 18 元）。
+# glm-5 流式响应在 enable_thinking=true 时经运行时流式管道会丢失 tool_calls，
+# 因此 default/reasoning 均固定 enable_thinking=false 以保证工具调用稳定。
 model_catalog:
   aliyun_bailian/glm-5:
     model_id: "glm-5"
@@ -75,7 +77,7 @@ routing:
       candidates:
         - model: "aliyun_bailian/glm-5"
           options:
-            enable_thinking: true
+            enable_thinking: false
   embedding:
     default:
       model: "aliyun_bailian/qwen3.7-text-embedding"

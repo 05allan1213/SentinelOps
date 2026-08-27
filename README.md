@@ -912,7 +912,7 @@ cp manifest/config/config.yaml manifest/config/config.local.yaml
 `aliyun_bailian` 是当前开发示例，并非代码固定值：
 
 - `routing.chat.default`：`glm-5`，`enable_thinking=false`
-- `routing.chat.reasoning`：同一模型，`enable_thinking=true`
+- `routing.chat.reasoning`：同一模型，`enable_thinking=false`
 - `routing.embedding.default`：`qwen3.7-text-embedding`，固定 2048 维
 - `routing.rerank.default`：`qwen3-rerank`
 
