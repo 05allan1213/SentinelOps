@@ -104,7 +104,7 @@ chmod 0755 "${TOOLS_DIR}/goose"
 docker rm -f "${GOOSE_CONTAINER}" >/dev/null
 GOOSE_CONTAINER=""
 export SENTINELOPS_GOOSE_BIN="${TOOLS_DIR}/goose"
-"${SENTINELOPS_GOOSE_BIN}" -version | rg -q 'v3\.27\.3' || {
+"${SENTINELOPS_GOOSE_BIN}" -version | grep -Eq 'v3\.27\.3' || {
   echo "FAIL: migrate image did not provide goose v3.27.3" >&2
   exit 1
 }

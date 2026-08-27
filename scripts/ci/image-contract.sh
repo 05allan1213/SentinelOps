@@ -103,7 +103,7 @@ PY
 check_from_version() {
   local file="$1" expected="$2"
   [[ -f "$file" ]] || { echo "FAIL: missing Dockerfile ${file}" >&2; exit 1; }
-  if ! rg -q "^FROM ${expected}([[:space:]]|-)" "$file"; then
+  if ! grep -Eq "^FROM ${expected}([[:space:]]|-)" "$file"; then
     echo "FAIL: ${file} does not declare ${expected}" >&2
     exit 1
   fi
@@ -114,7 +114,7 @@ check_from_version manifest/docker/Dockerfile.backend.e2e golang:1.27.0
 check_from_version manifest/docker/Dockerfile.migrate golang:1.27.0
 check_from_version manifest/docker/Dockerfile.frontend node:24.19.0
 
-if rg -n '^FROM (golang|node):' manifest/docker/Dockerfile.* | rg -v 'golang:1\.27\.0|node:24\.19\.0' >/dev/null; then
+if grep -En '^FROM (golang|node):' manifest/docker/Dockerfile.* | grep -Ev 'golang:1\.27\.0|node:24\.19\.0' >/dev/null; then
   echo "FAIL: an application builder uses an unlocked Go/Node version" >&2
   exit 1
 fi
@@ -144,7 +144,7 @@ for service in "${services[@]}"; do
 done
 
 base_refs_file="${OUTPUT_DIR}/base-refs.txt"
-rg --no-filename '^FROM ' manifest/docker/Dockerfile.* | awk '{print $2}' | sort -u >"${base_refs_file}"
+grep -hE '^FROM ' manifest/docker/Dockerfile.* | awk '{print $2}' | sort -u >"${base_refs_file}"
 while IFS= read -r base_ref; do
   [[ -n "${base_ref}" ]] || continue
   if ! docker image inspect "${base_ref}" >/dev/null 2>&1; then
