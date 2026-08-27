@@ -251,13 +251,3 @@ func nonNilCleanup(cleanup func() error) func() error {
 	}
 	return cleanup
 }
-
-func restoreAfterError(restore func() error, cause error) error {
-	if restore == nil {
-		return cause
-	}
-	if err := restore(); err != nil {
-		return fmt.Errorf("%v; restore local scenario process: %w", cause, err)
-	}
-	return cause
-}
