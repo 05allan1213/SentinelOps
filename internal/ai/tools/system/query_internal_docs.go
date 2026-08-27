@@ -1,9 +1,9 @@
 package system
 
 import (
+	"SentinelOps/internal/ai/evidence"
 	"SentinelOps/internal/ai/retrieval"
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -35,8 +35,14 @@ func NewQueryInternalDocsTool() tool.InvokableTool {
 				return "", err
 			}
 			g.Log().Infof(ctx, "[Tool] query_internal_docs 完成 | 返回=%d 条", len(resp))
-			respBytes, _ := json.Marshal(resp)
-			return string(respBytes), nil
+			// 复用既有 Evidence 契约：把召回结果格式化为带 canonical
+			// Evidence ID 的不受信任数据，并登记到当前 Run 的 Collector，
+			// 否则 Plan/Executor 路径的最终答案无法通过 Evidence 校验。
+			formatted, _, err := evidence.FormatDocumentsContext(ctx, resp)
+			if err != nil {
+				return "", fmt.Errorf("format internal docs evidence: %w", err)
+			}
+			return formatted, nil
 		})
 	if err != nil {
 		panic(err)
