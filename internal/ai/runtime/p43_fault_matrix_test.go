@@ -1,3 +1,5 @@
+//go:build p43_fault_matrix
+
 package runtime
 
 import (
