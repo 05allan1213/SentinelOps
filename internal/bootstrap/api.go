@@ -21,6 +21,7 @@ import (
 	tracectrl "SentinelOps/internal/controller/trace"
 	dao "SentinelOps/internal/dao/mysql"
 	chatsvc "SentinelOps/internal/service/chat"
+	knowledgesvc "SentinelOps/internal/service/knowledge"
 	"SentinelOps/utility/middleware"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -108,7 +109,10 @@ func newDurableAPIService(ctx context.Context, config *appconfig.Config, evaluat
 	})
 }
 
-func serveAPI(context.Context) error {
+func serveAPI(ctx context.Context) error {
+	// API 角色也必须启动知识索引队列：知识库上传通过 HTTP 进入本进程的
+	// 全局队列，若只由 Worker 角色启动，API 上传的文档会永远停在 pending。
+	knowledgesvc.StartWorkerPool(ctx)
 	g.Server().Run()
 	return nil
 }
