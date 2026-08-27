@@ -19,6 +19,7 @@ import (
 	"github.com/cloudwego/eino/adk/middlewares/dynamictool/toolsearch"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -30,7 +31,7 @@ const (
 	dynamicToolRevision = "mcp_tool_v1"
 	// configuredMaxIterations 是已批准 MCP Agent 的固定迭代上界；只读文档检索
 	// 不应进入无界工具循环，避免真实模型调用预算失控。
-	configuredMaxIterations = 5
+	configuredMaxIterations = 3
 )
 
 // ToolSource 在每次 mcp_agent 构建时读取当前 MCP Session 的官方 Tool。
@@ -66,6 +67,9 @@ type Config struct {
 	UseModelToolSearch bool
 	ProviderContract   *ProviderToolSearchContract
 	MaxIterations      int
+	// DisableToolSearch 对已批准的小型只读 MCP 目录直接暴露官方 Tool，
+	// 跳过 tool_search 元工具轮次；默认保持官方 Tool Search 语义。
+	DisableToolSearch bool
 }
 
 // BuildMCPAgent 构建独立的 Eino ChatModelAgent；远端 Tool 只在该 Agent 内动态可见。
@@ -116,13 +120,31 @@ func newAgentConfig(ctx context.Context, cfg Config) (*adk.ChatModelAgentConfig,
 	if err != nil {
 		return nil, err
 	}
+	handlers := []adk.ChatModelAgentMiddleware{&dynamicCatalogMiddleware{BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}, catalog: catalog}}
+	if cfg.DisableToolSearch {
+		if cfg.UseModelToolSearch {
+			return nil, errors.New("mcp agent cannot combine direct tools with model tool search")
+		}
+		agentConfig := &adk.ChatModelAgentConfig{
+			Name: AgentName, Description: agentDescription,
+			ToolsConfig:   adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: dynamicTools}},
+			MaxIterations: cfg.MaxIterations,
+			Handlers:      handlers,
+		}
+		if cfg.Model != nil {
+			agentConfig.Model = cfg.Model
+		} else if err := models.ConfigureChatModelAgent(agentConfig, cfg.Reliability); err != nil {
+			return nil, fmt.Errorf("configure MCP Agent reliability: %w", err)
+		}
+		return agentConfig, nil
+	}
 	searchMiddleware, err := toolsearch.New(ctx, &toolsearch.Config{
 		DynamicTools: dynamicTools, UseModelToolSearch: cfg.UseModelToolSearch,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("configure official MCP Tool Search: %w", err)
 	}
-	handlers, err := airuntime.RuntimeHandlerFirst(cfg.RuntimeHandler, &dynamicCatalogMiddleware{BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}, catalog: catalog}, searchMiddleware)
+	handlers, err = airuntime.RuntimeHandlerFirst(cfg.RuntimeHandler, handlers[0], searchMiddleware)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +322,7 @@ func buildConfiguredMCPAgent(ctx context.Context, handler *airuntime.RuntimeHand
 	inner, err := BuildMCPAgent(ctx, Config{
 		Reliability: reliability, RuntimeHandler: handler, Profile: defaultProfile,
 		Source: ownerToolSource{owners: owners, handler: handler}, CatalogHash: mustMCPConfigHash(mcpConfig),
-		MaxIterations: configuredMaxIterations,
+		MaxIterations: configuredMaxIterations, DisableToolSearch: true,
 	})
 	if err != nil {
 		for _, owner := range owners {
