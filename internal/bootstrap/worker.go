@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"SentinelOps/internal/ai/agent/plan_pipeline"
@@ -25,6 +26,8 @@ import (
 	"github.com/cloudwego/eino/adk"
 	"github.com/gogf/gf/v2/frame/g"
 )
+
+const workerIDEnv = "SENTINELOPS_WORKER_ID"
 
 func startWorker(ctx context.Context) error {
 	config, err := appconfig.Current()
@@ -60,9 +63,9 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 	if err != nil {
 		return nil, err
 	}
-	owner, err := os.Hostname()
-	if err != nil || owner == "" {
-		owner = "sentinelops-worker"
+	owner, err := durableWorkerOwner()
+	if err != nil {
+		return nil, err
 	}
 	var retention *airuntime.RetentionCoordinator
 	if config.Observability.Retention.Enabled {
@@ -113,6 +116,24 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 		Execute: executor.ExecuteClaimedRun, QueryEffectTargetState: queryEffectTargetState,
 		Retention: retention, RuntimeVersion: airuntime.CurrentRuntimeVersion(), Gates: evaluator,
 	})
+}
+
+// durableWorkerOwner 允许同一主机上的独立 Worker 使用可审计的 lease owner。
+func durableWorkerOwner() (string, error) {
+	if configured, ok := os.LookupEnv(workerIDEnv); ok {
+		if configured != strings.TrimSpace(configured) || configured == "" || len(configured) > 128 {
+			return "", fmt.Errorf("%s must contain 1 to 128 unpadded bytes", workerIDEnv)
+		}
+		return configured, nil
+	}
+	owner, err := os.Hostname()
+	if err != nil || strings.TrimSpace(owner) == "" {
+		owner = "sentinelops-worker"
+	}
+	if owner != strings.TrimSpace(owner) || len(owner) > 128 {
+		return "", fmt.Errorf("worker hostname must contain 1 to 128 unpadded bytes")
+	}
+	return owner, nil
 }
 
 func expectedFrozenGateCompatibilityWithEvaluator(
