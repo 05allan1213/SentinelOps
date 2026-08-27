@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"SentinelOps/internal/ai/evidence"
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
 	appconfig "SentinelOps/internal/config"
@@ -181,6 +182,10 @@ func TestTypedContextRebuildsAttemptFromDatabaseTruth(t *testing.T) {
 	identity, err := policy.IdentityFromContext(ctx)
 	if err != nil || identity.UserID != "user-1" {
 		t.Fatalf("policy identity lookup = %+v, %v", identity, err)
+	}
+	retrievalScope, ok := evidence.ScopeFromContext(ctx)
+	if !ok || retrievalScope.UserID != "user-1" || retrievalScope.AccessScope != "user:user-1" {
+		t.Fatalf("retrieval Scope was not propagated into durable Attempt: %+v, ok=%t", retrievalScope, ok)
 	}
 }
 

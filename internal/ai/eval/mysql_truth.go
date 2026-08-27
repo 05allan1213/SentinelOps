@@ -136,7 +136,13 @@ func projectEvents(truth *RunTruth, events []mysql.WorkflowEvent) {
 		case workflow.EventRunResumed:
 			truth.RecoveryMode = "resume"
 		case workflow.EventRunReplayed:
-			truth.RecoveryMode = "replay"
+			// The worker records a replay selection for the first execution so
+			// that the Runner can start from an empty checkpoint.  That is not a
+			// user-visible recovery.  Only later attempts represent replay
+			// recovery in Eval truth.
+			if eventAttempt(data) > 1 {
+				truth.RecoveryMode = "replay"
+			}
 		case workflow.EventRunParked:
 			if stringValue(data, "mode") == "parked" {
 				truth.RecoveryMode = "parked"
@@ -363,4 +369,20 @@ func stringSliceValue(values map[string]any, key string) []string {
 		}
 	}
 	return result
+}
+
+func eventAttempt(values map[string]any) int {
+	if values == nil {
+		return 0
+	}
+	switch value := values["attempt"].(type) {
+	case float64:
+		return int(value)
+	case json.Number:
+		attempt, err := value.Int64()
+		if err == nil {
+			return int(attempt)
+		}
+	}
+	return 0
 }

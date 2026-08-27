@@ -29,6 +29,33 @@ func TestMetricReuseProjectsWorkflowTruth(t *testing.T) {
 	}
 }
 
+func TestMetricReuseDoesNotTreatJSONNumbersAsSecrets(t *testing.T) {
+	for _, value := range []string{
+		`{"data":{"attempt":1,"lease_generation":1,"runtime_version":"app-v1"}}`,
+		`{"data":{"estimate":{"input_tokens":754},"kind":"model_call","metadata":{"input_price":12,"output_price":36}}}`,
+	} {
+		if looksLikeSecret(value) {
+			t.Fatalf("numeric JSON was treated as secret material: %s", value)
+		}
+	}
+}
+
+func TestMetricReuseIgnoresInitialReplaySelection(t *testing.T) {
+	truth := RunTruth{}
+	projectEvents(&truth, []mysql.WorkflowEvent{
+		{EventType: workflow.EventRunReplayed, Payload: `{"data":{"mode":"replay","attempt":1}}`},
+	})
+	if truth.RecoveryMode != "" {
+		t.Fatalf("initial replay selection was reported as recovery: %q", truth.RecoveryMode)
+	}
+	projectEvents(&truth, []mysql.WorkflowEvent{
+		{EventType: workflow.EventRunReplayed, Payload: `{"data":{"mode":"replay","attempt":2}}`},
+	})
+	if truth.RecoveryMode != "replay" {
+		t.Fatalf("later replay recovery was not reported: %q", truth.RecoveryMode)
+	}
+}
+
 func TestMetricReuseFailsClosedForInvalidEvidence(t *testing.T) {
 	truth := RunTruth{}
 	projectEvents(&truth, []mysql.WorkflowEvent{

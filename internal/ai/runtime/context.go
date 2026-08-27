@@ -211,6 +211,11 @@ func BuildAttemptContext(parent context.Context, claimed workflow.ClaimedRun, bu
 	leaseContext = budgetctx.WithProvider(leaseContext, newRAGBudgetProvider(attempt))
 	collector := evidence.NewCollector(run.ID)
 	collector.Scope = evidence.Scope{UserID: validatedIdentity.UserID, Role: string(validatedIdentity.Role), AccessScope: "user:" + validatedIdentity.UserID}
+	// Retrieval tools consume the same immutable identity Scope as the
+	// Evidence collector.  Keep both context entries on the durable Attempt;
+	// setting only the collector leaves query_internal_docs fail-closed with
+	// "missing retrieval scope".
+	leaseContext = evidence.WithScope(leaseContext, collector.Scope)
 	leaseContext = evidence.WithCollector(leaseContext, collector)
 	return context.WithValue(leaseContext, attemptContextKey{}, attempt), attempt, nil
 }

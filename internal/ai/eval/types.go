@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"SentinelOps/internal/ai/policy"
@@ -343,6 +344,30 @@ func structuredSecretChanged(original, redacted any) bool {
 			return false
 		}
 		return config.SecretRef(value).Validate() != nil
+	case float64:
+		switch masked := redacted.(type) {
+		case float64:
+			return masked != value
+		case json.Number:
+			parsed, err := strconv.ParseFloat(masked.String(), 64)
+			return err != nil || parsed != value
+		default:
+			return true
+		}
+	case json.Number:
+		original, err := strconv.ParseFloat(value.String(), 64)
+		if err != nil {
+			return true
+		}
+		switch masked := redacted.(type) {
+		case json.Number:
+			parsed, parseErr := strconv.ParseFloat(masked.String(), 64)
+			return parseErr != nil || parsed != original
+		case float64:
+			return masked != original
+		default:
+			return true
+		}
 	default:
 		return !reflect.DeepEqual(original, redacted)
 	}
