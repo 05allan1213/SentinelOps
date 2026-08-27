@@ -111,7 +111,7 @@ func TestLangfuseOfficialLifecycleMetadataUsageAndRedaction(t *testing.T) {
 	encoded := ""
 	for _, span := range spans {
 		for _, attribute := range span.Attributes {
-			encoded += string(attribute.Key) + "=" + attribute.Value.Emit() + "\n"
+			encoded += string(attribute.Key) + "=" + attribute.Value.String() + "\n"
 		}
 	}
 	for _, want := range []string{
@@ -131,7 +131,7 @@ func TestLangfuseOfficialLifecycleMetadataUsageAndRedaction(t *testing.T) {
 	}
 	for _, span := range spans {
 		for _, attribute := range span.Attributes {
-			if len(attribute.Value.Emit()) > 512 {
+			if len(attribute.Value.String()) > 512 {
 				t.Fatalf("attribute %s exceeded configured limit", attribute.Key)
 			}
 		}
