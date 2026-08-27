@@ -105,7 +105,10 @@ func normalizeApplicationDSN(rawDSN string) (string, error) {
 	if cfg.Params == nil {
 		cfg.Params = make(map[string]string)
 	}
-	// go-sql-driver/mysql 会在每条新连接上用 SET 应用 Params；数字 offset 不依赖 MySQL 时区表。
+	// go-sql-driver/mysql 会在每条新连接上用 SET 应用 Params；显式固定字符集，
+	// 避免连接继承服务端 latin1 后写入中文错误、Prompt 或工具结果时失败。
+	cfg.Params["charset"] = "utf8mb4"
+	// 数字 offset 不依赖 MySQL 时区表。
 	cfg.Params["time_zone"] = "'+00:00'"
 	return cfg.FormatDSN(), nil
 }
