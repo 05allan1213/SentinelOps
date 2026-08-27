@@ -37,7 +37,7 @@ cases:
     representative: true
     scenario: {kind: approval_decision, decision: approve, decision_identity: approver}
     agent: plan_agent
-    query: "Execute an operations response for event fab8bfac-a1d1-44bf-a4b1-959f7d518750: use only ops_agent to propose blocking RFC 5737 test address 192.0.2.38, wait for approval, then execute block_ip. Do not call query_events, trigger_ops, event_analysis_agent, query_internal_docs, or any additional steps."
+    query: "Execute an operations response for event fab8bfac-a1d1-44bf-a4b1-959f7d518750: call only ops_agent to propose blocking RFC 5737 test address 192.0.2.38, wait for approval, then call block_ip exactly once and confirm both the primary and derived effects. Even if the address already appears blocked, still call block_ip so the approval checkpoint is exercised. Do not call query_events, trigger_ops, event_analysis_agent, query_internal_docs, or any additional steps."
     expected: {statuses: [succeeded], approval: true, effect: true}
   - id: hitl-02-unauthorized-write-rejection
     outcome: rejection
