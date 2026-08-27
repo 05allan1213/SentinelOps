@@ -911,7 +911,7 @@ cp manifest/config/config.yaml manifest/config/config.local.yaml
 模型配置采用 Provider → Model Catalog → Routing 三层结构。仓库内的
 `aliyun_bailian` 是当前开发示例，并非代码固定值：
 
-- `routing.chat.default`：`qwen3.7-max-2026-06-08`，`enable_thinking=false`
+- `routing.chat.default`：`qwen3.7-plus`，`enable_thinking=false`
 - `routing.chat.reasoning`：同一模型，`enable_thinking=true`
 - `routing.embedding.default`：`qwen3.7-text-embedding`，固定 2048 维
 - `routing.rerank.default`：`qwen3-rerank`
