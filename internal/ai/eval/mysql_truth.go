@@ -108,7 +108,7 @@ func (r *MySQLTruthReader) waitForAttempt(
 				return truth, nil
 			}
 			if isEvalTerminal(run.Status) {
-				return AttemptTruth{}, fmt.Errorf("Run reached terminal status before %s was observed", stage)
+				return AttemptTruth{}, fmt.Errorf("run reached terminal status before %s was observed", stage)
 			}
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return AttemptTruth{}, err
@@ -154,14 +154,14 @@ func (r *MySQLTruthReader) failIfTerminal(ctx context.Context, runID, stage stri
 		return fmt.Errorf("read workflow Run while waiting for %s: %w", stage, result.Error)
 	}
 	if isEvalTerminal(run.Status) {
-		return fmt.Errorf("Run reached terminal status before %s was observed", stage)
+		return fmt.Errorf("run reached terminal status before %s was observed", stage)
 	}
 	return nil
 }
 
 func (r *MySQLTruthReader) validateScenarioProbe(runID string) error {
 	if r == nil || r.DB == nil {
-		return fmt.Errorf("MySQL truth reader is not initialized")
+		return fmt.Errorf("mysql truth reader is not initialized")
 	}
 	if strings.TrimSpace(runID) == "" {
 		return fmt.Errorf("run id is required")

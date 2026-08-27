@@ -352,7 +352,7 @@ func withRuntimeAdapter(
 		})
 	}
 	if casesRequireSeparateDecisionIdentity(cases) {
-		return fmt.Errorf("Approval scenarios require identity-specific authorization refs")
+		return fmt.Errorf("approval scenarios require identity-specific authorization refs")
 	}
 	return withAuthorization(ctx, opts.authorizationRef, func(header http.Header) error {
 		adapter, err := aieval.NewHTTPRuntimeAdapter(opts.baseURL, http.DefaultClient, header)

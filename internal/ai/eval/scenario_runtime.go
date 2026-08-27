@@ -110,10 +110,10 @@ func (a *HTTPRuntimeAdapter) decideApproval(ctx context.Context, scenario Scenar
 		return err
 	}
 	if ExecutionIdentity(role) != scenario.DecisionIdentity {
-		return fmt.Errorf("Approval decision token role does not match the configured eval identity")
+		return fmt.Errorf("approval decision token role does not match the configured eval identity")
 	}
 	if subject == observed.RequestedBy {
-		return fmt.Errorf("Approval proposer cannot decide its own proposal")
+		return fmt.Errorf("approval proposer cannot decide its own proposal")
 	}
 	current, err := a.getApproval(ctx, header, observed.ID)
 	if err != nil {
@@ -189,15 +189,15 @@ func (a *HTTPRuntimeAdapter) do(
 func bearerIdentity(header http.Header) (string, string, error) {
 	parts := strings.SplitN(strings.TrimSpace(header.Get("Authorization")), " ", 2)
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return "", "", fmt.Errorf("Approval decision identity requires a bearer token")
+		return "", "", fmt.Errorf("approval decision identity requires a bearer token")
 	}
 	tokenParts := strings.Split(parts[1], ".")
 	if len(tokenParts) != 3 {
-		return "", "", fmt.Errorf("Approval decision identity token is malformed")
+		return "", "", fmt.Errorf("approval decision identity token is malformed")
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(tokenParts[1])
 	if err != nil {
-		return "", "", fmt.Errorf("Approval decision identity token is malformed")
+		return "", "", fmt.Errorf("approval decision identity token is malformed")
 	}
 	defer clear(payload)
 	var claims struct {
@@ -205,7 +205,7 @@ func bearerIdentity(header http.Header) (string, string, error) {
 		Role   string `json:"role"`
 	}
 	if err := json.Unmarshal(payload, &claims); err != nil || strings.TrimSpace(claims.UserID) == "" || strings.TrimSpace(claims.Role) == "" {
-		return "", "", fmt.Errorf("Approval decision identity token claims are invalid")
+		return "", "", fmt.Errorf("approval decision identity token claims are invalid")
 	}
 	return claims.UserID, claims.Role, nil
 }
