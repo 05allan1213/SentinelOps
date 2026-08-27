@@ -27,7 +27,7 @@ const (
 	defaultSkillDir  = "manifest/skills"
 	// configuredMaxIterations 是已批准 Skill Agent 的固定迭代上界；只读 SOP 流程
 	// 不应进入无界工具循环，避免真实模型调用预算失控。
-	configuredMaxIterations = 5
+	configuredMaxIterations = 6
 )
 
 // DefaultToolNames 是 Skill Agent 可调用的最小 L0 Tool 集。
