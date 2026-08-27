@@ -911,7 +911,7 @@ cp manifest/config/config.yaml manifest/config/config.local.yaml
 模型配置采用 Provider → Model Catalog → Routing 三层结构。仓库内的
 `aliyun_bailian` 是当前开发示例，并非代码固定值：
 
-- `routing.chat.default`：`qwen3-max`，`enable_thinking=false`
+- `routing.chat.default`：`qwen3.5-plus`，`enable_thinking=false`
 - `routing.chat.reasoning`：同一模型，`enable_thinking=false`
 - `routing.embedding.default`：`qwen3.7-text-embedding`，固定 2048 维
 - `routing.rerank.default`：`qwen3-rerank`
@@ -921,8 +921,8 @@ cp manifest/config/config.yaml manifest/config/config.local.yaml
 `https://dashscope.aliyuncs.com/compatible-api/v1`。
 
 价格按中国内地北京地域、人民币付费价估算，忽略免费额度，计价单位均为每百万 Token：Chat
-输入 ¥2.5、缓存输入 ¥0.5、输出 ¥10；Embedding 输入 ¥0.5；Rerank 输入 ¥0.5。
-来源为[阿里云百炼模型价格](https://help.aliyun.com/zh/model-studio/model-pricing)，核对日期：2026-08-28。
+输入 ¥0.8、输出 ¥4.8（未公布自动缓存命中折扣，按输入价保守计）；Embedding 输入 ¥0.5；
+Rerank 输入 ¥0.5。来源为[阿里云百炼模型价格](https://help.aliyun.com/zh/model-studio/model-pricing)，核对日期：2026-08-28。
 缓存 Token 已包含在输入 Token 中，推理 Token 已包含在输出 Token 中，成本不会重复累计。
 
 在线测试默认跳过。填写本地 Key 后显式运行：
