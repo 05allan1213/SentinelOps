@@ -95,7 +95,7 @@ func BuildReactAgentGraph(ctx context.Context, cfg BuildConfig) (compose.Runnabl
 			formatted, _, err := evidence.FormatDocumentsContext(ctx, docs)
 			return formatted, err
 		},
-	), compose.WithOutputKey("documents"), compose.WithNodeName(EvidencePrompt))
+	), compose.WithInputKey("documents"), compose.WithOutputKey("documents"), compose.WithNodeName(EvidencePrompt))
 
 	_ = graph.AddEdge(compose.START, RetrievalNode)
 	_ = graph.AddEdge(compose.START, InputToChat)
