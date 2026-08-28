@@ -893,6 +893,11 @@ Controller 接收请求
 docker compose -f manifest/docker/docker-compose.dev.yml up -d
 ```
 
+该开发 Compose 会同时启动默认 MCP 服务 Context7（`127.0.0.1:3333/mcp`）。
+镜像固定使用 `@upstash/context7-mcp@4.0.3`；如需 Context7 云端配额，可在启动前通过
+`CONTEXT7_API_KEY` 环境变量注入，不要把 Key 写入仓库。`config.local.yaml` 已将
+`context7` 配为默认 MCP Server，并限制为 `resolve-library-id` 与 `query-docs` 两个只读工具。
+
 ### 2. 配置
 
 复制并编辑配置文件：

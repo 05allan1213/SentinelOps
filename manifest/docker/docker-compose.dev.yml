@@ -6,6 +6,20 @@ name: sentinelops-dev
 # 访问：http://localhost:5173
 
 services:
+  # Context7 is the default MCP provider for local integration tests.  The
+  # backend remains a host process, so config.local.yaml points at
+  # http://127.0.0.1:3333/mcp (the published port below).
+  context7:
+    container_name: dev-context7
+    build:
+      context: ../..
+      dockerfile: manifest/docker/Dockerfile.context7
+    environment:
+      CONTEXT7_API_KEY: ${CONTEXT7_API_KEY:-}
+    ports:
+      - "3333:3333"
+    restart: unless-stopped
+
   etcd:
     container_name: dev-milvus-etcd
     image: quay.io/coreos/etcd:v3.5.18

@@ -1,0 +1,11 @@
+FROM node:22-alpine
+
+WORKDIR /opt/context7
+
+# Pin the MCP implementation so local and Compose runs expose the same tool
+# catalogue and protocol behavior.
+RUN npm install --global @upstash/context7-mcp@4.0.3
+
+EXPOSE 3333
+
+CMD ["context7-mcp", "--transport", "http", "--port", "3333"]

@@ -124,7 +124,17 @@ secret_refs:
 
 mcp:
   enabled: false
-  servers: {}
+  # Context7 is the default MCP server. The production template remains
+  # fail-closed; an environment-specific override can enable this entry.
+  servers:
+    context7:
+      enabled: false
+      required: true
+      transport: streamable-http
+      url: "http://context7:3333/mcp"
+      allowed_tools: ["resolve-library-id", "query-docs"]
+      allowed_hosts: ["context7"]
+      allowed_ports: [3333]
 
 skill:
   enabled: false
