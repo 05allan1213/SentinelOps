@@ -5,9 +5,8 @@ name: sentinelops
 # 访问：http://localhost
 
 services:
-  # Context7 is the default MCP provider.  The tracked production config keeps
-  # the MCP gate fail-closed; enabling the local/production override points to
-  # http://context7:3333/mcp on this Compose network.
+  # Context7 is the default MCP provider for local development. Production
+  # config uses the official HTTPS endpoint and injects CONTEXT7_API_KEY.
   context7:
     container_name: context7
     build:
@@ -143,6 +142,9 @@ services:
       SENTINELOPS_ADMIN_PASSWORD: ${SENTINELOPS_ADMIN_PASSWORD:-}
       SENTINELOPS_MODEL_API_KEY: ${SENTINELOPS_MODEL_API_KEY:-}
       SENTINELOPS_SMTP_PASSWORD: ${SENTINELOPS_SMTP_PASSWORD:-}
+      SENTINELOPS_LANGFUSE_PUBLIC_KEY: ${SENTINELOPS_LANGFUSE_PUBLIC_KEY:-}
+      SENTINELOPS_LANGFUSE_SECRET_KEY: ${SENTINELOPS_LANGFUSE_SECRET_KEY:-}
+      CONTEXT7_API_KEY: ${CONTEXT7_API_KEY:-}
     depends_on:
       mysql:
         condition: service_healthy
@@ -169,6 +171,9 @@ services:
       SENTINELOPS_MYSQL_DSN: ${SENTINELOPS_MYSQL_DSN:-}
       SENTINELOPS_MODEL_API_KEY: ${SENTINELOPS_MODEL_API_KEY:-}
       SENTINELOPS_SMTP_PASSWORD: ${SENTINELOPS_SMTP_PASSWORD:-}
+      SENTINELOPS_LANGFUSE_PUBLIC_KEY: ${SENTINELOPS_LANGFUSE_PUBLIC_KEY:-}
+      SENTINELOPS_LANGFUSE_SECRET_KEY: ${SENTINELOPS_LANGFUSE_SECRET_KEY:-}
+      CONTEXT7_API_KEY: ${CONTEXT7_API_KEY:-}
     depends_on:
       mysql:
         condition: service_healthy

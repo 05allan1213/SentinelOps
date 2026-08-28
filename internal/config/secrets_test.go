@@ -175,8 +175,8 @@ func TestConfigLocalIsCompleteIgnoredReplacement(t *testing.T) {
 		if filepath.Base(selectedActual) != localFileName {
 			t.Fatalf("selected actual config = %s, want ignored local replacement", selectedActual)
 		}
-		if actualConfig.AgentRuntime.Enabled {
-			t.Fatal("durable Agent gate must remain disabled in local replacement")
+		if !actualConfig.AgentRuntime.Enabled {
+			t.Fatal("durable Agent gate must be enabled in local replacement")
 		}
 		baseData, readErr := os.ReadFile(filepath.Join(repoRoot, "manifest", "config", baseFileName))
 		if readErr != nil {

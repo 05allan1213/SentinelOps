@@ -910,6 +910,10 @@ cp manifest/config/config.yaml manifest/config/config.local.yaml
 `env:` / `file:` Secret 引用；解析后的值不得写入配置、日志或持久化对象。该文件和
 `manifest/config/.secrets/` 均被 Git 忽略，禁止打印、回传或提交 Secret。
 
+仓库默认配置已开启 Agent Runtime、MCP（Context7）、Skill、Langfuse 追踪及 L1/L2
+功能 Gate；启动时仍需提供对应的模型、数据库、JWT、Langfuse 等 Secret，缺失时会按配置
+校验报出明确错误。
+
 开发环境默认运行 `all`；也可显式运行 `go run . api` 或 `go run . worker`。生产配置只允许
 `api` / `worker`，并要求数据库、JWT、初始管理员和当前 Provider 的环境 Secret 非空且不是默认值。
 

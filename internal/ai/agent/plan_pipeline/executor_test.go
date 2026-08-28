@@ -176,8 +176,8 @@ func TestPlanTopology(t *testing.T) {
 		if readErr != nil {
 			t.Fatalf("读取 durable Gate 配置 %s: %v", path, readErr)
 		}
-		if !strings.Contains(string(config), "agent_runtime:\n  enabled: false") {
-			t.Errorf("%s 未保持 agent_runtime.enabled=false", path)
+		if !strings.Contains(string(config), "agent_runtime:\n  enabled: true") {
+			t.Errorf("%s 未保持 agent_runtime.enabled=true", path)
 		}
 	}
 }

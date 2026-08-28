@@ -123,35 +123,36 @@ secret_refs:
   effect: ""
 
 mcp:
-  enabled: false
-  # Context7 is the default MCP server. The production template remains
-  # fail-closed; an environment-specific override can enable this entry.
+  enabled: true
+  # Context7 is the default MCP server for documentation lookups.
   servers:
     context7:
-      enabled: false
+      enabled: true
       required: true
       transport: streamable-http
-      url: "http://context7:3333/mcp"
+      url: "https://mcp.context7.com/mcp"
+      header_name: "X-Context7-API-Key"
+      header_ref: "env:CONTEXT7_API_KEY"
       allowed_tools: ["resolve-library-id", "query-docs"]
-      allowed_hosts: ["context7"]
-      allowed_ports: [3333]
+      allowed_hosts: ["mcp.context7.com"]
+      allowed_ports: [443]
 
 skill:
-  enabled: false
+  enabled: true
   base_dir: "/app/manifest/skills"
   max_bytes: 65536
 
 agent_runtime:
-  enabled: false
-  accept_new_runs: false
-  shadow_mode: false
-  l1_writes: false
-  l2_writes: false
-  admin_query_database_debug: false
+  enabled: true
+  accept_new_runs: true
+  shadow_mode: true
+  l1_writes: true
+  l2_writes: true
+  admin_query_database_debug: true
 
 observability:
   langfuse:
-    enabled: false
+    enabled: true
     host: "https://cloud.langfuse.com"
     public_key_ref: "env:SENTINELOPS_LANGFUSE_PUBLIC_KEY"
     secret_key_ref: "env:SENTINELOPS_LANGFUSE_SECRET_KEY"
