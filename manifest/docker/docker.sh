@@ -4,6 +4,9 @@ set -e
 
 cd "$(dirname "$0")"
 
+# Docker 构建上下文不包含 .git，显式把当前提交作为不可变运行时身份传入。
+export SENTINELOPS_RUNTIME_VERSION="${SENTINELOPS_RUNTIME_VERSION:-$(git -C ../.. rev-parse HEAD)}"
+
 API_CONTAINER="sentinelops-api"
 API_SERVICE="api"
 WORKER_SERVICE="worker"
