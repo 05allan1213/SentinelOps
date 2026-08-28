@@ -861,7 +861,7 @@ Controller 接收请求
 |------|------|------|
 | 后端框架 | GoFrame v2.7.1 | HTTP 服务器、配置管理、日志 |
 | AI 编排 | Cloudwego Eino | 多 Agent 管道编排、ReAct、Graph、Plan-Execute-Replan |
-| 对话模型 | Qwen3.7 Max | 主要推理与分析（OpenAI 兼容接口） |
+| 对话模型 | Qwen3.6 Flash | 主要推理与分析（阿里云百炼 OpenAI 兼容接口） |
 | 嵌入模型 | DashScope qwen3.7-text-embedding | 向量嵌入 |
 | Rerank 模型 | DashScope qwen3-rerank | 检索结果重排序精排 |
 | 联网搜索 | Tavily Search API | 专为 AI Agent 设计的搜索接口 |
@@ -911,7 +911,7 @@ cp manifest/config/config.yaml manifest/config/config.local.yaml
 模型配置采用 Provider → Model Catalog → Routing 三层结构。仓库内的
 `aliyun_bailian` 是当前开发示例，并非代码固定值：
 
-- `routing.chat.default`：`qwen3.5-plus`，`enable_thinking=false`
+- `routing.chat.default`：`qwen3.6-flash`，`enable_thinking=false`
 - `routing.chat.reasoning`：同一模型，`enable_thinking=false`
 - `routing.embedding.default`：`qwen3.7-text-embedding`，固定 2048 维
 - `routing.rerank.default`：`qwen3-rerank`
@@ -921,7 +921,8 @@ cp manifest/config/config.yaml manifest/config/config.local.yaml
 `https://dashscope.aliyuncs.com/compatible-api/v1`。
 
 价格按中国内地北京地域、人民币付费价估算，忽略免费额度，计价单位均为每百万 Token：Chat
-输入 ¥0.8、输出 ¥4.8（未公布自动缓存命中折扣，按输入价保守计）；Embedding 输入 ¥0.5；
+输入 ¥1.2、输出 ¥7.2（北京输入 <=256K 档；256K<Token<=1M 输入 ¥4.8、输出 ¥28.8；
+上下文缓存享有折扣但未单独公布命中价，按输入价保守计）；Embedding 输入 ¥0.5；
 Rerank 输入 ¥0.5。来源为[阿里云百炼模型价格](https://help.aliyun.com/zh/model-studio/model-pricing)，核对日期：2026-08-28。
 缓存 Token 已包含在输入 Token 中，推理 Token 已包含在输出 Token 中，成本不会重复累计。
 
