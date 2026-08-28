@@ -1,16 +1,40 @@
 # SentinelOps
 
-安全事件智能研判与响应平台，使用 Go、Cloudwego Eino、RAG 和可持久化工作流，把“告警接入 → 检索与分析 → 人工审批/自动处置 → 可观测与复盘”组织成一条可追踪的工程链路。
+[![CI](https://github.com/05allan1213/SentinelOps/actions/workflows/pr.yml/badge.svg)](https://github.com/05allan1213/SentinelOps/actions/workflows/pr.yml) [![Go 1.27.0](https://img.shields.io/badge/Go-1.27.0-00ADD8?logo=go)](https://go.dev/) [![Eino v0.9.15](https://img.shields.io/badge/Eino-v0.9.15-6f42c1)](https://github.com/cloudwego/eino)
 
-SentinelOps 当前仓库包含：
+面向安全运营的 Agent Runtime 与响应平台：基于 Cloudwego Eino，把 Agent 的规划、执行、暂停审批、恢复重放和副作用落账组织成一条可追踪、可校验的工程链路。
 
-- GoFrame HTTP API、React/TypeScript Web Console，以及可拆分的 API/Worker 启动角色；
-- 标准意图路由与官方 Eino Plan/Execute/Replan 两种 Agent 执行模式；
-- Milvus 混合检索、Redis 语义缓存、文档知识库和异步索引；
-- RSS/GitHub 订阅抓取、Webhook/CEF/LEEF/API Push 告警归一化；
-- MySQL 持久化的 durable Run、checkpoint、HITL approval、effect ledger 和 SSE 断线续传；
-- JWT/RBAC、资源 Scope、SecretRef、Gate、审计 Trace、RAG Eval、Skill 与 MCP 集成。
+> 不只回答“模型说了什么”，还记录“运行到哪一步、谁批准了什么、哪些副作用已经发生”。
 
+**项目定位**：把 Eino Agent 放进一个可恢复、可审计、可治理的 Runtime。核心实现集中在 Eino Plan–Execute–Replan、MySQL Durable Runtime、RBAC + HITL + Effect Ledger，以及 Evidence RAG + MCP/Skill。
+
+| Durable Agent Runtime | HITL + Effect Ledger | Evidence RAG + MCP + Skill |
+| --- | --- | --- |
+| Eino Plan–Execute–Replan、专业 AgentTool、MySQL Run/Checkpoint，以及 generation-fenced lease。 | RuntimeHandler 统一接入 RBAC、Policy、Gate、Approval 生命周期和幂等 Effect。 | Scope-aware 混合检索输出 Evidence；MCP 只读目录与 Skill Pipeline 复用 Runtime 的 Policy、Budget、Trace。 |
+
+~~~mermaid
+flowchart LR
+  UI["Web Console"] --> API["GoFrame API"]
+  API --> ROUTER["Intent Router + Agent Registry"]
+  ROUTER --> SUBAGENTS["Chat / Event / Report / Risk / Solve / Intelligence / Ops"]
+  SUBAGENTS --> RAG["Evidence RAG"]
+  API --> RUN["Durable Run API"]
+  RUN --> WORKER["Worker"]
+  WORKER --> RT["RuntimeHandler: Gate / Policy / Budget / Trace"]
+  RT --> PLAN["Eino Plan → Execute → Replan"]
+  PLAN --> TOOLS["Specialist AgentTool: MCP / Skill"]
+  PLAN --> RAG
+  RT --> HITL["HITL Approval"]
+  RT --> EFFECT["Effect Ledger"]
+  RT --> STORE["GORMStore: Run / Event / Checkpoint"]
+  STORE --> MYSQL[("MySQL")]
+  RAG --> MILVUS[("Milvus")]
+  RAG --> REDIS[("Redis semantic cache")]
+~~~
+
+上图是首屏摘要；下面的 C4 Context/Container、核心流程和能力边界会展开部署边界、数据流以及实际代码约束。
+
+---
 
 ## 目录
 
@@ -477,25 +501,17 @@ UI 层覆盖登录与权限、事件态势、订阅管理、聊天/SSE、知识�
 
 以下命令均在仓库根目录 `/home/monody/project/SentinelOps` 执行。
 
-### 1. 启动开发依赖
+### 1. 创建本地配置并注入 Secret
 
-~~~bash
-docker compose -f manifest/docker/docker-compose.dev.yml up -d --build
-~~~
-
-该 Compose 只启动基础设施和 migrate；Context7 默认暴露在 `127.0.0.1:3333/mcp`，Milvus 暴露 `19530`，Redis 暴露 `16379`，MySQL 暴露 `3307`，Attu 暴露 `8000`。
-
-全新数据库会执行版本化迁移并写入学习环境的 `admin` 与 `user1` 默认账号（密码均为 `123456`）。它们只用于本地学习，部署前请替换或清理。
-
-### 2. 准备配置与 Secret
-
-`config.local.yaml` 已被 Git 忽略，并且会完整覆盖 `config.yaml`；没有本地文件时才回退到基础配置。可按以下方式创建本地副本：
+启动本地 API/Worker 和前端前，先把基础配置复制为本地覆盖文件。`config.local.yaml` 已被 Git 忽略，加载器会优先读取它，并将其作为 `config.yaml` 的完整替换，而不是逐字段合并：
 
 ~~~bash
 cp manifest/config/config.yaml manifest/config/config.local.yaml
 ~~~
 
-然后在环境中提供配置引用所需的值。示例变量名如下（值请使用你自己的 Secret，不要提交）：
+后端从该文件读取 Provider、数据库和认证配置；前端本地开发通过 Vite 的 `/api` 代理访问后端，因此前后端启动前都先完成这一步。默认模型 API Key 由 `providers.*.secret_ref: env:SENTINELOPS_MODEL_API_KEY` 注入，不要把明文 `api_key` 写进 YAML。
+
+如果本机已经有 `config.local.yaml`，不要重复覆盖其中的 Secret，直接编辑现有文件。然后在环境中提供配置引用所需的值。示例变量名如下（值请使用你自己的 Secret，不要提交）：
 
 ~~~bash
 export SENTINELOPS_MYSQL_DSN='root:change-me@tcp(127.0.0.1:3307)/sentinelops?parseTime=true&multiStatements=true'
@@ -513,6 +529,16 @@ export SENTINELOPS_ADMIN_PASSWORD='replace-with-admin-password'
 ~~~bash
 export SENTINELOPS_CONFIG_DIR=/path/to/config-dir
 ~~~
+
+### 2. 启动开发依赖
+
+~~~bash
+docker compose -f manifest/docker/docker-compose.dev.yml up -d --build
+~~~
+
+该 Compose 只启动基础设施和 migrate；Context7 默认暴露在 `127.0.0.1:3333/mcp`，Milvus 暴露 `19530`，Redis 暴露 `16379`，MySQL 暴露 `3307`，Attu 暴露 `8000`。
+
+全新数据库会执行版本化迁移并写入学习环境的 `admin` 与 `user1` 默认账号（密码均为 `123456`）。它们只用于本地学习，部署前请替换或清理。
 
 ### 3. 启动后端
 
