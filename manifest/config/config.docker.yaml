@@ -130,12 +130,13 @@ mcp:
       enabled: true
       required: true
       transport: streamable-http
-      url: "https://mcp.context7.com/mcp"
-      header_name: "X-Context7-API-Key"
-      header_ref: "env:CONTEXT7_API_KEY"
+      url: "http://context7:3333/mcp"
+      header_name: ""
+      header_ref: ""
       allowed_tools: ["resolve-library-id", "query-docs"]
-      allowed_hosts: ["mcp.context7.com"]
-      allowed_ports: [443]
+      allowed_hosts: ["context7"]
+      allowed_ports: [3333]
+      allow_insecure_tls_for_test: true
 
 skill:
   enabled: true

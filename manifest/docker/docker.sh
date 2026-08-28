@@ -28,8 +28,11 @@ echo "==> 构建最新前端代码..."
 echo "==> 启动基础设施容器..."
 docker compose up -d etcd minio standalone attu redis mysql
 
-echo "==> 构建最新 api/worker/frontend 镜像..."
-docker compose build api worker frontend
+echo "==> 构建迁移、api/worker/frontend 镜像..."
+docker compose build migrate api worker frontend
+
+echo "==> 执行数据库迁移（包含默认 admin/user1 用户）..."
+docker compose --profile migration run --rm migrate
 
 echo "==> 更新 api/worker/frontend 容器..."
 docker compose up -d api worker frontend

@@ -109,7 +109,7 @@ services:
     ports:
       - "3307:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=sentinel123
+      - MYSQL_ROOT_PASSWORD=123456
       - MYSQL_DATABASE=sentinelops
     volumes:
       - dev_mysql_data:/var/lib/mysql
@@ -118,6 +118,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+
+  # 新 clone 启动开发依赖时自动执行版本化迁移，并写入默认登录用户。
+  migrate:
+    build:
+      context: ../..
+      dockerfile: manifest/docker/Dockerfile.migrate
+    environment:
+      GOOSE_DRIVER: mysql
+      GOOSE_DBSTRING: "root:123456@tcp(mysql:3306)/sentinelops?parseTime=true&multiStatements=true"
+    command: ["-dir", "/migrations", "up"]
+    depends_on:
+      mysql:
+        condition: service_healthy
 
 networks:
   default:

@@ -12,7 +12,13 @@ ENV TZ=Asia/Shanghai
 RUN apk add --no-cache docker-cli
 WORKDIR /app
 COPY --from=builder /app/server ./server
-COPY manifest/config/config.docker.yaml ./manifest/config/config.yaml
+# Docker 镜像显式使用 config.local.yaml 作为完整配置覆盖；Secret 仍通过环境变量解析。
+COPY manifest/config/config.docker.yaml ./manifest/config/config.local.yaml
+RUN sed -i \
+    -e 's#https://mcp.context7.com/mcp#http://context7:3333/mcp#' \
+    -e 's#allowed_hosts: \["mcp.context7.com"\]#allowed_hosts: ["context7"]#' \
+    -e 's#allowed_ports: \[443\]#allowed_ports: [3333]#' \
+    ./manifest/config/config.local.yaml
 RUN mkdir -p ./docs ./manifest/upload/knowledge && \
     mkdir -p ./nginx_blocklist && \
     echo "# AI 运维动态 IP 黑名单（由 block_ip 工具自动写入）" > ./nginx_blocklist/blocked_ips.conf

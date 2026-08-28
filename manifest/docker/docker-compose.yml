@@ -39,8 +39,8 @@ services:
     container_name: milvus-minio
     image: minio/minio:RELEASE.2023-03-20T20-16-18Z
     environment:
-      MINIO_ACCESS_KEY: ${SENTINELOPS_MINIO_ACCESS_KEY:-}
-      MINIO_SECRET_KEY: ${SENTINELOPS_MINIO_SECRET_KEY:-}
+      MINIO_ACCESS_KEY: ${SENTINELOPS_MINIO_ACCESS_KEY:-123456}
+      MINIO_SECRET_KEY: ${SENTINELOPS_MINIO_SECRET_KEY:-12345678}
     ports:
       - "9001:9001"
       - "9000:9000"
@@ -107,7 +107,7 @@ services:
     ports:
       - "3307:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: ${SENTINELOPS_MYSQL_ROOT_PASSWORD:-}
+      MYSQL_ROOT_PASSWORD: ${SENTINELOPS_MYSQL_ROOT_PASSWORD:-123456}
       MYSQL_DATABASE: sentinelops
     volumes:
       - mysql_data:/var/lib/mysql
@@ -124,7 +124,7 @@ services:
       dockerfile: manifest/docker/Dockerfile.migrate
     environment:
       GOOSE_DRIVER: mysql
-      GOOSE_DBSTRING: ${SENTINELOPS_MYSQL_DSN:-}
+      GOOSE_DBSTRING: "${SENTINELOPS_MYSQL_DSN:-root:123456@tcp(mysql:3306)/sentinelops?parseTime=true&multiStatements=true}"
     command: ["-dir", "/migrations", "up"]
     depends_on:
       mysql:
@@ -137,9 +137,9 @@ services:
       dockerfile: manifest/docker/Dockerfile.backend
     command: ["./server", "api"]
     environment:
-      SENTINELOPS_MYSQL_DSN: ${SENTINELOPS_MYSQL_DSN:-}
-      SENTINELOPS_JWT_SECRET: ${SENTINELOPS_JWT_SECRET:-}
-      SENTINELOPS_ADMIN_PASSWORD: ${SENTINELOPS_ADMIN_PASSWORD:-}
+      SENTINELOPS_MYSQL_DSN: "${SENTINELOPS_MYSQL_DSN:-root:123456@tcp(mysql:3306)/sentinelops?parseTime=true&multiStatements=true}"
+      SENTINELOPS_JWT_SECRET: ${SENTINELOPS_JWT_SECRET:-123456}
+      SENTINELOPS_ADMIN_PASSWORD: ${SENTINELOPS_ADMIN_PASSWORD:-123456}
       SENTINELOPS_MODEL_API_KEY: ${SENTINELOPS_MODEL_API_KEY:-}
       SENTINELOPS_SMTP_PASSWORD: ${SENTINELOPS_SMTP_PASSWORD:-}
       SENTINELOPS_LANGFUSE_PUBLIC_KEY: ${SENTINELOPS_LANGFUSE_PUBLIC_KEY:-}
@@ -169,7 +169,8 @@ services:
       dockerfile: manifest/docker/Dockerfile.backend
     command: ["./server", "worker"]
     environment:
-      SENTINELOPS_MYSQL_DSN: ${SENTINELOPS_MYSQL_DSN:-}
+      SENTINELOPS_MYSQL_DSN: "${SENTINELOPS_MYSQL_DSN:-root:123456@tcp(mysql:3306)/sentinelops?parseTime=true&multiStatements=true}"
+      SENTINELOPS_JWT_SECRET: ${SENTINELOPS_JWT_SECRET:-123456}
       SENTINELOPS_MODEL_API_KEY: ${SENTINELOPS_MODEL_API_KEY:-}
       SENTINELOPS_SMTP_PASSWORD: ${SENTINELOPS_SMTP_PASSWORD:-}
       SENTINELOPS_LANGFUSE_PUBLIC_KEY: ${SENTINELOPS_LANGFUSE_PUBLIC_KEY:-}

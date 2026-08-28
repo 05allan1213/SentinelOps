@@ -890,10 +890,12 @@ Controller 接收请求
 ### 1. 启动依赖服务
 
 ```bash
-docker compose -f manifest/docker/docker-compose.dev.yml up -d
+docker compose -f manifest/docker/docker-compose.dev.yml up -d --build
 ```
 
-该开发 Compose 会同时启动默认 MCP 服务 Context7（`127.0.0.1:3333/mcp`）。
+该开发 Compose 会同时启动默认 MCP 服务 Context7（`127.0.0.1:3333/mcp`）并执行数据库迁移。
+全新 clone 的数据库会由 `migrations/00008_default_users.sql` 自动写入两个学习环境账号：
+`admin/123456`（管理员）和 `user1/123456`（普通用户）。
 镜像固定使用 `@upstash/context7-mcp@4.0.3`；如需 Context7 云端配额，可在启动前通过
 `CONTEXT7_API_KEY` 环境变量注入，不要把 Key 写入仓库。`config.local.yaml` 已将
 `context7` 配为默认 MCP Server，并限制为 `resolve-library-id` 与 `query-docs` 两个只读工具。
@@ -980,6 +982,9 @@ go mod vendor
 cd manifest/docker
 bash docker.sh
 ```
+
+`docker.sh` 会先执行版本化数据库迁移，再启动 API、Worker、前端和 Nginx；因此新 clone
+不依赖本机已有数据库数据即可获得上述两个默认账号。
 
 启动完成后访问：
 - 前端界面：http://localhost
