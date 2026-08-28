@@ -8,6 +8,8 @@ import (
 
 	v1 "SentinelOps/api/knowledge/v1"
 	aidoc "SentinelOps/internal/ai/document"
+	"SentinelOps/internal/ai/evidence"
+	"SentinelOps/internal/ai/policy"
 	knowledgesvc "SentinelOps/internal/service/knowledge"
 )
 
@@ -257,6 +259,22 @@ func (c *controllerV1) ChunkEnable(ctx context.Context, req *v1.ChunkEnableReq) 
 
 // Search RAG 检索测试：从知识库召回最相关的文档分块，供管理员验证检索效果
 func (c *controllerV1) Search(ctx context.Context, req *v1.SearchReq) (res *v1.SearchRes, err error) {
+	// 文档分区检索必须携带服务端身份作用域，避免跨用户/知识库泄露，
+	// 同时让检索缓存按身份和知识库隔离。知识库文档当前使用 public 访问范围。
+	identity, err := policy.IdentityFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	scope := evidence.Scope{
+		UserID:          identity.UserID,
+		Role:            string(identity.Role),
+		KnowledgeBaseID: req.BaseID,
+		AccessScope:     "public",
+	}
+	if version, versionErr := knowledgesvc.CurrentIndexedVersion(ctx, req.BaseID); versionErr == nil {
+		scope.IndexedVersion = version
+	}
+	ctx = evidence.WithScope(ctx, scope)
 	results, err := knowledgesvc.SearchDocs(ctx, req.BaseID, req.Query, req.TopK)
 	if err != nil {
 		return nil, err

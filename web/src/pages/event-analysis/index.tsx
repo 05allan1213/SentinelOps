@@ -199,7 +199,10 @@ export default function EventAnalysis() {
 
       const response = await fetch('/api/event/v1/pipeline/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
+        },
         body: JSON.stringify({ query }),
         signal: controller.signal,
       })

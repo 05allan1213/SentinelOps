@@ -523,6 +523,24 @@ type SearchResult struct {
 	Score        float64 // Milvus 余弦相似度分（0-1）
 }
 
+// CurrentIndexedVersion 返回知识库内文档索引版本的最大值。
+// 该版本参与检索作用域缓存命名空间，文档重建/启停后可自动失效旧缓存。
+func CurrentIndexedVersion(ctx context.Context, baseID string) (uint64, error) {
+	db, err := dao.DB(ctx)
+	if err != nil {
+		return 0, err
+	}
+	var row struct {
+		Version uint64 `gorm:"column:version"`
+	}
+	if err := db.Model(&dao.KnowledgeDocument{}).
+		Select("COALESCE(MAX(indexed_version), 0) AS version").
+		Where("base_id = ?", baseID).Scan(&row).Error; err != nil {
+		return 0, err
+	}
+	return row.Version, nil
+}
+
 // SearchDocs 执行 RAG 检索测试：从 documents 分区按语义相似度召回分块，并按 base_id 过滤。
 // 供"检索测试"面板使用，不经过查询重写，直接检索。
 func SearchDocs(ctx context.Context, baseID, query string, topK int) ([]SearchResult, error) {

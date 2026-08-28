@@ -224,7 +224,10 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
 
     fetch('/api/event/v1/analyze/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
+      },
       body: JSON.stringify({
         event_id: event.event_id,
         title: event.title,

@@ -138,6 +138,73 @@ export const chatService = {
     const lastSeq = parseInt(sessionStorage.getItem(`chat_last_seq_${sid}`) || '0')
     const userID = useAuthStore.getState().userID ?? ''
 
+    let durableRunId = runId
+    let durableStarted = false
+    const emittedAssistant = new Set<string>()
+
+    const streamDurableEvents = (activeRunId: string) => {
+      if (durableStarted || !activeRunId) return
+      durableStarted = true
+      const token = localStorage.getItem('token')
+      fetch(`/api/chat/v2/runs/${encodeURIComponent(activeRunId)}/events?after_seq=${lastSeq}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }).then(async response => {
+        if (!response.ok) throw new Error(`请求工作流事件失败（${response.status}）`)
+        const reader = response.body?.getReader()
+        if (!reader) throw new Error('工作流事件流不可用')
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let eventType = ''
+        let eventData = ''
+        const flushEvent = () => {
+          if (!eventType || !eventData) return false
+          let payload: { summary?: string; data?: { agent_name?: string; retryable?: boolean } } = {}
+          try { payload = JSON.parse(eventData) } catch { payload = { summary: eventData } }
+          const summary = payload.summary ?? ''
+          if (eventType === 'agent.plan' && summary) {
+            // planner/replanner 的结构化计划进入规划面板；最终 response 回到正文。
+            try {
+              const parsed = JSON.parse(summary) as { response?: string; steps?: string[] }
+              if (parsed.response && !emittedAssistant.has(parsed.response)) {
+                emittedAssistant.add(parsed.response)
+                onMessage('assistant', parsed.response)
+              }
+              else if (Array.isArray(parsed.steps)) onMessage('plan_step', JSON.stringify({ type: 'plan_steps', steps: parsed.steps }))
+            } catch {
+              if (!emittedAssistant.has(summary)) {
+                emittedAssistant.add(summary)
+                onMessage('assistant', summary)
+              }
+            }
+          } else if (eventType === 'agent.tool_result' && summary) {
+            onMessage('tool_result', summary)
+          } else if (eventType === 'run.failed') {
+            throw new Error(summary || '工作流执行失败')
+          }
+          return eventType === 'run.completed' || eventType === 'run.parked' || eventType === 'run.failed'
+        }
+        let terminal = false
+        while (!terminal) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
+          for (const line of lines) {
+            if (line.startsWith('event: ')) eventType = line.slice(7).trim()
+            else if (line.startsWith('data: ')) eventData += (eventData ? '\n' : '') + line.slice(6)
+            else if (line === '') {
+              terminal = flushEvent()
+              eventType = ''
+              eventData = ''
+              if (terminal) break
+            }
+          }
+        }
+        onDone()
+      }).catch(error => onError?.(error instanceof Error ? error : new Error(String(error))))
+    }
+
     streamFetch(
       '/api/chat/v1/chat',
       {
@@ -151,6 +218,17 @@ export const chatService = {
         last_seq: lastSeq
       },
       (type, content, id) => {
+        if (type === 'run.created') {
+          try {
+            const meta = JSON.parse(content) as { runId?: string }
+            if (meta.runId) {
+              durableRunId = meta.runId
+              sessionStorage.setItem(`chat_run_id_${sid}`, meta.runId)
+              streamDurableEvents(meta.runId)
+            }
+          } catch { /* 忽略无效元数据 */ }
+          return
+        }
         if (type === 'meta') {
           try {
             const meta = JSON.parse(content) as { runId?: string }
@@ -164,7 +242,10 @@ export const chatService = {
         }
         onMessage(type, content)
       },
-      onDone,
+      () => {
+        if (durableRunId) streamDurableEvents(durableRunId)
+        else onDone()
+      },
       onError,
       signal
     )
