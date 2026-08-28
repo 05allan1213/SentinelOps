@@ -41,7 +41,7 @@ type Identity struct {
 	AuthDisabled bool
 }
 
-// Permission 是 P05 冻结的授权能力。
+// Permission 是 phase05 冻结的授权能力。
 type Permission string
 
 const (
@@ -64,7 +64,7 @@ type Resource struct {
 
 type identityContextKey struct{}
 
-// NormalizeRole 将旧角色映射到 P05 的规范角色集合。
+// NormalizeRole 将旧角色映射到 phase05 的规范角色集合。
 func NormalizeRole(role string) (Role, error) {
 	switch Role(strings.ToLower(strings.TrimSpace(role))) {
 	case "user", RoleViewer:

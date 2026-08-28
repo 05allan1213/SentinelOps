@@ -25,7 +25,7 @@ import (
 type SessionIdCtxKey struct{}
 
 // namedWorkerAgent 保留 migration manifest 的稳定 Worker 名称，同时把执行
-// 委托给 P17/P18 真实的 ChatModelAgent。它不实现独立的 Agent loop、事件或恢复协议。
+// 委托给 phase17/phase18 真实的 ChatModelAgent。它不实现独立的 Agent loop、事件或恢复协议。
 type namedWorkerAgent struct {
 	name        string
 	description string

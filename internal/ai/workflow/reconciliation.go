@@ -404,7 +404,7 @@ func (s *GORMStore) ResolveEffect(ctx context.Context, input ResolveEffectInput)
 	})
 }
 
-// AdminAcceptUnknownAndCancel 只记录 admin 证据；Run 终态始终委托 P08 primitive。
+// AdminAcceptUnknownAndCancel 只记录 admin 证据；Run 终态始终委托 phase08 primitive。
 func (s *GORMStore) AdminAcceptUnknownAndCancel(ctx context.Context, input AdminAcceptUnknownInput) error {
 	if err := policy.Authorize(ctx, policy.PermissionManageUsersPolicyGates, policy.Resource{}); err != nil {
 		return err

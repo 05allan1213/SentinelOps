@@ -12,7 +12,7 @@ import (
 	"SentinelOps/internal/ai/workflow"
 )
 
-// WorkerConfig 是 P09 Worker 雏形所需的 lease 与有界空轮询参数。
+// WorkerConfig 是 phase09 Worker 雏形所需的 lease 与有界空轮询参数。
 type WorkerConfig struct {
 	Owner                  string
 	LeaseDuration          time.Duration
@@ -32,7 +32,7 @@ type WorkerConfig struct {
 	Gates                  *GateEvaluator
 }
 
-// Worker 只委派唯一 workflow.GORMStore，并承载 P20 唯一 durable poll loop。
+// Worker 只委派唯一 workflow.GORMStore，并承载 phase20 唯一 durable poll loop。
 type Worker struct {
 	store           *workflow.GORMStore
 	config          WorkerConfig

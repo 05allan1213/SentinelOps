@@ -8,7 +8,7 @@ import (
 	"SentinelOps/internal/ai/workflow"
 )
 
-// MCPBudgetHook 将 official MCP Tool call 接入 P28 唯一 durable reservation primitive。
+// MCPBudgetHook 将 official MCP Tool call 接入 phase28 唯一 durable reservation primitive。
 type MCPBudgetHook struct {
 	Attempt *AttemptContext
 }

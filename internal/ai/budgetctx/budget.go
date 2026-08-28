@@ -15,7 +15,7 @@ type Provider interface {
 
 type providerKey struct{}
 
-// WithProvider 将 P28 适配器放入当前 durable Attempt Context。
+// WithProvider 将 phase28 适配器放入当前 durable Attempt Context。
 func WithProvider(ctx context.Context, provider Provider) context.Context {
 	return context.WithValue(ctx, providerKey{}, provider)
 }

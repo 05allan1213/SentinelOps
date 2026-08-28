@@ -7,7 +7,7 @@ import (
 	"SentinelOps/internal/ai/policy"
 )
 
-// DurableContextSnapshotSchema 是 MySQL context_snapshot_json 的唯一 P11 版本。
+// DurableContextSnapshotSchema 是 MySQL context_snapshot_json 的唯一 phase11 版本。
 const DurableContextSnapshotSchema = "sentinelops/runtime-context/v1"
 
 // RuntimeSnapshotFields 是 workflow Store 原样持久化的 Runtime Snapshot 列集合。

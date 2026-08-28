@@ -6,12 +6,12 @@ import (
 )
 
 func TestDurableWorkerOwnerUsesExplicitProcessIdentity(t *testing.T) {
-	t.Setenv(workerIDEnv, "p43-worker-a")
+	t.Setenv(workerIDEnv, "phase43-worker-a")
 	owner, err := durableWorkerOwner()
 	if err != nil {
 		t.Fatalf("durableWorkerOwner() error = %v", err)
 	}
-	if owner != "p43-worker-a" {
+	if owner != "phase43-worker-a" {
 		t.Fatalf("durableWorkerOwner() = %q", owner)
 	}
 }

@@ -412,7 +412,7 @@ type ResultUsage struct {
 // ResultObserver 只接收计量事实，不接收或持久化 Secret。
 type ResultObserver func(context.Context, ResultUsage)
 
-// BudgetRequest 描述接入 P28 的 MCP reservation；不包含第二套 Store 或计数器。
+// BudgetRequest 描述接入 phase28 的 MCP reservation；不包含第二套 Store 或计数器。
 type BudgetRequest struct {
 	ReservationIdentity string
 	Subject             string
@@ -430,7 +430,7 @@ type BudgetSettlement struct {
 	ResultBytes         int64
 }
 
-// BudgetHook 是对 P28 同一 reservation primitive 的最小回调边界。
+// BudgetHook 是对 phase28 同一 reservation primitive 的最小回调边界。
 type BudgetHook interface {
 	ReserveMCP(context.Context, BudgetRequest) error
 	SettleMCP(context.Context, BudgetSettlement) error

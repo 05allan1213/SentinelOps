@@ -27,7 +27,7 @@ import (
 //   - query_internal_docs：内部知识库文档检索（跨域基础工具）
 //   - get_current_time：实时时间戳（时间范围查询辅助）
 //
-// ── 底层实现原理（P15 NewExecutorBuilder + 官方 planexecute）───────────────
+// ── 底层实现原理（phase15 NewExecutorBuilder + 官方 planexecute）───────────────
 //
 //  1. 每次调用时从 Session 读取三项共享状态：
 //     UserInput       - 原始任务描述（key="UserInput"）

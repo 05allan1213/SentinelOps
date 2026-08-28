@@ -64,7 +64,7 @@ func BuildDurableReportAgent(ctx context.Context, handler *runtime.RuntimeHandle
 	return NewReportAgent(ctx, nil, handler)
 }
 
-// GetDurableReportAgent 懒构建 ADK 报告 Agent；P19 负责接入 Planner/AgentTool。
+// GetDurableReportAgent 懒构建 ADK 报告 Agent；phase19 负责接入 Planner/AgentTool。
 func GetDurableReportAgent(ctx context.Context) (adk.Agent, error) {
 	reportDurableOnce.Do(func() {
 		reportDurableAgent, reportDurableErr = BuildDurableReportAgent(ctx, runtime.NewRuntimeHandler())

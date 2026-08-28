@@ -74,7 +74,7 @@ func (c *ControllerV1) ResolveEffect(ctx context.Context, req *opsv1.ResolveEffe
 	return &opsv1.ResolveEffectRes{}, nil
 }
 
-// AcceptUnknownEffect 记录 admin 风险接受并通过 P08 完成 primitive 取消 Run。
+// AcceptUnknownEffect 记录 admin 风险接受并通过 phase08 完成 primitive 取消 Run。
 func (c *ControllerV1) AcceptUnknownEffect(ctx context.Context, req *opsv1.AcceptUnknownEffectReq) (*opsv1.AcceptUnknownEffectRes, error) {
 	if err := requireAdmin(ctx); err != nil {
 		return nil, err

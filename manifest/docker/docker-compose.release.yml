@@ -1,4 +1,4 @@
-# P42 release overlay：只接受显式不可变 current/compatibility image 引用。
+# phase42 release overlay：只接受显式不可变 current/compatibility image 引用。
 services:
   api:
     image: "${SENTINELOPS_CURRENT_IMAGE:?set SENTINELOPS_CURRENT_IMAGE to an immutable digest}"

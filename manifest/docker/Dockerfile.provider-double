@@ -1,9 +1,0 @@
-FROM golang:1.27.0-alpine AS builder
-WORKDIR /src
-COPY manifest/test/provider-double/main.go ./main.go
-RUN CGO_ENABLED=0 GOOS=linux go build -o /provider-double ./main.go
-
-FROM alpine:3.22
-COPY --from=builder /provider-double /provider-double
-EXPOSE 8080
-ENTRYPOINT ["/provider-double"]

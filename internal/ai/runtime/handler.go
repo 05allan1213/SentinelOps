@@ -79,12 +79,12 @@ func (h *RuntimeHandler) ToolOnly() *RuntimeHandler {
 
 var _ adk.ChatModelAgentMiddleware = (*RuntimeHandler)(nil)
 
-// NewRuntimeHandler 创建 P14/P22/P28 继续原位扩展的唯一共享 Handler。
+// NewRuntimeHandler 创建 phase14/phase22/phase28 继续原位扩展的唯一共享 Handler。
 func NewRuntimeHandler() *RuntimeHandler {
 	return &RuntimeHandler{BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}}
 }
 
-// NewHITLRuntimeHandler 原位启用 Approval/Effect 生命周期；P26 生产 Worker 复用它，写 Gate 继续关闭。
+// NewHITLRuntimeHandler 原位启用 Approval/Effect 生命周期；phase26 生产 Worker 复用它，写 Gate 继续关闭。
 func NewHITLRuntimeHandler(store *workflow.GORMStore, evaluators ...*GateEvaluator) (*RuntimeHandler, error) {
 	if store == nil {
 		return nil, fmt.Errorf("workflow GORMStore is required for HITL")
@@ -182,7 +182,7 @@ func (h *RuntimeHandler) WrapModel(_ context.Context, endpoint model.BaseChatMod
 		return endpoint, nil
 	}
 	if endpointType, ok := components.GetType(endpoint); ok && endpointType == "FailoverProxyModel" {
-		// P27 已把同一 Handler 绑定到每个真实候选；代理层不能再次 reserve/settle。
+		// phase27 已把同一 Handler 绑定到每个真实候选；代理层不能再次 reserve/settle。
 		return endpoint, nil
 	}
 	if _, ok := endpoint.(interface{ DurablePhysicalModel() }); ok {

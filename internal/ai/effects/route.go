@@ -13,7 +13,7 @@ var (
 type legacyMutationContextKey struct{}
 
 // WithLegacyMutationContext 只能在 legacy 兼容 Gate 已通过后调用。
-// 它保留 P42/P43 前的回滚 Artifact，但不允许 durable_v1 伪装 legacy。
+// 它保留 phase42/phase43 前的回滚 Artifact，但不允许 durable_v1 伪装 legacy。
 func WithLegacyMutationContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, legacyMutationContextKey{}, true)
 }

@@ -19,8 +19,8 @@ import (
 
 func TestExecutorBuilder(t *testing.T) {
 	ctx := context.Background()
-	chatModel := &p15Model{}
-	agentTool := adk.NewAgentTool(ctx, &p15Agent{name: "specialist"})
+	chatModel := &fixture15Model{}
+	agentTool := adk.NewAgentTool(ctx, &fixture15Agent{name: "specialist"})
 	handler := airuntime.NewRuntimeHandler()
 
 	cfg, err := newExecutorAgentConfig(ctx, &ExecutorBuilderConfig{
@@ -86,7 +86,7 @@ func TestExecutorBuilder(t *testing.T) {
 }
 
 func TestExecutorSessionKeys(t *testing.T) {
-	plan := &p15Plan{Steps: []string{"collect evidence", "write answer"}}
+	plan := &fixture15Plan{Steps: []string{"collect evidence", "write answer"}}
 	sessionValues := map[string]any{
 		planexecute.UserInputSessionKey:     []adk.Message{schema.UserMessage("investigate alert")},
 		planexecute.PlanSessionKey:          plan,
@@ -94,7 +94,7 @@ func TestExecutorSessionKeys(t *testing.T) {
 		planexecute.ExecutedStepSessionKey:  "must not be read as input",
 		"sentinelops.forbidden":             "must not leak",
 	}
-	probe := &p15InputProbeAgent{genInput: executorGenModelInput}
+	probe := &fixture15InputProbeAgent{genInput: executorGenModelInput}
 	runner := adk.NewRunner(context.Background(), adk.RunnerConfig{Agent: probe})
 	iter := runner.Run(context.Background(), nil, adk.WithSessionValues(sessionValues))
 	for {
@@ -121,7 +121,7 @@ func TestExecutorSessionKeys(t *testing.T) {
 		}
 	}
 
-	officialModel := &p15Model{}
+	officialModel := &fixture15Model{}
 	officialExecutor, err := planexecute.NewExecutor(context.Background(), &planexecute.ExecutorConfig{
 		Model: officialModel, MaxIterations: 20,
 	})
@@ -182,35 +182,37 @@ func TestPlanTopology(t *testing.T) {
 	}
 }
 
-type p15Plan struct {
+type fixture15Plan struct {
 	Steps []string `json:"steps"`
 }
 
-func (p *p15Plan) FirstStep() string {
+func (p *fixture15Plan) FirstStep() string {
 	if len(p.Steps) == 0 {
 		return ""
 	}
 	return p.Steps[0]
 }
 
-func (p *p15Plan) MarshalJSON() ([]byte, error) {
-	type plan p15Plan
+func (p *fixture15Plan) MarshalJSON() ([]byte, error) {
+	type plan fixture15Plan
 	return json.Marshal((*plan)(p))
 }
 
-func (p *p15Plan) UnmarshalJSON(data []byte) error {
-	type plan p15Plan
+func (p *fixture15Plan) UnmarshalJSON(data []byte) error {
+	type plan fixture15Plan
 	return json.Unmarshal(data, (*plan)(p))
 }
 
-type p15InputProbeAgent struct {
+type fixture15InputProbeAgent struct {
 	genInput adk.GenModelInput
 	messages []adk.Message
 }
 
-func (*p15InputProbeAgent) Name(context.Context) string        { return "executor_input_probe" }
-func (*p15InputProbeAgent) Description(context.Context) string { return "captures Executor input" }
-func (a *p15InputProbeAgent) Run(ctx context.Context, input *adk.AgentInput, _ ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
+func (*fixture15InputProbeAgent) Name(context.Context) string { return "executor_input_probe" }
+func (*fixture15InputProbeAgent) Description(context.Context) string {
+	return "captures Executor input"
+}
+func (a *fixture15InputProbeAgent) Run(ctx context.Context, input *adk.AgentInput, _ ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
 	iter, generator := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 	var err error
 	a.messages, err = a.genInput(ctx, "", input)
@@ -221,27 +223,27 @@ func (a *p15InputProbeAgent) Run(ctx context.Context, input *adk.AgentInput, _ .
 	return iter
 }
 
-type p15Agent struct{ name string }
+type fixture15Agent struct{ name string }
 
-func (a *p15Agent) Name(context.Context) string      { return a.name }
-func (*p15Agent) Description(context.Context) string { return "scripted specialist" }
-func (a *p15Agent) Run(context.Context, *adk.AgentInput, ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
+func (a *fixture15Agent) Name(context.Context) string      { return a.name }
+func (*fixture15Agent) Description(context.Context) string { return "scripted specialist" }
+func (a *fixture15Agent) Run(context.Context, *adk.AgentInput, ...adk.AgentRunOption) *adk.AsyncIterator[*adk.AgentEvent] {
 	iter, generator := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 	generator.Close()
 	return iter
 }
 
-type p15Model struct {
+type fixture15Model struct {
 	inputs []*schema.Message
 }
 
-func (m *p15Model) Generate(_ context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (m *fixture15Model) Generate(_ context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
 	m.inputs = append([]*schema.Message(nil), input...)
 	return schema.AssistantMessage("done", nil), nil
 }
 
-func (*p15Model) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (*fixture15Model) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
 	return nil, nil
 }
 
-func (*p15Model) BindTools([]*schema.ToolInfo) error { return nil }
+func (*fixture15Model) BindTools([]*schema.ToolInfo) error { return nil }

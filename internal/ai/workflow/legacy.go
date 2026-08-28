@@ -22,7 +22,7 @@ const (
 	RuntimeModeDurableV1 = "durable_v1"
 	// LegacyCutoverParkReason 记录旧运行无法由新 Worker 恢复的审计原因。
 	LegacyCutoverParkReason = "legacy_cutover_not_resumable"
-	// P07 只消费 Spec 已锁定的名称，不在 P08 前建立第二份 Event catalog。
+	// phase07 只消费 Spec 已锁定的名称，不在 phase08 前建立第二份 Event catalog。
 	legacyCutoverAuditEventType = "run.failed"
 	legacyCutoverMaxRuns        = 1000
 )
@@ -53,7 +53,7 @@ type LegacyCutoverResult struct {
 }
 
 // applyDurableRuntimeContract 添加新 Worker 必须复用的 runtime contract 防线。
-// P09 只在此基础上追加状态、可用时间和 lease 条件，不得放宽本谓词。
+// phase09 只在此基础上追加状态、可用时间和 lease 条件，不得放宽本谓词。
 func applyDurableRuntimeContract(query *gorm.DB) *gorm.DB {
 	return query.Where(
 		"runtime_mode = ? AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> ''",

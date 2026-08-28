@@ -15,7 +15,7 @@ function captureRuntimeErrors(page: Page) {
 
 async function installAuthenticatedFixture(page: Page, dark = false) {
   await page.addInitScript(({ enableDark }) => {
-    localStorage.setItem('token', 'p02-smoke-token')
+    localStorage.setItem('token', 'smoke-test-token')
     if (enableDark) {
       document.addEventListener('DOMContentLoaded', () => {
         document.documentElement.classList.add('dark')

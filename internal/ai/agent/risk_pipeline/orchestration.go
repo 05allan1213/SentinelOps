@@ -65,7 +65,7 @@ func BuildDurableRiskAgent(ctx context.Context, handler *runtime.RuntimeHandler)
 	return NewRiskAgent(ctx, nil, handler)
 }
 
-// GetDurableRiskAgent lazily constructs the ADK specialist. P19 owns outer
+// GetDurableRiskAgent lazily constructs the ADK specialist. phase19 owns outer
 // Planner/AgentTool wiring.
 func GetDurableRiskAgent(ctx context.Context) (adk.Agent, error) {
 	durableOnce.Do(func() {

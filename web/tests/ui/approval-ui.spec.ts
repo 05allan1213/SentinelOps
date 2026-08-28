@@ -28,8 +28,8 @@ const unknownEffect = {
 
 async function installFixture(page: Page, role = 'admin') {
   await page.addInitScript(({ currentRole }) => {
-    localStorage.setItem('token', 'p37-ui-token')
-    localStorage.setItem('auth-storage', JSON.stringify({ state: { token: 'p37-ui-token', userID: 'user-1', role: currentRole, username: 'p37' }, version: 0 }))
+    localStorage.setItem('token', 'phase37-ui-token')
+    localStorage.setItem('auth-storage', JSON.stringify({ state: { token: 'phase37-ui-token', userID: 'user-1', role: currentRole, username: 'phase37' }, version: 0 }))
   }, { currentRole: role })
 
   await page.route('**/api/**', async route => {

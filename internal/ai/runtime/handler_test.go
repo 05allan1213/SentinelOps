@@ -24,13 +24,13 @@ import (
 func TestRuntimeHandlerCoversAllEndpoints(t *testing.T) {
 	handler := NewRuntimeHandler()
 	budget := newP14RecordingBudget()
-	ctx, invocation := p14InvocationContext(t, "run-five-endpoints", "user-five", budget)
+	ctx, invocation := fixture14InvocationContext(t, "run-five-endpoints", "user-five", budget)
 	ctx, err := WithModelInvocation(ctx, invocation)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	modelEndpoint := &p14Model{}
+	modelEndpoint := &fixture14Model{}
 	wrappedModel, err := handler.WrapModel(ctx, modelEndpoint, &adk.ModelContext{})
 	if err != nil {
 		t.Fatalf("wrap model: %v", err)
@@ -41,7 +41,7 @@ func TestRuntimeHandlerCoversAllEndpoints(t *testing.T) {
 
 	invokableCalls := 0
 	invokable, err := handler.WrapInvokableToolCall(ctx, func(callCtx context.Context, _ string, _ ...tool.Option) (string, error) {
-		p14RequireCallMetadata(t, callCtx, BudgetCallKindL0Tool, "query_events")
+		fixture14RequireCallMetadata(t, callCtx, BudgetCallKindL0Tool, "query_events")
 		invokableCalls++
 		return "ok", nil
 	}, &adk.ToolContext{Name: "query_events", CallID: "call-invokable"})
@@ -54,7 +54,7 @@ func TestRuntimeHandlerCoversAllEndpoints(t *testing.T) {
 
 	streamableCalls := 0
 	streamable, err := handler.WrapStreamableToolCall(ctx, func(callCtx context.Context, _ string, _ ...tool.Option) (*schema.StreamReader[string], error) {
-		p14RequireCallMetadata(t, callCtx, BudgetCallKindL0Tool, "query_events")
+		fixture14RequireCallMetadata(t, callCtx, BudgetCallKindL0Tool, "query_events")
 		streamableCalls++
 		return schema.StreamReaderFromArray([]string{"ok"}), nil
 	}, &adk.ToolContext{Name: "query_events", CallID: "call-streamable"})
@@ -65,11 +65,11 @@ func TestRuntimeHandlerCoversAllEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p14DrainStream(t, stream)
+	fixture14DrainStream(t, stream)
 
 	enhancedCalls := 0
 	enhanced, err := handler.WrapEnhancedInvokableToolCall(ctx, func(callCtx context.Context, _ *schema.ToolArgument, _ ...tool.Option) (*schema.ToolResult, error) {
-		p14RequireCallMetadata(t, callCtx, BudgetCallKindL0Tool, "query_events")
+		fixture14RequireCallMetadata(t, callCtx, BudgetCallKindL0Tool, "query_events")
 		enhancedCalls++
 		return &schema.ToolResult{}, nil
 	}, &adk.ToolContext{Name: "query_events", CallID: "call-enhanced"})
@@ -82,7 +82,7 @@ func TestRuntimeHandlerCoversAllEndpoints(t *testing.T) {
 
 	enhancedStreamCalls := 0
 	enhancedStream, err := handler.WrapEnhancedStreamableToolCall(ctx, func(callCtx context.Context, _ *schema.ToolArgument, _ ...tool.Option) (*schema.StreamReader[*schema.ToolResult], error) {
-		p14RequireCallMetadata(t, callCtx, BudgetCallKindL0Tool, "query_events")
+		fixture14RequireCallMetadata(t, callCtx, BudgetCallKindL0Tool, "query_events")
 		enhancedStreamCalls++
 		return schema.StreamReaderFromArray([]*schema.ToolResult{{}}), nil
 	}, &adk.ToolContext{Name: "query_events", CallID: "call-enhanced-stream"})
@@ -93,7 +93,7 @@ func TestRuntimeHandlerCoversAllEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p14DrainStream(t, enhancedResultStream)
+	fixture14DrainStream(t, enhancedResultStream)
 
 	if modelEndpoint.calls != 1 || invokableCalls != 1 || streamableCalls != 1 || enhancedCalls != 1 || enhancedStreamCalls != 1 {
 		t.Fatalf("endpoint calls = model %d invokable %d streamable %d enhanced %d enhanced_stream %d",
@@ -102,15 +102,15 @@ func TestRuntimeHandlerCoversAllEndpoints(t *testing.T) {
 	if reserved, settled := budget.counts(); reserved != 5 || settled != 5 {
 		t.Fatalf("budget calls = reserved %d settled %d, want 5/5", reserved, settled)
 	}
-	p14RequireAllEndpointsRejectMissingContext(t, handler)
+	fixture14RequireAllEndpointsRejectMissingContext(t, handler)
 }
 
 func TestRuntimeHandlerInterruptKeepsToolReservationUntilResume(t *testing.T) {
 	handler := NewRuntimeHandler()
 	budget := newP14RecordingBudget()
-	ctx, _ := p14InvocationContext(t, "run-interrupt-reservation", "user-interrupt-reservation", budget)
+	ctx, _ := fixture14InvocationContext(t, "run-interrupt-reservation", "user-interrupt-reservation", budget)
 	interrupt := func() error {
-		return fmt.Errorf("wrapped StatefulInterrupt: %w", &adk.InterruptSignal{ID: "p38-interrupt"})
+		return fmt.Errorf("wrapped StatefulInterrupt: %w", &adk.InterruptSignal{ID: "phase38-interrupt"})
 	}
 	assertInterrupt := func(name string, err error) {
 		t.Helper()
@@ -222,7 +222,7 @@ func TestRuntimeHandlerRejectsPolicyScopeDeadlineBeforeEndpoint(t *testing.T) {
 		return "unexpected", nil
 	}
 
-	ctx, _ := p14InvocationContext(t, "run-policy", "user-policy", newP14RecordingBudget())
+	ctx, _ := fixture14InvocationContext(t, "run-policy", "user-policy", newP14RecordingBudget())
 	for _, testCase := range []struct {
 		name string
 		ctx  context.Context
@@ -231,8 +231,8 @@ func TestRuntimeHandlerRejectsPolicyScopeDeadlineBeforeEndpoint(t *testing.T) {
 	}{
 		{name: "unknown", ctx: ctx, tool: adk.ToolContext{Name: "dynamic_unknown", CallID: "unknown"}, want: policy.ErrUnknownCatalogTool},
 		{name: "mutation", ctx: ctx, tool: adk.ToolContext{Name: "create_report", CallID: "mutation"}, want: policy.ErrMutationDisabled},
-		{name: "scope", ctx: p14TamperScope(t, ctx), tool: adk.ToolContext{Name: "query_events", CallID: "scope"}, want: policy.ErrForbidden},
-		{name: "deadline", ctx: p14ExpireDeadline(t, ctx), tool: adk.ToolContext{Name: "query_events", CallID: "deadline"}, want: context.DeadlineExceeded},
+		{name: "scope", ctx: fixture14TamperScope(t, ctx), tool: adk.ToolContext{Name: "query_events", CallID: "scope"}, want: policy.ErrForbidden},
+		{name: "deadline", ctx: fixture14ExpireDeadline(t, ctx), tool: adk.ToolContext{Name: "query_events", CallID: "deadline"}, want: context.DeadlineExceeded},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			wrapped, err := handler.WrapInvokableToolCall(testCase.ctx, endpoint, &testCase.tool)
@@ -251,7 +251,7 @@ func TestRuntimeHandlerRejectsPolicyScopeDeadlineBeforeEndpoint(t *testing.T) {
 
 func TestMutationDisabledAcrossAllToolEndpoints(t *testing.T) {
 	handler := NewRuntimeHandler()
-	ctx, _ := p14InvocationContext(t, "run-mutation-endpoints", "user-mutation-endpoints", newP14RecordingBudget())
+	ctx, _ := fixture14InvocationContext(t, "run-mutation-endpoints", "user-mutation-endpoints", newP14RecordingBudget())
 	mutationTools := []string{"create_report", "save_intelligence", "update_event_status", "block_ip", "notify_dingtalk", "notify_wecom", "notify_email", "webhook_out"}
 	endpointCalls := 0
 	plain := func(context.Context, string, ...tool.Option) (string, error) {
@@ -316,7 +316,7 @@ func TestMutationDisabledInNestedBeforeAgentTool(t *testing.T) {
 	if mutationTool == nil {
 		t.Fatal("create_report is not registered")
 	}
-	dynamicHandler := &p14DynamicToolHandler{
+	dynamicHandler := &fixture14DynamicToolHandler{
 		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}, tool: mutationTool,
 	}
 	handlers, err := RuntimeHandlerFirst(handler, dynamicHandler)
@@ -324,14 +324,14 @@ func TestMutationDisabledInNestedBeforeAgentTool(t *testing.T) {
 		t.Fatal(err)
 	}
 	budget := newP14RecordingBudget()
-	ctx, invocation := p14InvocationContext(t, "run-nested-mutation", "user-nested-mutation", budget)
+	ctx, invocation := fixture14InvocationContext(t, "run-nested-mutation", "user-nested-mutation", budget)
 	ctx, err = WithModelInvocation(ctx, invocation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	model := &p14MutationToolCallingModel{}
+	model := &fixture14MutationToolCallingModel{}
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name: "p18-nested-mutation", Description: "P18 nested mutation policy contract", Model: model,
+		Name: "phase18-nested-mutation", Description: "phase18 nested mutation policy contract", Model: model,
 		GenModelInput: LiteralGenModelInput, Handlers: handlers,
 	})
 	if err != nil {
@@ -363,7 +363,7 @@ func TestMutationDisabledInNestedBeforeAgentTool(t *testing.T) {
 func TestHandlerConcurrentIsolation(t *testing.T) {
 	handler := NewRuntimeHandler()
 	const runs = 128
-	frozen, freezeErr := FreezeRuntimeSnapshot(p14SnapshotInput(t))
+	frozen, freezeErr := FreezeRuntimeSnapshot(fixture14SnapshotInput(t))
 	if freezeErr != nil {
 		t.Fatal(freezeErr)
 	}
@@ -379,7 +379,7 @@ func TestHandlerConcurrentIsolation(t *testing.T) {
 			runID := fmt.Sprintf("run-concurrent-%03d", index)
 			userID := fmt.Sprintf("user-concurrent-%03d", index)
 			budget := newP14RecordingBudget()
-			ctx, _ := p14InvocationContextWithSnapshot(t, runID, userID, uint64(index+1), budget, frozen)
+			ctx, _ := fixture14InvocationContextWithSnapshot(t, runID, userID, uint64(index+1), budget, frozen)
 			wrapped, err := handler.WrapInvokableToolCall(ctx, func(endpointCtx context.Context, _ string, _ ...tool.Option) (string, error) {
 				metadata, metadataErr := CallMetadataFromContext(endpointCtx)
 				if metadataErr != nil {
@@ -432,7 +432,7 @@ func TestDynamicToolPolicyAndRuntimeHandlerOrder(t *testing.T) {
 		t.Fatalf("handler order = %#v, RuntimeHandler must be first", ordered)
 	}
 
-	input := p14SnapshotInput(t)
+	input := fixture14SnapshotInput(t)
 	frameworkEntry, err := policy.LookupCatalog("trigger_ops")
 	if err != nil {
 		t.Fatal(err)
@@ -448,10 +448,10 @@ func TestDynamicToolPolicyAndRuntimeHandlerOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	budget := newP14RecordingBudget()
-	ctx, _ := p14InvocationContextWithSnapshot(t, "run-dynamic", "user-dynamic", 1, budget, frozen)
+	ctx, _ := fixture14InvocationContextWithSnapshot(t, "run-dynamic", "user-dynamic", 1, budget, frozen)
 	frameworkCalls := 0
 	framework, err := handler.WrapInvokableToolCall(ctx, func(callCtx context.Context, _ string, _ ...tool.Option) (string, error) {
-		p14RequireCallMetadata(t, callCtx, BudgetCallKindL0Tool, "trigger_ops")
+		fixture14RequireCallMetadata(t, callCtx, BudgetCallKindL0Tool, "trigger_ops")
 		frameworkCalls++
 		return "proposal-only", nil
 	}, &adk.ToolContext{Name: "trigger_ops", CallID: "dynamic-framework"})
@@ -485,32 +485,32 @@ func TestDynamicToolPolicyAndRuntimeHandlerOrder(t *testing.T) {
 	if endpointCalls != 0 {
 		t.Fatalf("dynamic rejected endpoint calls = %d", endpointCalls)
 	}
-	p14RequireBeforeAgentDynamicToolRejected(t, handler)
+	fixture14RequireBeforeAgentDynamicToolRejected(t, handler)
 }
 
 func TestRuntimeHandlerFirstIsOutermostInEinoAgent(t *testing.T) {
 	handler := NewRuntimeHandler()
-	probe := &p14MetadataProbeHandler{BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}}
+	probe := &fixture14MetadataProbeHandler{BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}}
 	handlers, err := RuntimeHandlerFirst(handler, probe)
 	if err != nil {
 		t.Fatal(err)
 	}
 	budget := newP14RecordingBudget()
-	ctx, invocation := p14InvocationContext(t, "run-eino-order", "user-eino-order", budget)
+	ctx, invocation := fixture14InvocationContext(t, "run-eino-order", "user-eino-order", budget)
 	ctx, err = WithModelInvocation(ctx, invocation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	endpoint := &p14Model{}
+	endpoint := &fixture14Model{}
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name: "p14-handler-order", Description: "P14 Handler order contract", Model: endpoint,
+		Name: "phase14-handler-order", Description: "phase14 Handler order contract", Model: endpoint,
 		GenModelInput: LiteralGenModelInput, Handlers: handlers,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent})
-	p12DrainRuntimeEvents(t, runner.Query(ctx, "verify outermost RuntimeHandler"))
+	fixture12DrainRuntimeEvents(t, runner.Query(ctx, "verify outermost RuntimeHandler"))
 	if probe.calls != 1 || endpoint.calls != 1 {
 		t.Fatalf("probe/endpoint calls = %d/%d, want 1/1", probe.calls, endpoint.calls)
 	}
@@ -520,7 +520,7 @@ func TestRuntimeHandlerFirstIsOutermostInEinoAgent(t *testing.T) {
 }
 
 func TestRuntimeHandlerModelMetadataUsesProviderQualifiedSnapshot(t *testing.T) {
-	input := p14SnapshotInput(t)
+	input := fixture14SnapshotInput(t)
 	input.Models = []ModelSnapshot{
 		{Kind: "chat", Profile: "default", CatalogRef: "provider_a/shared", Provider: "provider_a", Driver: appconfig.DriverOpenAICompatibleChat, ModelID: "same-vendor-id", Pricing: PricingSnapshot{Revision: "price-a", Currency: "CNY", Unit: "per_million_tokens", Input: 1}},
 		{Kind: "chat", Profile: "reasoning", CatalogRef: "provider_b/shared", Provider: "provider_b", Driver: appconfig.DriverOpenAICompatibleChat, ModelID: "same-vendor-id", Pricing: PricingSnapshot{Revision: "price-b", Currency: "CNY", Unit: "per_million_tokens", Input: 2}},
@@ -530,7 +530,7 @@ func TestRuntimeHandlerModelMetadataUsesProviderQualifiedSnapshot(t *testing.T) 
 		t.Fatal(err)
 	}
 	budget := newP14RecordingBudget()
-	ctx, _ := p14InvocationContextWithSnapshot(t, "run-model-identity", "user-model", 9, budget, frozen)
+	ctx, _ := fixture14InvocationContextWithSnapshot(t, "run-model-identity", "user-model", 9, budget, frozen)
 	modelSnapshot := input.Models[1]
 	ctx, err = WithModelInvocation(ctx, ModelInvocation{
 		ReservationIdentity: "physical-call-provider-b", CatalogRef: modelSnapshot.CatalogRef,
@@ -540,7 +540,7 @@ func TestRuntimeHandlerModelMetadataUsesProviderQualifiedSnapshot(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	inner := &p14Model{validate: func(callCtx context.Context) error {
+	inner := &fixture14Model{validate: func(callCtx context.Context) error {
 		metadata, metadataErr := CallMetadataFromContext(callCtx)
 		if metadataErr != nil {
 			return metadataErr
@@ -584,12 +584,12 @@ func TestRuntimeHandlerModelMetadataUsesProviderQualifiedSnapshot(t *testing.T) 
 
 func TestRuntimeHandlerModelStreamSettlesAfterConsumption(t *testing.T) {
 	budget := newP14RecordingBudget()
-	ctx, invocation := p14InvocationContext(t, "run-model-stream", "user-model-stream", budget)
+	ctx, invocation := fixture14InvocationContext(t, "run-model-stream", "user-model-stream", budget)
 	ctx, err := WithModelInvocation(ctx, invocation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wrapped, err := NewRuntimeHandler().WrapModel(ctx, &p14Model{}, &adk.ModelContext{})
+	wrapped, err := NewRuntimeHandler().WrapModel(ctx, &fixture14Model{}, &adk.ModelContext{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -600,32 +600,32 @@ func TestRuntimeHandlerModelStreamSettlesAfterConsumption(t *testing.T) {
 	if reserved, settled := budget.counts(); reserved != 1 || settled != 0 {
 		t.Fatalf("budget before stream consumption = %d/%d, want 1/0", reserved, settled)
 	}
-	p14DrainStream(t, stream)
+	fixture14DrainStream(t, stream)
 	if reserved, settled := budget.counts(); reserved != 1 || settled != 1 {
 		t.Fatalf("budget after stream consumption = %d/%d, want 1/1", reserved, settled)
 	}
 }
 
-type p14Model struct {
+type fixture14Model struct {
 	calls    int
 	validate func(context.Context) error
 }
 
-type p14MetadataProbeHandler struct {
+type fixture14MetadataProbeHandler struct {
 	*adk.BaseChatModelAgentMiddleware
 	calls int
 }
 
-func (h *p14MetadataProbeHandler) WrapModel(_ context.Context, endpoint model.BaseChatModel, _ *adk.ModelContext) (model.BaseChatModel, error) {
-	return &p14MetadataProbeModel{handler: h, endpoint: endpoint}, nil
+func (h *fixture14MetadataProbeHandler) WrapModel(_ context.Context, endpoint model.BaseChatModel, _ *adk.ModelContext) (model.BaseChatModel, error) {
+	return &fixture14MetadataProbeModel{handler: h, endpoint: endpoint}, nil
 }
 
-type p14MetadataProbeModel struct {
-	handler  *p14MetadataProbeHandler
+type fixture14MetadataProbeModel struct {
+	handler  *fixture14MetadataProbeHandler
 	endpoint model.BaseChatModel
 }
 
-func (m *p14MetadataProbeModel) Generate(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.Message, error) {
+func (m *fixture14MetadataProbeModel) Generate(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.Message, error) {
 	if _, err := CallMetadataFromContext(ctx); err != nil {
 		return nil, fmt.Errorf("RuntimeHandler is not the outermost user Model wrapper: %w", err)
 	}
@@ -633,7 +633,7 @@ func (m *p14MetadataProbeModel) Generate(ctx context.Context, input []*schema.Me
 	return m.endpoint.Generate(ctx, input, options...)
 }
 
-func (m *p14MetadataProbeModel) Stream(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *fixture14MetadataProbeModel) Stream(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.StreamReader[*schema.Message], error) {
 	if _, err := CallMetadataFromContext(ctx); err != nil {
 		return nil, fmt.Errorf("RuntimeHandler is not the outermost user Model wrapper: %w", err)
 	}
@@ -641,33 +641,33 @@ func (m *p14MetadataProbeModel) Stream(ctx context.Context, input []*schema.Mess
 	return m.endpoint.Stream(ctx, input, options...)
 }
 
-type p14DynamicToolHandler struct {
+type fixture14DynamicToolHandler struct {
 	*adk.BaseChatModelAgentMiddleware
 	tool tool.BaseTool
 }
 
-func (h *p14DynamicToolHandler) BeforeAgent(ctx context.Context, runContext *adk.ChatModelAgentContext) (context.Context, *adk.ChatModelAgentContext, error) {
+func (h *fixture14DynamicToolHandler) BeforeAgent(ctx context.Context, runContext *adk.ChatModelAgentContext) (context.Context, *adk.ChatModelAgentContext, error) {
 	runContext.Tools = append(runContext.Tools, h.tool)
 	return ctx, runContext, nil
 }
 
-type p14DynamicUnknownTool struct{ calls int }
+type fixture14DynamicUnknownTool struct{ calls int }
 
-func (*p14DynamicUnknownTool) Info(context.Context) (*schema.ToolInfo, error) {
+func (*fixture14DynamicUnknownTool) Info(context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "dynamic_before_agent_unknown", Desc: "P14 dynamic Tool policy contract",
+		Name: "dynamic_before_agent_unknown", Desc: "phase14 dynamic Tool policy contract",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{}),
 	}, nil
 }
 
-func (t *p14DynamicUnknownTool) InvokableRun(context.Context, string, ...tool.Option) (string, error) {
+func (t *fixture14DynamicUnknownTool) InvokableRun(context.Context, string, ...tool.Option) (string, error) {
 	t.calls++
 	return "unsafe", nil
 }
 
-type p14DynamicToolCallingModel struct{ calls int }
+type fixture14DynamicToolCallingModel struct{ calls int }
 
-func (m *p14DynamicToolCallingModel) Generate(context.Context, []*schema.Message, ...model.Option) (*schema.Message, error) {
+func (m *fixture14DynamicToolCallingModel) Generate(context.Context, []*schema.Message, ...model.Option) (*schema.Message, error) {
 	m.calls++
 	if m.calls == 1 {
 		return &schema.Message{Role: schema.Assistant, ToolCalls: []schema.ToolCall{{
@@ -678,7 +678,7 @@ func (m *p14DynamicToolCallingModel) Generate(context.Context, []*schema.Message
 	return schema.AssistantMessage("unexpected", nil), nil
 }
 
-func (m *p14DynamicToolCallingModel) Stream(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *fixture14DynamicToolCallingModel) Stream(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.StreamReader[*schema.Message], error) {
 	message, err := m.Generate(ctx, input, options...)
 	if err != nil {
 		return nil, err
@@ -686,11 +686,11 @@ func (m *p14DynamicToolCallingModel) Stream(ctx context.Context, input []*schema
 	return schema.StreamReaderFromArray([]*schema.Message{message}), nil
 }
 
-func (*p14DynamicToolCallingModel) BindTools([]*schema.ToolInfo) error { return nil }
+func (*fixture14DynamicToolCallingModel) BindTools([]*schema.ToolInfo) error { return nil }
 
-type p14MutationToolCallingModel struct{ calls int }
+type fixture14MutationToolCallingModel struct{ calls int }
 
-func (m *p14MutationToolCallingModel) Generate(context.Context, []*schema.Message, ...model.Option) (*schema.Message, error) {
+func (m *fixture14MutationToolCallingModel) Generate(context.Context, []*schema.Message, ...model.Option) (*schema.Message, error) {
 	m.calls++
 	if m.calls == 1 {
 		return &schema.Message{Role: schema.Assistant, ToolCalls: []schema.ToolCall{{
@@ -701,7 +701,7 @@ func (m *p14MutationToolCallingModel) Generate(context.Context, []*schema.Messag
 	return schema.AssistantMessage("unexpected", nil), nil
 }
 
-func (m *p14MutationToolCallingModel) Stream(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *fixture14MutationToolCallingModel) Stream(ctx context.Context, input []*schema.Message, options ...model.Option) (*schema.StreamReader[*schema.Message], error) {
 	message, err := m.Generate(ctx, input, options...)
 	if err != nil {
 		return nil, err
@@ -709,9 +709,9 @@ func (m *p14MutationToolCallingModel) Stream(ctx context.Context, input []*schem
 	return schema.StreamReaderFromArray([]*schema.Message{message}), nil
 }
 
-func (*p14MutationToolCallingModel) BindTools([]*schema.ToolInfo) error { return nil }
+func (*fixture14MutationToolCallingModel) BindTools([]*schema.ToolInfo) error { return nil }
 
-func (m *p14Model) Generate(ctx context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (m *fixture14Model) Generate(ctx context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
 	m.calls++
 	if m.validate != nil {
 		if err := m.validate(ctx); err != nil {
@@ -721,7 +721,7 @@ func (m *p14Model) Generate(ctx context.Context, _ []*schema.Message, _ ...model
 	return schema.AssistantMessage("ok", nil), nil
 }
 
-func (m *p14Model) Stream(ctx context.Context, _ []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *fixture14Model) Stream(ctx context.Context, _ []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
 	m.calls++
 	if m.validate != nil {
 		if err := m.validate(ctx); err != nil {
@@ -731,19 +731,19 @@ func (m *p14Model) Stream(ctx context.Context, _ []*schema.Message, _ ...model.O
 	return schema.StreamReaderFromArray([]*schema.Message{schema.AssistantMessage("ok", nil)}), nil
 }
 
-type p14RecordingBudget struct {
+type fixture14RecordingBudget struct {
 	mu           sync.Mutex
 	reservations map[string]BudgetCall
 	settled      map[string]BudgetSettlement
 }
 
-func newP14RecordingBudget() *p14RecordingBudget {
-	return &p14RecordingBudget{reservations: map[string]BudgetCall{}, settled: map[string]BudgetSettlement{}}
+func newP14RecordingBudget() *fixture14RecordingBudget {
+	return &fixture14RecordingBudget{reservations: map[string]BudgetCall{}, settled: map[string]BudgetSettlement{}}
 }
 
-func (*p14RecordingBudget) RuntimeBudgetHandle() {}
+func (*fixture14RecordingBudget) RuntimeBudgetHandle() {}
 
-func (b *p14RecordingBudget) ReserveCall(_ context.Context, call BudgetCall) (BudgetReservation, error) {
+func (b *fixture14RecordingBudget) ReserveCall(_ context.Context, call BudgetCall) (BudgetReservation, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if !time.Now().Before(call.Deadline) {
@@ -759,7 +759,7 @@ func (b *p14RecordingBudget) ReserveCall(_ context.Context, call BudgetCall) (Bu
 	return BudgetReservation{Identity: call.ReservationIdentity}, nil
 }
 
-func (b *p14RecordingBudget) SettleCall(_ context.Context, settlement BudgetSettlement) error {
+func (b *fixture14RecordingBudget) SettleCall(_ context.Context, settlement BudgetSettlement) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if _, ok := b.reservations[settlement.ReservationIdentity]; !ok {
@@ -769,22 +769,22 @@ func (b *p14RecordingBudget) SettleCall(_ context.Context, settlement BudgetSett
 	return nil
 }
 
-func (b *p14RecordingBudget) counts() (int, int) {
+func (b *fixture14RecordingBudget) counts() (int, int) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return len(b.reservations), len(b.settled)
 }
 
-func p14InvocationContext(t *testing.T, runID, userID string, budget BudgetHandle) (context.Context, ModelInvocation) {
+func fixture14InvocationContext(t *testing.T, runID, userID string, budget BudgetHandle) (context.Context, ModelInvocation) {
 	t.Helper()
-	frozen, err := FreezeRuntimeSnapshot(p14SnapshotInput(t))
+	frozen, err := FreezeRuntimeSnapshot(fixture14SnapshotInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return p14InvocationContextWithSnapshot(t, runID, userID, 1, budget, frozen)
+	return fixture14InvocationContextWithSnapshot(t, runID, userID, 1, budget, frozen)
 }
 
-func p14InvocationContextWithSnapshot(t *testing.T, runID, userID string, generation uint64, budget BudgetHandle, frozen FrozenRuntimeSnapshot) (context.Context, ModelInvocation) {
+func fixture14InvocationContextWithSnapshot(t *testing.T, runID, userID string, generation uint64, budget BudgetHandle, frozen FrozenRuntimeSnapshot) (context.Context, ModelInvocation) {
 	t.Helper()
 	identity := policy.Identity{UserID: userID, Role: policy.RoleViewer, Scope: policy.Scope{UserID: userID}}
 	token := workflow.LeaseToken{RunID: runID, Owner: "worker-" + runID, Generation: generation}
@@ -795,7 +795,7 @@ func p14InvocationContextWithSnapshot(t *testing.T, runID, userID string, genera
 	}
 	attempt := &AttemptContext{
 		Run: RunIdentity{ID: runID, SessionID: "session-" + runID, Attempt: 1, LeaseGeneration: generation,
-			RuntimeVersion: "runtime-p14", RuntimeCompatibilityHash: frozen.CompatibilityHash()},
+			RuntimeVersion: "runtime-phase14", RuntimeCompatibilityHash: frozen.CompatibilityHash()},
 		Identity: identity, Scope: identity.Scope, Budget: budget, Lease: token,
 		Trace: TraceIdentity{ID: "trace-" + runID}, Deadline: time.Now().Add(time.Hour), Snapshot: frozen,
 	}
@@ -809,9 +809,9 @@ func p14InvocationContextWithSnapshot(t *testing.T, runID, userID string, genera
 	}
 }
 
-func p14SnapshotInput(t *testing.T) RuntimeSnapshotInput {
+func fixture14SnapshotInput(t *testing.T) RuntimeSnapshotInput {
 	t.Helper()
-	input := p11SnapshotInput()
+	input := fixture11SnapshotInput()
 	for index := range input.Tools {
 		entry, err := policy.LookupCatalog(input.Tools[index].Name)
 		if err != nil {
@@ -823,7 +823,7 @@ func p14SnapshotInput(t *testing.T) RuntimeSnapshotInput {
 	return input
 }
 
-func p14TamperScope(t *testing.T, ctx context.Context) context.Context {
+func fixture14TamperScope(t *testing.T, ctx context.Context) context.Context {
 	t.Helper()
 	attempt, err := AttemptContextFromContext(ctx)
 	if err != nil {
@@ -834,7 +834,7 @@ func p14TamperScope(t *testing.T, ctx context.Context) context.Context {
 	return context.WithValue(ctx, attemptContextKey{}, &clone)
 }
 
-func p14ExpireDeadline(t *testing.T, ctx context.Context) context.Context {
+func fixture14ExpireDeadline(t *testing.T, ctx context.Context) context.Context {
 	t.Helper()
 	attempt, err := AttemptContextFromContext(ctx)
 	if err != nil {
@@ -845,7 +845,7 @@ func p14ExpireDeadline(t *testing.T, ctx context.Context) context.Context {
 	return context.WithValue(ctx, attemptContextKey{}, &clone)
 }
 
-func p14RequireCallMetadata(t *testing.T, ctx context.Context, kind BudgetCallKind, subject string) {
+func fixture14RequireCallMetadata(t *testing.T, ctx context.Context, kind BudgetCallKind, subject string) {
 	t.Helper()
 	metadata, err := CallMetadataFromContext(ctx)
 	if err != nil {
@@ -857,11 +857,11 @@ func p14RequireCallMetadata(t *testing.T, ctx context.Context, kind BudgetCallKi
 	}
 }
 
-func p14RequireAllEndpointsRejectMissingContext(t *testing.T, handler *RuntimeHandler) {
+func fixture14RequireAllEndpointsRejectMissingContext(t *testing.T, handler *RuntimeHandler) {
 	t.Helper()
 	ctx := context.Background()
 	toolContext := &adk.ToolContext{Name: "query_events", CallID: "missing-runtime-context"}
-	modelEndpoint := &p14Model{}
+	modelEndpoint := &fixture14Model{}
 	wrappedModel, err := handler.WrapModel(ctx, modelEndpoint, &adk.ModelContext{})
 	if err != nil {
 		t.Fatal(err)
@@ -919,10 +919,10 @@ func p14RequireAllEndpointsRejectMissingContext(t *testing.T, handler *RuntimeHa
 	}
 }
 
-func p14RequireBeforeAgentDynamicToolRejected(t *testing.T, handler *RuntimeHandler) {
+func fixture14RequireBeforeAgentDynamicToolRejected(t *testing.T, handler *RuntimeHandler) {
 	t.Helper()
-	dynamicTool := &p14DynamicUnknownTool{}
-	dynamicHandler := &p14DynamicToolHandler{
+	dynamicTool := &fixture14DynamicUnknownTool{}
+	dynamicHandler := &fixture14DynamicToolHandler{
 		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{}, tool: dynamicTool,
 	}
 	handlers, err := RuntimeHandlerFirst(handler, dynamicHandler)
@@ -930,14 +930,14 @@ func p14RequireBeforeAgentDynamicToolRejected(t *testing.T, handler *RuntimeHand
 		t.Fatal(err)
 	}
 	budget := newP14RecordingBudget()
-	ctx, invocation := p14InvocationContext(t, "run-before-agent-dynamic", "user-before-agent-dynamic", budget)
+	ctx, invocation := fixture14InvocationContext(t, "run-before-agent-dynamic", "user-before-agent-dynamic", budget)
 	ctx, err = WithModelInvocation(ctx, invocation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dynamicModel := &p14DynamicToolCallingModel{}
+	dynamicModel := &fixture14DynamicToolCallingModel{}
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name: "p14-dynamic-tool", Description: "P14 BeforeAgent dynamic Tool contract", Model: dynamicModel,
+		Name: "phase14-dynamic-tool", Description: "phase14 BeforeAgent dynamic Tool contract", Model: dynamicModel,
 		GenModelInput: LiteralGenModelInput, Handlers: handlers,
 	})
 	if err != nil {
@@ -966,7 +966,7 @@ func p14RequireBeforeAgentDynamicToolRejected(t *testing.T, handler *RuntimeHand
 	}
 }
 
-func p14DrainStream[T any](t *testing.T, stream *schema.StreamReader[T]) {
+func fixture14DrainStream[T any](t *testing.T, stream *schema.StreamReader[T]) {
 	t.Helper()
 	if stream == nil {
 		t.Fatal("stream is nil")

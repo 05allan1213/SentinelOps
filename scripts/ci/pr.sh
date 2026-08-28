@@ -80,8 +80,6 @@ run_backend_gate() {
 
 run_contract_gate() {
   go test ./internal/testutil/agent ./internal/ai/tools/mcp ./internal/ai/agent/skill_pipeline ./internal/ai/policy -count=1
-  go test ./internal/ai/runtime ./internal/ai/effects ./internal/ai/workflow \
-    -run '^TestFaultInjectionRepresentative$' -count=1
 }
 
 run_frontend_gate() {

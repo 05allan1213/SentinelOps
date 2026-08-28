@@ -78,7 +78,7 @@ var (
 	ErrUnsafeSessionValue = errors.New("unsafe Eino SessionValues entry")
 )
 
-// BudgetHandle 是 P14 记账服务在 typed Context 中的非序列化运行时引用。
+// BudgetHandle 是 phase14 记账服务在 typed Context 中的非序列化运行时引用。
 type BudgetHandle interface {
 	RuntimeBudgetHandle()
 }
@@ -91,7 +91,7 @@ type BudgetState struct {
 	Reservations json.RawMessage
 }
 
-// BudgetHandleFactory 由 P14 的唯一 Budget service 实现，P11 不建立平行记账逻辑。
+// BudgetHandleFactory 由 phase14 的唯一 Budget service 实现，phase11 不建立平行记账逻辑。
 type BudgetHandleFactory interface {
 	RebuildBudgetHandle(context.Context, BudgetState) (BudgetHandle, error)
 }
@@ -137,7 +137,7 @@ func (a *AttemptContext) Cancel() {
 
 type attemptContextKey struct{}
 
-// BuildAttemptContext 从 ClaimedRun 的 MySQL 列重建所有安全值并注入 P09 lease。
+// BuildAttemptContext 从 ClaimedRun 的 MySQL 列重建所有安全值并注入 phase09 lease。
 func BuildAttemptContext(parent context.Context, claimed workflow.ClaimedRun, budgets BudgetHandleFactory) (context.Context, *AttemptContext, error) {
 	if parent == nil {
 		return nil, nil, fmt.Errorf("parent context is required")

@@ -235,7 +235,7 @@ func buildTransitionInput(request TransactionalRequest) (workflow.TransitionEffe
 		return workflow.TransitionEffectInput{}, err
 	}
 	if entry.EffectType != policy.EffectTransactionalDB || entry.Risk != policy.RiskL1 || entry.Audience != policy.AudienceDurable {
-		return workflow.TransitionEffectInput{}, fmt.Errorf("tool %q is not a P23 transactional_db mutation", request.ToolName)
+		return workflow.TransitionEffectInput{}, fmt.Errorf("tool %q is not a phase23 transactional_db mutation", request.ToolName)
 	}
 	if entry.Revision != request.ToolRevision || entry.SchemaHash != request.ToolSchemaHash || !sameSteps(entry.EffectSteps, request.EffectSteps) {
 		return workflow.TransitionEffectInput{}, workflow.ErrEffectIdentityMismatch
@@ -251,8 +251,8 @@ func buildTransitionInput(request TransactionalRequest) (workflow.TransitionEffe
 	targetDigest := sha256.Sum256(canonicalArguments)
 	derived := make([]workflow.DerivedEffectInput, 0, len(entry.EffectSteps)-1)
 	for _, step := range entry.EffectSteps[1:] {
-		// P23 唯一 transactional_db 后继是可核对的 MySQL→Milvus 索引；
-		// 执行、deadline 与 reconciliation 仍留在 P24/P25。
+		// phase23 唯一 transactional_db 后继是可核对的 MySQL→Milvus 索引；
+		// 执行、deadline 与 reconciliation 仍留在 phase24/phase25。
 		derived = append(derived, workflow.DerivedEffectInput{Step: step, EffectType: string(policy.EffectReconcilable)})
 	}
 	return workflow.TransitionEffectInput{

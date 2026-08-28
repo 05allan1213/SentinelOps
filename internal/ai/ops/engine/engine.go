@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// LegacyWriteGate 是 P42 发布期兼容 Gate evaluator 的接口别名。
+// LegacyWriteGate 是 phase42 发布期兼容 Gate evaluator 的接口别名。
 type LegacyWriteGate = ops_pipeline.LegacyWriteGate
 
 // ErrLegacyOpsWritesDisabled 表示旧 Ops 直写入口默认关闭或收到 durable_v1 Context。

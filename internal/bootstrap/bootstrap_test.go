@@ -304,14 +304,14 @@ func TestProductionRejectsAmbiguousRuntimeVersion(t *testing.T) {
 func TestRollbackCompatibilityUsesFrozenGateAndCurrentSkillContent(t *testing.T) {
 	t.Setenv(airuntime.RuntimeVersionEnv, strings.Repeat("a", 40))
 	baseDir := t.TempDir()
-	skillDir := filepath.Join(baseDir, "p42-skill")
+	skillDir := filepath.Join(baseDir, "phase42-skill")
 	if err := os.MkdirAll(skillDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	skillPath := filepath.Join(skillDir, "SKILL.md")
 	writeSkill := func(body string) {
 		t.Helper()
-		content := "---\nname: p42-skill\ndescription: P42 compatibility fixture.\n---\n\n" + body + "\n"
+		content := "---\nname: phase42-skill\ndescription: phase42 compatibility fixture.\n---\n\n" + body + "\n"
 		if err := os.WriteFile(skillPath, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}

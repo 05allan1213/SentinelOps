@@ -82,7 +82,7 @@ type revisionZeroState struct {
 }
 
 // BootstrapRevisionZero 在独立事务中以 insert-if-absent 建立并返回 Revision 0。
-// P08 在 CreateRunWithSessionLock 的同一事务中直接复用 bootstrapRevisionZero。
+// phase08 在 CreateRunWithSessionLock 的同一事务中直接复用 bootstrapRevisionZero。
 func (s *GORMStore) BootstrapRevisionZero(ctx context.Context, sessionID, userID string) (*mysql.SessionStateRevision, error) {
 	if err := policy.Authorize(ctx, policy.PermissionViewScoped, policy.Resource{OwnerID: strings.TrimSpace(userID)}); err != nil {
 		return nil, err

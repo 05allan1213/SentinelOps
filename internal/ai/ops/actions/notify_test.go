@@ -13,16 +13,16 @@ import (
 	appconfig "SentinelOps/internal/config"
 )
 
-type p24ActionResolver struct {
+type fixture24ActionResolver struct {
 	value []byte
 	ref   appconfig.SecretRef
 }
 
-func (r *p24ActionResolver) Resolve(_ context.Context, ref appconfig.SecretRef) ([]byte, error) {
+func (r *fixture24ActionResolver) Resolve(_ context.Context, ref appconfig.SecretRef) ([]byte, error) {
 	if ref != r.ref {
 		return nil, fmt.Errorf("unexpected SecretRef")
 	}
-	r.value = []byte("p24-short-lived-token")
+	r.value = []byte("phase24-short-lived-token")
 	return r.value, nil
 }
 
@@ -41,13 +41,13 @@ func TestExternalEffectEphemeralSecretReachesWebhookEndpoint(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		gotKey = request.Header.Get("Idempotency-Key")
 		gotAuthorization = request.Header.Get("Authorization")
-		w.Header().Set("X-Request-ID", "provider-request-p24")
+		w.Header().Set("X-Request-ID", "provider-request-phase24")
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
 	oldConfig, _ := appconfig.Current()
-	resolver := &p24ActionResolver{ref: "env:P24_EFFECT_TOKEN"}
+	resolver := &fixture24ActionResolver{ref: "env:phase24_EFFECT_TOKEN"}
 	appconfig.SetCurrent(&appconfig.Config{Secrets: appconfig.SecretReferences{Effect: resolver.ref}})
 	appconfig.SetSecretResolver(resolver)
 	defer func() {
@@ -55,12 +55,12 @@ func TestExternalEffectEphemeralSecretReachesWebhookEndpoint(t *testing.T) {
 		appconfig.SetSecretResolver(appconfig.NewEnvironmentResolver())
 	}()
 	result, err := (&WebhookOutAction{}).Execute(effects.WithLegacyMutationContext(context.Background()), map[string]string{
-		"url": server.URL, "payload": `{"event":"p24"}`, "method": http.MethodPost,
+		"url": server.URL, "payload": `{"event":"phase24"}`, "method": http.MethodPost,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotKey != "" || gotAuthorization != "Bearer p24-short-lived-token" || result.Output["external_reference"] != "provider-request-p24" {
+	if gotKey != "" || gotAuthorization != "Bearer phase24-short-lived-token" || result.Output["external_reference"] != "provider-request-phase24" {
 		t.Fatalf("key=%q authorization=%q result=%#v", gotKey, gotAuthorization, result)
 	}
 	for _, value := range resolver.value {
@@ -75,7 +75,7 @@ func TestExternalEffectUnknownErrorDoesNotExposeResolvedSecret(t *testing.T) {
 	url := server.URL
 	server.Close()
 	oldConfig, _ := appconfig.Current()
-	resolver := &p24ActionResolver{ref: "env:P24_UNKNOWN_TOKEN"}
+	resolver := &fixture24ActionResolver{ref: "env:phase24_UNKNOWN_TOKEN"}
 	appconfig.SetCurrent(&appconfig.Config{Secrets: appconfig.SecretReferences{Effect: resolver.ref}})
 	appconfig.SetSecretResolver(resolver)
 	defer func() {
@@ -83,7 +83,7 @@ func TestExternalEffectUnknownErrorDoesNotExposeResolvedSecret(t *testing.T) {
 		appconfig.SetSecretResolver(appconfig.NewEnvironmentResolver())
 	}()
 	_, err := (&WebhookOutAction{}).Execute(effects.WithLegacyMutationContext(context.Background()), map[string]string{"url": url, "payload": `{}`})
-	if err == nil || !strings.Contains(err.Error(), "result unknown") || strings.Contains(err.Error(), "p24-short-lived-token") {
+	if err == nil || !strings.Contains(err.Error(), "result unknown") || strings.Contains(err.Error(), "phase24-short-lived-token") {
 		t.Fatalf("error=%v", err)
 	}
 	var invocationErr *effects.InvocationError

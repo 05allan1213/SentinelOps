@@ -1,31 +1,31 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- 这两个索引由旧启动路径手工创建；空库需要补建，既有库必须原样保留。
-SET @p03_index_exists = (
+SET @phase03_index_exists = (
     SELECT COUNT(*) FROM information_schema.STATISTICS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'events' AND INDEX_NAME = 'idx_events_created_at'
 );
-SET @p03_index_sql = IF(
-    @p03_index_exists = 0,
+SET @phase03_index_sql = IF(
+    @phase03_index_exists = 0,
     'CREATE INDEX idx_events_created_at ON events(created_at DESC)',
     'SELECT 1'
 );
-PREPARE p03_index_statement FROM @p03_index_sql;
-EXECUTE p03_index_statement;
-DEALLOCATE PREPARE p03_index_statement;
+PREPARE phase03_index_statement FROM @phase03_index_sql;
+EXECUTE phase03_index_statement;
+DEALLOCATE PREPARE phase03_index_statement;
 
-SET @p03_index_exists = (
+SET @phase03_index_exists = (
     SELECT COUNT(*) FROM information_schema.STATISTICS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'agent_trace_runs' AND INDEX_NAME = 'idx_trace_runs_created'
 );
-SET @p03_index_sql = IF(
-    @p03_index_exists = 0,
+SET @phase03_index_sql = IF(
+    @phase03_index_exists = 0,
     'CREATE INDEX idx_trace_runs_created ON agent_trace_runs(created_at DESC)',
     'SELECT 1'
 );
-PREPARE p03_index_statement FROM @p03_index_sql;
-EXECUTE p03_index_statement;
-DEALLOCATE PREPARE p03_index_statement;
+PREPARE phase03_index_statement FROM @phase03_index_sql;
+EXECUTE phase03_index_statement;
+DEALLOCATE PREPARE phase03_index_statement;
 CREATE INDEX idx_trace_runs_retention ON agent_trace_runs(created_at, status);
 CREATE INDEX idx_trace_nodes_retention ON agent_trace_nodes(created_at, trace_id);
 CREATE INDEX idx_workflow_runs_retention ON workflow_runs(finished_at, deleted_at, status);

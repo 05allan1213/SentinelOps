@@ -409,7 +409,7 @@ func (s *GORMStore) AuthorizeApprovalResume(ctx context.Context, input Authorize
 	return authorized, resultErr
 }
 
-// ExpireDueApprovals 在既有 Worker loop 中有界扫描，并复用 P21 决策 primitive 唤醒 Run。
+// ExpireDueApprovals 在既有 Worker loop 中有界扫描，并复用 phase21 决策 primitive 唤醒 Run。
 func (s *GORMStore) ExpireDueApprovals(ctx context.Context, workerID string, limit int) (int, error) {
 	if strings.TrimSpace(workerID) == "" || limit <= 0 || limit > 1000 {
 		return 0, fmt.Errorf("approval expiry worker and limit are invalid")

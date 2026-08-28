@@ -19,7 +19,7 @@ import (
 const einoCheckpointIDPrefix = "sentinelops/run/"
 
 var (
-	// ErrCheckpointContextMissing 表示 Eino Set 未携带 P09 唯一租约身份。
+	// ErrCheckpointContextMissing 表示 Eino Set 未携带 phase09 唯一租约身份。
 	ErrCheckpointContextMissing = errors.New("workflow checkpoint lease context missing")
 	// ErrCheckpointIDMismatch 表示 checkpoint ID 并非由 context 中的 Run 派生。
 	ErrCheckpointIDMismatch = errors.New("workflow checkpoint id does not match lease run")
@@ -34,7 +34,7 @@ var (
 	_ adk.CheckPointDeleter = (*GORMStore)(nil)
 )
 
-// ContextWithLeaseToken 将 P09 唯一 fenced write identity 传给 Eino Store。
+// ContextWithLeaseToken 将 phase09 唯一 fenced write identity 传给 Eino Store。
 func ContextWithLeaseToken(ctx context.Context, token LeaseToken) (context.Context, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("checkpoint context is required")
@@ -45,7 +45,7 @@ func ContextWithLeaseToken(ctx context.Context, token LeaseToken) (context.Conte
 	return context.WithValue(ctx, leaseTokenContextKey{}, token), nil
 }
 
-// LeaseTokenFromContext 读取同一 P09 token，供后续 typed RuntimeContext 复用。
+// LeaseTokenFromContext 读取同一 phase09 token，供后续 typed RuntimeContext 复用。
 func LeaseTokenFromContext(ctx context.Context) (LeaseToken, error) {
 	if ctx == nil {
 		return LeaseToken{}, ErrCheckpointContextMissing

@@ -36,7 +36,7 @@ var (
 )
 
 // DerivedEffectInput 描述 Primary 提交时必须确定性创建的 pending 后继步骤。
-// 后继执行与 reconciliation 属于 P24/P25，本单元只提交稳定 ledger 行。
+// 后继执行与 reconciliation 属于 phase24/phase25，本单元只提交稳定 ledger 行。
 type DerivedEffectInput struct {
 	Step       string
 	EffectType string
@@ -218,7 +218,7 @@ func validateTransitionEffectInput(input TransitionEffectInput, callback Transac
 		return fmt.Errorf("transactional Effect callback is required")
 	}
 	if input.EffectType != string(policy.EffectTransactionalDB) {
-		return fmt.Errorf("P23 requires transactional_db Primary Effect")
+		return fmt.Errorf("phase23 requires transactional_db Primary Effect")
 	}
 	if input.Attempt == 0 || strings.TrimSpace(input.ApprovalID) == "" || strings.TrimSpace(input.ToolName) == "" ||
 		strings.TrimSpace(input.ToolRevision) == "" || strings.TrimSpace(input.TraceID) == "" {

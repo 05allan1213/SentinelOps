@@ -75,8 +75,8 @@ type BudgetSettlement struct {
 	UsageQuality        string
 }
 
-// CallBudget 是 P14 RuntimeHandler 消费的最小 durable Budget 能力。
-// 它扩展 P11 handle，不定义第二套 Store 或业务 Service 接口。
+// CallBudget 是 phase14 RuntimeHandler 消费的最小 durable Budget 能力。
+// 它扩展 phase11 handle，不定义第二套 Store 或业务 Service 接口。
 type CallBudget interface {
 	BudgetHandle
 	ReserveCall(context.Context, BudgetCall) (BudgetReservation, error)
@@ -94,7 +94,7 @@ type DurableBudget struct {
 	store *workflow.GORMStore
 }
 
-// NewDurableBudget 创建 P14/P28 唯一 durable Budget factory。
+// NewDurableBudget 创建 phase14/phase28 唯一 durable Budget factory。
 func NewDurableBudget(store *workflow.GORMStore) (*DurableBudget, error) {
 	if store == nil {
 		return nil, fmt.Errorf("workflow GORMStore is required")
@@ -102,7 +102,7 @@ func NewDurableBudget(store *workflow.GORMStore) (*DurableBudget, error) {
 	return &DurableBudget{store: store}, nil
 }
 
-// RebuildBudgetHandle 只校验 P11 读出的持久化 JSON，不把额度复制为进程内真值。
+// RebuildBudgetHandle 只校验 phase11 读出的持久化 JSON，不把额度复制为进程内真值。
 func (b *DurableBudget) RebuildBudgetHandle(_ context.Context, state BudgetState) (BudgetHandle, error) {
 	if b == nil || b.store == nil {
 		return nil, fmt.Errorf("durable Budget Store is required")

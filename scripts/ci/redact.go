@@ -1,4 +1,4 @@
-// redact 使用现有 P06 Redactor 清理 CI 日志和报告，不保留 Secret 原值。
+// redact 使用现有 phase06 Redactor 清理 CI 日志和报告，不保留 Secret 原值。
 package main
 
 import (

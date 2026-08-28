@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// ErrRuntimeIncompatible 表示 Snapshot v1 不是精确相等；P12 决定 parked 转换。
+// ErrRuntimeIncompatible 表示 Snapshot v1 不是精确相等；phase12 决定 parked 转换。
 var ErrRuntimeIncompatible = errors.New("runtime snapshot is incompatible")
 
 // RequireExactCompatibility 实施 v1 唯一兼容规则，不做猜测或子集兼容。

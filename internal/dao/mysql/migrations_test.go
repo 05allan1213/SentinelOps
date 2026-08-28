@@ -18,7 +18,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const disposableDatabasePrefix = "sentinelops_p03"
+const disposableDatabasePrefix = "sentinelops_phase03"
 
 func TestMigrationsUpFromEmptyDatabase(t *testing.T) {
 	_, gormDB, dsn := newDisposableDatabase(t, "empty")
@@ -30,7 +30,7 @@ func TestMigrationsUpFromCurrentSchemaSnapshot(t *testing.T) {
 	_, gormDB, dsn := newDisposableDatabase(t, "current")
 	requireCurrentSchemaSnapshot(t, gormDB)
 
-	legacy := p03WorkflowRun{
+	legacy := fixture03WorkflowRun{
 		ID: "legacy-run", WorkflowKey: "legacy", SessionID: "legacy-session",
 		Status: "running", StartedAt: time.Now(),
 	}
@@ -195,10 +195,10 @@ func requireCurrentSchemaSnapshot(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	models := []any{
 		&Event{}, &Subscription{}, &Report{}, &User{}, &Setting{}, &QueryTermMapping{},
-		&TraceRun{}, &TraceNode{}, &p03KnowledgeBase{}, &p03KnowledgeDocument{}, &p03KnowledgeChunk{},
+		&TraceRun{}, &TraceNode{}, &fixture03KnowledgeBase{}, &fixture03KnowledgeDocument{}, &fixture03KnowledgeChunk{},
 		&MessageFeedback{}, &UserPreference{}, &OpsPlaybook{}, &OpsRun{}, &OpsRunStep{},
-		&OpsProtectedAsset{}, &p03WorkflowRun{}, &p03WorkflowEvent{}, &p03WorkflowCheckpoint{},
-		&p03SessionStateRevision{},
+		&OpsProtectedAsset{}, &fixture03WorkflowRun{}, &fixture03WorkflowEvent{}, &fixture03WorkflowCheckpoint{},
+		&fixture03SessionStateRevision{},
 	}
 	if err := db.AutoMigrate(models...); err != nil {
 		t.Fatalf("create current schema snapshot: %v", err)
@@ -216,9 +216,9 @@ func requireCurrentSchemaSnapshot(t *testing.T, db *gorm.DB) {
 	}
 }
 
-// 下列冻结模型只用于重建 P03 开始前的旧 Schema。生产 GORM 模型会随
+// 下列冻结模型只用于重建 phase03 开始前的旧 Schema。生产 GORM 模型会随
 // 后续单元映射 Expand 列，不能反向改变“从旧 Schema Up”的 contract test。
-type p03KnowledgeBase struct {
+type fixture03KnowledgeBase struct {
 	ID          string         `gorm:"column:id;primaryKey;size:64"`
 	Name        string         `gorm:"column:name;size:128;not null"`
 	Description string         `gorm:"column:description;type:text"`
@@ -229,9 +229,9 @@ type p03KnowledgeBase struct {
 	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
-func (p03KnowledgeBase) TableName() string { return "knowledge_bases" }
+func (fixture03KnowledgeBase) TableName() string { return "knowledge_bases" }
 
-type p03KnowledgeDocument struct {
+type fixture03KnowledgeDocument struct {
 	ID              string         `gorm:"column:id;primaryKey;size:64"`
 	BaseID          string         `gorm:"column:base_id;size:64;not null;index"`
 	Name            string         `gorm:"column:name;size:256;not null"`
@@ -253,9 +253,9 @@ type p03KnowledgeDocument struct {
 	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
-func (p03KnowledgeDocument) TableName() string { return "knowledge_documents" }
+func (fixture03KnowledgeDocument) TableName() string { return "knowledge_documents" }
 
-type p03KnowledgeChunk struct {
+type fixture03KnowledgeChunk struct {
 	ID             string    `gorm:"column:id;primaryKey;size:64"`
 	DocID          string    `gorm:"column:doc_id;size:64;not null;index"`
 	ChunkIndex     int       `gorm:"column:chunk_index;not null"`
@@ -267,9 +267,9 @@ type p03KnowledgeChunk struct {
 	UpdatedAt      time.Time `gorm:"column:updated_at;type:datetime;autoUpdateTime"`
 }
 
-func (p03KnowledgeChunk) TableName() string { return "knowledge_chunks" }
+func (fixture03KnowledgeChunk) TableName() string { return "knowledge_chunks" }
 
-type p03WorkflowRun struct {
+type fixture03WorkflowRun struct {
 	ID            string         `gorm:"column:id;primaryKey;size:64"`
 	WorkflowKey   string         `gorm:"column:workflow_key;size:128;not null;index"`
 	SessionID     string         `gorm:"column:session_id;size:64;index"`
@@ -285,9 +285,9 @@ type p03WorkflowRun struct {
 	DeletedAt     gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
-func (p03WorkflowRun) TableName() string { return "workflow_runs" }
+func (fixture03WorkflowRun) TableName() string { return "workflow_runs" }
 
-type p03WorkflowEvent struct {
+type fixture03WorkflowEvent struct {
 	ID        uint      `gorm:"primaryKey;autoIncrement"`
 	RunID     string    `gorm:"column:run_id;size:64;not null;uniqueIndex:idx_workflow_events_run_seq,priority:1"`
 	Seq       int       `gorm:"column:seq;not null;uniqueIndex:idx_workflow_events_run_seq,priority:2"`
@@ -296,9 +296,9 @@ type p03WorkflowEvent struct {
 	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
 }
 
-func (p03WorkflowEvent) TableName() string { return "workflow_events" }
+func (fixture03WorkflowEvent) TableName() string { return "workflow_events" }
 
-type p03WorkflowCheckpoint struct {
+type fixture03WorkflowCheckpoint struct {
 	ID            string         `gorm:"column:id;primaryKey;size:64"`
 	RunID         string         `gorm:"column:run_id;size:64;not null;index"`
 	CheckpointKey string         `gorm:"column:checkpoint_key;size:128;not null;index"`
@@ -308,9 +308,9 @@ type p03WorkflowCheckpoint struct {
 	DeletedAt     gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
-func (p03WorkflowCheckpoint) TableName() string { return "workflow_checkpoints" }
+func (fixture03WorkflowCheckpoint) TableName() string { return "workflow_checkpoints" }
 
-type p03SessionStateRevision struct {
+type fixture03SessionStateRevision struct {
 	ID        uint           `gorm:"primaryKey;autoIncrement"`
 	SessionID string         `gorm:"column:session_id;size:64;not null;uniqueIndex:idx_session_state_revisions_session_revision,priority:1"`
 	Revision  int            `gorm:"column:revision;not null;uniqueIndex:idx_session_state_revisions_session_revision,priority:2"`
@@ -319,7 +319,7 @@ type p03SessionStateRevision struct {
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
-func (p03SessionStateRevision) TableName() string { return "session_state_revisions" }
+func (fixture03SessionStateRevision) TableName() string { return "session_state_revisions" }
 
 func newDisposableDatabase(t *testing.T, suffix string) (*sql.DB, *gorm.DB, string) {
 	t.Helper()
@@ -330,7 +330,7 @@ func newDisposableDatabaseWithDSN(t *testing.T, suffix string) (*sql.DB, *gorm.D
 	t.Helper()
 	baseDSN := os.Getenv("SENTINELOPS_TEST_DSN")
 	if baseDSN == "" {
-		t.Fatal("SENTINELOPS_TEST_DSN is required and must target the P03 throwaway MySQL")
+		t.Fatal("SENTINELOPS_TEST_DSN is required and must target the phase03 throwaway MySQL")
 	}
 	cfg, err := driver.ParseDSN(baseDSN)
 	if err != nil {

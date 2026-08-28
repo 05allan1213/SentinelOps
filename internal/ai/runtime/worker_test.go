@@ -9,7 +9,7 @@ import (
 
 func TestLeaseBackoffIsBounded(t *testing.T) {
 	worker, err := NewWorker(workflow.NewGORMStore(nil), WorkerConfig{
-		Owner:          "worker-p09",
+		Owner:          "worker-phase09",
 		LeaseDuration:  time.Minute,
 		MinPollBackoff: 25 * time.Millisecond,
 		MaxPollBackoff: 200 * time.Millisecond,

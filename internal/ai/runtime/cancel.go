@@ -49,7 +49,7 @@ func RequestDrain(cancel adk.AgentCancelFunc, boundary DrainBoundary, timeout ti
 	return handle, nil
 }
 
-// RequestLostLeaseCancel 立即 recursive cancel；P09/P10 fence 继续拒绝旧 generation 的所有写入。
+// RequestLostLeaseCancel 立即 recursive cancel；phase09/phase10 fence 继续拒绝旧 generation 的所有写入。
 func RequestLostLeaseCancel(cancel adk.AgentCancelFunc) (*adk.CancelHandle, error) {
 	if cancel == nil {
 		return nil, fmt.Errorf("agent cancel function is required")

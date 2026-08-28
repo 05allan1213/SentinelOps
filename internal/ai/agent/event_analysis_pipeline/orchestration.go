@@ -68,7 +68,7 @@ func BuildDurableEventAnalysisAgent(ctx context.Context, handler *runtime.Runtim
 }
 
 // GetDurableEventAnalysisAgent lazily constructs the ADK specialist. It is not
-// connected to the outer Planner until P19.
+// connected to the outer Planner until phase19.
 func GetDurableEventAnalysisAgent(ctx context.Context) (adk.Agent, error) {
 	durableOnce.Do(func() {
 		durableAgent, durableErr = BuildDurableEventAnalysisAgent(ctx, runtime.NewRuntimeHandler())

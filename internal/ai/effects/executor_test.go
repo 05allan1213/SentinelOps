@@ -46,6 +46,6 @@ func TestTransactionalEffectExecutorRejectsExternalCatalogEntries(t *testing.T) 
 		ArgumentsJSON: `{"ip":"192.0.2.1"}`, EffectSteps: entry.EffectSteps,
 	})
 	if err == nil {
-		t.Fatal("P24 external Effect entered P23 Executor")
+		t.Fatal("phase24 external Effect entered phase23 Executor")
 	}
 }

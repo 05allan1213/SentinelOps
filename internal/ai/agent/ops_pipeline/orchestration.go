@@ -58,7 +58,7 @@ func BuildDurableOpsAgent(ctx context.Context, handler *runtime.RuntimeHandler) 
 	return NewOpsAgent(ctx, nil, handler)
 }
 
-// GetDurableOpsAgent 懒构建 ADK 运维 Agent；旧 ExecuteRun 路径和 P19 接线均保持独立。
+// GetDurableOpsAgent 懒构建 ADK 运维 Agent；旧 ExecuteRun 路径和 phase19 接线均保持独立。
 func GetDurableOpsAgent(ctx context.Context) (adk.Agent, error) {
 	opsDurableOnce.Do(func() {
 		opsDurableAgent, opsDurableErr = BuildDurableOpsAgent(ctx, runtime.NewRuntimeHandler())

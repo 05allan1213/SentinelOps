@@ -15,8 +15,6 @@ import (
 const (
 	// PolicyMutationDisabled 是 Effect/HITL 接线前 Mutation Tool 的固定拒绝码。
 	PolicyMutationDisabled = "POLICY_MUTATION_DISABLED"
-	// ToolInventoryVersion 是 durable 专业 Agent inventory 的版本标识。
-	ToolInventoryVersion = "sentinelops.agent.tool-inventory/v1"
 	// AdminQueryDatabaseDebugGate 是通用只读 SQL debug builder 的默认关闭 Gate。
 	AdminQueryDatabaseDebugGate = "agent_runtime.admin_query_database_debug"
 )
@@ -166,7 +164,7 @@ func CatalogEntries() map[string]CatalogEntry {
 }
 
 // RequireExecutable 对未知 Tool 和尚未接线的 Mutation Tool fail-closed。
-// L0 通过只表示可进入 P14 的 Scope、预算、deadline 与 Trace 检查，不代表直接授权 endpoint。
+// L0 通过只表示可进入 phase14 的 Scope、预算、deadline 与 Trace 检查，不代表直接授权 endpoint。
 func RequireExecutable(name string) error {
 	entry, err := LookupCatalog(name)
 	if err != nil {

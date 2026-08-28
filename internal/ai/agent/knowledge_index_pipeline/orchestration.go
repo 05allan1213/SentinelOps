@@ -23,10 +23,10 @@ type IndexInput struct {
 	BaseID         string            // 所属知识库ID（可选，metadata 注入）
 	DocID          string            // 文档ID（可选，Milvus 删除依据）
 	DocTitle       string            // 文档主标题（metadata 注入）
-	SourceVersion  string            // P03 Evidence 字段快照
-	ContentHash    string            // P03 内容 hash 快照
-	AccessScope    string            // P03 授权 Scope 快照
-	IndexedVersion uint64            // P03 索引版本快照
+	SourceVersion  string            // phase03 Evidence 字段快照
+	ContentHash    string            // phase03 内容 hash 快照
+	AccessScope    string            // phase03 授权 Scope 快照
+	IndexedVersion uint64            // phase03 索引版本快照
 	Config         aidoc.ChunkConfig // 含 hierarchical 策略参数
 }
 

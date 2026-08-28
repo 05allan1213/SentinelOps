@@ -34,7 +34,7 @@ func TestDurableCreatePreservesCallerDeadline(t *testing.T) {
 	deadline := time.Now().Add(time.Minute)
 	service, err := NewDurableService(DurableServiceConfig{
 		AcceptNewRuns: true,
-		Snapshot:      p20ServiceSnapshot(),
+		Snapshot:      fixture20ServiceSnapshot(),
 		CreateRun: func(ctx context.Context, _ workflow.CreateRunInput) (*mysql.WorkflowRun, error) {
 			got, ok := ctx.Deadline()
 			if !ok || !got.Equal(deadline) {

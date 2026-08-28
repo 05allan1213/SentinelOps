@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// RecoveryMode 是 P12 写入 workflow Event 的确定性恢复选择。
+// RecoveryMode 是 phase12 写入 workflow Event 的确定性恢复选择。
 type RecoveryMode string
 
 const (
@@ -144,7 +144,7 @@ func (s *GORMStore) ParkRecovery(ctx context.Context, input RecoveryParkInput) e
 	switch input.Reason {
 	case ParkReasonRuntimeIncompatible, ParkReasonCheckpointMissing, ParkReasonCheckpointCorrupt:
 	default:
-		return fmt.Errorf("unsupported P12 park reason %q", input.Reason)
+		return fmt.Errorf("unsupported phase12 park reason %q", input.Reason)
 	}
 	event := recoveryEvent(EventRunParked, RecoveryModeParked, input.Attempt, input.Lease.Generation, input.RuntimeVersion, input.TraceID, input.Reason)
 	payload, err := marshalDurableEvent(event)

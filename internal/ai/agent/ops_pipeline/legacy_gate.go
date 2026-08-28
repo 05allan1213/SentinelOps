@@ -12,8 +12,8 @@ var (
 	ErrLegacyOpsWritesDisabled = errors.New("legacy Ops direct writes are disabled")
 )
 
-// LegacyWriteGate 是 P42 才能接入发布 Gate evaluator 的最薄兼容边界。
-// P26 不提供生产开启实现；nil 为默认关闭，durable_v1 永远不能通过。
+// LegacyWriteGate 是 phase42 才能接入发布 Gate evaluator 的最薄兼容边界。
+// phase26 不提供生产开启实现；nil 为默认关闭，durable_v1 永远不能通过。
 type LegacyWriteGate interface {
 	AllowLegacyOpsWrites(context.Context) bool
 }

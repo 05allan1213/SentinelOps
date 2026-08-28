@@ -19,7 +19,7 @@ import (
 
 func startRBACServer(t *testing.T, authEnabled bool) string {
 	t.Helper()
-	s := g.Server("p05-" + uuid.NewString())
+	s := g.Server("phase05-" + uuid.NewString())
 	s.SetDumpRouterMap(false)
 	s.SetPort(0)
 	s.Group("/api", func(group *ghttp.RouterGroup) {
@@ -83,7 +83,7 @@ func doRequest(t *testing.T, method, url, token, clientUserID string) (int, stri
 }
 
 func TestJWTContextIsAuthoritative(t *testing.T) {
-	if err := auth.Init([]byte("p05-test-jwt-secret-with-sufficient-length")); err != nil {
+	if err := auth.Init([]byte("phase05-test-jwt-secret-with-sufficient-length")); err != nil {
 		t.Fatal(err)
 	}
 	token, err := auth.Generate("server-user", "alice", "user", time.Minute)
@@ -98,7 +98,7 @@ func TestJWTContextIsAuthoritative(t *testing.T) {
 }
 
 func TestClientUserIDCannotOverrideJWT(t *testing.T) {
-	if err := auth.Init([]byte("p05-test-jwt-secret-with-sufficient-length")); err != nil {
+	if err := auth.Init([]byte("phase05-test-jwt-secret-with-sufficient-length")); err != nil {
 		t.Fatal(err)
 	}
 	token, err := auth.Generate("jwt-user", "alice", "viewer", time.Minute)
@@ -113,7 +113,7 @@ func TestClientUserIDCannotOverrideJWT(t *testing.T) {
 }
 
 func TestRoleMatrixHTTP(t *testing.T) {
-	if err := auth.Init([]byte("p05-test-jwt-secret-with-sufficient-length")); err != nil {
+	if err := auth.Init([]byte("phase05-test-jwt-secret-with-sufficient-length")); err != nil {
 		t.Fatal(err)
 	}
 	baseURL := startRBACServer(t, true)

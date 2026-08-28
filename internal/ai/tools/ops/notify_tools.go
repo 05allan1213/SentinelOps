@@ -187,14 +187,14 @@ func NewUpdateEventStatusTool() tool.InvokableTool {
 }
 
 // WebhookOutInput 是 webhook_out 的服务端固定参数 Schema。
-// 鉴权 Secret 不接受模型参数，后续 Effect 执行时只从 P04 Resolver 即时解析。
+// 鉴权 Secret 不接受模型参数，后续 Effect 执行时只从 phase04 Resolver 即时解析。
 type WebhookOutInput struct {
 	URL     string `json:"url" jsonschema:"description=经服务端 Policy 允许的目标 URL,required=true"`
 	Payload string `json:"payload" jsonschema:"description=发送给目标系统的 JSON payload,required=true"`
 	Method  string `json:"method,omitempty" jsonschema:"description=HTTP 方法，默认 POST"`
 }
 
-// NewWebhookOutTool 创建 P26 durable Ops inventory 使用的 L2 webhook_out Tool。
+// NewWebhookOutTool 创建 phase26 durable Ops inventory 使用的 L2 webhook_out Tool。
 func NewWebhookOutTool() tool.InvokableTool {
 	t, err := utils.InferOptionableTool(
 		"webhook_out",

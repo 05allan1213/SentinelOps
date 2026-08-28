@@ -65,7 +65,7 @@ func BuildDurableSolveAgent(ctx context.Context, handler *runtime.RuntimeHandler
 	return NewSolveAgent(ctx, nil, handler)
 }
 
-// GetDurableSolveAgent lazily constructs the ADK specialist. P19 owns outer
+// GetDurableSolveAgent lazily constructs the ADK specialist. phase19 owns outer
 // Planner/AgentTool wiring.
 func GetDurableSolveAgent(ctx context.Context) (adk.Agent, error) {
 	durableOnce.Do(func() {

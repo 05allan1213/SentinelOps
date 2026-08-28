@@ -21,7 +21,7 @@ jobs:
         image: mysql:8.0.43
         env:
           MYSQL_ROOT_PASSWORD: sentinelops-pr-root-password
-          MYSQL_DATABASE: sentinelops_p03
+          MYSQL_DATABASE: sentinelops_phase03
         ports:
           - 3306:3306
         options: >-
@@ -30,7 +30,7 @@ jobs:
           --health-timeout=5s
           --health-retries=30
     env:
-      SENTINELOPS_TEST_DSN: root:sentinelops-pr-root-password@tcp(127.0.0.1:3306)/sentinelops_p03?parseTime=true
+      SENTINELOPS_TEST_DSN: root:sentinelops-pr-root-password@tcp(127.0.0.1:3306)/sentinelops_phase03?parseTime=true
       STATICCHECK_VERSION: "2026.2.1"
       GOVULNCHECK_MODULE_VERSION: v1.7.0
     steps:

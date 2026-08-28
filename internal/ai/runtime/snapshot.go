@@ -179,7 +179,7 @@ func RecoveryCompatibilityHash(snapshot FrozenRuntimeSnapshot) string {
 	return snapshot.CompatibilityHash()
 }
 
-// WorkflowFields 将同一个 Frozen Snapshot 拆为 P03 已有列，不重复计算身份。
+// WorkflowFields 将同一个 Frozen Snapshot 拆为 phase03 已有列，不重复计算身份。
 func (s FrozenRuntimeSnapshot) WorkflowFields() workflow.RuntimeSnapshotFields {
 	runtimeVersion, _ := policy.CanonicalJSON(s.document.Runtime)
 	models, _ := policy.CanonicalJSON(s.document.Models)

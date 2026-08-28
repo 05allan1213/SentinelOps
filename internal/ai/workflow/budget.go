@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	// BaseBudgetSchema 是 P14 初始 Model/L0 Tool 调用预算的持久化版本。
+	// BaseBudgetSchema 是 phase14 初始 Model/L0 Tool 调用预算的持久化版本。
 	BaseBudgetSchema = "sentinelops/run-base-budget/v1"
 
 	// BaseBudgetKindModelCall 表示一次真实 Model endpoint 调用。
@@ -54,22 +54,22 @@ var (
 	ErrBaseBudgetDeadlineExceeded = errors.New("base run budget deadline exceeded")
 	// ErrBudgetReservationConflict 表示相同 reservation identity 被用于不同物理调用。
 	ErrBudgetReservationConflict = errors.New("budget reservation identity conflict")
-	// ErrBaseBudgetLimitsInvalid 表示 P14 调用需要的持久化 limit 缺失或非法。
+	// ErrBaseBudgetLimitsInvalid 表示 phase14 调用需要的持久化 limit 缺失或非法。
 	ErrBaseBudgetLimitsInvalid = errors.New("base run budget limits invalid")
 	ErrBaseBudgetUsageUnknown  = errors.New("run budget usage is unknown")
 )
 
-// BaseBudgetKind 是 P14 唯一支持的基础 reservation 分类。
+// BaseBudgetKind 是 phase14 唯一支持的基础 reservation 分类。
 type BaseBudgetKind string
 
 // BaseBudgetReservationState 是 reservation 的 crash-preserved 状态。
 type BaseBudgetReservationState string
 
-// BaseBudgetOutcome 是 endpoint 的基础结算结果；P28 再补 Token/Cost quality。
+// BaseBudgetOutcome 是 endpoint 的基础结算结果；phase28 再补 Token/Cost quality。
 type BaseBudgetOutcome string
 
-// BaseBudgetLimits 是 P14 从 Run budget_limits_json 消费的最小硬限制。
-// P28 只能在同一 JSON 文档中增加字段，不能迁移 identity 或建立第二个 Store。
+// BaseBudgetLimits 是 phase14 从 Run budget_limits_json 消费的最小硬限制。
+// phase28 只能在同一 JSON 文档中增加字段，不能迁移 identity 或建立第二个 Store。
 type BaseBudgetLimits struct {
 	MaxModelCalls        int64   `json:"max_model_calls"`
 	MaxL0ToolCalls       int64   `json:"max_l0_tool_calls"`
@@ -176,7 +176,7 @@ type BaseBudgetReservation struct {
 	UsageQuality       string                     `json:"usage_quality,omitempty"`
 }
 
-// BaseBudgetReservations 是 budget_reservations_json 的唯一 P14 envelope。
+// BaseBudgetReservations 是 budget_reservations_json 的唯一 phase14 envelope。
 type BaseBudgetReservations struct {
 	Schema string                           `json:"schema"`
 	Items  map[string]BaseBudgetReservation `json:"items"`
@@ -309,7 +309,7 @@ func (s *GORMStore) ReserveBaseBudget(ctx context.Context, input ReserveBaseBudg
 }
 
 // SettleBaseBudget 将 pending reservation 标为 settled；额度不会退回。
-// P28 在同一 reservation 上增加 Token/Cost settle，不得改变本方法的 identity 语义。
+// phase28 在同一 reservation 上增加 Token/Cost settle，不得改变本方法的 identity 语义。
 func (s *GORMStore) SettleBaseBudget(ctx context.Context, input SettleBaseBudgetInput) error {
 	if err := s.authorizeRunScope(ctx, input.Lease.RunID); err != nil {
 		return err

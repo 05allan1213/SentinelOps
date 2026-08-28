@@ -35,7 +35,7 @@ type RecoveryStartResult struct {
 // AgentResolver 只把 immutable input 中白名单 Agent 名映射到真实 Eino Agent。
 type AgentResolver func(context.Context, string) (adk.Agent, error)
 
-// DurableExecutor 组合 P10-P14 primitive 与官方 Runner，不定义第二套 Agent Loop。
+// DurableExecutor 组合 phase10-phase14 primitive 与官方 Runner，不定义第二套 Agent Loop。
 type DurableExecutor struct {
 	store                 *workflow.GORMStore
 	budgets               BudgetHandleFactory
@@ -93,7 +93,7 @@ func NewDurableExecutorWithReleaseControls(
 	return executor, nil
 }
 
-// ExecuteClaimedRun 从 MySQL 快照重建 Context，并只通过 P12 StartRecovery 调用官方 Runner。
+// ExecuteClaimedRun 从 MySQL 快照重建 Context，并只通过 phase12 StartRecovery 调用官方 Runner。
 func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workflow.ClaimedRun) (result RunExecutionResult, execErr error) {
 	if e == nil || claimed == nil || claimed.Run.ImmutableInputJSON == nil {
 		return RunExecutionResult{}, fmt.Errorf("claimed durable Run input is required")
@@ -470,7 +470,7 @@ func classifyRunnerError(err error) error {
 	return err
 }
 
-// NewDurableRunner 直接把 P10 Store 注入官方 Eino RunnerConfig。
+// NewDurableRunner 直接把 phase10 Store 注入官方 Eino RunnerConfig。
 func NewDurableRunner(ctx context.Context, agent adk.Agent, store adk.CheckPointStore, enableStreaming bool) (*adk.Runner, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("runner context is required")

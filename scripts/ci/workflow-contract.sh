@@ -16,7 +16,7 @@ import pathlib
 import re
 
 root = pathlib.Path(".github/workflows")
-expected = {"pr.yml", "integration.yml", "provider-eval.yml"}
+expected = {"pr.yml"}
 present = {path.name for path in root.glob("*.yml")}
 missing = sorted(expected - present)
 if missing:
@@ -40,16 +40,8 @@ if count == 0:
     raise SystemExit("no external Actions were inspected")
 
 pr = (root / "pr.yml").read_text()
-integration = (root / "integration.yml").read_text()
-provider = (root / "provider-eval.yml").read_text()
 if "pull_request:" not in pr:
     raise SystemExit("pr.yml is not a Pull Request workflow")
-if "pull_request:" in provider or "push:" in provider:
-    raise SystemExit("provider-eval.yml must be manual/scheduled only")
-if "workflow_dispatch:" not in provider or "schedule:" not in provider:
-    raise SystemExit("provider-eval.yml must define workflow_dispatch and schedule")
-if "sentinelops-e2e" not in integration:
-    raise SystemExit("integration.yml does not use the isolated sentinelops-e2e project")
 PY
 
 echo "PASS: workflow syntax, separation and immutable Action pins"

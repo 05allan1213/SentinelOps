@@ -64,7 +64,7 @@ func BuildDurableIntelligenceAgent(ctx context.Context, handler *runtime.Runtime
 	return NewIntelligenceAgent(ctx, nil, handler)
 }
 
-// GetDurableIntelligenceAgent 懒构建 ADK 情报 Agent；P19 负责接入 Planner/AgentTool。
+// GetDurableIntelligenceAgent 懒构建 ADK 情报 Agent；phase19 负责接入 Planner/AgentTool。
 func GetDurableIntelligenceAgent(ctx context.Context) (adk.Agent, error) {
 	intelligenceDurableOnce.Do(func() {
 		intelligenceDurableAgent, intelligenceDurableErr = BuildDurableIntelligenceAgent(ctx, runtime.NewRuntimeHandler())
