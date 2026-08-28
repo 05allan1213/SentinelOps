@@ -163,7 +163,7 @@ func (r *MySQLTruthReader) readAttempt(ctx context.Context, runID string) (Attem
 
 func (r *MySQLTruthReader) failIfTerminal(ctx context.Context, runID, stage string) error {
 	var run mysql.WorkflowRun
-	result := r.DB.WithContext(ctx).Select("id", "status").Where("id = ?", strings.TrimSpace(runID)).First(&run)
+	result := r.DB.WithContext(ctx).Select("id", "status", "attempt", "max_attempts").Where("id = ?", strings.TrimSpace(runID)).First(&run)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil
@@ -171,6 +171,9 @@ func (r *MySQLTruthReader) failIfTerminal(ctx context.Context, runID, stage stri
 		return fmt.Errorf("read workflow Run while waiting for %s: %w", stage, result.Error)
 	}
 	if isEvalTerminal(run.Status) {
+		return fmt.Errorf("run reached terminal status before %s was observed", stage)
+	}
+	if run.Status == workflow.RunStatusPending && run.Attempt >= run.MaxAttempts {
 		return fmt.Errorf("run reached terminal status before %s was observed", stage)
 	}
 	return nil

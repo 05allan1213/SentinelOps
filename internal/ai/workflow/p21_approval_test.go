@@ -79,6 +79,42 @@ func TestApprovalDecisionCASIsIdempotentAndWakesRun(t *testing.T) {
 	}
 }
 
+func TestApprovalDecisionParksRunWhenAttemptsExhausted(t *testing.T) {
+	db := newP07Database(t, "p21_attempts_exhausted")
+	store, approval := p21SeedApproval(t, db, "attempts-exhausted", ApprovalStatusPending, "requester", time.Now().Add(time.Hour))
+	if err := db.Model(&mysql.WorkflowRun{}).Where("id = ?", approval.RunID).Update("attempt", 3).Error; err != nil {
+		t.Fatalf("raise fixture Run attempt: %v", err)
+	}
+	ctx := p21Identity("approver", policy.RoleApprover)
+	decided, err := store.DecideApprovalAndWakeRun(ctx, DecideApprovalInput{
+		ApprovalID: approval.ID, ProposalHash: approval.ProposalHash,
+		ExpectedVersion: approval.Version, Decision: ApprovalStatusApproved, Reason: "final decision",
+	})
+	if err != nil {
+		t.Fatalf("decide final Approval: %v", err)
+	}
+	if decided.Status != ApprovalStatusApproved {
+		t.Fatalf("decided Approval = %#v", decided)
+	}
+	var run mysql.WorkflowRun
+	if err := db.First(&run, "id = ?", approval.RunID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != RunStatusParked || run.ParkReason == nil || *run.ParkReason != ParkReasonApprovalAttemptsExhausted {
+		t.Fatalf("exhausted Run = status=%q park_reason=%v, want parked %q", run.Status, run.ParkReason, ParkReasonApprovalAttemptsExhausted)
+	}
+	if run.LeaseOwner != nil || run.LeaseUntil != nil {
+		t.Fatalf("exhausted Run still holds a lease: owner=%v until=%v", run.LeaseOwner, run.LeaseUntil)
+	}
+	var parkedCount int64
+	if err := db.Model(&mysql.WorkflowEvent{}).Where("run_id = ? AND event_type = ?", approval.RunID, EventRunParked).Count(&parkedCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if parkedCount != 1 {
+		t.Fatalf("run.parked count=%d, want 1", parkedCount)
+	}
+}
+
 func TestApprovalDecisionExpiredReturnsStableConflict(t *testing.T) {
 	db := newP07Database(t, "p21_expired")
 	store, approval := p21SeedApproval(t, db, "expired", ApprovalStatusPending, "requester", time.Now().Add(-time.Minute))

@@ -165,7 +165,12 @@ func (s *GORMStore) DecideApprovalAndWakeRun(ctx context.Context, input DecideAp
 		if runResult.Error != nil {
 			return fmt.Errorf("锁定 Approval Run: %w", runResult.Error)
 		}
-		if err := ValidateRunTransition(run.Status, RunStatusPending, TransitionIntentApprovalDecided, ""); err != nil {
+		attemptsExhausted := run.Attempt >= run.MaxAttempts
+		if attemptsExhausted {
+			if err := ValidateRunTransition(run.Status, RunStatusParked, TransitionIntentDefault, ParkReasonApprovalAttemptsExhausted); err != nil {
+				return err
+			}
+		} else if err := ValidateRunTransition(run.Status, RunStatusPending, TransitionIntentApprovalDecided, ""); err != nil {
 			return err
 		}
 
@@ -202,15 +207,24 @@ func (s *GORMStore) DecideApprovalAndWakeRun(ctx context.Context, input DecideAp
 			return ErrApprovalVersionConflict
 		}
 
+		targetStatus := RunStatusPending
+		parkReason := ""
+		eventDelta := 1
+		if attemptsExhausted {
+			targetStatus = RunStatusParked
+			parkReason = ParkReasonApprovalAttemptsExhausted
+			eventDelta = 2
+		}
 		runUpdate := applyDurableRuntimeContract(tx.Model(&mysql.WorkflowRun{})).
 			Where("id = ? AND status = ?", run.ID, RunStatusWaitingApproval).
 			Updates(map[string]any{
-				"status":         RunStatusPending,
+				"status":         targetStatus,
+				"park_reason":    nullableApprovalReason(parkReason),
 				"available_at":   databaseNow,
 				"lease_owner":    nil,
 				"lease_until":    nil,
 				"heartbeat_at":   nil,
-				"last_event_seq": gorm.Expr("last_event_seq + 1"),
+				"last_event_seq": gorm.Expr(fmt.Sprintf("last_event_seq + %d", eventDelta)),
 			})
 		if runUpdate.Error != nil {
 			return fmt.Errorf("唤醒 Approval Run: %w", runUpdate.Error)
@@ -224,6 +238,22 @@ func (s *GORMStore) DecideApprovalAndWakeRun(ctx context.Context, input DecideAp
 		}
 		if err := insertDurableEvent(tx, run.ID, seq, event, eventPayload); err != nil {
 			return err
+		}
+		if attemptsExhausted {
+			parkedEvent := WorkflowEventInput{
+				Type: EventRunParked,
+				Payload: EventPayload{Attributes: map[string]any{
+					"park_reason": ParkReasonApprovalAttemptsExhausted,
+					"attempt":     run.Attempt,
+				}},
+			}
+			parkedPayload, err := marshalDurableEvent(parkedEvent)
+			if err != nil {
+				return err
+			}
+			if err := insertDurableEvent(tx, run.ID, seq+1, parkedEvent, parkedPayload); err != nil {
+				return err
+			}
 		}
 		if err := tx.First(&approval, "id = ?", approval.ID).Error; err != nil {
 			return fmt.Errorf("读取已决策 Approval: %w", err)

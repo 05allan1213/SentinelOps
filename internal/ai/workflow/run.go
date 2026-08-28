@@ -29,11 +29,12 @@ const (
 )
 
 const (
-	ParkReasonRuntimeIncompatible = "runtime_incompatible"
-	ParkReasonEffectUnknown       = "effect_unknown"
-	ParkReasonCheckpointMissing   = "checkpoint_missing"
-	ParkReasonCheckpointCorrupt   = "checkpoint_corrupt"
-	ParkReasonApprovalInvalidated = "approval_invalidated"
+	ParkReasonRuntimeIncompatible       = "runtime_incompatible"
+	ParkReasonEffectUnknown             = "effect_unknown"
+	ParkReasonCheckpointMissing         = "checkpoint_missing"
+	ParkReasonCheckpointCorrupt         = "checkpoint_corrupt"
+	ParkReasonApprovalInvalidated       = "approval_invalidated"
+	ParkReasonApprovalAttemptsExhausted = "approval_attempts_exhausted"
 )
 
 var (
