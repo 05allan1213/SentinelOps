@@ -59,6 +59,23 @@ func TestEvaluateCaseFailsFastOnUnexpectedApprovalWait(t *testing.T) {
 	}
 }
 
+func TestEvaluateCaseReportsFailureWhenScenarioRetriesExhausted(t *testing.T) {
+	runtime := &scriptedRetryScenarioRuntime{scriptedRuntime: scriptedRuntime{runID: "run-scenario-exhausted"}, failures: 3}
+	truth := &scriptedScenarioTruth{
+		scriptedTruth: scriptedTruth{truth: RunTruth{RunID: "run-scenario-exhausted", Status: "succeeded", Trace: TraceTruth{Complete: true}}},
+	}
+	result, err := EvaluateCase(context.Background(), runtime, truth, EvalCase{
+		ID: "scenario-exhausted", Query: "safe",
+		Scenario: Scenario{Kind: ScenarioPreCheckpointReplay}, Expected: Expected{Statuses: []string{"succeeded"}},
+	})
+	if err != nil {
+		t.Fatalf("EvaluateCase() error = %v", err)
+	}
+	if result.Passed || result.Retries != 2 || len(result.DiscardedRunIDs) != 2 || len(result.Failures) == 0 {
+		t.Fatalf("exhausted scenario retries result = %+v", result)
+	}
+}
+
 func TestLoadCasesReadsVersionedYAML(t *testing.T) {
 	input := strings.NewReader(`schema: sentinelops/eval-case/v1
 cases:

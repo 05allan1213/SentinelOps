@@ -40,11 +40,21 @@ func EvaluateCase(ctx context.Context, runtime ProductionRuntime, truth TruthRea
 	for attempt := 0; attempt < maxEvalAttempts; attempt++ {
 		result, err := evaluateOnce(ctx, runtime, truth, item)
 		if err != nil {
-			if attempt < maxEvalAttempts-1 && strings.Contains(err.Error(), retryableTerminalMessage) {
-				if strings.TrimSpace(result.RunID) != "" {
-					discarded = append(discarded, result.RunID)
+			if strings.Contains(err.Error(), retryableTerminalMessage) {
+				if attempt < maxEvalAttempts-1 {
+					if strings.TrimSpace(result.RunID) != "" {
+						discarded = append(discarded, result.RunID)
+					}
+					continue
 				}
-				continue
+				result.Passed = false
+				if strings.TrimSpace(result.Status) == "" {
+					result.Status = "failed"
+				}
+				result.Failures = append(result.Failures, err.Error())
+				result.Retries = attempt
+				result.DiscardedRunIDs = discarded
+				return result, nil
 			}
 			return CaseResult{}, err
 		}
