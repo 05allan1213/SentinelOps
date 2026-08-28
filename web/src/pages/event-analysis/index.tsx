@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { FileText, BrainCircuit, RotateCcw } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { FileText, BrainCircuit, RotateCcw, Database, Upload, ArrowRight } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useEventStore } from '@/stores/eventStore'
 import { useAnalyzeStore } from '@/stores/analyzeStore'
@@ -12,7 +12,6 @@ import ResultPanel from './components/ResultPanel'
 import AnalysisModeSelect, { type AnalysisMode } from './components/AnalysisModeSelect'
 import EventPickerModal from './components/EventPickerModal'
 import ReportModal, { buildMarkdown } from './components/ReportModal'
-import ActionSandbox from './components/ActionSandbox'
 import MitigationConsole from './components/MitigationConsole'
 import { eventService } from '@/services/event'
 import { reportService } from '@/services/report'
@@ -21,6 +20,7 @@ export default function EventAnalysis() {
   const { clearLogs, isProcessing, setProcessing, agentLogs, addLog, terminateRunningLogs } = useEventStore()
   const { riskData, analysisText, savedAt, setResult, clearResult, updateEventSolution, reportGenerating, reportSaving, setReportGenerating, setReportSaving } = useAnalyzeStore()
   const location = useLocation()
+  const navigate = useNavigate()
   const abortControllerRef = useRef<AbortController | null>(null)
   const stageTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(() => {
@@ -30,6 +30,20 @@ export default function EventAnalysis() {
     return location.state?.preSelectedIds ?? []
   })
   const [showEventPicker, setShowEventPicker] = useState(false)
+  const [availableEventCount, setAvailableEventCount] = useState<number | null>(null)
+
+  // 进入页面时读取事件总数，用于区分“暂无数据”和“尚未开始研判”。
+  useEffect(() => {
+    let cancelled = false
+    eventService.list({ size: 1 })
+      .then(res => {
+        if (!cancelled) setAvailableEventCount(res.total)
+      })
+      .catch(() => {
+        // 列表请求失败时保留未知状态，避免把网络错误误报成空数据。
+      })
+    return () => { cancelled = true }
+  }, [])
 
   // 从事件列表页跳转时，若携带了预选事件则自动读取（仅首次挂载）
   useEffect(() => {
@@ -132,6 +146,13 @@ export default function EventAnalysis() {
       const dispHigh     = severeEvents.filter(e => e.severity === 'high').length
       const dispTotal    = severeEvents.length
       const dispMaxCVSS  = dispCritical > 0 ? 9.0 : dispHigh > 0 ? 7.0 : 5.0
+
+      setAvailableEventCount(severeEvents.length)
+      if (severeEvents.length === 0) {
+        toast.error('当前没有可分析的安全事件，请先导入事件')
+        setProcessing(false)
+        return
+      }
 
       const buildSpecificQuery = () => {
         if (severeEvents.length === 0) return `分析以下事件 ID：${selectedEventIds.join(', ')}`
@@ -294,13 +315,17 @@ export default function EventAnalysis() {
               </button>
             </>
           )}
-          <AnalysisModeSelect
-            value={analysisMode}
-            onChange={handleModeChange}
-            disabled={isProcessing}
-            selectedCount={analysisMode === 'specific' ? selectedEventIds.length : undefined}
-          />
-          <StartButton isProcessing={isProcessing} onStart={startAnalysis} onStop={stopAnalysis} hasData={!!riskData} />
+          {availableEventCount !== 0 && (
+            <>
+              <AnalysisModeSelect
+                value={analysisMode}
+                onChange={handleModeChange}
+                disabled={isProcessing}
+                selectedCount={analysisMode === 'specific' ? selectedEventIds.length : undefined}
+              />
+              <StartButton isProcessing={isProcessing} onStart={startAnalysis} onStop={stopAnalysis} hasData={!!riskData} />
+            </>
+          )}
         </div>
       </div>
 
@@ -310,21 +335,48 @@ export default function EventAnalysis() {
       </div>
 
       {/* 主内容区：左右两栏 */}
-      <div className="flex">
-        <div className="w-[960px] shrink-0 flex flex-col border-r border-gray-200">
-          <div className="h-[260px] shrink-0 border-b border-gray-100">
-            <AgentFlowGraph logs={agentLogs} isProcessing={isProcessing} />
-          </div>
-          <div className="p-3">
-            <ThinkingConsole logs={agentLogs} isProcessing={isProcessing} />
+      {availableEventCount === 0 && !isProcessing && !riskData ? (
+        <div className="flex-1 flex items-center justify-center px-6 py-12">
+          <div className="w-full max-w-xl rounded-2xl border border-dashed border-gray-300 bg-gray-50/80 px-8 py-12 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-500">
+              <Database className="h-7 w-7" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-800">暂无安全事件</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">
+              当前事件库为空，导入或接入安全事件后，才能启动 AI 研判并生成风险分析结果。
+            </p>
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <button
+                onClick={() => navigate('/events')}
+                className="btn-default inline-flex items-center gap-1.5 text-sm"
+              >
+                查看安全事件 <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => navigate('/ingest')}
+                className="btn-primary inline-flex items-center gap-1.5 text-sm"
+              >
+                <Upload className="h-3.5 w-3.5" /> 导入事件
+              </button>
+            </div>
           </div>
         </div>
-        <div className="flex-1">
-          <ResultPanel data={riskData} isProcessing={isProcessing} onSolutionUpdate={handleSolutionUpdate} />
+      ) : (
+        <div className="flex">
+          <div className="w-[960px] shrink-0 flex flex-col border-r border-gray-200">
+            <div className="h-[260px] shrink-0 border-b border-gray-100">
+              <AgentFlowGraph logs={agentLogs} isProcessing={isProcessing} />
+            </div>
+            <div className="p-3">
+              <ThinkingConsole logs={agentLogs} isProcessing={isProcessing} />
+            </div>
+          </div>
+          <div className="flex-1">
+            <ResultPanel data={riskData} isProcessing={isProcessing} onSolutionUpdate={handleSolutionUpdate} />
+          </div>
+          <MitigationConsole selected={riskData ? 'proposal' : null} logs={agentLogs} />
         </div>
-        <ActionSandbox selected={riskData ? 'proposal' : null} />
-        <MitigationConsole selected={riskData ? 'proposal' : null} logs={agentLogs} />
-      </div>
+      )}
 
       {/* 事件选择弹窗 */}
       <EventPickerModal

@@ -349,8 +349,8 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
     return (
       <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500 dark:text-[#8B949E] bg-white dark:bg-[#080C13]/95">
         <Shield className="w-10 h-10 mb-2.5 opacity-20" />
-        <p className="text-sm tracking-wide">启动分析后查看结果</p>
-        <p className="text-xs text-gray-300 dark:text-[#30363D] mt-1 font-mono">AWAITING ANALYSIS</p>
+        <p className="text-sm tracking-wide">暂无研判结果</p>
+        <p className="text-xs text-gray-300 dark:text-[#30363D] mt-1 font-mono">SELECT EVENTS AND START ANALYSIS</p>
       </div>
     )
   }
