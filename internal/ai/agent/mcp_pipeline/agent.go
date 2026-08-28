@@ -130,6 +130,10 @@ func newAgentConfig(ctx context.Context, cfg Config) (*adk.ChatModelAgentConfig,
 		if cfg.UseModelToolSearch {
 			return nil, errors.New("mcp agent cannot combine direct tools with model tool search")
 		}
+		handlers, err = airuntime.RuntimeHandlerFirst(cfg.RuntimeHandler, handlers[0])
+		if err != nil {
+			return nil, err
+		}
 		agentConfig := &adk.ChatModelAgentConfig{
 			Name: AgentName, Description: agentDescription,
 			ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{

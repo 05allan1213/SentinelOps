@@ -85,6 +85,27 @@ func TestMCPAgentToolSearchDefaultsToClientMode(t *testing.T) {
 	}
 }
 
+func TestMCPDirectModeStillUsesRuntimeHandler(t *testing.T) {
+	handler := airuntime.NewRuntimeHandler()
+	cfg, err := newAgentConfig(context.Background(), Config{
+		Model:             &fixture33Model{},
+		RuntimeHandler:    handler,
+		DisableToolSearch: true,
+		Source: fixture33Source{tools: []tool.BaseTool{
+			&fixture33Tool{info: fixture33Info("inventory__search", map[string]any{"readOnlyHint": true})},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Handlers) < 2 {
+		t.Fatalf("direct MCP Agent handlers = %d, want RuntimeHandler + dynamic catalog", len(cfg.Handlers))
+	}
+	if cfg.Handlers[0] != handler {
+		t.Fatalf("direct MCP Agent outer handler = %T, want shared RuntimeHandler", cfg.Handlers[0])
+	}
+}
+
 func TestMCPAgentAcceptsModelToolSearchOnlyWithValidatedContract(t *testing.T) {
 	_, err := BuildMCPAgent(context.Background(), Config{
 		Model:              &fixture33Model{},
