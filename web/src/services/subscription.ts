@@ -127,15 +127,9 @@ export const subscriptionService = {
     return { list, total: data?.total ?? list.length, page, size: pageSize }
   },
 
-  // 获取订阅的抓取统计（后端无此接口，暂时 mock）
-  async getFetchStats(_subscriptionId: string): Promise<FetchStats> {
-    return {
-      total_fetches: 0,
-      success_count: 0,
-      failed_count: 0,
-      total_events: 0,
-      avg_duration_ms: 0,
-    }
+  async getFetchStats(subscriptionId: string): Promise<FetchStats> {
+    const res = await api.get<ApiResponse<FetchStats>>('/subscription/v1/fetch_stats', { params: { subscription_id: subscriptionId } })
+    return res.data.data
   },
 
   // 手动触发抓取

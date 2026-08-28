@@ -96,3 +96,35 @@ type FetchRes struct {
 	DurationMs   int64  `json:"duration_ms"`
 	Message      string `json:"message"`
 }
+
+type LogsReq struct {
+	g.Meta         `path:"/subscription/v1/logs" method:"get" summary:"订阅抓取日志"`
+	SubscriptionID string `p:"subscription_id" v:"required"`
+	Limit          int    `p:"limit" d:"20"`
+	Offset         int    `p:"offset" d:"0"`
+}
+type FetchLogItem struct {
+	ID           uint64 `json:"id"`
+	Status       string `json:"status"`
+	FetchedCount int    `json:"fetched_count"`
+	NewCount     int    `json:"new_count"`
+	DurationMs   int64  `json:"duration_ms"`
+	ErrorMsg     string `json:"error_msg,omitempty"`
+	CreatedAt    string `json:"created_at"`
+}
+type LogsRes struct {
+	Total int64          `json:"total"`
+	Logs  []FetchLogItem `json:"logs"`
+}
+
+type FetchStatsReq struct {
+	g.Meta         `path:"/subscription/v1/fetch_stats" method:"get" summary:"订阅抓取统计"`
+	SubscriptionID string `p:"subscription_id" v:"required"`
+}
+type FetchStatsRes struct {
+	TotalFetches  int64 `json:"total_fetches"`
+	SuccessCount  int64 `json:"success_count"`
+	FailedCount   int64 `json:"failed_count"`
+	TotalEvents   int64 `json:"total_events"`
+	AvgDurationMs int64 `json:"avg_duration_ms"`
+}

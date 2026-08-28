@@ -126,9 +126,9 @@ export const reportService = {
     await Promise.all(ids.map(id => api.post('/report/v1/delete', { id })))
   },
 
-  // 导出报告（后端无此接口，暂时 mock）
-  async export(_id: string, _format: string): Promise<Blob> {
-    return new Blob([''])
+  async export(id: string, format: string): Promise<Blob> {
+    const res = await api.get('/report/v1/export', { params: { id, format }, responseType: 'blob' })
+    return res.data
   },
 
   // 保存 Agent 分析生成的报告到数据库（POST /report/v1/create）

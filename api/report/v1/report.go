@@ -101,3 +101,10 @@ type DeleteReq struct {
 
 // DeleteRes 删除响应
 type DeleteRes struct{}
+
+type ExportReq struct {
+	g.Meta `path:"/report/v1/export" method:"get"`
+	ID     string `p:"id" v:"required"`
+	Format string `p:"format" d:"json"`
+}
+type ExportRes struct{}

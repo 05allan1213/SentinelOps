@@ -5,10 +5,15 @@ package report
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"html/template"
+	"net/url"
+	"strings"
 
 	v1 "SentinelOps/api/report/v1"
 	reportsvc "SentinelOps/internal/service/report"
+	"github.com/gogf/gf/v2/frame/g"
 )
 
 type ControllerV1 struct{}
@@ -98,4 +103,30 @@ func (c *ControllerV1) Delete(ctx context.Context, req *v1.DeleteReq) (*v1.Delet
 		return nil, err
 	}
 	return &v1.DeleteRes{}, nil
+}
+
+func (c *ControllerV1) Export(ctx context.Context, req *v1.ExportReq) (*v1.ExportRes, error) {
+	r, err := reportsvc.GetReport(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	format := strings.ToLower(req.Format)
+	contentType, ext := "application/json", "json"
+	var body []byte
+	switch format {
+	case "markdown", "md":
+		contentType, ext, body = "text/markdown; charset=utf-8", "md", []byte(r.Content)
+	case "html":
+		contentType, ext, body = "text/html; charset=utf-8", "html", []byte("<html><body><pre>"+template.HTMLEscapeString(r.Content)+"</pre></body></html>")
+	default:
+		payload := map[string]any{"id": r.ID, "title": r.Title, "type": r.Type, "content": r.Content, "created_at": r.CreatedAt}
+		body, _ = json.MarshalIndent(payload, "", "  ")
+	}
+	request := g.RequestFromCtx(ctx)
+	if request != nil {
+		request.Response.Header().Set("Content-Type", contentType)
+		request.Response.Header().Set("Content-Disposition", `attachment; filename="`+url.PathEscape(r.Title)+"."+ext+`"`)
+		request.Response.Write(body)
+	}
+	return &v1.ExportRes{}, nil
 }

@@ -180,6 +180,7 @@ func FetchNow(ctx context.Context, id string) (fetchedCount, inserted int, total
 	items, fetchErr := pipeline.Fetch(ctx, sub)
 	durationMs = time.Since(start).Milliseconds()
 	if fetchErr != nil {
+		_ = dao.CreateSubscriptionFetchLog(ctx, &dao.SubscriptionFetchLog{SubscriptionID: id, Status: "failed", DurationMs: durationMs, ErrorMsg: fetchErr.Error()})
 		err = fetchErr
 		return
 	}
@@ -197,6 +198,7 @@ func FetchNow(ctx context.Context, id string) (fetchedCount, inserted int, total
 	}
 	totalEvents, _ = dao.CountEventsBySource(ctx, sub.Name)
 	durationMs = time.Since(start).Milliseconds()
+	_ = dao.CreateSubscriptionFetchLog(ctx, &dao.SubscriptionFetchLog{SubscriptionID: id, Status: "success", FetchedCount: fetchedCount, NewCount: inserted, DurationMs: durationMs})
 	return
 }
 

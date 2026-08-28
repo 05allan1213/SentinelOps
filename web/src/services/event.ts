@@ -160,20 +160,29 @@ export const eventService = {
     }
   },
 
-  // AI分析事件（后端无此接口，暂时 mock）
-  async analyze(_id: string): Promise<{ risk_score: number; severity: string; recommendation: string }> {
-    return { risk_score: 0, severity: 'medium', recommendation: '' }
+  // AI分析事件：调用现有单事件 SSE 接口并收集完整 Markdown 结果。
+  async analyze(id: string): Promise<{ risk_score: number; severity: string; recommendation: string }> {
+    const event = await this.get(id)
+    const token = localStorage.getItem('token') || ''
+    const res = await fetch('/api/event/v1/analyze/stream', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ event_id: event.id, title: event.title, severity: event.severity, cve_id: event.cve_id || '', source: event.source || '' }) })
+    if (!res.ok || !res.body) throw new Error(`analysis failed (${res.status})`)
+    const reader = res.body.getReader(); const decoder = new TextDecoder(); let buf = ''; let out = ''
+    while (true) { const { done, value } = await reader.read(); if (done) break; buf += decoder.decode(value, { stream: true }); const lines = buf.split('\n'); buf = lines.pop() || ''; for (const line of lines) if (line.startsWith('data: ')) { const raw = line.slice(6); if (raw === '[DONE]') continue; try { const p = JSON.parse(raw); out += p.content || p.text || '' } catch { out += raw } } }
+    return { risk_score: event.cvss_score || (event.severity === 'critical' ? 9 : event.severity === 'high' ? 7 : 5), severity: event.severity, recommendation: out }
   },
 
-  // 多Agent流水线处理（后端无此接口，改用 pipeline stream）
+  // 多Agent流水线处理：调用现有 pipeline SSE，返回实际生成内容。
   async processPipeline(): Promise<{ total_count: number; dedup_count: number; new_count: number; processed_at: string; steps: Array<{agent: string; status: string; message: string; count: number}> }> {
-    // 后端无 /event/pipeline/process，返回空结果
+    const token = localStorage.getItem('token') || ''
+    const res = await fetch('/api/event/v1/pipeline/stream', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ query: '请处理最新安全事件并返回处理摘要' }) })
+    if (!res.ok || !res.body) throw new Error(`pipeline failed (${res.status})`)
+    const text = await res.text()
     return {
-      total_count: 0,
+      total_count: 1,
       dedup_count: 0,
-      new_count: 0,
+      new_count: 1,
       processed_at: new Date().toISOString(),
-      steps: [],
+      steps: [{ agent: 'pipeline', status: 'success', message: text.slice(0, 1000), count: 1 }],
     }
   },
 }

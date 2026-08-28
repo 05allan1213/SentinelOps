@@ -16,6 +16,13 @@ type PlaybookItem struct {
 type ListPlaybooksReq struct {
 	g.Meta `path:"/ops/v1/playbooks" method:"get"`
 }
+type GetPlaybookReq struct {
+	g.Meta `path:"/ops/v1/playbooks/{id}" method:"get"`
+	ID     string `p:"id" v:"required"`
+}
+type GetPlaybookRes struct {
+	Item PlaybookItem `json:"item"`
+}
 type ListPlaybooksRes struct {
 	Items []PlaybookItem `json:"items"`
 }
@@ -121,5 +128,50 @@ type DirectRunForEventReq struct {
 	EventID string `json:"event_id" v:"required"`
 }
 type DirectRunForEventRes struct {
+	RunID string `json:"run_id"`
+}
+
+type TestPlaybookReq struct {
+	g.Meta  `path:"/ops/v1/playbooks/{id}/test" method:"post"`
+	ID      string `p:"id" v:"required"`
+	EventID string `json:"event_id" v:"required"`
+}
+type TestPlaybookRes struct {
+	RunID string `json:"run_id"`
+}
+
+type ProtectedAssetItem struct {
+	ID        uint   `json:"id"`
+	AssetType string `json:"asset_type"`
+	Value     string `json:"value"`
+	Reason    string `json:"reason"`
+	CreatedAt string `json:"created_at"`
+}
+type ListProtectedAssetsReq struct {
+	g.Meta `path:"/ops/v1/protected_assets" method:"get"`
+}
+type ListProtectedAssetsRes struct {
+	Items []ProtectedAssetItem `json:"items"`
+}
+type CreateProtectedAssetReq struct {
+	g.Meta    `path:"/ops/v1/protected_assets" method:"post"`
+	AssetType string `json:"asset_type" v:"required"`
+	Value     string `json:"value" v:"required"`
+	Reason    string `json:"reason"`
+}
+type CreateProtectedAssetRes struct {
+	ID uint `json:"id"`
+}
+type DeleteProtectedAssetReq struct {
+	g.Meta `path:"/ops/v1/protected_assets/{id}" method:"delete"`
+	ID     uint `p:"id" v:"required"`
+}
+type DeleteProtectedAssetRes struct{}
+
+type TriggerForEventReq struct {
+	g.Meta  `path:"/ops/v1/playbooks/trigger_for_event" method:"post"`
+	EventID string `json:"event_id" v:"required"`
+}
+type TriggerForEventRes struct {
 	RunID string `json:"run_id"`
 }

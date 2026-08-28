@@ -172,6 +172,59 @@ func CreateProtectedAsset(ctx context.Context, a *OpsProtectedAsset) error {
 	return db.Create(a).Error
 }
 
+func ListProtectedAssets(ctx context.Context) ([]OpsProtectedAsset, error) {
+	db, err := DB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var list []OpsProtectedAsset
+	return list, db.Order("created_at desc").Find(&list).Error
+}
+
+func DeleteProtectedAsset(ctx context.Context, id uint) error {
+	db, err := DB(ctx)
+	if err != nil {
+		return err
+	}
+	return db.Delete(&OpsProtectedAsset{}, id).Error
+}
+
+func CreateSubscriptionFetchLog(ctx context.Context, l *SubscriptionFetchLog) error {
+	db, err := DB(ctx)
+	if err != nil {
+		return err
+	}
+	return db.Create(l).Error
+}
+func ListSubscriptionFetchLogs(ctx context.Context, subscriptionID string, limit, offset int) ([]SubscriptionFetchLog, int64, error) {
+	db, err := DB(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	q := db.Model(&SubscriptionFetchLog{}).Where("subscription_id = ?", subscriptionID)
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var list []SubscriptionFetchLog
+	if err := q.Order("created_at desc").Limit(limit).Offset(offset).Find(&list).Error; err != nil {
+		return nil, 0, err
+	}
+	return list, total, nil
+}
+func GetSubscriptionFetchStats(ctx context.Context, subscriptionID string) (total, success, failed, events, avg int64, err error) {
+	db, err := DB(ctx)
+	if err != nil {
+		return
+	}
+	var row struct {
+		Total, Success, Failed, Events int64
+		Avg                            float64
+	}
+	err = db.Model(&SubscriptionFetchLog{}).Select("COUNT(*) total, SUM(status = 'success') success, SUM(status <> 'success') failed, COALESCE(SUM(new_count),0) events, COALESCE(AVG(duration_ms),0) avg").Where("subscription_id = ?", subscriptionID).Scan(&row).Error
+	return row.Total, row.Success, row.Failed, row.Events, int64(row.Avg), err
+}
+
 // ---- 运行统计 ----
 
 type OpsStats struct {

@@ -53,6 +53,19 @@ type Subscription struct {
 
 func (Subscription) TableName() string { return "subscriptions" }
 
+type SubscriptionFetchLog struct {
+	ID             uint64    `gorm:"primaryKey;autoIncrement"`
+	SubscriptionID string    `gorm:"column:subscription_id;size:64;not null;index"`
+	Status         string    `gorm:"column:status;size:32;not null"`
+	FetchedCount   int       `gorm:"column:fetched_count;default:0"`
+	NewCount       int       `gorm:"column:new_count;default:0"`
+	DurationMs     int64     `gorm:"column:duration_ms;default:0"`
+	ErrorMsg       string    `gorm:"column:error_msg;type:text"`
+	CreatedAt      time.Time `gorm:"column:created_at;autoCreateTime"`
+}
+
+func (SubscriptionFetchLog) TableName() string { return "subscription_fetch_logs" }
+
 // Report 安全分析报告
 type Report struct {
 	ID        string         `gorm:"column:id;primaryKey;size:64"`

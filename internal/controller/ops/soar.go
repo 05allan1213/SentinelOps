@@ -54,6 +54,17 @@ func (c *ControllerV1) ListPlaybooks(ctx context.Context, _ *soarv1.ListPlaybook
 	return &soarv1.ListPlaybooksRes{Items: items}, nil
 }
 
+func (c *ControllerV1) GetPlaybook(ctx context.Context, req *soarv1.GetPlaybookReq) (*soarv1.GetPlaybookRes, error) {
+	if err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	p, err := dao.GetPlaybook(ctx, req.ID)
+	if err != nil {
+		return nil, gerror.New("策略不存在")
+	}
+	return &soarv1.GetPlaybookRes{Item: soarv1.PlaybookItem{ID: p.ID, Name: p.Name, Description: p.Description, Enabled: p.Enabled, CreatedAt: p.CreatedAt.Format("2006-01-02 15:04:05")}}, nil
+}
+
 func (c *ControllerV1) CreatePlaybook(ctx context.Context, req *soarv1.CreatePlaybookReq) (*soarv1.CreatePlaybookRes, error) {
 	if err := requireAdmin(ctx); err != nil {
 		return nil, err
@@ -154,6 +165,72 @@ func (c *ControllerV1) DirectRunForEvent(ctx context.Context, req *soarv1.Direct
 		return nil, err
 	}
 	return &soarv1.DirectRunForEventRes{RunID: runID}, nil
+}
+
+func (c *ControllerV1) TestPlaybook(ctx context.Context, req *soarv1.TestPlaybookReq) (*soarv1.TestPlaybookRes, error) {
+	if err := requireBusinessWrite(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := dao.GetPlaybook(ctx, req.ID); err != nil {
+		return nil, gerror.New("策略不存在")
+	}
+	event, err := dao.GetEventByID(ctx, req.EventID)
+	if err != nil {
+		return nil, gerror.New("事件不存在")
+	}
+	runID, err := c.directRunForEvent(ctx, event)
+	if err != nil {
+		return nil, err
+	}
+	return &soarv1.TestPlaybookRes{RunID: runID}, nil
+}
+
+func (c *ControllerV1) TriggerForEvent(ctx context.Context, req *soarv1.TriggerForEventReq) (*soarv1.TriggerForEventRes, error) {
+	if err := requireBusinessWrite(ctx); err != nil {
+		return nil, err
+	}
+	event, err := dao.GetEventByID(ctx, req.EventID)
+	if err != nil {
+		return nil, gerror.New("事件不存在")
+	}
+	runID, err := engine.TriggerForEvent(ctx, c.legacyWrites, event)
+	if err != nil {
+		return nil, err
+	}
+	return &soarv1.TriggerForEventRes{RunID: runID}, nil
+}
+
+func (c *ControllerV1) ListProtectedAssets(ctx context.Context, _ *soarv1.ListProtectedAssetsReq) (*soarv1.ListProtectedAssetsRes, error) {
+	if err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	list, err := dao.ListProtectedAssets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]soarv1.ProtectedAssetItem, 0, len(list))
+	for _, a := range list {
+		items = append(items, soarv1.ProtectedAssetItem{ID: a.ID, AssetType: a.AssetType, Value: a.Value, Reason: a.Reason, CreatedAt: a.CreatedAt.Format("2006-01-02 15:04:05")})
+	}
+	return &soarv1.ListProtectedAssetsRes{Items: items}, nil
+}
+
+func (c *ControllerV1) CreateProtectedAsset(ctx context.Context, req *soarv1.CreateProtectedAssetReq) (*soarv1.CreateProtectedAssetRes, error) {
+	if err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	a := &dao.OpsProtectedAsset{AssetType: req.AssetType, Value: req.Value, Reason: req.Reason}
+	if err := dao.CreateProtectedAsset(ctx, a); err != nil {
+		return nil, err
+	}
+	return &soarv1.CreateProtectedAssetRes{ID: a.ID}, nil
+}
+
+func (c *ControllerV1) DeleteProtectedAsset(ctx context.Context, req *soarv1.DeleteProtectedAssetReq) (*soarv1.DeleteProtectedAssetRes, error) {
+	if err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	return &soarv1.DeleteProtectedAssetRes{}, dao.DeleteProtectedAsset(ctx, req.ID)
 }
 
 func (c *ControllerV1) directRunForEvent(ctx context.Context, event *dao.Event) (string, error) {

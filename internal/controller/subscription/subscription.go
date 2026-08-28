@@ -7,6 +7,7 @@ import (
 	"context"
 
 	v1 "SentinelOps/api/subscription/v1"
+	dao "SentinelOps/internal/dao/mysql"
 	subsvc "SentinelOps/internal/service/subscription"
 )
 
@@ -99,4 +100,31 @@ func (c *ControllerV1) Fetch(ctx context.Context, req *v1.FetchReq) (*v1.FetchRe
 		DurationMs:   durationMs,
 		Message:      "抓取完成",
 	}, nil
+}
+
+func (c *ControllerV1) Logs(ctx context.Context, req *v1.LogsReq) (*v1.LogsRes, error) {
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if req.Offset < 0 {
+		req.Offset = 0
+	}
+	logs, total, err := dao.ListSubscriptionFetchLogs(ctx, req.SubscriptionID, limit, req.Offset)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.FetchLogItem, 0, len(logs))
+	for _, l := range logs {
+		items = append(items, v1.FetchLogItem{ID: l.ID, Status: l.Status, FetchedCount: l.FetchedCount, NewCount: l.NewCount, DurationMs: l.DurationMs, ErrorMsg: l.ErrorMsg, CreatedAt: l.CreatedAt.Format("2006-01-02T15:04:05Z07:00")})
+	}
+	return &v1.LogsRes{Total: total, Logs: items}, nil
+}
+
+func (c *ControllerV1) FetchStats(ctx context.Context, req *v1.FetchStatsReq) (*v1.FetchStatsRes, error) {
+	total, success, failed, events, avg, err := dao.GetSubscriptionFetchStats(ctx, req.SubscriptionID)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.FetchStatsRes{TotalFetches: total, SuccessCount: success, FailedCount: failed, TotalEvents: events, AvgDurationMs: avg}, nil
 }
