@@ -43,6 +43,22 @@ func TestEvaluateCaseRejectsMismatchedTruthRunID(t *testing.T) {
 	}
 }
 
+func TestEvaluateCaseFailsFastOnUnexpectedApprovalWait(t *testing.T) {
+	truth := &scriptedApprovalWaitTruth{}
+	result, err := EvaluateCase(context.Background(), &scriptedRuntime{runID: "run-wait"}, truth, EvalCase{
+		ID: "approval-wait", Query: "safe", Expected: Expected{Statuses: []string{"failed"}},
+	})
+	if err != nil {
+		t.Fatalf("EvaluateCase() error = %v", err)
+	}
+	if result.Passed || result.Status != "waiting_approval" {
+		t.Fatalf("unexpected approval wait result = %+v", result)
+	}
+	if result.Retries != 2 || len(result.DiscardedRunIDs) != 2 || len(result.Failures) == 0 {
+		t.Fatalf("unexpected approval wait retries = %+v", result)
+	}
+}
+
 func TestLoadCasesReadsVersionedYAML(t *testing.T) {
 	input := strings.NewReader(`schema: sentinelops/eval-case/v1
 cases:
@@ -275,6 +291,12 @@ type scriptedTruth struct {
 func (s *scriptedTruth) Wait(_ context.Context, runID string) (RunTruth, error) {
 	s.gotRunID = runID
 	return s.truth, nil
+}
+
+type scriptedApprovalWaitTruth struct{}
+
+func (s *scriptedApprovalWaitTruth) Wait(_ context.Context, runID string) (RunTruth, error) {
+	return RunTruth{}, ErrUnexpectedApprovalWait
 }
 
 type scriptedScenarioRuntime struct {

@@ -237,6 +237,9 @@ func (r *MySQLTruthReader) Wait(ctx context.Context, runID string) (RunTruth, er
 			if isEvalTerminal(run.Status) {
 				return r.readTruth(ctx, &run)
 			}
+			if run.Status == workflow.RunStatusWaitingApproval {
+				return RunTruth{}, ErrUnexpectedApprovalWait
+			}
 		} else if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return RunTruth{}, fmt.Errorf("read workflow Run: %w", result.Error)
 		}

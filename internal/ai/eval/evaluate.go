@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -14,6 +15,10 @@ import (
 const maxEvalAttempts = 3
 
 const retryableTerminalMessage = "reached terminal status before"
+
+// ErrUnexpectedApprovalWait 表示非审批场景的 Run 进入了 waiting_approval，
+// Eval 没有驱动该审批的职责；直接判定 Case 失败而不是等待全局超时。
+var ErrUnexpectedApprovalWait = errors.New("run entered waiting_approval without an approval-driven scenario")
 
 // TruthReader 只读生产 MySQL 真值，不拥有任何执行能力。
 type TruthReader interface {
@@ -84,6 +89,12 @@ func evaluateOnce(ctx context.Context, runtime ProductionRuntime, truth TruthRea
 	runTruth, err := truth.Wait(ctx, handle.RunID)
 	cleanupErr := cleanup()
 	if err != nil {
+		if errors.Is(err, ErrUnexpectedApprovalWait) {
+			return CaseResult{
+				RunID: handle.RunID, Status: "waiting_approval", Passed: false,
+				Failures: []string{ErrUnexpectedApprovalWait.Error()},
+			}, nil
+		}
 		return CaseResult{}, fmt.Errorf("read truth for case %q: %w", item.ID, err)
 	}
 	if cleanupErr != nil {
