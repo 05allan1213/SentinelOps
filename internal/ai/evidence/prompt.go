@@ -60,20 +60,35 @@ func (c *Collector) record(refs []EvidenceRef) {
 	}
 }
 
-// FinalizeCollectedAnswer 在当前 Run 使用过 RAG 时验证最终答案；非 RAG Agent 保持原结果。
-func FinalizeCollectedAnswer(ctx context.Context, answer string) (string, error) {
+// ValidateCollectedAnswer 在当前 Run 使用过 RAG 时验证最终答案，并保留模型原文。
+// Durable API 使用该函数把 grounding 状态作为结构化元数据返回，而不是污染 answer 文本。
+// 非 RAG Agent 不执行证据校验，返回零值 AnswerValidation。
+func ValidateCollectedAnswer(ctx context.Context, answer string) (string, AnswerValidation, error) {
 	collector, ok := CollectorFromContext(ctx)
 	if !ok {
-		return answer, nil
+		return answer, AnswerValidation{}, nil
 	}
 	collector.mu.RLock()
 	active := collector.active
 	collector.mu.RUnlock()
 	if !active {
-		return answer, nil
+		return answer, AnswerValidation{}, nil
 	}
-	finalized, _, err := FinalizeAnswer(answer, collector.RunEvidence(), time.Now().UTC())
-	return finalized, err
+	validation, err := ValidateAnswer(answer, collector.RunEvidence(), time.Now().UTC())
+	return answer, validation, err
+}
+
+// FinalizeCollectedAnswer 在当前 Run 使用过 RAG 时验证最终答案；非 RAG Agent 保持原结果。
+// 该函数保留旧调用方的兼容行为：无有效引用时在文本前添加确定性提示。
+func FinalizeCollectedAnswer(ctx context.Context, answer string) (string, error) {
+	answer, validation, err := ValidateCollectedAnswer(ctx, answer)
+	if err != nil {
+		return "", err
+	}
+	if validation.Grounding == GroundingInference {
+		return "推断/信息不足：" + strings.TrimSpace(answer), nil
+	}
+	return answer, nil
 }
 
 // RunEvidence 返回当前 Run 的不可变 Evidence 引用快照。

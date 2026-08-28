@@ -54,3 +54,24 @@ func TestFinalizeCollectedAnswerMarksNoEvidenceInference(t *testing.T) {
 		t.Fatalf("answer=%q err=%v", answer, err)
 	}
 }
+
+func TestValidateCollectedAnswerPreservesRawAnswerAndReportsInference(t *testing.T) {
+	collector := NewCollector("run-32")
+	ctx := WithCollector(context.Background(), collector)
+	if _, _, err := FormatDocumentsContext(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	answer, validation, err := ValidateCollectedAnswer(ctx, "建议继续观察")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if answer != "建议继续观察" {
+		t.Fatalf("answer was decorated: %q", answer)
+	}
+	if validation.Grounding != GroundingInference {
+		t.Fatalf("grounding=%q, want %q", validation.Grounding, GroundingInference)
+	}
+	if validation.Reason == "" {
+		t.Fatal("inference reason is empty")
+	}
+}

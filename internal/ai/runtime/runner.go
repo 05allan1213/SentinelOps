@@ -222,7 +222,10 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 	if strings.TrimSpace(finalOutput) == "" {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, fmt.Errorf("durable L0 Agent returned no final answer")
 	}
-	finalOutput, err = evidence.FinalizeCollectedAnswer(attemptCtx, finalOutput)
+	// Durable chat/v2 返回结构化 grounding 元数据，保持 answer 为模型原文。
+	// 旧的 FinalizeCollectedAnswer 仍保留给兼容调用方（其文本提示语义不变）。
+	var answerValidation evidence.AnswerValidation
+	finalOutput, answerValidation, err = evidence.ValidateCollectedAnswer(attemptCtx, finalOutput)
 	if err != nil {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
 	}
@@ -244,7 +247,15 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 			}
 		}
 	}
-	outputPayload, err := json.Marshal(map[string]any{"answer": finalOutput, "trace_id": attempt.Trace.ID})
+	output := map[string]any{"answer": finalOutput, "trace_id": attempt.Trace.ID}
+	if answerValidation.Grounding != "" {
+		output["grounding"] = answerValidation.Grounding
+		output["grounding_reason"] = answerValidation.Reason
+		if len(answerValidation.Citations) > 0 {
+			output["citations"] = answerValidation.Citations
+		}
+	}
+	outputPayload, err := json.Marshal(output)
 	if err != nil {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
 	}
