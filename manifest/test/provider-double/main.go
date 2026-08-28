@@ -199,7 +199,7 @@ func nextResponse(request chatRequest) (string, string, string) {
 				markerCounts[role+":"+marker]++
 			}
 		}
-		if role == "user" && (strings.Contains(content, "unknown") || strings.Contains(content, "未知")) {
+		if role == "user" && hasUnknownFixtureIntent(content) {
 			unknown = true
 		}
 		if message["role"] == "tool" && (message["name"] == "block_ip" || strings.Contains(content, "192.0.2.38")) {
@@ -263,6 +263,13 @@ func nextResponse(request chatRequest) (string, string, string) {
 		}
 	}
 	return "", "", "e2e provider double response"
+}
+
+// hasUnknownFixtureIntent 只识别 P38 显式故障注入意图，避免把嵌套 Agent
+// 输入中的 unknown 状态说明误判成 webhook_out 场景。
+func hasUnknownFixtureIntent(content string) bool {
+	return strings.Contains(content, "外部 effect") &&
+		(strings.Contains(content, "unknown") || strings.Contains(content, "未知"))
 }
 
 func sortedToolNames(toolNames map[string]bool) []string {
