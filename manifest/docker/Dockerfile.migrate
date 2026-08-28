@@ -1,7 +1,7 @@
 FROM golang:1.27.0-bookworm AS builder
 
 ARG GOOSE_VERSION=v3.27.3
-ARG GOPROXY=https://proxy.golang.org,direct
+ARG GOPROXY=https://goproxy.cn,direct
 RUN CGO_ENABLED=0 GOPROXY="${GOPROXY}" go install github.com/pressly/goose/v3/cmd/goose@${GOOSE_VERSION}
 
 FROM debian:bookworm-slim
