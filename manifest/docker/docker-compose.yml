@@ -16,6 +16,8 @@ services:
       CONTEXT7_API_KEY: ${CONTEXT7_API_KEY:-}
     expose:
       - "3333"
+    ports:
+      - "3333:3333"
     restart: unless-stopped
 
   etcd:
