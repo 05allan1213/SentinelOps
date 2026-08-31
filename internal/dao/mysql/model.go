@@ -397,17 +397,74 @@ func (WorkflowRun) TableName() string { return "workflow_runs" }
 
 // WorkflowEvent 工作流事件明细，按运行和序号保持唯一
 type WorkflowEvent struct {
-	ID             uint      `gorm:"primaryKey;autoIncrement"`
-	RunID          string    `gorm:"column:run_id;size:64;not null;uniqueIndex:idx_workflow_events_run_seq,priority:1"`
-	Seq            uint64    `gorm:"column:seq;not null;uniqueIndex:idx_workflow_events_run_seq,priority:2"`
-	EventType      string    `gorm:"column:event_type;size:64;not null;index"`
-	Payload        string    `gorm:"column:payload;type:text"`
-	PayloadVersion uint      `gorm:"column:payload_version;not null;default:1"`
-	TraceID        string    `gorm:"column:trace_id;size:64"`
-	CreatedAt      time.Time `gorm:"column:created_at;autoCreateTime"`
+	ID                   uint      `gorm:"primaryKey;autoIncrement"`
+	RunID                string    `gorm:"column:run_id;size:64;not null;uniqueIndex:idx_workflow_events_run_seq,priority:1"`
+	Seq                  uint64    `gorm:"column:seq;not null;uniqueIndex:idx_workflow_events_run_seq,priority:2"`
+	EventType            string    `gorm:"column:event_type;size:64;not null;index"`
+	Payload              string    `gorm:"column:payload;type:text"`
+	PayloadVersion       uint      `gorm:"column:payload_version;not null;default:1"`
+	TraceID              string    `gorm:"column:trace_id;size:64"`
+	OperationID          *string   `gorm:"column:operation_id;size:128"`
+	CommandAction        *string   `gorm:"column:command_action;size:32"`
+	IdempotencyKeyDigest *string   `gorm:"column:idempotency_key_digest;type:char(64)"`
+	RequestFingerprint   *string   `gorm:"column:request_fingerprint;type:char(64)"`
+	ActorID              *string   `gorm:"column:actor_id;size:128"`
+	ReasonRedacted       *string   `gorm:"column:reason_redacted;type:text"`
+	CorrelationSeq       *uint64   `gorm:"column:correlation_seq"`
+	CreatedAt            time.Time `gorm:"column:created_at;autoCreateTime"`
 }
 
 func (WorkflowEvent) TableName() string { return "workflow_events" }
+
+// WorkflowAttempt 是 Durable Run 的查询投影；workflow_events 仍是事件真值。
+// 可缺失的投影字段使用指针，以便查询层准确表达 partial/reconstructed。
+type WorkflowAttempt struct {
+	ID                          string     `gorm:"column:id;primaryKey;size:128"`
+	RunID                       string     `gorm:"column:run_id;size:64;not null;uniqueIndex:uidx_workflow_attempts_run_attempt,priority:1"`
+	Attempt                     uint       `gorm:"column:attempt;not null;uniqueIndex:uidx_workflow_attempts_run_attempt,priority:2"`
+	Mode                        *string    `gorm:"column:mode;size:32"`
+	Status                      *string    `gorm:"column:status;size:32"`
+	CurrentPhase                *string    `gorm:"column:current_phase;size:32"`
+	WorkerID                    *string    `gorm:"column:worker_id;size:128"`
+	LeaseGeneration             *uint64    `gorm:"column:lease_generation"`
+	RuntimeVersion              *string    `gorm:"column:runtime_version;size:128"`
+	RunCompatibilityHash        *string    `gorm:"column:run_compatibility_hash;type:char(64)"`
+	CheckpointCompatibilityHash *string    `gorm:"column:checkpoint_compatibility_hash;type:char(64)"`
+	ExecutingWorkerFingerprint  *string    `gorm:"column:executing_worker_fingerprint;type:char(64)"`
+	TraceID                     *string    `gorm:"column:trace_id;size:64"`
+	OperationID                 *string    `gorm:"column:operation_id;size:128"`
+	RetryCount                  *uint      `gorm:"column:retry_count"`
+	FailoverCount               *uint      `gorm:"column:failover_count"`
+	FailureCode                 *string    `gorm:"column:failure_code;size:64"`
+	FailureMessageRedacted      *string    `gorm:"column:failure_message_redacted;type:text"`
+	UsageQuality                *string    `gorm:"column:usage_quality;size:32"`
+	TraceQuality                *string    `gorm:"column:trace_quality;size:32"`
+	StartedAt                   *time.Time `gorm:"column:started_at;type:datetime(3)"`
+	FinishedAt                  *time.Time `gorm:"column:finished_at;type:datetime(3)"`
+	CreatedAt                   *time.Time `gorm:"column:created_at;type:datetime(3)"`
+	UpdatedAt                   *time.Time `gorm:"column:updated_at;type:datetime(3)"`
+}
+
+func (WorkflowAttempt) TableName() string { return "workflow_attempts" }
+
+// RuntimeWorkerSnapshot 保存 Worker 的脱敏运行时观测，不包含 Secret 或连接句柄。
+type RuntimeWorkerSnapshot struct {
+	WorkerID                 string     `gorm:"column:worker_id;primaryKey;size:128"`
+	HeartbeatAt              *time.Time `gorm:"column:heartbeat_at;type:datetime(3)"`
+	RuntimeVersion           *string    `gorm:"column:runtime_version;size:128"`
+	RuntimeCompatibilityHash *string    `gorm:"column:runtime_compatibility_hash;type:char(64)"`
+	ConfiguredCatalogHash    *string    `gorm:"column:configured_catalog_hash;type:char(64)"`
+	ObservedMCPJSON          *string    `gorm:"column:observed_mcp_json;type:json"`
+	ObservedSkillJSON        *string    `gorm:"column:observed_skill_json;type:json"`
+	ActiveRunID              *string    `gorm:"column:active_run_id;size:64"`
+	ActiveGeneration         *uint64    `gorm:"column:active_generation"`
+	Status                   *string    `gorm:"column:status;size:32"`
+	LastErrorRedacted        *string    `gorm:"column:last_error_redacted;type:text"`
+	CreatedAt                *time.Time `gorm:"column:created_at;type:datetime(3)"`
+	UpdatedAt                *time.Time `gorm:"column:updated_at;type:datetime(3)"`
+}
+
+func (RuntimeWorkerSnapshot) TableName() string { return "runtime_worker_snapshots" }
 
 // WorkflowCheckpoint 工作流检查点，隔离 legacy JSON 与 Eino opaque bytes。
 type WorkflowCheckpoint struct {
