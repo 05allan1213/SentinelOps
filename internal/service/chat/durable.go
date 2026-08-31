@@ -8,11 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 const (
@@ -38,6 +40,7 @@ type DurableServiceConfig struct {
 	SnapshotLoader func(context.Context) (runtime.FrozenRuntimeSnapshot, error)
 	RunTimeout     time.Duration
 	CreateRun      func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error)
+	GetRun         func(context.Context, string) (*mysql.WorkflowRun, error)
 	ListEvents     func(context.Context, string, int64) ([]workflow.StreamEvent, error)
 }
 
@@ -46,6 +49,7 @@ type DurableService struct {
 	snapshotLoader func(context.Context) (runtime.FrozenRuntimeSnapshot, error)
 	runTimeout     time.Duration
 	createRun      func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error)
+	getRun         func(context.Context, string) (*mysql.WorkflowRun, error)
 	listEvents     func(context.Context, string, int64) ([]workflow.StreamEvent, error)
 }
 
@@ -64,6 +68,7 @@ func NewDurableService(config DurableServiceConfig) (*DurableService, error) {
 		snapshotLoader: config.SnapshotLoader,
 		runTimeout:     config.RunTimeout,
 		createRun:      config.CreateRun,
+		getRun:         config.GetRun,
 		listEvents:     config.ListEvents,
 	}
 	if service.snapshotLoader == nil {
@@ -77,10 +82,63 @@ func NewDurableService(config DurableServiceConfig) (*DurableService, error) {
 	if service.createRun == nil {
 		service.createRun = config.Store.CreateRunWithSessionLock
 	}
+	if service.getRun == nil && config.Store != nil {
+		service.getRun = config.Store.GetRunForResume
+	}
 	if service.listEvents == nil {
 		service.listEvents = config.Store.ListEventsAfter
 	}
 	return service, nil
+}
+
+var (
+	// ErrDurableReconnectInvalid 表示 v1 重连参数不符合兼容契约。
+	ErrDurableReconnectInvalid = errors.New("durable reconnect request is invalid")
+	// ErrDurableRunNotFound 表示请求的 durable Run 不存在。
+	ErrDurableRunNotFound = errors.New("durable Run not found")
+	// ErrDurableRunForbidden 表示 durable Run 不属于当前服务端 Scope。
+	ErrDurableRunForbidden = errors.New("durable Run access forbidden")
+)
+
+// ResumeRun 读取并校验已存在的 durable Run；不会创建 Run、写 Event 或启动执行。
+func (s *DurableService) ResumeRun(ctx context.Context, runID, sessionID string, afterSeq int64) (*mysql.WorkflowRun, error) {
+	if s == nil || s.getRun == nil {
+		return nil, fmt.Errorf("durable resume service is not initialized")
+	}
+	runID = strings.TrimSpace(runID)
+	sessionID = strings.TrimSpace(sessionID)
+	if runID == "" || sessionID == "" || afterSeq < 0 {
+		return nil, ErrDurableReconnectInvalid
+	}
+	if _, err := policy.IdentityFromContext(ctx); err != nil {
+		return nil, ErrDurableRunForbidden
+	}
+	run, err := s.getRun(ctx, runID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrDurableRunNotFound
+		}
+		if errors.Is(err, policy.ErrForbidden) || errors.Is(err, policy.ErrUnauthenticated) {
+			return nil, ErrDurableRunForbidden
+		}
+		return nil, err
+	}
+	if run == nil || strings.TrimSpace(run.ID) == "" {
+		return nil, ErrDurableRunNotFound
+	}
+	if run.RuntimeMode != workflow.RuntimeModeDurableV1 {
+		return nil, ErrDurableRunNotFound
+	}
+	if strings.TrimSpace(run.UserID) == "" {
+		return nil, ErrDurableRunForbidden
+	}
+	if err := policy.Authorize(ctx, policy.PermissionViewScoped, policy.Resource{OwnerID: run.UserID}); err != nil {
+		return nil, ErrDurableRunForbidden
+	}
+	if run.SessionID != sessionID {
+		return nil, ErrDurableReconnectInvalid
+	}
+	return run, nil
 }
 
 // CreateRun 将一次 API 请求转换为不可变 durable Run，并且只调用一次 phase08 primitive。

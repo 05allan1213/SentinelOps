@@ -48,6 +48,12 @@ func durableHTTPStatus(err error) int {
 	switch {
 	case errors.Is(err, workflow.ErrSessionRunActive):
 		return http.StatusConflict
+	case errors.Is(err, chatsvc.ErrDurableReconnectInvalid):
+		return http.StatusBadRequest
+	case errors.Is(err, chatsvc.ErrDurableRunNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, chatsvc.ErrDurableRunForbidden):
+		return http.StatusForbidden
 	case errors.Is(err, chatsvc.ErrDurableRunGateClosed):
 		return http.StatusServiceUnavailable
 	case errors.Is(err, policy.ErrForbidden):
