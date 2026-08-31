@@ -9,7 +9,7 @@ import (
 )
 
 // RequiredSchemaVersion 是当前应用可接受的 goose Schema 版本。
-const RequiredSchemaVersion int64 = 8
+const RequiredSchemaVersion int64 = 9
 
 // ErrSchemaVersionMismatch 标识数据库 Schema 尚未迁移到应用要求的精确版本。
 var ErrSchemaVersionMismatch = errors.New("schema version mismatch")

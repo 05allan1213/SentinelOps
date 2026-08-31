@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -132,6 +133,24 @@ func TestLegacyApplicationModelsReadExpandSchema(t *testing.T) {
 	if trace.CachedInputTokens != 7 || trace.ReasoningTokens != 11 {
 		t.Fatalf("trace token split changed: cached=%d reasoning=%d", trace.CachedInputTokens, trace.ReasoningTokens)
 	}
+	var legacyMetadata struct {
+		OperationID          *string `gorm:"column:operation_id"`
+		CommandAction        *string `gorm:"column:command_action"`
+		IdempotencyKeyDigest *string `gorm:"column:idempotency_key_digest"`
+		RequestFingerprint   *string `gorm:"column:request_fingerprint"`
+		ActorID              *string `gorm:"column:actor_id"`
+		ReasonRedacted       *string `gorm:"column:reason_redacted"`
+		CorrelationSeq       *uint64 `gorm:"column:correlation_seq"`
+	}
+	if err := gormDB.Raw(`SELECT operation_id, command_action, idempotency_key_digest,
+		request_fingerprint, actor_id, reason_redacted, correlation_seq
+		FROM workflow_events WHERE run_id = ? AND seq = 1`, "old-run").Scan(&legacyMetadata).Error; err != nil {
+		t.Fatalf("read legacy event metadata: %v", err)
+	}
+	if legacyMetadata.OperationID != nil || legacyMetadata.CommandAction != nil || legacyMetadata.IdempotencyKeyDigest != nil ||
+		legacyMetadata.RequestFingerprint != nil || legacyMetadata.ActorID != nil || legacyMetadata.ReasonRedacted != nil || legacyMetadata.CorrelationSeq != nil {
+		t.Fatalf("legacy event unexpectedly populated command metadata: %+v", legacyMetadata)
+	}
 }
 
 func TestRuntimeSchemaContract(t *testing.T) {
@@ -140,11 +159,125 @@ func TestRuntimeSchemaContract(t *testing.T) {
 	assertRuntimeColumns(t, gormDB)
 	assertRuntimeIndexes(t, gormDB)
 	assertNoRuntimeForeignKeys(t, gormDB)
+	assertNoRuntimeSensitiveColumns(t, gormDB)
+}
+
+func TestRuntimeEventIdempotencyDigestOnlyAcceptedReservesKey(t *testing.T) {
+	_, db, dsn := newDisposableDatabase(t, "idempotency")
+	requireMigrationsUp(t, dsn)
+
+	const runID = "runtime-idempotency-run"
+	accepted := `INSERT INTO workflow_events
+		(run_id, seq, event_type, payload, idempotency_key_digest)
+		VALUES (?, ?, 'operation.accepted', '{}', ?)`
+	if err := db.Exec(accepted, runID, 1, strings.Repeat("a", 64)).Error; err != nil {
+		t.Fatalf("insert operation.accepted: %v", err)
+	}
+	// Lifecycle events correlate the operation but leave the digest NULL.
+	lifecycle := `INSERT INTO workflow_events
+		(run_id, seq, event_type, payload, operation_id, idempotency_key_digest)
+		VALUES (?, ?, 'operation.started', '{}', ?, NULL)`
+	if err := db.Exec(lifecycle, runID, 2, "op-runtime-idempotency").Error; err != nil {
+		t.Fatalf("insert started lifecycle event: %v", err)
+	}
+	terminal := `INSERT INTO workflow_events
+		(run_id, seq, event_type, payload, operation_id, idempotency_key_digest)
+		VALUES (?, ?, 'operation.succeeded', '{}', ?, NULL)`
+	if err := db.Exec(terminal, runID, 3, "op-runtime-idempotency").Error; err != nil {
+		t.Fatalf("insert terminal event: %v", err)
+	}
+	var lifecycleWithoutDigest int64
+	if err := db.Raw(`SELECT COUNT(*) FROM workflow_events
+		WHERE run_id = ? AND operation_id = ? AND idempotency_key_digest IS NULL`, runID, "op-runtime-idempotency").Scan(&lifecycleWithoutDigest).Error; err != nil {
+		t.Fatalf("count lifecycle events without digest: %v", err)
+	}
+	if lifecycleWithoutDigest != 2 {
+		t.Fatalf("lifecycle events without digest = %d, want 2", lifecycleWithoutDigest)
+	}
+	if err := db.Exec(accepted, runID, 4, strings.Repeat("a", 64)).Error; err == nil {
+		t.Fatal("duplicate operation.accepted digest inserted, want unique violation")
+	}
+}
+
+func TestRuntimeProjectionModelsUseNullablePointers(t *testing.T) {
+	tests := []struct {
+		model  any
+		fields []string
+	}{
+		{WorkflowEvent{}, []string{"OperationID", "CommandAction", "IdempotencyKeyDigest", "RequestFingerprint", "ActorID", "ReasonRedacted", "CorrelationSeq"}},
+		{WorkflowAttempt{}, []string{"Mode", "Status", "CurrentPhase", "WorkerID", "LeaseGeneration", "RuntimeVersion", "RunCompatibilityHash", "CheckpointCompatibilityHash", "ExecutingWorkerFingerprint", "TraceID", "OperationID", "RetryCount", "FailoverCount", "FailureCode", "FailureMessageRedacted", "UsageQuality", "TraceQuality", "StartedAt", "FinishedAt", "CreatedAt", "UpdatedAt"}},
+		{RuntimeWorkerSnapshot{}, []string{"HeartbeatAt", "RuntimeVersion", "RuntimeCompatibilityHash", "ConfiguredCatalogHash", "ObservedMCPJSON", "ObservedSkillJSON", "ActiveRunID", "ActiveGeneration", "Status", "LastErrorRedacted", "CreatedAt", "UpdatedAt"}},
+	}
+	for _, test := range tests {
+		typeOf := reflect.TypeOf(test.model)
+		for _, name := range test.fields {
+			field, ok := typeOf.FieldByName(name)
+			if !ok {
+				t.Errorf("%s.%s is missing", typeOf.Name(), name)
+				continue
+			}
+			if field.Type.Kind() != reflect.Pointer {
+				t.Errorf("%s.%s type = %s, want nullable pointer", typeOf.Name(), name, field.Type)
+			}
+		}
+	}
 }
 
 func TestMigrationsDownOnDisposableDatabase(t *testing.T) {
-	db, _, dsn := newDisposableDatabase(t, "down")
+	db, gormDB, dsn := newDisposableDatabase(t, "down")
 	requireMigrationsUp(t, dsn)
+	runGoose(t, dsn, "down-to", "8")
+
+	for _, table := range []string{"workflow_runs", "workflow_events", "workflow_checkpoints"} {
+		var count int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM information_schema.tables
+			WHERE table_schema = DATABASE() AND table_name = ?`, table).Scan(&count); err != nil {
+			t.Fatalf("count table %s after down-to 8: %v", table, err)
+		}
+		if count != 1 {
+			t.Fatalf("table %s after down-to 8 = %d, want preserved", table, count)
+		}
+	}
+	for _, table := range []string{"workflow_attempts", "runtime_worker_snapshots"} {
+		var count int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM information_schema.tables
+			WHERE table_schema = DATABASE() AND table_name = ?`, table).Scan(&count); err != nil {
+			t.Fatalf("count removed table %s after down-to 8: %v", table, err)
+		}
+		if count != 0 {
+			t.Fatalf("table %s after down-to 8 = %d, want removed", table, count)
+		}
+	}
+	for _, column := range []string{
+		"operation_id", "command_action", "idempotency_key_digest", "request_fingerprint",
+		"actor_id", "reason_redacted", "correlation_seq",
+	} {
+		var count int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns
+			WHERE table_schema = DATABASE() AND table_name = 'workflow_events' AND column_name = ?`, column).Scan(&count); err != nil {
+			t.Fatalf("count removed workflow_events.%s after down-to 8: %v", column, err)
+		}
+		if count != 0 {
+			t.Fatalf("workflow_events.%s after down-to 8 = %d, want removed", column, count)
+		}
+	}
+	for _, index := range []string{
+		"uidx_workflow_events_run_idempotency", "idx_workflow_events_operation_seq", "idx_workflow_events_active_operation",
+	} {
+		var count int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM information_schema.statistics
+			WHERE table_schema = DATABASE() AND table_name = 'workflow_events' AND index_name = ?`, index).Scan(&count); err != nil {
+			t.Fatalf("count removed workflow_events index %s after down-to 8: %v", index, err)
+		}
+		if count != 0 {
+			t.Fatalf("workflow_events index %s after down-to 8 = %d, want removed", index, count)
+		}
+	}
+	legacyEvent := WorkflowEvent{RunID: "down-to-eight", Seq: 1, EventType: "legacy.event", Payload: `{}`}
+	if err := gormDB.Omit("OperationID", "CommandAction", "IdempotencyKeyDigest", "RequestFingerprint", "ActorID", "ReasonRedacted", "CorrelationSeq").Create(&legacyEvent).Error; err != nil {
+		t.Fatalf("legacy workflow event after down-to 8: %v", err)
+	}
+
 	runGoose(t, dsn, "down-to", "0")
 	var tables int
 	if err := db.QueryRow("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name <> 'goose_db_version'").Scan(&tables); err != nil {
@@ -493,6 +626,53 @@ func runtimeColumnContracts() []columnContract {
 		{"workflow_events", "payload", "text", "YES", noDefault},
 		{"workflow_events", "payload_version", "int unsigned", "NO", ptr("1")},
 		{"workflow_events", "trace_id", "varchar(64)", "YES", noDefault},
+		{"workflow_events", "operation_id", "varchar(128)", "YES", noDefault},
+		{"workflow_events", "command_action", "varchar(32)", "YES", noDefault},
+		{"workflow_events", "idempotency_key_digest", "char(64)", "YES", noDefault},
+		{"workflow_events", "request_fingerprint", "char(64)", "YES", noDefault},
+		{"workflow_events", "actor_id", "varchar(128)", "YES", noDefault},
+		{"workflow_events", "reason_redacted", "text", "YES", noDefault},
+		{"workflow_events", "correlation_seq", "bigint unsigned", "YES", noDefault},
+
+		// Spec 7.10: Runtime query projections; optional values remain nullable.
+		{"workflow_attempts", "id", "varchar(128)", "NO", noDefault},
+		{"workflow_attempts", "run_id", "varchar(64)", "NO", noDefault},
+		{"workflow_attempts", "attempt", "int unsigned", "NO", noDefault},
+		{"workflow_attempts", "mode", "varchar(32)", "YES", noDefault},
+		{"workflow_attempts", "status", "varchar(32)", "YES", noDefault},
+		{"workflow_attempts", "current_phase", "varchar(32)", "YES", noDefault},
+		{"workflow_attempts", "worker_id", "varchar(128)", "YES", noDefault},
+		{"workflow_attempts", "lease_generation", "bigint unsigned", "YES", noDefault},
+		{"workflow_attempts", "runtime_version", "varchar(128)", "YES", noDefault},
+		{"workflow_attempts", "run_compatibility_hash", "char(64)", "YES", noDefault},
+		{"workflow_attempts", "checkpoint_compatibility_hash", "char(64)", "YES", noDefault},
+		{"workflow_attempts", "executing_worker_fingerprint", "char(64)", "YES", noDefault},
+		{"workflow_attempts", "trace_id", "varchar(64)", "YES", noDefault},
+		{"workflow_attempts", "operation_id", "varchar(128)", "YES", noDefault},
+		{"workflow_attempts", "retry_count", "int unsigned", "YES", noDefault},
+		{"workflow_attempts", "failover_count", "int unsigned", "YES", noDefault},
+		{"workflow_attempts", "failure_code", "varchar(64)", "YES", noDefault},
+		{"workflow_attempts", "failure_message_redacted", "text", "YES", noDefault},
+		{"workflow_attempts", "usage_quality", "varchar(32)", "YES", noDefault},
+		{"workflow_attempts", "trace_quality", "varchar(32)", "YES", noDefault},
+		{"workflow_attempts", "started_at", "datetime(3)", "YES", noDefault},
+		{"workflow_attempts", "finished_at", "datetime(3)", "YES", noDefault},
+		{"workflow_attempts", "created_at", "datetime(3)", "YES", noDefault},
+		{"workflow_attempts", "updated_at", "datetime(3)", "YES", noDefault},
+
+		{"runtime_worker_snapshots", "worker_id", "varchar(128)", "NO", noDefault},
+		{"runtime_worker_snapshots", "heartbeat_at", "datetime(3)", "YES", noDefault},
+		{"runtime_worker_snapshots", "runtime_version", "varchar(128)", "YES", noDefault},
+		{"runtime_worker_snapshots", "runtime_compatibility_hash", "char(64)", "YES", noDefault},
+		{"runtime_worker_snapshots", "configured_catalog_hash", "char(64)", "YES", noDefault},
+		{"runtime_worker_snapshots", "observed_mcp_json", "json", "YES", noDefault},
+		{"runtime_worker_snapshots", "observed_skill_json", "json", "YES", noDefault},
+		{"runtime_worker_snapshots", "active_run_id", "varchar(64)", "YES", noDefault},
+		{"runtime_worker_snapshots", "active_generation", "bigint unsigned", "YES", noDefault},
+		{"runtime_worker_snapshots", "status", "varchar(32)", "YES", noDefault},
+		{"runtime_worker_snapshots", "last_error_redacted", "text", "YES", noDefault},
+		{"runtime_worker_snapshots", "created_at", "datetime(3)", "YES", noDefault},
+		{"runtime_worker_snapshots", "updated_at", "datetime(3)", "YES", noDefault},
 		{"workflow_events", "created_at", "datetime(3)", "YES", noDefault},
 
 		// Spec 7.5: legacy JSON 与 Eino opaque bytes 共存。
@@ -623,6 +803,14 @@ func assertRuntimeIndexes(t *testing.T, db *gorm.DB) {
 		{"workflow_runs", "idx_workflow_runs_user_scope", "user_id,status,created_at,id", false},
 		{"workflow_events", "idx_workflow_events_run_seq", "run_id,seq", true},
 		{"workflow_events", "idx_workflow_events_replay", "run_id,seq,event_type", false},
+		{"workflow_events", "uidx_workflow_events_run_idempotency", "run_id,idempotency_key_digest", true},
+		{"workflow_events", "idx_workflow_events_operation_seq", "operation_id,seq", false},
+		{"workflow_events", "idx_workflow_events_active_operation", "run_id,command_action,created_at", false},
+		{"workflow_attempts", "uidx_workflow_attempts_run_attempt", "run_id,attempt", true},
+		{"workflow_attempts", "idx_workflow_attempts_run_status", "run_id,status", false},
+		{"workflow_attempts", "idx_workflow_attempts_worker_generation", "worker_id,lease_generation", false},
+		{"runtime_worker_snapshots", "idx_runtime_worker_snapshots_active_run", "active_run_id,active_generation", false},
+		{"runtime_worker_snapshots", "idx_runtime_worker_snapshots_status_heartbeat", "status,heartbeat_at", false},
 		{"workflow_checkpoints", "uidx_workflow_checkpoints_eino_id", "eino_checkpoint_id", true},
 		{"workflow_checkpoints", "idx_workflow_checkpoints_run_expiry", "run_id,expires_at", false},
 		{"agent_approvals", "uidx_agent_approvals_run_proposal", "run_id,proposal_hash", true},
@@ -664,12 +852,30 @@ func assertNoRuntimeForeignKeys(t *testing.T, db *gorm.DB) {
 	err := db.Raw(`SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
 		WHERE CONSTRAINT_SCHEMA = DATABASE()
 		AND CONSTRAINT_TYPE = 'FOREIGN KEY'
-		AND TABLE_NAME IN ('workflow_runs','workflow_events','workflow_checkpoints','agent_approvals','agent_effects','session_state_revisions')`).Scan(&count).Error
+		AND TABLE_NAME IN ('workflow_runs','workflow_events','workflow_checkpoints','workflow_attempts','runtime_worker_snapshots','agent_approvals','agent_effects','session_state_revisions')`).Scan(&count).Error
 	if err != nil {
 		t.Fatalf("query runtime foreign keys: %v", err)
 	}
 	if count != 0 {
 		t.Fatalf("runtime foreign keys = %d, want 0 for expand compatibility", count)
+	}
+}
+
+func assertNoRuntimeSensitiveColumns(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	var names []string
+	if err := db.Raw(`SELECT CONCAT(TABLE_NAME, '.', COLUMN_NAME)
+		FROM information_schema.COLUMNS
+		WHERE TABLE_SCHEMA = DATABASE()
+		AND TABLE_NAME IN ('workflow_events', 'workflow_attempts', 'runtime_worker_snapshots')
+		AND (LOWER(COLUMN_NAME) LIKE '%secret%'
+			OR LOWER(COLUMN_NAME) LIKE '%authorization%'
+			OR LOWER(COLUMN_NAME) IN ('checkpoint_blob', 'checkpoint_bytes')
+			OR LOWER(COLUMN_NAME) = 'idempotency_key')`).Scan(&names).Error; err != nil {
+		t.Fatalf("query sensitive runtime columns: %v", err)
+	}
+	if len(names) != 0 {
+		t.Fatalf("sensitive runtime columns = %v", names)
 	}
 }
 
