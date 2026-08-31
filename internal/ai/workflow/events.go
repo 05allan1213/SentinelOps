@@ -54,6 +54,12 @@ const (
 	EventEvidenceCited       = "evidence.cited"
 	EventTraceFlushed        = "trace.flushed"
 	EventTraceIncomplete     = "trace.incomplete"
+	EventOperationAccepted   = "operation.accepted"
+	EventOperationStarted    = "operation.started"
+	EventOperationSucceeded  = "operation.succeeded"
+	EventOperationFailed     = "operation.failed"
+	EventOperationCanceled   = "operation.canceled"
+	EventOperationRejected   = "operation.rejected"
 )
 
 var eventCatalog = []string{
@@ -64,6 +70,8 @@ var eventCatalog = []string{
 	EventEffectStarted, EventEffectSucceeded, EventEffectFailed, EventEffectUnknown, EventEffectReconciling, EventEffectResolved,
 	EventBudgetReserved, EventBudgetSettled, EventBudgetExhausted, EventBudgetUsageUnknown,
 	EventEvidenceRetrieved, EventEvidenceCited, EventTraceFlushed, EventTraceIncomplete,
+	EventOperationAccepted, EventOperationStarted, EventOperationSucceeded,
+	EventOperationFailed, EventOperationCanceled, EventOperationRejected,
 }
 
 var (
@@ -85,6 +93,20 @@ type WorkflowEventInput struct {
 	Type    string
 	Payload EventPayload
 	TraceID string
+	// Operation 携带类型化命令元数据，写入专用可空列，不并入通用 payload envelope。
+	Operation *OperationEventMetadata
+}
+
+// OperationEventMetadata 是 Operation 生命周期 Event 的有界类型化元数据；不含原始幂等 key。
+type OperationEventMetadata struct {
+	OperationID          string
+	CommandAction        string
+	IdempotencyKeyDigest string
+	RequestFingerprint   string
+	ActorID              string
+	Reason               string
+	// CorrelationSeq 指向该 lifecycle Event 对应且已先写入的 Run Event seq；不是固定 accepted seq。
+	CorrelationSeq uint64
 }
 
 type eventEnvelope struct {
@@ -104,6 +126,17 @@ func VersionedEventCatalog() []string {
 func marshalDurableEvent(input WorkflowEventInput) (string, error) {
 	if !isCatalogEvent(input.Type) {
 		return "", fmt.Errorf("%w: %q", ErrUnknownEventType, input.Type)
+	}
+	if err := validateOperationMetadata(input.Type, input.Operation); err != nil {
+		return "", err
+	}
+	if isOperationEventType(input.Type) && input.Operation != nil {
+		// Operation Event 采用最小兼容 payload；命令身份字段写入专用列，
+		// 仅镜像安全关联值供现有 Event mapper 读取。
+		input.Payload = EventPayload{Attributes: map[string]any{
+			"operation_id": input.Operation.OperationID,
+			"action":       input.Operation.CommandAction,
+		}}
 	}
 	if len(input.TraceID) > 64 {
 		return "", fmt.Errorf("event trace id exceeds 64 bytes")

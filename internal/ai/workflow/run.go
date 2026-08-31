@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/dao/mysql"
@@ -575,6 +576,12 @@ func marshalDurableContextSnapshot(identity policy.Identity, history string, bud
 }
 
 func insertDurableEvent(tx *gorm.DB, runID string, seq uint64, input WorkflowEventInput, payload string) error {
+	if err := validateOperationMetadata(input.Type, input.Operation); err != nil {
+		return err
+	}
+	if input.Operation != nil && input.Type != EventOperationAccepted && input.Operation.CorrelationSeq >= seq {
+		return fmt.Errorf("%w: correlation_seq must reference an earlier Run Event", ErrInvalidOperationInput)
+	}
 	event := mysql.WorkflowEvent{
 		RunID:          runID,
 		Seq:            seq,
@@ -583,10 +590,37 @@ func insertDurableEvent(tx *gorm.DB, runID string, seq uint64, input WorkflowEve
 		PayloadVersion: EventPayloadVersion,
 		TraceID:        input.TraceID,
 	}
+	if metadata := input.Operation; metadata != nil {
+		event.OperationID = optionalString(metadata.OperationID)
+		event.CommandAction = optionalString(metadata.CommandAction)
+		if input.Type == EventOperationAccepted {
+			event.IdempotencyKeyDigest = optionalString(metadata.IdempotencyKeyDigest)
+			event.RequestFingerprint = optionalString(metadata.RequestFingerprint)
+			event.ActorID = optionalString(metadata.ActorID)
+			if metadata.Reason != "" {
+				reason := policy.NewRedactor().RedactText(metadata.Reason)
+				if !utf8.ValidString(reason) || len(reason) > 1000 {
+					return fmt.Errorf("%w: redacted reason exceeds 1000 bytes", ErrInvalidOperationInput)
+				}
+				event.ReasonRedacted = optionalString(reason)
+			}
+		}
+		if metadata.CorrelationSeq != 0 {
+			correlation := metadata.CorrelationSeq
+			event.CorrelationSeq = &correlation
+		}
+	}
 	if err := tx.Create(&event).Error; err != nil {
 		return fmt.Errorf("插入 durable workflow Event: %w", err)
 	}
 	return nil
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func insertNextSessionRevision(tx *gorm.DB, run *mysql.WorkflowRun, stateJSON json.RawMessage) error {
