@@ -321,6 +321,9 @@ func (s *GORMStore) MarkExternalEffectUnknownAndPark(ctx context.Context, input 
 		if err != nil {
 			return err
 		}
+		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: execution.Lease, Status: RunStatusParked, CurrentPhase: "unknown", FailureCode: ParkReasonEffectUnknown, FailureMessage: input.LastErrorRedacted, FinishedAt: time.Now()}); err != nil {
+			return err
+		}
 		return insertDurableEvent(tx, run.ID, seq, parkEvent, payload)
 	})
 }

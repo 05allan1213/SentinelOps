@@ -54,6 +54,10 @@ func TestUnknownEffectExpiredRunningExternalBecomesParked(t *testing.T) {
 	if effect.Status != EffectStatusUnknown || got.Status != RunStatusParked || got.ParkReason == nil || *got.ParkReason != ParkReasonEffectUnknown {
 		t.Fatalf("effect=%#v run=%#v", effect, got)
 	}
+	attempt := readAttempt(t, db, run.ID, run.Attempt)
+	if attempt.FinishedAt == nil || attempt.Status == nil || *attempt.Status != RunStatusParked || attempt.CurrentPhase == nil || *attempt.CurrentPhase != "unknown" || attempt.FailureCode == nil || *attempt.FailureCode != ParkReasonEffectUnknown {
+		t.Fatalf("expired Effect Attempt=%+v", attempt)
+	}
 	var ordinary mysql.WorkflowRun
 	if err := db.First(&ordinary, "id = ?", ordinaryRun.ID).Error; err != nil {
 		t.Fatal(err)
@@ -63,6 +67,44 @@ func TestUnknownEffectExpiredRunningExternalBecomesParked(t *testing.T) {
 	}
 	if count, err := store.ReapExpiredLeases(context.Background(), ReapInput{Limit: 1}); err != nil || count != 1 {
 		t.Fatalf("reap remaining ordinary lease count=%d err=%v", count, err)
+	}
+}
+
+func TestExpiredExternalEffectAttemptFailureRollsBackRunAndEffect(t *testing.T) {
+	db := newP07Database(t, "c02_expired_effect_attempt_rollback")
+	store, ctx, run, lease, approval := fixture23ApprovedEffectFixture(t, db, "c02-expired-effect-rollback", "webhook_out")
+	input := fixture24ExternalInput(run, lease, approval)
+	if _, err := store.EnsureExternalEffectDAG(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	started, err := store.StartExternalEffect(ctx, StartExternalEffectInput{Execution: input, EffectStep: EffectStepPrimary, AttemptDeadline: time.Now().Add(time.Hour), LeaseSafetyMargin: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	past := time.Now().Add(-time.Minute)
+	if err := db.Model(&mysql.WorkflowRun{}).Where("id = ?", run.ID).Updates(map[string]any{"lease_until": past, "heartbeat_at": past}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`CREATE TRIGGER reject_c02_expired_effect_attempt BEFORE UPDATE ON workflow_attempts FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'reject expired Effect Attempt'`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ReconcileExpiredRunningEffects(context.Background(), 1); err == nil {
+		t.Fatal("expired Effect reconciliation succeeded despite Attempt failure")
+	}
+	var storedRun mysql.WorkflowRun
+	var storedEffect mysql.AgentEffect
+	if err := db.First(&storedRun, "id = ?", run.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.First(&storedEffect, "id = ?", started.Effect.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if storedRun.Status != RunStatusRunning || storedRun.LeaseGeneration != lease.Generation || storedEffect.Status != EffectStatusRunning || storedEffect.LeaseGeneration != lease.Generation {
+		t.Fatalf("rollback Run=%+v Effect=%+v", storedRun, storedEffect)
+	}
+	attempt := readAttempt(t, db, run.ID, run.Attempt)
+	if attempt.FinishedAt != nil {
+		t.Fatalf("rollback Attempt=%+v", attempt)
 	}
 }
 

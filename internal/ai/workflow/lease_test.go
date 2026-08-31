@@ -192,8 +192,23 @@ func TestLeaseReapFencesExpiredOwner(t *testing.T) {
 	if run.LeaseOwner != nil || run.LeaseUntil != nil || run.HeartbeatAt != nil || run.LeaseGeneration <= token.Generation {
 		t.Fatalf("reaped lease = owner %v until %v heartbeat %v generation %d", run.LeaseOwner, run.LeaseUntil, run.HeartbeatAt, run.LeaseGeneration)
 	}
+	oldAttempt := readAttempt(t, db, token.RunID, 1)
+	if oldAttempt.FinishedAt == nil || oldAttempt.Status == nil || *oldAttempt.Status != RunStatusFailed || oldAttempt.CurrentPhase == nil || *oldAttempt.CurrentPhase != "failed" || oldAttempt.FailureCode == nil || *oldAttempt.FailureCode != "lease_expired" {
+		t.Fatalf("reaped Attempt = %+v", oldAttempt)
+	}
 	if err := store.HeartbeatLease(context.Background(), token, time.Minute); !errors.Is(err, ErrLeaseLost) {
 		t.Fatalf("reaped owner heartbeat error = %v, want ErrLeaseLost", err)
+	}
+	claimed, ok, err := store.ClaimNextRun(context.Background(), ClaimInput{Owner: "worker-reap-current", LeaseDuration: time.Minute})
+	if err != nil || !ok || claimed.Run.Attempt != 2 {
+		t.Fatalf("claim after reap=%#v ok=%v err=%v", claimed, ok, err)
+	}
+	var openAttempts int64
+	if err := db.Model(&mysql.WorkflowAttempt{}).Where("run_id = ? AND finished_at IS NULL", token.RunID).Count(&openAttempts).Error; err != nil {
+		t.Fatal(err)
+	}
+	if openAttempts != 1 {
+		t.Fatalf("open Attempts after reclaim=%d, want 1", openAttempts)
 	}
 }
 

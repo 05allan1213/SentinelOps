@@ -102,9 +102,11 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 		event := WorkflowEventInput{
 			Type: EventRunClaimed,
 			Payload: EventPayload{Attributes: map[string]any{
-				"owner":            input.Owner,
-				"lease_generation": run.LeaseGeneration,
-				"attempt":          run.Attempt,
+				"owner":                      input.Owner,
+				"lease_generation":           run.LeaseGeneration,
+				"attempt":                    run.Attempt,
+				"runtime_version":            valueOrEmpty(run.RuntimeVersion),
+				"runtime_compatibility_hash": valueOrEmpty(run.RuntimeCompatibilityHash),
 			}},
 		}
 		payload, err := marshalDurableEvent(event)
@@ -112,6 +114,9 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 			return err
 		}
 		if err := insertDurableEvent(tx, run.ID, run.LastEventSeq, event, payload); err != nil {
+			return err
+		}
+		if err := beginAttemptTx(tx, &run, LeaseToken{RunID: run.ID, Owner: input.Owner, Generation: run.LeaseGeneration}, input.Owner); err != nil {
 			return err
 		}
 		claimed = &ClaimedRun{

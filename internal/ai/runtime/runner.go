@@ -137,6 +137,9 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 		result.TraceID = attempt.Trace.ID
 		result.TraceBarrier = traceBarrier
 	}()
+	if err := e.store.AttachAttemptTrace(attemptCtx, attempt.Lease, attempt.Trace.ID); err != nil {
+		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
+	}
 	agent, err := e.resolveAgent(attemptCtx, input.Agent)
 	if err != nil {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, err

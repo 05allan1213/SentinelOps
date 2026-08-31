@@ -62,22 +62,23 @@ func TestRecoverySelectorPersistsFencedResumeReplayAndParkedEvents(t *testing.T)
 	if err := db.First(&run, "id = ?", token.RunID).Error; err != nil {
 		t.Fatal(err)
 	}
+	attemptTrace := "trace-recovery-attempt"
 
 	if err := store.RecordRecoverySelection(ctx, RecoverySelectionRecord{
-		Lease: token, Mode: RecoveryModeReplay, Attempt: run.Attempt, TraceID: "trace-replay",
+		Lease: token, Mode: RecoveryModeReplay, Attempt: run.Attempt, TraceID: attemptTrace,
 		RuntimeVersion: *run.RuntimeVersion,
 	}); err != nil {
 		t.Fatalf("record replay: %v", err)
 	}
 	if err := store.RecordRecoverySelection(ctx, RecoverySelectionRecord{
-		Lease: token, Mode: RecoveryModeResume, Attempt: run.Attempt, TraceID: "trace-resume",
+		Lease: token, Mode: RecoveryModeResume, Attempt: run.Attempt, TraceID: attemptTrace,
 		RuntimeVersion: *run.RuntimeVersion,
 	}); err != nil {
 		t.Fatalf("record resume: %v", err)
 	}
 	if err := store.ParkRecovery(ctx, RecoveryParkInput{
 		Lease: token, ExpectedStatus: RunStatusRunning, Reason: ParkReasonCheckpointCorrupt,
-		Attempt: run.Attempt, TraceID: "trace-parked", RuntimeVersion: *run.RuntimeVersion,
+		Attempt: run.Attempt, TraceID: attemptTrace, RuntimeVersion: *run.RuntimeVersion,
 	}); err != nil {
 		t.Fatalf("park recovery: %v", err)
 	}
@@ -106,7 +107,7 @@ func TestRecoverySelectorPersistsFencedResumeReplayAndParkedEvents(t *testing.T)
 	if err := json.Unmarshal([]byte(events[2].Payload), &replayEnvelope); err != nil {
 		t.Fatal(err)
 	}
-	if events[2].TraceID != "trace-replay" || replayEnvelope.Data["mode"] != string(RecoveryModeReplay) ||
+	if events[2].TraceID != attemptTrace || replayEnvelope.Data["mode"] != string(RecoveryModeReplay) ||
 		replayEnvelope.Data["attempt"] != float64(run.Attempt) || replayEnvelope.Data["lease_generation"] != float64(token.Generation) ||
 		replayEnvelope.Data["runtime_version"] != *run.RuntimeVersion {
 		t.Fatalf("structured replay event = trace %q payload %+v", events[2].TraceID, replayEnvelope)

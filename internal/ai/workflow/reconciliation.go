@@ -182,6 +182,9 @@ func reconcileExpiredRunningEffectsTx(tx *gorm.DB, limit int) (int64, error) {
 		if result.RowsAffected != 1 {
 			return 0, ErrEffectStateConflict
 		}
+		if err := finishAttemptAfterLeaseExpiryTx(tx, &run, run.LeaseGeneration, RunStatusParked, "unknown", ParkReasonEffectUnknown, "external Effect owner lease expired before outcome was recorded"); err != nil {
+			return 0, err
+		}
 		if err := updateRunWithoutLease(tx, &run, RunStatusParked, map[string]any{
 			"park_reason": ParkReasonEffectUnknown, "lease_owner": nil, "lease_until": nil,
 			"heartbeat_at": nil, "lease_generation": newGeneration,

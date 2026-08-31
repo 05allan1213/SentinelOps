@@ -288,6 +288,7 @@ func (s *GORMStore) ReserveBaseBudget(ctx context.Context, input ReserveBaseBudg
 			Payload: EventPayload{Attributes: map[string]any{
 				"reservation_identity": input.Identity, "kind": input.Kind, "subject": input.Subject,
 				"state": result.State, "reason": result.ExhaustedReason, "metadata": input.Metadata, "estimate": input.Estimate,
+				"attempt": run.Attempt, "lease_generation": input.Lease.Generation,
 			}},
 		}
 		eventPayload, err := marshalDurableEvent(event)
@@ -300,7 +301,13 @@ func (s *GORMStore) ReserveBaseBudget(ctx context.Context, input ReserveBaseBudg
 		if err != nil {
 			return err
 		}
-		return insertDurableEvent(tx, run.ID, seq, event, eventPayload)
+		if err := insertDurableEvent(tx, run.ID, seq, event, eventPayload); err != nil {
+			return err
+		}
+		if eventType == EventBudgetReserved {
+			return recordAttemptReliabilityFactTx(tx, run, input.Lease, input.Kind)
+		}
+		return nil
 	})
 	if err != nil {
 		return BaseBudgetReservation{}, err

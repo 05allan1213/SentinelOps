@@ -270,6 +270,12 @@ func (s *GORMStore) TransitionRunWithEvent(ctx context.Context, transition RunTr
 		if err != nil {
 			return err
 		}
+		if run.Status == RunStatusRunning && (transition.TargetStatus == RunStatusWaitingApproval || transition.TargetStatus == RunStatusRetryableFailed || transition.TargetStatus == RunStatusParked) {
+			phase := attemptPhaseForStatus(transition.TargetStatus)
+			if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: transition.Lease, Status: transition.TargetStatus, CurrentPhase: phase, FinishedAt: time.Now(), TraceQuality: "unknown"}); err != nil {
+				return err
+			}
+		}
 		return insertDurableEvent(tx, run.ID, seq, transition.Event, eventPayload)
 	})
 }
@@ -413,6 +419,13 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 			if err := insertDurableEvent(tx, run.ID, seq, event, eventPayload); err != nil {
 				return err
 			}
+		}
+		phase := attemptPhaseForStatus(input.TargetStatus)
+		if err := attachAttemptTraceTx(tx, run, input.Lease, input.TraceID); err != nil {
+			return err
+		}
+		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: input.TargetStatus, CurrentPhase: phase, FailureMessage: input.ErrorMessage, TraceQuality: input.TraceQuality, FinishedAt: now}); err != nil {
+			return err
 		}
 		return nil
 	})
