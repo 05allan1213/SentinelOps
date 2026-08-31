@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"SentinelOps/internal/ai/ops/actions"
 	"SentinelOps/internal/ai/policy"
 	airuntime "SentinelOps/internal/ai/runtime"
+	mcptools "SentinelOps/internal/ai/tools/mcp"
 	aitrace "SentinelOps/internal/ai/trace"
 	"SentinelOps/internal/ai/workflow"
 	appconfig "SentinelOps/internal/config"
@@ -67,6 +69,10 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 	if err != nil {
 		return nil, err
 	}
+	observation, err := configuredWorkerObservation(ctx, config, evaluator, owner)
+	if err != nil {
+		return nil, err
+	}
 	var retention *airuntime.RetentionCoordinator
 	if config.Observability.Retention.Enabled {
 		if err := store.EnsureRetentionLeaseRun(ctx); err != nil {
@@ -90,7 +96,7 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 			Owner: owner, LeaseDuration: 30 * time.Second,
 			MinPollBackoff: 100 * time.Millisecond, MaxPollBackoff: 2 * time.Second,
 			Retention: retention,
-			Gates:     evaluator,
+			Gates:     evaluator, SnapshotDB: db, Observation: observation,
 		})
 	}
 	handler, err := airuntime.NewHITLRuntimeHandler(store, evaluator)
@@ -115,7 +121,54 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 		MinPollBackoff: 100 * time.Millisecond, MaxPollBackoff: 2 * time.Second,
 		Execute: executor.ExecuteClaimedRun, QueryEffectTargetState: queryEffectTargetState,
 		Retention: retention, RuntimeVersion: airuntime.CurrentRuntimeVersion(), Gates: evaluator,
+		SnapshotDB: db, Observation: observation,
 	})
+}
+
+func configuredWorkerObservation(ctx context.Context, config *appconfig.Config, evaluator *airuntime.GateEvaluator, owner string) (airuntime.WorkerObservation, error) {
+	if config == nil || evaluator == nil {
+		return airuntime.WorkerObservation{}, fmt.Errorf("Worker snapshot configuration and Gate evaluator are required")
+	}
+	gates, err := evaluator.Current(ctx)
+	if err != nil {
+		return airuntime.WorkerObservation{}, err
+	}
+	var skills []airuntime.SkillSnapshot
+	if gates.Enabled(airuntime.GateSkillEnabled) {
+		skills, err = skill_pipeline.BuildConfiguredSkillSnapshots(ctx, config)
+		if err != nil {
+			return airuntime.WorkerObservation{}, err
+		}
+	}
+	frozen, err := airuntime.BuildDurableRuntimeSnapshotWithSkillsAndGates(config, skills, gates)
+	if err != nil {
+		return airuntime.WorkerObservation{}, err
+	}
+	mcpConfig, err := mcptools.FromAppConfig(config)
+	if err != nil {
+		return airuntime.WorkerObservation{}, err
+	}
+	observedMCP := make([]airuntime.ObservedRuntimeComponent, 0, len(mcpConfig.Servers))
+	for _, server := range mcpConfig.Servers {
+		status := "disabled"
+		if mcpConfig.Enabled && server.Enabled && gates.Enabled(airuntime.GateMCPEnabled) {
+			status = "not_observed"
+		}
+		observedMCP = append(observedMCP, airuntime.ObservedRuntimeComponent{Name: server.Name, Validation: "not_run", Status: status})
+	}
+	observedSkills := make([]airuntime.ObservedRuntimeComponent, 0, len(skills))
+	for _, skill := range skills {
+		observedSkills = append(observedSkills, airuntime.ObservedRuntimeComponent{
+			Name: skill.Name, Hash: skill.ContentHash, Validation: "valid", Status: "loaded",
+		})
+	}
+	sort.Slice(observedSkills, func(i, j int) bool { return observedSkills[i].Name < observedSkills[j].Name })
+	fields := frozen.WorkflowFields()
+	return airuntime.WorkerObservation{
+		WorkerID: owner, RuntimeVersion: frozen.RuntimeVersion(),
+		RuntimeCompatibilityHash: frozen.CompatibilityHash(), ConfiguredCatalogHash: fields.MCPCatalogHash,
+		ObservedMCP: observedMCP, ObservedSkill: observedSkills, Status: airuntime.WorkerStatusIdle,
+	}, nil
 }
 
 // durableWorkerOwner 允许同一主机上的独立 Worker 使用可审计的 lease owner。

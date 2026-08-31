@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"SentinelOps/internal/ai/effects"
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
+
+	"gorm.io/gorm"
 )
 
 // WorkerConfig 是 phase09 Worker 雏形所需的 lease 与有界空轮询参数。
@@ -30,21 +33,30 @@ type WorkerConfig struct {
 	Retention              *RetentionCoordinator
 	RuntimeVersion         string
 	Gates                  *GateEvaluator
+	SnapshotDB             *gorm.DB
+	Observation            WorkerObservation
+	PersistSnapshot        func(context.Context, WorkerObservation) error
+	HeartbeatSnapshot      func(context.Context, WorkerObservation) error
 }
 
 // Worker 只委派唯一 workflow.GORMStore，并承载 phase20 唯一 durable poll loop。
 type Worker struct {
-	store           *workflow.GORMStore
-	config          WorkerConfig
-	claimNext       func(context.Context) (*workflow.ClaimedRun, bool, error)
-	heartbeat       func(context.Context, workflow.LeaseToken) error
-	execute         func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
-	transition      func(context.Context, workflow.RunTransition) error
-	complete        func(context.Context, workflow.CompleteRunInput) error
-	projectRevision func(context.Context, string, []byte) error
-	expireApprovals func(context.Context, string, int) (int, error)
-	reconciler      *effects.Reconciler
-	retention       *RetentionCoordinator
+	store             *workflow.GORMStore
+	config            WorkerConfig
+	claimNext         func(context.Context) (*workflow.ClaimedRun, bool, error)
+	heartbeat         func(context.Context, workflow.LeaseToken) error
+	execute           func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
+	transition        func(context.Context, workflow.RunTransition) error
+	complete          func(context.Context, workflow.CompleteRunInput) error
+	projectRevision   func(context.Context, string, []byte) error
+	expireApprovals   func(context.Context, string, int) (int, error)
+	reconciler        *effects.Reconciler
+	retention         *RetentionCoordinator
+	snapshotMu        sync.Mutex
+	observation       WorkerObservation
+	persistSnapshot   func(context.Context, WorkerObservation) error
+	heartbeatSnapshot func(context.Context, WorkerObservation) error
+	snapshotStarted   bool
 }
 
 // RunExecutionResult 是 Worker 交给唯一完成 primitive 的基础结果。
@@ -122,7 +134,23 @@ func NewWorker(store *workflow.GORMStore, config WorkerConfig) (*Worker, error) 
 	worker := &Worker{
 		store: store, config: config, claimNext: config.ClaimNext, execute: config.Execute,
 		heartbeat: config.Heartbeat, transition: config.Transition, complete: config.Complete, projectRevision: config.ProjectRevision,
-		retention: config.Retention,
+		retention: config.Retention, observation: config.Observation,
+		persistSnapshot: config.PersistSnapshot, heartbeatSnapshot: config.HeartbeatSnapshot,
+	}
+	if worker.observation.WorkerID == "" && config.SnapshotDB != nil {
+		worker.observation.WorkerID = config.Owner
+	}
+	if config.SnapshotDB != nil {
+		if worker.persistSnapshot == nil {
+			worker.persistSnapshot = func(ctx context.Context, observation WorkerObservation) error {
+				return PersistWorkerSnapshot(ctx, config.SnapshotDB, observation)
+			}
+		}
+		if worker.heartbeatSnapshot == nil {
+			worker.heartbeatSnapshot = func(ctx context.Context, observation WorkerObservation) error {
+				return HeartbeatWorkerSnapshot(ctx, config.SnapshotDB, observation)
+			}
+		}
 	}
 	if worker.claimNext == nil {
 		worker.claimNext = worker.ClaimNext
@@ -175,6 +203,9 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 	if w == nil {
 		return false, fmt.Errorf("durable Worker is required")
 	}
+	if err := w.ensureSnapshot(ctx); err != nil {
+		return false, err
+	}
 	retained := false
 	if w.retention != nil {
 		var err error
@@ -202,6 +233,9 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 	if err != nil || !ok {
 		return ok || retained || expired > 0 || reconciled, err
 	}
+	if err := w.refreshSnapshot(ctx, WorkerStatusRunning, claimed.Run.ID, claimed.Token.Generation, ""); err != nil {
+		return true, err
+	}
 	runCtx := ctx
 	if w.store != nil {
 		var identityErr error
@@ -222,45 +256,70 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		cancel()
 	}
 	if heartbeatErr != nil {
+		_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusRunning, claimed.Run.ID, claimed.Token.Generation, heartbeatErr.Error())
 		return true, heartbeatErr
 	}
 	if result.RunTransitioned {
+		_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, errorText(executionErr))
 		return true, executionErr
 	}
 	if executionErr == nil {
-		return true, w.completeAndProject(runCtx, claimed.Run.ID, workflow.CompleteRunInput{
+		err = w.completeAndProject(runCtx, claimed.Run.ID, workflow.CompleteRunInput{
 			RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning,
 			TargetStatus: workflow.RunStatusSucceeded, Lease: claimed.Token,
 			OutputPayload: result.OutputPayload, RevisionStateJSON: result.RevisionStateJSON,
 			TraceQuality: result.TraceQuality, TraceID: result.TraceID,
 		})
+		if err == nil {
+			_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, "")
+		}
+		return true, err
 	}
 
 	var classified *classifiedExecutionError
 	if errors.As(executionErr, &classified) && classified.parkReason != "" {
-		return true, w.transition(runCtx, workflow.RunTransition{
+		err = w.transition(runCtx, workflow.RunTransition{
 			RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning,
 			TargetStatus: workflow.RunStatusParked, ParkReason: classified.parkReason, Lease: claimed.Token,
 			Event: workflow.WorkflowEventInput{Type: workflow.EventRunParked, TraceID: result.TraceID,
 				Payload: workflow.EventPayload{Attributes: map[string]any{"park_reason": classified.parkReason}}},
 		})
+		if err == nil {
+			_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, executionErr.Error())
+		}
+		return true, err
 	}
 	if errors.As(executionErr, &classified) && classified.retryable && claimed.Run.Attempt < claimed.Run.MaxAttempts {
-		return true, w.transition(runCtx, workflow.RunTransition{
+		err = w.transition(runCtx, workflow.RunTransition{
 			RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning,
 			TargetStatus: workflow.RunStatusRetryableFailed, AvailableAt: time.Now().Add(w.retryBackoff(claimed.Run.Attempt)),
 			Lease: claimed.Token, Event: workflow.WorkflowEventInput{Type: workflow.EventRunFailed, TraceID: result.TraceID,
 				Payload: workflow.EventPayload{Attributes: map[string]any{"retryable": true, "attempt": claimed.Run.Attempt}}},
 		})
+		if err == nil {
+			_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, executionErr.Error())
+		}
+		return true, err
 	}
 	target := workflow.RunStatusFailed
 	if errors.Is(executionErr, context.Canceled) {
 		target = workflow.RunStatusCanceled
 	}
-	return true, w.completeAndProject(runCtx, claimed.Run.ID, workflow.CompleteRunInput{
+	err = w.completeAndProject(runCtx, claimed.Run.ID, workflow.CompleteRunInput{
 		RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning, TargetStatus: target,
 		Lease: claimed.Token, ErrorMessage: executionErr.Error(), TraceQuality: result.TraceQuality, TraceID: result.TraceID,
 	})
+	if err == nil {
+		_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, executionErr.Error())
+	}
+	return true, err
+}
+
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func (w *Worker) completeAndProject(ctx context.Context, runID string, input workflow.CompleteRunInput) error {
@@ -409,6 +468,11 @@ func (w *Worker) withLeaseHeartbeat(ctx context.Context, token workflow.LeaseTok
 					heartbeatResult <- err
 					return
 				}
+				if err := w.heartbeatCurrentSnapshot(leaseCtx); err != nil {
+					cancel(err)
+					heartbeatResult <- err
+					return
+				}
 			}
 		}
 	}()
@@ -427,6 +491,11 @@ func workerLifecycleContext(ctx context.Context) context.Context {
 
 // Run 持续复用同一 MySQL claim loop；没有进程内 Queue 或第二个 Scheduler。
 func (w *Worker) Run(ctx context.Context) error {
+	defer func() {
+		drainCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+		defer cancel()
+		_ = w.refreshCurrentSnapshot(drainCtx, WorkerStatusDraining)
+	}()
 	empty := 0
 	for {
 		didWork, err := w.RunOnce(ctx)
@@ -460,6 +529,62 @@ func (w *Worker) Run(ctx context.Context) error {
 		case <-timer.C:
 		}
 	}
+}
+
+func (w *Worker) ensureSnapshot(ctx context.Context) error {
+	if w.persistSnapshot == nil || strings.TrimSpace(w.observation.WorkerID) == "" {
+		return nil
+	}
+	w.snapshotMu.Lock()
+	status, runID, generation, lastError := w.observation.Status, w.observation.ActiveRunID, w.observation.ActiveGeneration, w.observation.LastError
+	if status == "" {
+		status = WorkerStatusIdle
+	}
+	w.snapshotMu.Unlock()
+	return w.refreshSnapshot(ctx, status, runID, generation, lastError)
+}
+
+func (w *Worker) refreshCurrentSnapshot(ctx context.Context, status string) error {
+	w.snapshotMu.Lock()
+	runID, generation, lastError := w.observation.ActiveRunID, w.observation.ActiveGeneration, w.observation.LastError
+	w.snapshotMu.Unlock()
+	return w.refreshSnapshot(ctx, status, runID, generation, lastError)
+}
+
+func (w *Worker) refreshSnapshot(ctx context.Context, status, runID string, generation uint64, lastError string) error {
+	if w.persistSnapshot == nil || strings.TrimSpace(w.observation.WorkerID) == "" {
+		return nil
+	}
+	w.snapshotMu.Lock()
+	w.observation.HeartbeatAt = time.Now()
+	w.observation.Status = status
+	w.observation.ActiveRunID = runID
+	w.observation.ActiveGeneration = generation
+	w.observation.LastError = lastError
+	observation := w.observation
+	started := w.snapshotStarted
+	w.snapshotMu.Unlock()
+	var err error
+	if !started {
+		err = w.persistSnapshot(ctx, observation)
+	} else if w.heartbeatSnapshot != nil {
+		err = w.heartbeatSnapshot(ctx, observation)
+	} else {
+		err = w.persistSnapshot(ctx, observation)
+	}
+	if err == nil {
+		w.snapshotMu.Lock()
+		w.snapshotStarted = true
+		w.snapshotMu.Unlock()
+	}
+	return err
+}
+
+func (w *Worker) heartbeatCurrentSnapshot(ctx context.Context) error {
+	w.snapshotMu.Lock()
+	status, runID, generation, lastError := w.observation.Status, w.observation.ActiveRunID, w.observation.ActiveGeneration, w.observation.LastError
+	w.snapshotMu.Unlock()
+	return w.refreshSnapshot(ctx, status, runID, generation, lastError)
 }
 
 func (w *Worker) retryBackoff(attempt uint) time.Duration {
