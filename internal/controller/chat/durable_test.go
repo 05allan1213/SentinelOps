@@ -117,7 +117,7 @@ func TestChatV1ReconnectDoesNotCreateRun(t *testing.T) {
 			return nil, nil
 		},
 		GetRun: func(context.Context, string) (*mysql.WorkflowRun, error) {
-			return &mysql.WorkflowRun{ID: "run-c07", UserID: "owner-c07", SessionID: "session-c07", Status: workflow.RunStatusRunning, RuntimeMode: workflow.RuntimeModeDurableV1}, nil
+			return &mysql.WorkflowRun{ID: "run-c07", UserID: "owner-c07", SessionID: "session-c07", Status: workflow.RunStatusRunning, RuntimeMode: workflow.RuntimeModeDurableV1, LastEventSeq: 12}, nil
 		},
 		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
 	})
@@ -151,5 +151,14 @@ func TestChatV1ReconnectStableStatusMapping(t *testing.T) {
 	}
 	if got := durableHTTPStatus(chatsvc.ErrDurableRunNotFound); got != http.StatusNotFound {
 		t.Fatalf("not found status=%d, want 404", got)
+	}
+}
+
+func TestChatV1IdentityEventIDDoesNotAdvanceReconnectCursor(t *testing.T) {
+	if got := durableIdentityEventID(false); got != 1 {
+		t.Fatalf("new-run identity event id=%d, want 1", got)
+	}
+	if got := durableIdentityEventID(true); got != 0 {
+		t.Fatalf("reconnect identity event id=%d, want 0 non-cursor id", got)
 	}
 }

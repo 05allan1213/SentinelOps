@@ -161,7 +161,7 @@ func TestResumeRunValidatesOwnerSessionAndCursorWithoutCreating(t *testing.T) {
 			if runID != "run-c07-owned" {
 				t.Fatalf("GetRun runID=%q", runID)
 			}
-			return &mysql.WorkflowRun{ID: runID, UserID: "owner-c07", SessionID: "session-c07", Status: workflow.RunStatusRunning, RuntimeMode: workflow.RuntimeModeDurableV1}, nil
+			return &mysql.WorkflowRun{ID: runID, UserID: "owner-c07", SessionID: "session-c07", Status: workflow.RunStatusRunning, RuntimeMode: workflow.RuntimeModeDurableV1, LastEventSeq: 20}, nil
 		},
 		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
 	})
@@ -228,6 +228,27 @@ func TestResumeRunRejectsNegativeCursorBeforeStore(t *testing.T) {
 	}
 }
 
+func TestResumeRunRejectsCursorBeyondPersistedLastEventSeq(t *testing.T) {
+	var reads atomic.Int32
+	service, err := NewDurableService(DurableServiceConfig{
+		CreateRun: func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error) { return nil, nil },
+		GetRun: func(context.Context, string) (*mysql.WorkflowRun, error) {
+			reads.Add(1)
+			return &mysql.WorkflowRun{ID: "run-c07", UserID: "owner-c07", SessionID: "session-c07", RuntimeMode: workflow.RuntimeModeDurableV1, LastEventSeq: 0}, nil
+		},
+		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ResumeRun(c07IdentityContext(), "run-c07", "session-c07", 1); !errors.Is(err, ErrDurableReconnectInvalid) {
+		t.Fatalf("ResumeRun error=%v, want invalid cursor", err)
+	}
+	if reads.Load() != 1 {
+		t.Fatalf("GetRun reads=%d, want one read before persisted cursor validation", reads.Load())
+	}
+}
+
 func TestTerminalResumeRunIsReadOnly(t *testing.T) {
 	var creates atomic.Int32
 	service, err := NewDurableService(DurableServiceConfig{
@@ -236,7 +257,7 @@ func TestTerminalResumeRunIsReadOnly(t *testing.T) {
 			return nil, nil
 		},
 		GetRun: func(context.Context, string) (*mysql.WorkflowRun, error) {
-			return &mysql.WorkflowRun{ID: "run-c07-terminal", UserID: "owner-c07", SessionID: "session-c07", Status: workflow.RunStatusSucceeded, RuntimeMode: workflow.RuntimeModeDurableV1}, nil
+			return &mysql.WorkflowRun{ID: "run-c07-terminal", UserID: "owner-c07", SessionID: "session-c07", Status: workflow.RunStatusSucceeded, RuntimeMode: workflow.RuntimeModeDurableV1, LastEventSeq: 9}, nil
 		},
 		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
 	})

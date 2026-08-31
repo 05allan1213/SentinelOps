@@ -135,13 +135,17 @@ func (c *ControllerV1) Chat(ctx context.Context, req *v1.ChatReq) (*v1.ChatRes, 
 	}
 	client := sse.NewClient(g.RequestFromCtx(ctx))
 	meta, _ := json.Marshal(map[string]any{"sessionId": run.SessionID, "runId": run.ID, "status": run.Status, "after_seq": afterSeq})
-	metaSeq := afterSeq
-	if metaSeq == 0 {
-		metaSeq = 1
-	}
-	client.SendEvent(metaSeq, workflow.EventRunCreated, string(meta))
+	client.SendEvent(durableIdentityEventID(strings.TrimSpace(req.RunID) != ""), workflow.EventRunCreated, string(meta))
 	client.Done()
 	return nil, nil
+}
+
+// durableIdentityEventID keeps synthetic v1 identity metadata outside the persisted event cursor on every reconnect.
+func durableIdentityEventID(reconnect bool) int64 {
+	if reconnect {
+		return 0
+	}
+	return 1
 }
 
 // resolveRun 按 v1 兼容契约区分首次创建与已有 Run 重连。

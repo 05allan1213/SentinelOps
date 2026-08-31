@@ -135,6 +135,9 @@ func (s *DurableService) ResumeRun(ctx context.Context, runID, sessionID string,
 	if err := policy.Authorize(ctx, policy.PermissionViewScoped, policy.Resource{OwnerID: run.UserID}); err != nil {
 		return nil, ErrDurableRunForbidden
 	}
+	if uint64(afterSeq) > run.LastEventSeq {
+		return nil, ErrDurableReconnectInvalid
+	}
 	if run.SessionID != sessionID {
 		return nil, ErrDurableReconnectInvalid
 	}
