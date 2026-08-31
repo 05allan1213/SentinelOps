@@ -274,6 +274,9 @@ func (s *GORMStore) PublishApprovalAndWait(ctx context.Context, input PublishApp
 		if err := insertDurableEvent(tx, run.ID, secondSeq, requested, requestedPayload); err != nil {
 			return err
 		}
+		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: RunStatusWaitingApproval, CurrentPhase: "waiting_approval", TraceQuality: "unknown", FinishedAt: time.Now()}); err != nil {
+			return err
+		}
 		if err := tx.First(&approval, "id = ?", approval.ID).Error; err != nil {
 			return fmt.Errorf("读取已发布 Approval: %w", err)
 		}
@@ -566,6 +569,9 @@ func invalidateApprovalAndParkTx(tx *gorm.DB, run *mysql.WorkflowRun, lease Leas
 		"lease_owner": nil, "lease_until": nil, "heartbeat_at": nil,
 	})
 	if err != nil {
+		return err
+	}
+	if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: lease, Status: RunStatusParked, CurrentPhase: "unknown", FailureCode: reason, FinishedAt: time.Now()}); err != nil {
 		return err
 	}
 	return insertDurableEvent(tx, run.ID, secondSeq, parkedEvent, parkedPayload)

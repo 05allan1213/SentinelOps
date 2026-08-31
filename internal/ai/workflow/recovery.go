@@ -125,6 +125,26 @@ func (s *GORMStore) RecordRecoverySelection(ctx context.Context, input RecoveryS
 		if err := validateRecoveryAttempt(run, input.Attempt, input.RuntimeVersion); err != nil {
 			return err
 		}
+		checkpointFingerprint := ""
+		facts, factsErr := loadRecoveryFacts(tx, run)
+		if factsErr != nil {
+			return factsErr
+		}
+		if facts.Checkpoint.ID != "" {
+			var checkpoint mysql.WorkflowCheckpoint
+			if err := tx.Select("runtime_compatibility_hash").Where("run_id = ? AND eino_checkpoint_id = ?", run.ID, facts.Checkpoint.ID).First(&checkpoint).Error; err != nil {
+				return fmt.Errorf("读取 Recovery checkpoint compatibility: %w", err)
+			}
+			if checkpoint.RuntimeCompatibilityHash != nil {
+				checkpointFingerprint = *checkpoint.RuntimeCompatibilityHash
+			}
+		}
+		if err := setAttemptRecoveryModeTx(tx, run, input.Lease, input.Mode, checkpointFingerprint); err != nil {
+			return err
+		}
+		if err := attachAttemptTraceTx(tx, run, input.Lease, input.TraceID); err != nil {
+			return err
+		}
 		seq, err := updateFencedDurableRunAndAllocateSeq(tx, run.ID, run.Status, input.Lease, map[string]any{})
 		if err != nil {
 			return err
@@ -162,6 +182,9 @@ func (s *GORMStore) ParkRecovery(ctx context.Context, input RecoveryParkInput) e
 			"status": RunStatusParked, "park_reason": input.Reason,
 		})
 		if err != nil {
+			return err
+		}
+		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: RunStatusParked, CurrentPhase: "unknown", FailureCode: input.Reason, FinishedAt: time.Now()}); err != nil {
 			return err
 		}
 		return insertDurableEvent(tx, run.ID, seq, event, payload)

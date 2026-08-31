@@ -84,6 +84,10 @@ func (s *GORMStore) ReapExpiredLeases(ctx context.Context, input ReapInput) (int
 		}
 		for index := range runs {
 			run := &runs[index]
+			oldGeneration := run.LeaseGeneration
+			if err := finishAttemptAfterLeaseExpiryTx(tx, run, oldGeneration, RunStatusFailed, "failed", "lease_expired", "worker lease expired before Attempt completion"); err != nil {
+				return err
+			}
 			updateResult := tx.Model(&mysql.WorkflowRun{}).
 				Where("id = ? AND status = ? AND lease_owner = ? AND lease_generation = ? AND lease_until <= CURRENT_TIMESTAMP(3)",
 					run.ID, RunStatusRunning, run.LeaseOwner, run.LeaseGeneration).
