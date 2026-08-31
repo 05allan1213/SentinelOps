@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	runtimev1 "SentinelOps/api/runtime/v1"
 	"SentinelOps/internal/ai/policy"
 )
 
@@ -98,7 +99,7 @@ func RuntimeErrorCode(err error) string {
 		return ErrorCodeRuntimeNotFound
 	case errors.Is(err, ErrRuntimeForbidden), errors.Is(err, ErrRuntimeContentExpansionDenied):
 		return ErrorCodeRuntimeForbidden
-	case errors.Is(err, ErrRuntimeInvalidFilter):
+	case errors.Is(err, ErrRuntimeInvalidFilter), errors.Is(err, runtimev1.ErrRuntimeRequestValidation):
 		return ErrorCodeRuntimeInvalidFilter
 	case errors.Is(err, ErrRuntimeOperationConflict):
 		return ErrorCodeRuntimeOperationConflict

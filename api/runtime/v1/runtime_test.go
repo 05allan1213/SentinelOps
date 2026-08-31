@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -57,6 +58,8 @@ func TestRuntimeRequestValidation(t *testing.T) {
 	for _, req := range invalid {
 		if err := req.Valid(); err == nil {
 			t.Errorf("invalid %T accepted", req)
+		} else if !errors.Is(err, ErrRuntimeRequestValidation) {
+			t.Errorf("invalid %T error=%v, want ErrRuntimeRequestValidation", req, err)
 		}
 	}
 }
@@ -71,6 +74,8 @@ func TestParseRFC3339UTCNormalizesOffset(t *testing.T) {
 	}
 	if _, err := ParseRFC3339UTC("2026-08-31 12:00:00"); err == nil {
 		t.Fatal("invalid timestamp accepted")
+	} else if !errors.Is(err, ErrRuntimeRequestValidation) {
+		t.Fatalf("invalid timestamp error=%v", err)
 	}
 }
 

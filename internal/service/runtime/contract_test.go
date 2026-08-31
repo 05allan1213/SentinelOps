@@ -3,9 +3,11 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
+	runtimev1 "SentinelOps/api/runtime/v1"
 	"SentinelOps/internal/ai/policy"
 )
 
@@ -116,6 +118,8 @@ func TestRuntimeErrorCodeMapIsStableAndRedacted(t *testing.T) {
 		{ErrRuntimeOperationConflict, "RUNTIME_OPERATION_CONFLICT"},
 		{ErrRuntimeIdempotencyConflict, "RUNTIME_IDEMPOTENCY_CONFLICT"},
 		{ErrRuntimePrecondition, "RUNTIME_PRECONDITION_FAILED"},
+		{runtimev1.ErrRuntimeRequestValidation, "RUNTIME_INVALID_FILTER"},
+		{fmt.Errorf("wrapped request: %w", runtimev1.ErrRuntimeRequestValidation), "RUNTIME_INVALID_FILTER"},
 		{errors.New("password=plaintext-runtime-secret"), "RUNTIME_INTERNAL"},
 	}
 	for _, test := range tests {

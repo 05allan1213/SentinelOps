@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,6 +10,13 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 )
+
+// ErrRuntimeRequestValidation marks all client-supplied Runtime request validation failures.
+var ErrRuntimeRequestValidation = errors.New("runtime request validation failed")
+
+func validationErrorf(format string, args ...any) error {
+	return fmt.Errorf("%w: %s", ErrRuntimeRequestValidation, fmt.Sprintf(format, args...))
+}
 
 type Availability string
 
@@ -138,16 +146,16 @@ type PageRequest struct {
 
 func (r PageRequest) Valid() error {
 	if r.Page < 1 {
-		return fmt.Errorf("page must be >= 1")
+		return validationErrorf("page must be >= 1")
 	}
 	if r.PageSize < 1 || r.PageSize > 100 {
-		return fmt.Errorf("page_size must be between 1 and 100")
+		return validationErrorf("page_size must be between 1 and 100")
 	}
 	return nil
 }
 func validID(s, name string) error {
 	if strings.TrimSpace(s) == "" {
-		return fmt.Errorf("%s must not be empty", name)
+		return validationErrorf("%s must not be empty", name)
 	}
 	return nil
 }
@@ -159,7 +167,7 @@ func validPagedRun(runID string, page, pageSize int) error {
 }
 func validTime(s, name string) error {
 	if _, err := ParseRFC3339UTC(s); err != nil {
-		return fmt.Errorf("%s must be RFC3339", name)
+		return validationErrorf("%s must be RFC3339", name)
 	}
 	return nil
 }
@@ -172,7 +180,7 @@ func ParseRFC3339UTC(value string) (*time.Time, error) {
 	}
 	parsed, err := time.Parse(time.RFC3339, value)
 	if err != nil {
-		return nil, err
+		return nil, validationErrorf("invalid timestamp: %v", err)
 	}
 	utc := parsed.UTC()
 	return &utc, nil
@@ -204,13 +212,13 @@ func (r ListRunsReq) Valid() error {
 		return err
 	}
 	if r.Status != "" && !r.Status.Valid() {
-		return fmt.Errorf("invalid status")
+		return validationErrorf("invalid status")
 	}
 	if r.Direction != "" && !r.Direction.Valid() {
-		return fmt.Errorf("invalid direction")
+		return validationErrorf("invalid direction")
 	}
 	if r.Sort != "" && !validRunSort(r.Sort) {
-		return fmt.Errorf("invalid sort")
+		return validationErrorf("invalid sort")
 	}
 	return nil
 }
@@ -258,14 +266,14 @@ func (r GetTimelineReq) Valid() error {
 		return err
 	}
 	if r.Direction != "" && !r.Direction.Valid() {
-		return fmt.Errorf("invalid direction")
+		return validationErrorf("invalid direction")
 	}
 	if r.Sort != "" && !validRunSort(r.Sort) {
-		return fmt.Errorf("invalid sort")
+		return validationErrorf("invalid sort")
 	}
 	for _, eventType := range r.EventTypes {
 		if !validEventType(eventType) {
-			return fmt.Errorf("invalid event_type")
+			return validationErrorf("invalid event_type")
 		}
 	}
 	return nil
@@ -291,7 +299,7 @@ func (r RunEventsReq) Valid() error {
 		return e
 	}
 	if r.AfterSeq < 0 {
-		return fmt.Errorf("after_seq must be >= 0")
+		return validationErrorf("after_seq must be >= 0")
 	}
 	return nil
 }
@@ -361,7 +369,7 @@ func (r ExpandEvidenceReq) Valid() error {
 		return e
 	}
 	if r.Include != "" && r.Include != "quote" {
-		return fmt.Errorf("invalid include")
+		return validationErrorf("invalid include")
 	}
 	return nil
 }
@@ -377,7 +385,7 @@ func (r GetContextReq) Valid() error {
 		return e
 	}
 	if r.Include != "" && r.Include != "history" {
-		return fmt.Errorf("invalid include")
+		return validationErrorf("invalid include")
 	}
 	return nil
 }
@@ -406,13 +414,13 @@ func (r RecoverRunReq) Valid() error {
 		return e
 	}
 	if !r.Action.Valid() {
-		return fmt.Errorf("invalid action")
+		return validationErrorf("invalid action")
 	}
 	if strings.TrimSpace(r.IdempotencyKey) == "" {
-		return fmt.Errorf("idempotency_key must not be empty")
+		return validationErrorf("idempotency_key must not be empty")
 	}
 	if strings.TrimSpace(r.Reason) == "" {
-		return fmt.Errorf("reason must not be empty")
+		return validationErrorf("reason must not be empty")
 	}
 	return nil
 }
