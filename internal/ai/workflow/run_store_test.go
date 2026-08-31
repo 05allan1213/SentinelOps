@@ -284,6 +284,7 @@ func TestVersionedEventCatalogIsComplete(t *testing.T) {
 		"effect.started", "effect.succeeded", "effect.failed", "effect.unknown", "effect.reconciling", "effect.resolved",
 		"budget.reserved", "budget.settled", "budget.exhausted", "budget.usage_unknown",
 		"evidence.retrieved", "evidence.cited", "trace.flushed", "trace.incomplete",
+		"operation.accepted", "operation.started", "operation.succeeded", "operation.failed", "operation.canceled", "operation.rejected",
 	}
 	got := VersionedEventCatalog()
 	if fmt.Sprint(got) != fmt.Sprint(want) {
