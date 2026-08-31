@@ -53,6 +53,39 @@ func TestWorkerSnapshotNeverContainsSecret(t *testing.T) {
 	}
 }
 
+func TestWorkerSnapshotNormalizesForbiddenErrorMaterial(t *testing.T) {
+	for _, input := range []string{
+		"x-custom-header: abc123",
+		"secret_ref=env:MCP_SECRET",
+		"handle=opaque-session",
+		"request failed at https://example.test/mcp",
+		"credential=abc",
+	} {
+		record, err := workerSnapshotRecord(WorkerObservation{
+			WorkerID: "worker-error", Status: WorkerStatusIdle, LastError: input,
+			ObservedMCP: []ObservedRuntimeComponent{{Name: "inventory", Status: "error", Error: input}},
+		})
+		if err != nil {
+			t.Fatalf("input %q: %v", input, err)
+		}
+		for _, value := range []string{workerStringValue(record.LastErrorRedacted), workerStringValue(record.ObservedMCPJSON)} {
+			lower := strings.ToLower(value)
+			for _, forbidden := range []string{"secret_ref", "https://", "header", "handle", "credential", "authorization"} {
+				if strings.Contains(lower, forbidden) {
+					t.Fatalf("input %q persisted forbidden %q in %s", input, forbidden, value)
+				}
+			}
+		}
+	}
+}
+
+func workerStringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
 func TestWorkerSnapshotHeartbeatAndStale(t *testing.T) {
 	now := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 	fresh := now.Add(-29 * time.Second)

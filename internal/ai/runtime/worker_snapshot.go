@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -122,6 +123,10 @@ func workerSnapshotRecord(observation WorkerObservation) (mysql.RuntimeWorkerSna
 	}
 	now := observation.HeartbeatAt
 	persistedAt := time.Now()
+	lastError := normalizeWorkerError(observation.LastError)
+	if err := validateWorkerText("last_error_redacted", lastError); err != nil {
+		return mysql.RuntimeWorkerSnapshot{}, err
+	}
 	return mysql.RuntimeWorkerSnapshot{
 		WorkerID: observation.WorkerID, HeartbeatAt: &now,
 		RuntimeVersion:           nullableWorkerText(observation.RuntimeVersion),
@@ -131,7 +136,7 @@ func workerSnapshotRecord(observation WorkerObservation) (mysql.RuntimeWorkerSna
 		ActiveRunID:       nullableWorkerText(observation.ActiveRunID),
 		ActiveGeneration:  nullableWorkerGeneration(observation.ActiveRunID, observation.ActiveGeneration),
 		Status:            nullableWorkerText(observation.Status),
-		LastErrorRedacted: nullableWorkerText(redactWorkerError(observation.LastError)),
+		LastErrorRedacted: nullableWorkerText(lastError),
 		CreatedAt:         &persistedAt, UpdatedAt: &persistedAt,
 	}, nil
 }
@@ -165,7 +170,10 @@ func encodeObservedComponents(components []ObservedRuntimeComponent) (string, er
 		if clean[index].Name == "" {
 			return "", fmt.Errorf("observed component name is required")
 		}
-		clean[index].Error = redactWorkerError(clean[index].Error)
+		clean[index].Error = normalizeWorkerError(clean[index].Error)
+		if err := validateWorkerText("observed_error", clean[index].Error); err != nil {
+			return "", err
+		}
 		if clean[index].Hash != "" && (len(clean[index].Hash) != 64 || !isHexWorkerHash(clean[index].Hash)) {
 			return "", fmt.Errorf("observed component hash must be a SHA-256 digest")
 		}
@@ -194,15 +202,26 @@ func validateWorkerText(field, value string) error {
 	return nil
 }
 
-func redactWorkerError(value string) string {
+func normalizeWorkerError(value string) string {
 	value = policy.NewRedactor().RedactText(value)
-	for _, label := range []string{"authorization", "proxy_authorization", "password", "passwd", "api_key", "apikey", "token"} {
-		value = strings.ReplaceAll(value, label, "credential")
-		value = strings.ReplaceAll(value, strings.ToUpper(label), "credential")
-		value = strings.ReplaceAll(value, strings.ToUpper(label[:1])+label[1:], "credential")
+	lower := strings.ToLower(value)
+	for _, forbidden := range []string{
+		"secretref", "secret_ref", "secret-ref", "secret ref", "http://", "https://", "://", "authorization", "proxy_authorization", "header", "handle",
+		"password", "passwd", "api_key", "apikey", "token", "credential", "credentials", "x-api-key", "bearer ",
+	} {
+		if strings.Contains(lower, forbidden) {
+			return "[REDACTED]"
+		}
+	}
+	for _, line := range strings.Split(value, "\n") {
+		if workerHeaderPattern.MatchString(strings.TrimSpace(line)) {
+			return "[REDACTED]"
+		}
 	}
 	return value
 }
+
+var workerHeaderPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9-]{1,63}:\s*\S+`)
 
 func isHexWorkerHash(value string) bool { _, err := hex.DecodeString(value); return err == nil }
 

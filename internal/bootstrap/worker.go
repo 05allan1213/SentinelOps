@@ -159,7 +159,7 @@ func configuredWorkerObservation(ctx context.Context, config *appconfig.Config, 
 	observedSkills := make([]airuntime.ObservedRuntimeComponent, 0, len(skills))
 	for _, skill := range skills {
 		observedSkills = append(observedSkills, airuntime.ObservedRuntimeComponent{
-			Name: skill.Name, Hash: skill.ContentHash, Validation: "valid", Status: "loaded",
+			Name: skill.Name, Validation: "not_run", Status: "not_observed",
 		})
 	}
 	sort.Slice(observedSkills, func(i, j int) bool { return observedSkills[i].Name < observedSkills[j].Name })

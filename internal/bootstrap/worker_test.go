@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -33,6 +34,7 @@ func TestDurableWorkerOwnerRejectsAmbiguousIdentity(t *testing.T) {
 
 func TestWorkerBootstrapBuildsRedactedConfiguredObservation(t *testing.T) {
 	config := validBootstrapConfig("development")
+	config.Skill = appconfig.SkillConfig{Enabled: true, BaseDir: filepath.Join("..", "..", "manifest", "skills"), MaxBytes: 64 * 1024}
 	config.MCP = appconfig.MCPConfig{Enabled: true, Servers: map[string]appconfig.MCPServer{
 		"inventory": {Enabled: true, Transport: "stdio", Command: "/bin/echo", CWD: "/tmp", HeaderName: "Authorization", HeaderRef: "env:MCP_SECRET"},
 	}}
@@ -55,6 +57,11 @@ func TestWorkerBootstrapBuildsRedactedConfiguredObservation(t *testing.T) {
 	}
 	if len(observation.ObservedMCP) != 1 || observation.ObservedMCP[0].Name != "inventory" || observation.ObservedMCP[0].Status != "not_observed" {
 		t.Fatalf("MCP was falsely reported observed: %#v", observation.ObservedMCP)
+	}
+	for _, skill := range observation.ObservedSkill {
+		if skill.Status == "loaded" || skill.Validation == "valid" || skill.Hash != "" {
+			t.Fatalf("configured Skill was falsely reported observed: %#v", observation.ObservedSkill)
+		}
 	}
 	joined := strings.ToLower(observation.ObservedMCP[0].Name + observation.ObservedMCP[0].Error)
 	for _, secretLike := range []string{"example.test", "authorization", "mcp_secret", "password"} {
