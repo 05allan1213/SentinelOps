@@ -202,11 +202,11 @@ func validateOperationRequest(input OperationRequestInput) error {
 	if input.Action != OperationActionCancel && input.ExpectedGeneration == 0 {
 		return fmt.Errorf("%w: expected_generation must be positive", ErrInvalidOperationInput)
 	}
-	if input.Action != OperationActionCancel && !compatibilityHashPattern.MatchString(input.ExpectedCompatibilityHash) {
+	if input.ExpectedCompatibilityHash != "" && !compatibilityHashPattern.MatchString(input.ExpectedCompatibilityHash) {
 		return fmt.Errorf("%w: expected_compatibility_hash must be lowercase hex64", ErrInvalidOperationInput)
 	}
-	if input.Action == OperationActionCancel && input.ExpectedCompatibilityHash != "" && !compatibilityHashPattern.MatchString(input.ExpectedCompatibilityHash) {
-		return fmt.Errorf("%w: expected_compatibility_hash must be lowercase hex64", ErrInvalidOperationInput)
+	if input.Action == OperationActionRestore && input.ExpectedCompatibilityHash == "" {
+		return fmt.Errorf("%w: expected_compatibility_hash is required for restore", ErrInvalidOperationInput)
 	}
 	return nil
 }
