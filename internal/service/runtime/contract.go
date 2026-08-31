@@ -5,9 +5,13 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"unicode/utf8"
 
 	runtimev1 "SentinelOps/api/runtime/v1"
 	"SentinelOps/internal/ai/policy"
+	"SentinelOps/internal/ai/workflow"
+
+	"gorm.io/gorm"
 )
 
 var (
@@ -109,5 +113,47 @@ func RuntimeErrorCode(err error) string {
 		return ErrorCodeRuntimePreconditionFailed
 	default:
 		return ErrorCodeRuntimeInternal
+	}
+}
+
+// ValidateRecoveryRequest 校验并规范化 Runtime Recovery 命令；Actor 只取自服务端 Context。
+func ValidateRecoveryRequest(ctx context.Context, runID string, request runtimev1.RecoveryCommandRequest) (workflow.AcceptRecoveryOperationInput, error) {
+	if err := RequireRuntimeAdmin(ctx); err != nil {
+		return workflow.AcceptRecoveryOperationInput{}, err
+	}
+	if strings.TrimSpace(runID) == "" {
+		return workflow.AcceptRecoveryOperationInput{}, ErrRuntimeInvalidFilter
+	}
+	if !request.Action.Valid() || len(request.IdempotencyKey) < 16 || len(request.IdempotencyKey) > 128 ||
+		!utf8.ValidString(request.IdempotencyKey) {
+		return workflow.AcceptRecoveryOperationInput{}, ErrRuntimeInvalidFilter
+	}
+	input := workflow.OperationRequestInput{
+		RunID: runID, Action: string(request.Action), Reason: request.Reason,
+		ExpectedGeneration: request.ExpectedGeneration, ExpectedCompatibilityHash: request.ExpectedCompatibilityHash,
+	}
+	if _, err := workflow.OperationRequestFingerprint(input); err != nil {
+		return workflow.AcceptRecoveryOperationInput{}, ErrRuntimeInvalidFilter
+	}
+	return workflow.AcceptRecoveryOperationInput{OperationRequestInput: input, IdempotencyKey: request.IdempotencyKey}, nil
+}
+
+// MapRecoveryError 将 workflow 接纳错误映射为 Runtime 服务稳定 sentinel。
+func MapRecoveryError(err error) error {
+	switch {
+	case errors.Is(err, workflow.ErrOperationConflict):
+		return ErrRuntimeOperationConflict
+	case errors.Is(err, workflow.ErrOperationIdempotencyConflict):
+		return ErrRuntimeIdempotencyConflict
+	case errors.Is(err, workflow.ErrOperationPrecondition):
+		return ErrRuntimePrecondition
+	case errors.Is(err, workflow.ErrInvalidOperationInput), errors.Is(err, runtimev1.ErrRuntimeRequestValidation):
+		return ErrRuntimeInvalidFilter
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		return ErrRuntimeNotFound
+	case errors.Is(err, policy.ErrForbidden), errors.Is(err, policy.ErrUnauthenticated):
+		return ErrRuntimeForbidden
+	default:
+		return err
 	}
 }

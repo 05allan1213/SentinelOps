@@ -1,14 +1,244 @@
 package workflow
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/dao/mysql"
 )
+
+func TestRecoverySameKeyReplaysOriginalOperation(t *testing.T) {
+	db := newP07Database(t, "operation_accept_replay")
+	store, token := fixture09ClaimRun(t, db, "operation-accept-replay", time.Hour)
+	ctx := fixtureOperationAdminContext("admin-c04")
+	input := fixtureAcceptRecoveryInput(token.RunID, OperationActionReplay, token.Generation, "same-key-replay-0001")
+
+	first, err := store.AcceptRecoveryOperation(ctx, input)
+	if err != nil {
+		t.Fatalf("first accept: %v", err)
+	}
+	second, err := store.AcceptRecoveryOperation(ctx, input)
+	if err != nil {
+		t.Fatalf("idempotent replay: %v", err)
+	}
+	if first.OperationID != second.OperationID || first.IdempotentReplay || !second.IdempotentReplay {
+		t.Fatalf("records first=%#v second=%#v", first, second)
+	}
+	var count int64
+	if err := db.Model(&mysql.WorkflowEvent{}).Where("run_id = ? AND event_type = ?", token.RunID, EventOperationAccepted).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("accepted event count = %d, want 1", count)
+	}
+}
+
+func TestRecoverySameKeyDifferentFingerprintConflicts(t *testing.T) {
+	db := newP07Database(t, "operation_accept_idempotency_conflict")
+	store, token := fixture09ClaimRun(t, db, "operation-accept-idempotency", time.Hour)
+	ctx := fixtureOperationAdminContext("admin-c04")
+	input := fixtureAcceptRecoveryInput(token.RunID, OperationActionReplay, token.Generation, "same-key-conflict-0001")
+	if _, err := store.AcceptRecoveryOperation(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	input.Reason = "materially different reason"
+	if _, err := store.AcceptRecoveryOperation(ctx, input); !errors.Is(err, ErrOperationIdempotencyConflict) {
+		t.Fatalf("conflict error = %v", err)
+	}
+}
+
+func TestRecoveryDifferentKeyActiveConflict(t *testing.T) {
+	db := newP07Database(t, "operation_accept_active_conflict")
+	store, token := fixture09ClaimRun(t, db, "operation-accept-active", time.Hour)
+	ctx := fixtureOperationAdminContext("admin-c04")
+	if _, err := store.AcceptRecoveryOperation(ctx, fixtureAcceptRecoveryInput(token.RunID, OperationActionReplay, token.Generation, "active-key-first-0001")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AcceptRecoveryOperation(ctx, fixtureAcceptRecoveryInput(token.RunID, OperationActionReplay, token.Generation, "active-key-other-0002")); !errors.Is(err, ErrOperationConflict) {
+		t.Fatalf("active conflict error = %v", err)
+	}
+}
+
+func TestRecoveryLegalityMatrix(t *testing.T) {
+	t.Run("replay requires no durable recovery dependency", func(t *testing.T) {
+		db := newP07Database(t, "operation_legality_replay")
+		store, token := fixture09ClaimRun(t, db, "operation-legality-replay", time.Hour)
+		fixture09InsertGuardedTruthFixtures(t, db, token.RunID, token.Generation)
+		_, err := store.AcceptRecoveryOperation(fixtureOperationAdminContext("admin-c04"), fixtureAcceptRecoveryInput(token.RunID, OperationActionReplay, token.Generation, "legality-replay-key-01"))
+		if !errors.Is(err, ErrOperationPrecondition) {
+			t.Fatalf("replay dependency error = %v", err)
+		}
+	})
+	t.Run("resume requires complete checkpoint or explicit approval target", func(t *testing.T) {
+		db := newP07Database(t, "operation_legality_resume")
+		store, token := fixture09ClaimRun(t, db, "operation-legality-resume", time.Hour)
+		_, err := store.AcceptRecoveryOperation(fixtureOperationAdminContext("admin-c04"), fixtureAcceptRecoveryInput(token.RunID, OperationActionResume, token.Generation, "legality-resume-key-01"))
+		if !errors.Is(err, ErrOperationPrecondition) {
+			t.Fatalf("resume without target error = %v", err)
+		}
+	})
+	t.Run("cancel accepts nonterminal and terminal is event-free", func(t *testing.T) {
+		db := newP07Database(t, "operation_legality_cancel")
+		store, _, run := fixture08CreateRun(t, db, "operation-legality-cancel")
+		ctx := fixtureOperationAdminContext("admin-c04")
+		accepted, err := store.AcceptRecoveryOperation(ctx, fixtureAcceptRecoveryInput(run.ID, OperationActionCancel, 0, "legality-cancel-key-01"))
+		if err != nil || accepted.Status != OperationStatusAccepted {
+			t.Fatalf("nonterminal cancel = %#v err=%v", accepted, err)
+		}
+		terminalRun := *run
+		terminalRun.ID += "-terminal"
+		terminalRun.SessionID += "-terminal"
+		terminalRun.ActiveSessionKey = nil
+		terminalRun.Status = RunStatusCanceled
+		terminalRun.LeaseGeneration = 1
+		finishedAt := time.Now()
+		terminalRun.FinishedAt = &finishedAt
+		if err := db.Create(&terminalRun).Error; err != nil {
+			t.Fatal(err)
+		}
+		terminal, err := store.AcceptRecoveryOperation(ctx, fixtureAcceptRecoveryInput(terminalRun.ID, OperationActionCancel, 0, "legality-terminal-key-01"))
+		if err != nil || !terminal.Terminal || terminal.IdempotentReplay || terminal.Status != OperationStatusCanceled {
+			t.Fatalf("terminal cancel = %#v err=%v", terminal, err)
+		}
+		repeated, err := store.AcceptRecoveryOperation(ctx, fixtureAcceptRecoveryInput(terminalRun.ID, OperationActionCancel, 0, "legality-terminal-key-01"))
+		if err != nil || !repeated.Terminal || repeated.IdempotentReplay || repeated.OperationID != terminal.OperationID {
+			t.Fatalf("repeated terminal cancel = %#v err=%v", repeated, err)
+		}
+		replayTerminal := fixtureAcceptRecoveryInput(terminalRun.ID, OperationActionReplay, terminalRun.LeaseGeneration, "legality-terminal-replay-key-01")
+		if _, err := store.AcceptRecoveryOperation(ctx, replayTerminal); !errors.Is(err, ErrOperationPrecondition) {
+			t.Fatalf("terminal replay error = %v", err)
+		}
+		var count int64
+		if err := db.Model(&mysql.WorkflowEvent{}).Where("run_id = ? AND operation_id IS NOT NULL", terminalRun.ID).Count(&count).Error; err != nil || count != 0 {
+			t.Fatalf("terminal cancel events=%d err=%v", count, err)
+		}
+	})
+	t.Run("cancel rejects stale expected generation without Event", func(t *testing.T) {
+		db := newP07Database(t, "operation_legality_cancel_stale")
+		store, token := fixture09ClaimRun(t, db, "operation-legality-cancel-stale", time.Hour)
+		input := fixtureAcceptRecoveryInput(token.RunID, OperationActionCancel, token.Generation+1, "legality-cancel-stale-key-01")
+		if _, err := store.AcceptRecoveryOperation(fixtureOperationAdminContext("admin-c04"), input); !errors.Is(err, ErrOperationPrecondition) {
+			t.Fatalf("stale cancel error = %v", err)
+		}
+		var count int64
+		if err := db.Model(&mysql.WorkflowEvent{}).Where("run_id = ? AND event_type = ?", token.RunID, EventOperationAccepted).Count(&count).Error; err != nil || count != 0 {
+			t.Fatalf("stale cancel accepted events=%d err=%v", count, err)
+		}
+	})
+	t.Run("unknown status rejects cancel and replay", func(t *testing.T) {
+		db := newP07Database(t, "operation_legality_unknown_status")
+		store, _, run := fixture08CreateRun(t, db, "operation-legality-unknown-status")
+		if err := db.Model(&mysql.WorkflowRun{}).Where("id = ?", run.ID).Updates(map[string]any{"status": "mystery", "lease_generation": 1}).Error; err != nil {
+			t.Fatal(err)
+		}
+		ctx := fixtureOperationAdminContext("admin-c04")
+		for _, action := range []string{OperationActionCancel, OperationActionReplay, OperationActionRestore} {
+			input := fixtureAcceptRecoveryInput(run.ID, action, 1, "legality-unknown-"+action+"-0001")
+			if action == OperationActionRestore {
+				input.ExpectedCompatibilityHash = *run.RuntimeCompatibilityHash
+			}
+			if _, err := store.AcceptRecoveryOperation(ctx, input); !errors.Is(err, ErrOperationPrecondition) {
+				t.Fatalf("unknown status %s error = %v", action, err)
+			}
+		}
+	})
+	t.Run("restore only runtime incompatible exact hash with valid dependencies", func(t *testing.T) {
+		db := newP07Database(t, "operation_legality_restore")
+		store, _, run := fixture08CreateRun(t, db, "operation-legality-restore")
+		if err := db.Model(&mysql.WorkflowRun{}).Where("id = ?", run.ID).Updates(map[string]any{
+			"status": RunStatusParked, "park_reason": ParkReasonRuntimeIncompatible, "lease_generation": 1,
+		}).Error; err != nil {
+			t.Fatal(err)
+		}
+		input := fixtureAcceptRecoveryInput(run.ID, OperationActionRestore, 1, "legality-restore-key-01")
+		input.ExpectedCompatibilityHash = *run.RuntimeCompatibilityHash
+		if _, err := store.AcceptRecoveryOperation(fixtureOperationAdminContext("admin-c04"), input); err != nil {
+			t.Fatalf("valid restore: %v", err)
+		}
+	})
+}
+
+func TestRecoveryHandlerNeverExecutesAgentOrEffect(t *testing.T) {
+	parsed, err := parser.ParseFile(token.NewFileSet(), "operations.go", nil, 0)
+	if err != nil {
+		t.Fatalf("parse operations.go: %v", err)
+	}
+	forbidden := map[string]bool{"StartRecovery": true, "InvokeRecoveryRunner": true, "TransitionEffect": true, "BeginExternalEffect": true}
+	var target *ast.FuncDecl
+	for _, declaration := range parsed.Decls {
+		function, ok := declaration.(*ast.FuncDecl)
+		if ok && function.Name.Name == "AcceptRecoveryOperation" {
+			target = function
+			break
+		}
+	}
+	if target == nil {
+		t.Fatal("AcceptRecoveryOperation not found")
+	}
+	ast.Inspect(target.Body, func(node ast.Node) bool {
+		selector, ok := node.(*ast.SelectorExpr)
+		if ok && forbidden[selector.Sel.Name] {
+			t.Errorf("AcceptRecoveryOperation calls forbidden execution symbol %s", selector.Sel.Name)
+		}
+		return true
+	})
+}
+
+func TestRecoveryRunRowLockSerializesRequests(t *testing.T) {
+	db := newP07Database(t, "operation_accept_serial")
+	store, token := fixture09ClaimRun(t, db, "operation-accept-serial", time.Hour)
+	ctx := fixtureOperationAdminContext("admin-c04")
+	inputs := []AcceptRecoveryOperationInput{
+		fixtureAcceptRecoveryInput(token.RunID, OperationActionReplay, token.Generation, "serial-operation-key-01"),
+		fixtureAcceptRecoveryInput(token.RunID, OperationActionReplay, token.Generation, "serial-operation-key-02"),
+	}
+	var wg sync.WaitGroup
+	errs := make(chan error, len(inputs))
+	for _, input := range inputs {
+		wg.Add(1)
+		go func(input AcceptRecoveryOperationInput) {
+			defer wg.Done()
+			_, err := store.AcceptRecoveryOperation(ctx, input)
+			errs <- err
+		}(input)
+	}
+	wg.Wait()
+	close(errs)
+	accepted, conflicts := 0, 0
+	for err := range errs {
+		switch {
+		case err == nil:
+			accepted++
+		case errors.Is(err, ErrOperationConflict):
+			conflicts++
+		default:
+			t.Fatalf("unexpected concurrent error: %v", err)
+		}
+	}
+	if accepted != 1 || conflicts != 1 {
+		t.Fatalf("accepted=%d conflicts=%d", accepted, conflicts)
+	}
+}
+
+func fixtureOperationAdminContext(userID string) context.Context {
+	return policy.WithIdentity(context.Background(), policy.Identity{UserID: userID, Role: policy.RoleAdmin, Scope: policy.Scope{All: true}})
+}
+
+func fixtureAcceptRecoveryInput(runID, action string, generation uint64, key string) AcceptRecoveryOperationInput {
+	return AcceptRecoveryOperationInput{OperationRequestInput: OperationRequestInput{
+		RunID: runID, Action: action, Reason: "operator accepted recovery", ExpectedGeneration: generation,
+	}, IdempotencyKey: key}
+}
 
 func TestOperationIdentityStableAndKeyOpaque(t *testing.T) {
 	vectorID, vectorDigest, err := OperationIdentity("run-vector-20260831", "idempotency-key-vector-0001")

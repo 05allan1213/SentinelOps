@@ -16,6 +16,7 @@ import (
 	"SentinelOps/internal/dao/mysql"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const OperationIdentityDomain = "sentinelops/runtime-operation/v1"
@@ -35,10 +36,13 @@ const (
 )
 
 var (
-	ErrInvalidOperationInput      = errors.New("invalid operation input")
-	ErrInvalidOperationTransition = errors.New("invalid operation event transition")
-	compatibilityHashPattern      = regexp.MustCompile(`^[0-9a-f]{64}$`)
-	operationIDPattern            = regexp.MustCompile(`^op-[0-9a-f]{64}$`)
+	ErrInvalidOperationInput        = errors.New("invalid operation input")
+	ErrInvalidOperationTransition   = errors.New("invalid operation event transition")
+	ErrOperationConflict            = errors.New("workflow recovery operation conflict")
+	ErrOperationIdempotencyConflict = errors.New("workflow recovery operation idempotency conflict")
+	ErrOperationPrecondition        = errors.New("workflow recovery operation precondition failed")
+	compatibilityHashPattern        = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	operationIDPattern              = regexp.MustCompile(`^op-[0-9a-f]{64}$`)
 )
 
 // OperationRequestInput 是幂等冲突判断使用的精确请求材料；Reason 必须先校验原文。
@@ -67,6 +71,19 @@ type Operation struct {
 	AcceptedSeq          uint64
 	StartedSeq           uint64
 	CorrelationSeq       uint64
+}
+
+// OperationRecord 是命令接纳结果；IdempotentReplay 仅表示同 key、同 fingerprint
+// 返回了已有 Operation。终态 cancel 不写命令 Event，而是返回 Run 的既有终态。
+type OperationRecord struct {
+	Operation
+	IdempotentReplay bool
+}
+
+// AcceptRecoveryOperationInput 只包含客户端命令材料；Actor 必须从 Context 读取。
+type AcceptRecoveryOperationInput struct {
+	OperationRequestInput
+	IdempotencyKey string
 }
 
 // OperationEventInput 是 canonical Operation Event 的类型化构造输入。
@@ -372,4 +389,288 @@ func (s *GORMStore) ListActiveOperationsForRun(ctx context.Context, runID string
 		}
 	}
 	return result, nil
+}
+
+// AcceptRecoveryOperation 在 Run 行锁内串行化幂等检查、active-operation 冲突、
+// Recovery 合法性与 operation.accepted 写入。它不执行 Runner、Agent、Tool 或 Effect。
+func (s *GORMStore) AcceptRecoveryOperation(ctx context.Context, input AcceptRecoveryOperationInput) (OperationRecord, error) {
+	if err := policy.Authorize(ctx, policy.PermissionRecoverRuntime, policy.Resource{}); err != nil {
+		return OperationRecord{}, err
+	}
+	identity, err := policy.IdentityFromContext(ctx)
+	if err != nil {
+		return OperationRecord{}, err
+	}
+	operationID, keyDigest, err := OperationIdentity(input.RunID, input.IdempotencyKey)
+	if err != nil {
+		return OperationRecord{}, err
+	}
+	fingerprint, err := OperationRequestFingerprint(input.OperationRequestInput)
+	if err != nil {
+		return OperationRecord{}, err
+	}
+
+	var accepted OperationRecord
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var run mysql.WorkflowRun
+		result := applyDurableRuntimeContract(tx.Clauses(clause.Locking{Strength: "UPDATE"}).Model(&mysql.WorkflowRun{})).
+			Where("id = ?", input.RunID).First(&run)
+		if result.Error != nil {
+			return result.Error
+		}
+		if err := policy.Authorize(ctx, policy.PermissionViewScoped, policy.Resource{OwnerID: run.UserID}); err != nil {
+			return err
+		}
+		existing, found, err := loadOperationByKeyDigestTx(tx, run.ID, keyDigest)
+		if err != nil {
+			return err
+		}
+		if found {
+			if existing.RequestFingerprint != fingerprint {
+				return ErrOperationIdempotencyConflict
+			}
+			accepted = OperationRecord{Operation: existing, IdempotentReplay: true}
+			return nil
+		}
+		if input.ExpectedGeneration != 0 && input.ExpectedGeneration != run.LeaseGeneration {
+			return ErrOperationPrecondition
+		}
+
+		if input.Action == OperationActionCancel && isTerminalRunStatus(run.Status) {
+			accepted = terminalCancelRecord(run, operationID, identity.UserID)
+			return nil
+		}
+		if !isDurableRunStatus(run.Status) || isTerminalRunStatus(run.Status) {
+			return ErrOperationPrecondition
+		}
+		active, err := listActiveOperationsForRunTx(tx, run.ID)
+		if err != nil {
+			return err
+		}
+		if len(active) != 0 {
+			return ErrOperationConflict
+		}
+		if input.Action == OperationActionCancel {
+			if err := validateRecoveryOperationTx(tx, &run, RecoveryFacts{}, input.OperationRequestInput); err != nil {
+				return err
+			}
+			event, err := (OperationEventInput{
+				Type: EventOperationAccepted, OperationID: operationID, Action: input.Action,
+				IdempotencyKeyDigest: keyDigest, RequestFingerprint: fingerprint,
+				ActorID: identity.UserID, Reason: input.Reason,
+			}).WorkflowEventInput()
+			if err != nil {
+				return err
+			}
+			return acceptOperationEventTx(tx, &run, event, &accepted)
+		}
+		facts, err := loadRecoveryFacts(tx, &run)
+		if err != nil {
+			return err
+		}
+		if err := validateRecoveryOperationTx(tx, &run, facts, input.OperationRequestInput); err != nil {
+			return err
+		}
+
+		event, err := (OperationEventInput{
+			Type: EventOperationAccepted, OperationID: operationID, Action: input.Action,
+			IdempotencyKeyDigest: keyDigest, RequestFingerprint: fingerprint,
+			ActorID: identity.UserID, Reason: input.Reason,
+		}).WorkflowEventInput()
+		if err != nil {
+			return err
+		}
+		return acceptOperationEventTx(tx, &run, event, &accepted)
+	})
+	return accepted, err
+}
+
+func acceptOperationEventTx(tx *gorm.DB, run *mysql.WorkflowRun, event WorkflowEventInput, accepted *OperationRecord) error {
+	payload, err := marshalDurableEvent(event)
+	if err != nil {
+		return err
+	}
+	seq := run.LastEventSeq + 1
+	result := tx.Model(&mysql.WorkflowRun{}).Where("id = ? AND last_event_seq = ?", run.ID, run.LastEventSeq).
+		Update("last_event_seq", seq)
+	if result.Error != nil {
+		return fmt.Errorf("allocate operation accepted Event seq: %w", result.Error)
+	}
+	if result.RowsAffected != 1 {
+		return ErrOperationConflict
+	}
+	if err := insertDurableEvent(tx, run.ID, seq, event, payload); err != nil {
+		return err
+	}
+	var row mysql.WorkflowEvent
+	if err := tx.Where("run_id = ? AND seq = ?", run.ID, seq).First(&row).Error; err != nil {
+		return fmt.Errorf("reload accepted operation Event: %w", err)
+	}
+	operation, err := DeriveOperation([]mysql.WorkflowEvent{row})
+	if err != nil {
+		return err
+	}
+	*accepted = OperationRecord{Operation: operation}
+	return nil
+}
+
+func loadOperationByKeyDigestTx(tx *gorm.DB, runID, keyDigest string) (Operation, bool, error) {
+	var accepted mysql.WorkflowEvent
+	result := tx.Where("run_id = ? AND event_type = ? AND idempotency_key_digest = ?", runID, EventOperationAccepted, keyDigest).
+		Order("seq ASC").First(&accepted)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return Operation{}, false, nil
+	}
+	if result.Error != nil {
+		return Operation{}, false, fmt.Errorf("load idempotent operation: %w", result.Error)
+	}
+	if accepted.OperationID == nil {
+		return Operation{}, false, fmt.Errorf("%w: accepted operation is missing operation_id", ErrInvalidOperationTransition)
+	}
+	var rows []mysql.WorkflowEvent
+	if err := tx.Where("run_id = ? AND operation_id = ?", runID, *accepted.OperationID).Order("seq ASC").Find(&rows).Error; err != nil {
+		return Operation{}, false, fmt.Errorf("load idempotent operation lifecycle: %w", err)
+	}
+	operation, err := DeriveOperation(rows)
+	return operation, true, err
+}
+
+func listActiveOperationsForRunTx(tx *gorm.DB, runID string) ([]Operation, error) {
+	var rows []mysql.WorkflowEvent
+	if err := tx.Where("run_id = ? AND operation_id IS NOT NULL", runID).Order("operation_id ASC, seq ASC").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("list active operation events: %w", err)
+	}
+	grouped := make(map[string][]mysql.WorkflowEvent)
+	order := make([]string, 0)
+	for _, row := range rows {
+		if row.OperationID == nil {
+			continue
+		}
+		if _, exists := grouped[*row.OperationID]; !exists {
+			order = append(order, *row.OperationID)
+		}
+		grouped[*row.OperationID] = append(grouped[*row.OperationID], row)
+	}
+	active := make([]Operation, 0, len(order))
+	for _, id := range order {
+		operation, err := DeriveOperation(grouped[id])
+		if err != nil {
+			return nil, err
+		}
+		if !operation.Terminal {
+			active = append(active, operation)
+		}
+	}
+	return active, nil
+}
+
+func validateRecoveryOperationTx(tx *gorm.DB, run *mysql.WorkflowRun, facts RecoveryFacts, input OperationRequestInput) error {
+	if run == nil || !isDurableRunStatus(run.Status) || isTerminalRunStatus(run.Status) {
+		return fmt.Errorf("%w: Run is terminal", ErrOperationPrecondition)
+	}
+	if input.ExpectedGeneration != 0 && input.ExpectedGeneration != run.LeaseGeneration {
+		return fmt.Errorf("%w: lease generation changed", ErrOperationPrecondition)
+	}
+	if input.Action != OperationActionCancel && input.ExpectedGeneration != run.LeaseGeneration {
+		return fmt.Errorf("%w: expected generation is not current", ErrOperationPrecondition)
+	}
+	if input.ExpectedCompatibilityHash != "" &&
+		(run.RuntimeCompatibilityHash == nil || input.ExpectedCompatibilityHash != *run.RuntimeCompatibilityHash) {
+		return fmt.Errorf("%w: runtime compatibility hash changed", ErrOperationPrecondition)
+	}
+	if input.Action == OperationActionCancel {
+		return nil
+	}
+
+	approvalTarget, err := hasExplicitApprovalResumeTargetTx(tx, run)
+	if err != nil {
+		return err
+	}
+	switch input.Action {
+	case OperationActionResume:
+		checkpointCurrent := facts.Checkpoint.State == RecoveryCheckpointValid && facts.Checkpoint.LeaseGeneration == run.LeaseGeneration
+		if !checkpointCurrent && !approvalTarget {
+			return fmt.Errorf("%w: resume requires a complete checkpoint or explicit Approval target", ErrOperationPrecondition)
+		}
+	case OperationActionReplay:
+		if facts.Checkpoint.State != RecoveryCheckpointMissing || facts.HasPublishedApproval || facts.HasEffect || strings.TrimSpace(facts.ImmutableQuery) == "" {
+			return fmt.Errorf("%w: replay dependencies are not clean", ErrOperationPrecondition)
+		}
+	case OperationActionRestore:
+		if run.Status != RunStatusParked || run.ParkReason == nil || *run.ParkReason != ParkReasonRuntimeIncompatible {
+			return fmt.Errorf("%w: restore requires runtime_incompatible parked Run", ErrOperationPrecondition)
+		}
+		if run.RuntimeCompatibilityHash == nil || input.ExpectedCompatibilityHash != *run.RuntimeCompatibilityHash {
+			return fmt.Errorf("%w: runtime compatibility hash changed", ErrOperationPrecondition)
+		}
+		resumeValid := facts.Checkpoint.State == RecoveryCheckpointValid || approvalTarget
+		replayValid := facts.Checkpoint.State == RecoveryCheckpointMissing && !facts.HasPublishedApproval && !facts.HasEffect && strings.TrimSpace(facts.ImmutableQuery) != ""
+		if !resumeValid && !replayValid {
+			return fmt.Errorf("%w: restore recovery dependencies are invalid", ErrOperationPrecondition)
+		}
+	default:
+		return ErrInvalidOperationInput
+	}
+	return nil
+}
+
+func hasExplicitApprovalResumeTargetTx(tx *gorm.DB, run *mysql.WorkflowRun) (bool, error) {
+	var approval mysql.AgentApproval
+	result := tx.Where("run_id = ? AND status IN ?", run.ID, []string{ApprovalStatusPreparing, ApprovalStatusPending, ApprovalStatusApproved}).
+		Order("created_at DESC, id DESC").First(&approval)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if result.Error != nil {
+		return false, fmt.Errorf("load explicit Approval resume target: %w", result.Error)
+	}
+	if approval.Status == ApprovalStatusPreparing {
+		if approval.CheckpointID == nil || strings.TrimSpace(*approval.CheckpointID) == "" {
+			return false, nil
+		}
+		if _, err := lockCheckpoint(tx, run, *approval.CheckpointID); err != nil {
+			if errors.Is(err, ErrApprovalCheckpointMismatch) || errors.Is(err, gorm.ErrRecordNotFound) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	}
+	if approval.InterruptID == nil || strings.TrimSpace(*approval.InterruptID) == "" {
+		return false, nil
+	}
+	if err := validateApprovalCheckpointBinding(tx, run, &approval); err != nil {
+		if errors.Is(err, ErrApprovalCheckpointMismatch) || errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func terminalCancelRecord(run mysql.WorkflowRun, operationID, actorID string) OperationRecord {
+	status := OperationStatusCanceled
+	if run.Status == RunStatusSucceeded || run.Status == RunStatusSuccess {
+		status = OperationStatusSucceeded
+	} else if run.Status == RunStatusFailed {
+		status = OperationStatusFailed
+	}
+	finished := run.FinishedAt
+	acceptedAt := run.UpdatedAt
+	if finished != nil {
+		acceptedAt = *finished
+	}
+	return OperationRecord{Operation: Operation{
+		OperationID: operationID, RunID: run.ID, Action: OperationActionCancel,
+		Status: status, Terminal: true, ActorID: actorID, AcceptedAt: acceptedAt, FinishedAt: finished,
+	}}
+}
+
+func isTerminalRunStatus(status string) bool {
+	switch status {
+	case RunStatusSucceeded, RunStatusSuccess, RunStatusFailed, RunStatusCanceled:
+		return true
+	default:
+		return false
+	}
 }
