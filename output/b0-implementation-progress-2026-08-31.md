@@ -65,8 +65,15 @@
 | `/home/monody/go/bin/goimports -l`（全部本轮 Go 文件） | PASS | 无输出 |
 | `git diff --check` | PASS | 三个实现提交及最终工作树 |
 | workflow 纯事件/状态测试 | PASS | `TestVersionedEventCatalogIsComplete` 与 Trace phase 纯测试 |
-| `go test ./internal/ai/workflow ./internal/service/runtime -run 'Event|Status|Phase'` | NOT RUN | `SENTINELOPS_TEST_DSN` 未设置；workflow 命中用例在测试前置处明确要求 phase03 throwaway MySQL；service mapper PASS |
-| `go test ./...` | NOT RUN | 数据库绑定包因同一缺失 DSN 前置条件退出；非数据库包已通过，未将环境前置失败冒充产品 FAIL |
+| `go test ./internal/ai/workflow ./internal/service/runtime -run 'Event|Status|Phase'` | PASS | 使用隔离 MySQL 8.0.43、Goose v3.27.3 与临时 `sentinelops_phase03` base DSN；workflow 与 service 均通过 |
+| `go test ./...` | PASS | 使用同一隔离 DSN 串行运行，全量 Go 包通过 |
+
+## DSN 测试环境闭环
+
+- 本轮临时容器：`sentinelops-test-mysql-20260831`，镜像 `mysql:8.0.43`，仅绑定 `127.0.0.1:13306`，使用 tmpfs 数据目录。
+- `SENTINELOPS_TEST_DSN` 仅在测试命令 shell 内设置，基础库名为 `sentinelops_phase03`；测试 helper 自行创建并清理派生数据库。
+- `/home/monody/go/bin/goose` 精确版本为 `v3.27.3`。
+- 全量测试结束后已确认无 `sentinelops_phase03_*` 派生数据库，并删除临时 MySQL 容器；未留下长驻测试资源。
 
 ## 边界审计
 
@@ -77,4 +84,4 @@
 
 ## 阶段结论
 
-阶段 B0 的三个 Task 均已完成实现、独立 review、窄范围本地提交和本地可运行验证；数据库依赖项保持 `NOT RUN`。协调器在此停止，不进入 C。
+阶段 B0 的三个 Task 均已完成实现、独立 review、窄范围本地提交和本地可运行验证；此前因 DSN 缺失的测试现已在隔离 MySQL 下全部 PASS。协调器在此停止，不进入 C。
