@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 
 	apichat "SentinelOps/api/chat"
 	v1 "SentinelOps/api/chat/v1"
@@ -15,6 +16,7 @@ import (
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/trace"
 	"SentinelOps/internal/ai/workflow"
+	"SentinelOps/internal/dao/mysql"
 	chatsvc "SentinelOps/internal/service/chat"
 	"SentinelOps/utility/sse"
 
@@ -124,9 +126,7 @@ func (c *ControllerV1) Chat(ctx context.Context, req *v1.ChatReq) (*v1.ChatRes, 
 	if c.durable == nil {
 		return nil, gerror.New("durable chat adapter is not initialized")
 	}
-	run, err := c.durable.CreateRun(ctx, chatsvc.CreateDurableRunRequest{
-		SessionID: req.SessionId, Query: req.Query, Agent: chatsvc.DurableAgentPlan,
-	})
+	run, afterSeq, err := c.resolveRun(ctx, req)
 	if err != nil {
 		if status := durableHTTPStatus(err); status != 0 {
 			g.RequestFromCtx(ctx).Response.WriteStatus(status)
@@ -134,8 +134,32 @@ func (c *ControllerV1) Chat(ctx context.Context, req *v1.ChatReq) (*v1.ChatRes, 
 		return nil, err
 	}
 	client := sse.NewClient(g.RequestFromCtx(ctx))
-	meta, _ := json.Marshal(map[string]any{"sessionId": run.SessionID, "runId": run.ID, "status": run.Status})
-	client.SendEvent(1, workflow.EventRunCreated, string(meta))
+	meta, _ := json.Marshal(map[string]any{"sessionId": run.SessionID, "runId": run.ID, "status": run.Status, "after_seq": afterSeq})
+	client.SendEvent(durableIdentityEventID(strings.TrimSpace(req.RunID) != ""), workflow.EventRunCreated, string(meta))
 	client.Done()
 	return nil, nil
+}
+
+// durableIdentityEventID keeps synthetic v1 identity metadata outside the persisted event cursor on every reconnect.
+func durableIdentityEventID(reconnect bool) int64 {
+	if reconnect {
+		return 0
+	}
+	return 1
+}
+
+// resolveRun 按 v1 兼容契约区分首次创建与已有 Run 重连。
+// 重连只读取既有身份，不写 run.created，也不触发 Worker/Agent/Effect。
+func (c *ControllerV1) resolveRun(ctx context.Context, req *v1.ChatReq) (*mysql.WorkflowRun, int64, error) {
+	if strings.TrimSpace(req.RunID) == "" {
+		if req.LastSeq != 0 {
+			return nil, 0, chatsvc.ErrDurableReconnectInvalid
+		}
+		run, err := c.durable.CreateRun(ctx, chatsvc.CreateDurableRunRequest{
+			SessionID: req.SessionId, Query: req.Query, Agent: chatsvc.DurableAgentPlan,
+		})
+		return run, 0, err
+	}
+	run, err := c.durable.ResumeRun(ctx, req.RunID, req.SessionId, req.LastSeq)
+	return run, req.LastSeq, err
 }

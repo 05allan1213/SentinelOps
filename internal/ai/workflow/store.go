@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"SentinelOps/internal/ai/policy"
@@ -171,6 +172,27 @@ func (s *GORMStore) ListEventsAfter(ctx context.Context, runID string, afterSeq 
 		})
 	}
 	return events, nil
+}
+
+// GetRunForResume 读取 durable Run 身份及元数据，供兼容重连路径复用；该 primitive 只读且不启动执行。
+func (s *GORMStore) GetRunForResume(ctx context.Context, runID string) (*mysql.WorkflowRun, error) {
+	if _, err := policy.IdentityFromContext(ctx); err != nil {
+		return nil, err
+	}
+	var run mysql.WorkflowRun
+	if err := s.db.WithContext(ctx).
+		Select("id", "user_id", "session_id", "status", "runtime_mode", "last_event_seq", "started_at", "finished_at").
+		Where("id = ? AND runtime_mode = ?", runID, RuntimeModeDurableV1).
+		First(&run).Error; err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(run.UserID) == "" {
+		return nil, policy.ErrForbidden
+	}
+	if err := policy.Authorize(ctx, policy.PermissionViewScoped, policy.Resource{OwnerID: run.UserID}); err != nil {
+		return nil, err
+	}
+	return &run, nil
 }
 
 // SaveCheckpoint 保存工作流可恢复检查点快照。

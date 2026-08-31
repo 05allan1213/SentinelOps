@@ -7,9 +7,12 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
+
+	"gorm.io/gorm"
 )
 
 func TestCreateRunCallsDurablePrimitiveOnceAndNeverExecutesAgent(t *testing.T) {
@@ -140,6 +143,163 @@ func TestSSEReconnectOnlyReadsEventsAndChecksOwnerScope(t *testing.T) {
 	}
 	if len(events) != 1 || events[0].ID != 5 || reads.Load() != 1 {
 		t.Fatalf("events=%+v reads=%d", events, reads.Load())
+	}
+}
+
+func TestResumeRunValidatesOwnerSessionAndCursorWithoutCreating(t *testing.T) {
+	var creates atomic.Int32
+	var reads atomic.Int32
+	service, err := NewDurableService(DurableServiceConfig{
+		AcceptNewRuns: true,
+		Snapshot:      fixture20ServiceSnapshot(),
+		CreateRun: func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error) {
+			creates.Add(1)
+			return nil, nil
+		},
+		GetRun: func(_ context.Context, runID string) (*mysql.WorkflowRun, error) {
+			reads.Add(1)
+			if runID != "run-c07-owned" {
+				t.Fatalf("GetRun runID=%q", runID)
+			}
+			return &mysql.WorkflowRun{ID: runID, UserID: "owner-c07", SessionID: "session-c07", Status: workflow.RunStatusRunning, RuntimeMode: workflow.RuntimeModeDurableV1, LastEventSeq: 20}, nil
+		},
+		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := service.ResumeRun(c07IdentityContext(), "run-c07-owned", "session-c07", 17)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.ID != "run-c07-owned" || run.SessionID != "session-c07" || reads.Load() != 1 || creates.Load() != 0 {
+		t.Fatalf("run=%+v reads=%d creates=%d", run, reads.Load(), creates.Load())
+	}
+}
+
+func TestResumeRunRejectsMissingForbiddenAndSessionMismatch(t *testing.T) {
+	tests := []struct {
+		name    string
+		getRun  func(context.Context, string) (*mysql.WorkflowRun, error)
+		session string
+		want    error
+	}{
+		{name: "missing", getRun: func(context.Context, string) (*mysql.WorkflowRun, error) { return nil, gorm.ErrRecordNotFound }, session: "session-c07", want: ErrDurableRunNotFound},
+		{name: "forbidden", getRun: func(context.Context, string) (*mysql.WorkflowRun, error) { return nil, policy.ErrForbidden }, session: "session-c07", want: ErrDurableRunForbidden},
+		{name: "session mismatch", getRun: func(context.Context, string) (*mysql.WorkflowRun, error) {
+			return &mysql.WorkflowRun{ID: "run-c07", UserID: "owner-c07", SessionID: "other-session", RuntimeMode: workflow.RuntimeModeDurableV1}, nil
+		}, session: "session-c07", want: ErrDurableReconnectInvalid},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			service, err := NewDurableService(DurableServiceConfig{
+				CreateRun:  func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error) { return nil, nil },
+				GetRun:     test.getRun,
+				ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := service.ResumeRun(c07IdentityContext(), "run-c07", test.session, 0); !errors.Is(err, test.want) {
+				t.Fatalf("ResumeRun error=%v, want %v", err, test.want)
+			}
+		})
+	}
+}
+
+func TestResumeRunRejectsNegativeCursorBeforeStore(t *testing.T) {
+	var reads atomic.Int32
+	service, err := NewDurableService(DurableServiceConfig{
+		CreateRun: func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error) { return nil, nil },
+		GetRun: func(context.Context, string) (*mysql.WorkflowRun, error) {
+			reads.Add(1)
+			return nil, nil
+		},
+		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ResumeRun(c07IdentityContext(), "run-c07", "session-c07", -1); !errors.Is(err, ErrDurableReconnectInvalid) {
+		t.Fatalf("ResumeRun error=%v, want invalid reconnect", err)
+	}
+	if reads.Load() != 0 {
+		t.Fatalf("negative cursor reached Store %d times", reads.Load())
+	}
+}
+
+func TestResumeRunRejectsCursorBeyondPersistedLastEventSeq(t *testing.T) {
+	var reads atomic.Int32
+	service, err := NewDurableService(DurableServiceConfig{
+		CreateRun: func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error) { return nil, nil },
+		GetRun: func(context.Context, string) (*mysql.WorkflowRun, error) {
+			reads.Add(1)
+			return &mysql.WorkflowRun{ID: "run-c07", UserID: "owner-c07", SessionID: "session-c07", RuntimeMode: workflow.RuntimeModeDurableV1, LastEventSeq: 0}, nil
+		},
+		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ResumeRun(c07IdentityContext(), "run-c07", "session-c07", 1); !errors.Is(err, ErrDurableReconnectInvalid) {
+		t.Fatalf("ResumeRun error=%v, want invalid cursor", err)
+	}
+	if reads.Load() != 1 {
+		t.Fatalf("GetRun reads=%d, want one read before persisted cursor validation", reads.Load())
+	}
+}
+
+func TestTerminalResumeRunIsReadOnly(t *testing.T) {
+	var creates atomic.Int32
+	service, err := NewDurableService(DurableServiceConfig{
+		CreateRun: func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error) {
+			creates.Add(1)
+			return nil, nil
+		},
+		GetRun: func(context.Context, string) (*mysql.WorkflowRun, error) {
+			return &mysql.WorkflowRun{ID: "run-c07-terminal", UserID: "owner-c07", SessionID: "session-c07", Status: workflow.RunStatusSucceeded, RuntimeMode: workflow.RuntimeModeDurableV1, LastEventSeq: 9}, nil
+		},
+		ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := service.ResumeRun(c07IdentityContext(), "run-c07-terminal", "session-c07", 9)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != workflow.RunStatusSucceeded || creates.Load() != 0 {
+		t.Fatalf("run=%+v creates=%d", run, creates.Load())
+	}
+}
+
+func c07IdentityContext() context.Context {
+	return policy.WithIdentity(context.Background(), policy.Identity{UserID: "owner-c07", Role: policy.RoleViewer, Scope: policy.Scope{UserID: "owner-c07"}})
+}
+
+func TestResumeRunRechecksReturnedOwnerAndDurableMode(t *testing.T) {
+	tests := []struct {
+		name string
+		run  *mysql.WorkflowRun
+		want error
+	}{
+		{name: "owner mismatch", run: &mysql.WorkflowRun{ID: "run-c07", UserID: "other-owner", SessionID: "session-c07", RuntimeMode: workflow.RuntimeModeDurableV1}, want: ErrDurableRunForbidden},
+		{name: "legacy run", run: &mysql.WorkflowRun{ID: "run-c07", UserID: "owner-c07", SessionID: "session-c07", RuntimeMode: workflow.RuntimeModeLegacy}, want: ErrDurableRunNotFound},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			service, err := NewDurableService(DurableServiceConfig{
+				CreateRun:  func(context.Context, workflow.CreateRunInput) (*mysql.WorkflowRun, error) { return nil, nil },
+				GetRun:     func(context.Context, string) (*mysql.WorkflowRun, error) { return test.run, nil },
+				ListEvents: func(context.Context, string, int64) ([]workflow.StreamEvent, error) { return nil, nil },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := service.ResumeRun(c07IdentityContext(), "run-c07", "session-c07", 0); !errors.Is(err, test.want) {
+				t.Fatalf("ResumeRun error=%v, want %v", err, test.want)
+			}
+		})
 	}
 }
 

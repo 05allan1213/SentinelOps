@@ -72,6 +72,46 @@ func TestCreateRunSameSessionReturnsConflict(t *testing.T) {
 	}
 }
 
+func TestGetRunForResumeRequiresOwnedDurableRunAndDoesNotWrite(t *testing.T) {
+	db := newP07Database(t, "phase08_resume_read_only")
+	store, ownerCtx, run := fixture08CreateRun(t, db, "resume_read_only")
+
+	var eventsBefore int64
+	if err := db.Model(&mysql.WorkflowEvent{}).Where("run_id = ?", run.ID).Count(&eventsBefore).Error; err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.GetRunForResume(ownerCtx, run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != run.ID || got.UserID != run.UserID || got.SessionID != run.SessionID || got.RuntimeMode != RuntimeModeDurableV1 {
+		t.Fatalf("resume Run=%+v", got)
+	}
+
+	otherCtx := fixture08UserContext("other-resume-owner")
+	if _, err := store.GetRunForResume(otherCtx, run.ID); !errors.Is(err, policy.ErrForbidden) {
+		t.Fatalf("cross-scope resume error=%v, want forbidden", err)
+	}
+	legacy := mysql.WorkflowRun{
+		ID: "legacy-resume-read-only", WorkflowKey: "legacy", UserID: run.UserID,
+		SessionID: "legacy-session", Status: RunStatusRunning, RuntimeMode: RuntimeModeLegacy, StartedAt: time.Now(),
+	}
+	if err := db.Create(&legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.GetRunForResume(ownerCtx, legacy.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("legacy resume error=%v, want not found", err)
+	}
+
+	var eventsAfter int64
+	if err := db.Model(&mysql.WorkflowEvent{}).Where("run_id = ?", run.ID).Count(&eventsAfter).Error; err != nil {
+		t.Fatal(err)
+	}
+	if eventsAfter != eventsBefore {
+		t.Fatalf("resume read wrote workflow events: before=%d after=%d", eventsBefore, eventsAfter)
+	}
+}
+
 func TestCreateRunSameSessionConcurrentOnlyOneSucceeds(t *testing.T) {
 	db := newP07Database(t, "phase08_session_concurrent")
 	store := NewGORMStore(db)
