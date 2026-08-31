@@ -54,20 +54,19 @@ func TestOperationFingerprintChangesOnMaterialInput(t *testing.T) {
 	base := OperationRequestInput{
 		RunID: "run-operation-fingerprint", Action: OperationActionResume,
 		Reason: "recover after operator review", ExpectedGeneration: 7,
-		ExpectedCompatibilityHash: strings.Repeat("a", 64),
 	}
 	fingerprint, err := OperationRequestFingerprint(base)
 	if err != nil {
 		t.Fatalf("fingerprint: %v", err)
 	}
-	canonical := `{"action":"resume","expected_compatibility_hash":"` + strings.Repeat("a", 64) + `","expected_generation":7,"reason":"recover after operator review","run_id":"run-operation-fingerprint"}`
+	canonical := `{"action":"resume","expected_compatibility_hash":"","expected_generation":7,"reason":"recover after operator review","run_id":"run-operation-fingerprint"}`
 	want := sha256.Sum256([]byte(canonical))
-	if fingerprint != hex.EncodeToString(want[:]) {
+	if fingerprint != "48e63ea0a5439d7f6400f131c2fa8285316396980c79bf4f971aa557fe01be82" || fingerprint != hex.EncodeToString(want[:]) {
 		t.Fatalf("fingerprint = %q, want %q", fingerprint, hex.EncodeToString(want[:]))
 	}
 	variants := []OperationRequestInput{base, base, base, base, base}
 	variants[0].RunID += "-other"
-	variants[1].Action = OperationActionRestore
+	variants[1].Action = OperationActionReplay
 	variants[2].Reason += "."
 	variants[3].ExpectedGeneration++
 	variants[4].ExpectedCompatibilityHash = strings.Repeat("b", 64)
@@ -85,10 +84,28 @@ func TestOperationFingerprintChangesOnMaterialInput(t *testing.T) {
 	if _, err := OperationRequestFingerprint(invalid); !errors.Is(err, ErrInvalidOperationInput) {
 		t.Fatalf("zero generation error = %v", err)
 	}
-	invalid = base
-	invalid.ExpectedCompatibilityHash = strings.Repeat("A", 64)
-	if _, err := OperationRequestFingerprint(invalid); !errors.Is(err, ErrInvalidOperationInput) {
-		t.Fatalf("uppercase compatibility error = %v", err)
+	for _, action := range []string{OperationActionResume, OperationActionReplay} {
+		optional := base
+		optional.Action = action
+		optional.ExpectedCompatibilityHash = ""
+		if _, err := OperationRequestFingerprint(optional); err != nil {
+			t.Fatalf("%s without compatibility hash: %v", action, err)
+		}
+		optional.ExpectedCompatibilityHash = strings.Repeat("A", 64)
+		if _, err := OperationRequestFingerprint(optional); !errors.Is(err, ErrInvalidOperationInput) {
+			t.Fatalf("%s uppercase compatibility error = %v", action, err)
+		}
+	}
+	restore := base
+	restore.Action = OperationActionRestore
+	if _, err := OperationRequestFingerprint(restore); !errors.Is(err, ErrInvalidOperationInput) {
+		t.Fatalf("restore missing compatibility error = %v", err)
+	}
+	restore.ExpectedCompatibilityHash = strings.Repeat("a", 64)
+	if got, err := OperationRequestFingerprint(restore); err != nil {
+		t.Fatalf("restore fingerprint: %v", err)
+	} else if got != "aba3fbc9b7bc25472ff51babba2576283749b6111c0a22b85d04881297f9ad55" {
+		t.Fatalf("restore fingerprint = %q", got)
 	}
 	cancel := base
 	cancel.Action = OperationActionCancel
