@@ -53,6 +53,8 @@ const (
 	PermissionDecideProposal         Permission = "decide_proposal"
 	PermissionBusinessWrite          Permission = "business_write"
 	PermissionManageUsersPolicyGates Permission = "manage_users_policy_gates"
+	PermissionViewRuntimeContent     Permission = "view_runtime_content"
+	PermissionRecoverRuntime         Permission = "recover_runtime"
 )
 
 // Resource 携带资源级授权所需的最小事实。
@@ -166,6 +168,14 @@ func Authorize(ctx context.Context, permission Permission, resource Resource) er
 	switch permission {
 	case PermissionViewScoped:
 		if resource.OwnerID == "" || identity.Scope.All || resource.OwnerID == identity.Scope.UserID {
+			return nil
+		}
+	case PermissionViewRuntimeContent:
+		if !identity.AuthDisabled && (identity.Scope.All || resource.OwnerID != "" && resource.OwnerID == identity.Scope.UserID) {
+			return nil
+		}
+	case PermissionRecoverRuntime:
+		if !identity.AuthDisabled && identity.Role == RoleAdmin {
 			return nil
 		}
 	case PermissionCreateReadOnlyRun:

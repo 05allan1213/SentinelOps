@@ -55,6 +55,10 @@ func startRBACServer(t *testing.T, authEnabled bool) string {
 }
 
 func doRequest(t *testing.T, method, url, token, clientUserID string) (int, string) {
+	return doRequestWithHeaders(t, method, url, token, clientUserID, nil)
+}
+
+func doRequestWithHeaders(t *testing.T, method, url, token, clientUserID string, headers map[string]string) (int, string) {
 	t.Helper()
 	var requestBody io.Reader
 	if clientUserID != "" && method == http.MethodPost {
@@ -70,6 +74,9 @@ func doRequest(t *testing.T, method, url, token, clientUserID string) (int, stri
 	if clientUserID != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -80,6 +87,29 @@ func doRequest(t *testing.T, method, url, token, clientUserID string) (int, stri
 		t.Fatal(err)
 	}
 	return res.StatusCode, strings.TrimSpace(string(responseBody))
+}
+
+func startRuntimeHeaderRBACServer(t *testing.T) string {
+	t.Helper()
+	s := g.Server("runtime-header-rbac-" + uuid.NewString())
+	s.SetDumpRouterMap(false)
+	s.SetPort(0)
+	s.Group("/api", func(group *ghttp.RouterGroup) {
+		group.Middleware(jwtMiddleware(func(context.Context) bool { return true }))
+		group.Middleware(AuthorizationMiddleware())
+		group.POST("/ordinary", func(r *ghttp.Request) { r.Response.Write("ordinary") })
+		group.POST("/runtime/v1/runs/:run_id/recovery", func(r *ghttp.Request) { r.Response.Write("recovery") })
+	})
+	s.Start()
+	t.Cleanup(func() { _ = s.Shutdown() })
+	deadline := time.Now().Add(2 * time.Second)
+	for s.GetListenedPort() == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if s.GetListenedPort() == 0 {
+		t.Fatal("GoFrame Runtime header test server did not start")
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d", s.GetListenedPort())
 }
 
 func TestJWTContextIsAuthoritative(t *testing.T) {
@@ -194,5 +224,110 @@ func TestAuthDisabledRejectsBusinessWrites(t *testing.T) {
 	status, _ = doRequest(t, http.MethodPost, baseURL+"/ingest/push", "", "")
 	if status != http.StatusForbidden {
 		t.Fatalf("auth-disabled machine write status=%d, want %d", status, http.StatusForbidden)
+	}
+}
+
+func TestClientUserIDNeverSelectsRuntimeScope(t *testing.T) {
+	if err := auth.Init([]byte("phase05-test-jwt-secret-with-sufficient-length")); err != nil {
+		t.Fatal(err)
+	}
+	viewerToken, err := auth.Generate("viewer-owner", "viewer", "viewer", time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminToken, err := auth.Generate("admin-owner", "admin", "admin", time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseURL := startRBACServer(t, true)
+
+	for _, path := range []string{
+		"/api/runtime/v1/runs?scope=all&user_id=other-owner",
+		"/api/runtime/v1/runs/other-owner?scope=all",
+	} {
+		status, body := doRequest(t, http.MethodGet, baseURL+path, viewerToken, "other-owner")
+		if status != http.StatusOK || !strings.HasPrefix(body, "viewer-owner:viewer") {
+			t.Fatalf("runtime client scope selected identity: path=%q status=%d body=%q", path, status, body)
+		}
+	}
+
+	status, _ := doRequest(t, http.MethodPost, baseURL+"/api/runtime/v1/runs/run-id/recovery?scope=all", viewerToken, "admin-owner")
+	if status != http.StatusForbidden {
+		t.Fatalf("viewer recovery status=%d, want %d", status, http.StatusForbidden)
+	}
+	status, _ = doRequest(t, http.MethodPost, baseURL+"/api/runtime/v1/runs/run-id/recovery", adminToken, "viewer-owner")
+	if status != http.StatusOK {
+		t.Fatalf("admin recovery status=%d, want %d", status, http.StatusOK)
+	}
+	for _, manipulated := range []string{
+		"/api/runtime/v1/runs//recovery",
+		"/api/runtime/v1/runs/run-id/recovery/extra",
+		"/api/runtime/v1/runs/run-id%2Frecovery",
+	} {
+		status, _ = doRequest(t, http.MethodPost, baseURL+manipulated, viewerToken, "")
+		if status != http.StatusForbidden {
+			t.Fatalf("manipulated recovery path %q status=%d, want %d", manipulated, status, http.StatusForbidden)
+		}
+	}
+}
+
+func TestRuntimeRecoveryPathUsesDedicatedPermission(t *testing.T) {
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		permission policy.Permission
+	}{
+		{"exact recovery", http.MethodPost, "/api/runtime/v1/runs/run-id/recovery", policy.PermissionRecoverRuntime},
+		{"missing run id", http.MethodPost, "/api/runtime/v1/runs//recovery", policy.PermissionBusinessWrite},
+		{"extra segment", http.MethodPost, "/api/runtime/v1/runs/run-id/recovery/extra", policy.PermissionBusinessWrite},
+		{"trailing slash", http.MethodPost, "/api/runtime/v1/runs/run-id/recovery/", policy.PermissionBusinessWrite},
+		{"metadata read", http.MethodGet, "/api/runtime/v1/runs/run-id", policy.PermissionViewScoped},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			permission, public := requestPermission(test.method, test.path)
+			if public || permission != test.permission {
+				t.Fatalf("requestPermission(%q, %q)=(%q, %v), want (%q, false)", test.method, test.path, permission, public, test.permission)
+			}
+		})
+	}
+}
+
+func TestRuntimeAuthorizationUsesEffectiveRouterPath(t *testing.T) {
+	if err := auth.Init([]byte("phase05-test-jwt-secret-with-sufficient-length")); err != nil {
+		t.Fatal(err)
+	}
+	operatorToken, err := auth.Generate("operator-owner", "operator", "operator", time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminToken, err := auth.Generate("admin-owner", "admin", "admin", time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseURL := startRuntimeHeaderRBACServer(t)
+	recoveryPath := "/api/runtime/v1/runs/run-id/recovery"
+
+	status, _ := doRequestWithHeaders(t, http.MethodPost, baseURL+"/api/ordinary", operatorToken, "", map[string]string{ghttp.HeaderXUrlPath: recoveryPath})
+	if status != http.StatusForbidden {
+		t.Fatalf("operator X-Url-Path recovery status=%d, want %d", status, http.StatusForbidden)
+	}
+	status, body := doRequestWithHeaders(t, http.MethodPost, baseURL+"/api/ordinary", adminToken, "", map[string]string{ghttp.HeaderXUrlPath: recoveryPath})
+	if status != http.StatusOK || body != "recovery" {
+		t.Fatalf("admin X-Url-Path recovery status=%d body=%q, want 200 recovery", status, body)
+	}
+	doubleSlashRecoveryPath := "/api/runtime/v1//runs/run-id/recovery"
+	status, _ = doRequestWithHeaders(t, http.MethodPost, baseURL+"/api/ordinary", operatorToken, "", map[string]string{ghttp.HeaderXUrlPath: doubleSlashRecoveryPath})
+	if status != http.StatusForbidden {
+		t.Fatalf("operator double-slash X-Url-Path recovery status=%d, want %d", status, http.StatusForbidden)
+	}
+	status, body = doRequestWithHeaders(t, http.MethodPost, baseURL+"/api/ordinary", adminToken, "", map[string]string{ghttp.HeaderXUrlPath: doubleSlashRecoveryPath})
+	if status != http.StatusOK || body != "recovery" {
+		t.Fatalf("admin double-slash X-Url-Path recovery status=%d body=%q, want 200 recovery", status, body)
+	}
+	status, body = doRequestWithHeaders(t, http.MethodPost, baseURL+recoveryPath, operatorToken, "", map[string]string{ghttp.HeaderXUrlPath: "/api/ordinary"})
+	if status != http.StatusOK || body != "ordinary" {
+		t.Fatalf("alternate effective path status=%d body=%q, want 200 ordinary", status, body)
 	}
 }
