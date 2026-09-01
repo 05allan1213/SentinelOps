@@ -24,8 +24,10 @@ type ClaimInput struct {
 
 // ClaimedRun 返回被认领的 Run 快照和唯一 fenced write token。
 type ClaimedRun struct {
-	Run   mysql.WorkflowRun
-	Token LeaseToken
+	Run             mysql.WorkflowRun
+	Token           LeaseToken
+	OperationID     string
+	OperationAction string
 }
 
 // ClaimNextRun 使用 MySQL 行锁原子认领一个 eligible Run 并写 run.claimed。
@@ -42,6 +44,18 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 		var run mysql.WorkflowRun
 		query := applyDurableRuntimeContract(tx.Model(&mysql.WorkflowRun{})).
 			Where("attempt < max_attempts").
+			Where(`NOT EXISTS (
+				SELECT 1 FROM workflow_events op_accepted
+				WHERE op_accepted.run_id = workflow_runs.id
+				  AND op_accepted.event_type = ?
+				  AND op_accepted.operation_id IS NOT NULL
+				  AND NOT EXISTS (
+					SELECT 1 FROM workflow_events op_terminal
+					WHERE op_terminal.run_id = op_accepted.run_id
+					  AND op_terminal.operation_id = op_accepted.operation_id
+					  AND op_terminal.event_type IN (?, ?, ?, ?)
+				  )
+			)`, EventOperationAccepted, EventOperationSucceeded, EventOperationFailed, EventOperationCanceled, EventOperationRejected).
 			Where(`(
 				(status = ? AND available_at <= CURRENT_TIMESTAMP(3) AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
 				OR

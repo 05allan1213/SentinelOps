@@ -113,15 +113,17 @@ type RunIdentity struct {
 
 // AttemptContext 保存从 MySQL Run 真值重建的进程内 handle；它本身绝不进入 Checkpoint。
 type AttemptContext struct {
-	Run      RunIdentity
-	Identity policy.Identity
-	Scope    policy.Scope
-	Budget   BudgetHandle
-	Lease    workflow.LeaseToken
-	Trace    TraceIdentity
-	Deadline time.Time
-	Snapshot FrozenRuntimeSnapshot
-	History  json.RawMessage
+	Run             RunIdentity
+	Identity        policy.Identity
+	Scope           policy.Scope
+	Budget          BudgetHandle
+	Lease           workflow.LeaseToken
+	Trace           TraceIdentity
+	OperationID     string
+	OperationAction string
+	Deadline        time.Time
+	Snapshot        FrozenRuntimeSnapshot
+	History         json.RawMessage
 
 	cancel        context.CancelFunc
 	physicalCalls *atomic.Uint64
@@ -205,7 +207,8 @@ func BuildAttemptContext(parent context.Context, claimed workflow.ClaimedRun, bu
 			RuntimeVersion: *run.RuntimeVersion, RuntimeCompatibilityHash: *run.RuntimeCompatibilityHash,
 		},
 		Identity: validatedIdentity, Scope: validatedIdentity.Scope, Budget: budget, Lease: claimed.Token,
-		Trace: TraceIdentity{ID: uuid.NewString()}, Deadline: deadline, Snapshot: snapshot,
+		Trace: TraceIdentity{ID: uuid.NewString()}, OperationID: claimed.OperationID, OperationAction: claimed.OperationAction,
+		Deadline: deadline, Snapshot: snapshot,
 		History: append(json.RawMessage(nil), stored.History...), cancel: cancel, physicalCalls: &atomic.Uint64{},
 	}
 	leaseContext = budgetctx.WithProvider(leaseContext, newRAGBudgetProvider(attempt))

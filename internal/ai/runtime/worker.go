@@ -37,36 +37,47 @@ type WorkerConfig struct {
 	Observation            WorkerObservation
 	PersistSnapshot        func(context.Context, WorkerObservation) error
 	HeartbeatSnapshot      func(context.Context, WorkerObservation) error
+	// ConsumeRecovery executes one claimed operation through the existing
+	// RuntimeHandler/Eino path. It returns operation status, controlled error
+	// code/reason, and must not invoke Effects directly.
+	ConsumeRecovery       func(context.Context, *workflow.RecoveryOperationClaim) (status, errorCode, reason string, err error)
+	ConsumeRecoveryResult func(context.Context, *workflow.RecoveryOperationClaim) (workflow.FinishRecoveryOperationResult, error)
 }
 
 // Worker 只委派唯一 workflow.GORMStore，并承载 phase20 唯一 durable poll loop。
 type Worker struct {
-	store             *workflow.GORMStore
-	config            WorkerConfig
-	claimNext         func(context.Context) (*workflow.ClaimedRun, bool, error)
-	heartbeat         func(context.Context, workflow.LeaseToken) error
-	execute           func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
-	transition        func(context.Context, workflow.RunTransition) error
-	complete          func(context.Context, workflow.CompleteRunInput) error
-	projectRevision   func(context.Context, string, []byte) error
-	expireApprovals   func(context.Context, string, int) (int, error)
-	reconciler        *effects.Reconciler
-	retention         *RetentionCoordinator
-	snapshotMu        sync.Mutex
-	observation       WorkerObservation
-	persistSnapshot   func(context.Context, WorkerObservation) error
-	heartbeatSnapshot func(context.Context, WorkerObservation) error
-	snapshotStarted   bool
+	store                 *workflow.GORMStore
+	config                WorkerConfig
+	claimNext             func(context.Context) (*workflow.ClaimedRun, bool, error)
+	heartbeat             func(context.Context, workflow.LeaseToken) error
+	execute               func(context.Context, *workflow.ClaimedRun) (RunExecutionResult, error)
+	transition            func(context.Context, workflow.RunTransition) error
+	complete              func(context.Context, workflow.CompleteRunInput) error
+	projectRevision       func(context.Context, string, []byte) error
+	expireApprovals       func(context.Context, string, int) (int, error)
+	reconciler            *effects.Reconciler
+	retention             *RetentionCoordinator
+	snapshotMu            sync.Mutex
+	observation           WorkerObservation
+	persistSnapshot       func(context.Context, WorkerObservation) error
+	heartbeatSnapshot     func(context.Context, WorkerObservation) error
+	consumeRecovery       func(context.Context, *workflow.RecoveryOperationClaim) (string, string, string, error)
+	consumeRecoveryResult func(context.Context, *workflow.RecoveryOperationClaim) (workflow.FinishRecoveryOperationResult, error)
+	snapshotStarted       bool
+	cancelMu              sync.Mutex
+	activeCancel          *workflow.RecoveryOperationClaim
 }
 
 // RunExecutionResult 是 Worker 交给唯一完成 primitive 的基础结果。
 type RunExecutionResult struct {
-	OutputPayload     string
-	RevisionStateJSON []byte
-	TraceQuality      string
-	TraceID           string
-	TraceBarrier      AttemptTraceBarrier
-	RunTransitioned   bool
+	OutputPayload      string
+	RevisionStateJSON  []byte
+	TraceQuality       string
+	TraceID            string
+	TraceBarrier       AttemptTraceBarrier
+	RunTransitioned    bool
+	CancelOperation    *workflow.RecoveryOperationClaim
+	OperationFinalized bool
 }
 
 // AttemptTraceBarrier 是现有 MySQL Trace Attempt-scoped barrier 的最薄消费契约。
@@ -136,6 +147,8 @@ func NewWorker(store *workflow.GORMStore, config WorkerConfig) (*Worker, error) 
 		heartbeat: config.Heartbeat, transition: config.Transition, complete: config.Complete, projectRevision: config.ProjectRevision,
 		retention: config.Retention, observation: config.Observation,
 		persistSnapshot: config.PersistSnapshot, heartbeatSnapshot: config.HeartbeatSnapshot,
+		consumeRecovery:       config.ConsumeRecovery,
+		consumeRecoveryResult: config.ConsumeRecoveryResult,
 	}
 	if worker.observation.WorkerID == "" && config.SnapshotDB != nil {
 		worker.observation.WorkerID = config.Owner
@@ -214,7 +227,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 			return false, err
 		}
 	}
-	if w.execute == nil {
+	if w.execute == nil && w.consumeRecovery == nil && w.consumeRecoveryResult == nil {
 		return retained, nil
 	}
 	expired := 0
@@ -228,6 +241,12 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 	reconciled, err := w.reconcileEffects(ctx)
 	if err != nil {
 		return false, err
+	}
+	if didRecovery, recoveryErr := w.consumeRecoveryOperation(ctx); didRecovery {
+		return true, recoveryErr
+	}
+	if w.execute == nil {
+		return retained || expired > 0 || reconciled, nil
 	}
 	claimed, ok, err := w.claimNext(ctx)
 	if err != nil || !ok {
@@ -245,6 +264,10 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		}
 	}
 	result, executionErr, heartbeatErr := w.executeWithHeartbeat(runCtx, claimed)
+	w.cancelMu.Lock()
+	result.CancelOperation = w.activeCancel
+	w.activeCancel = nil
+	w.cancelMu.Unlock()
 	if result.TraceBarrier != nil {
 		traceErr := executionErr
 		if heartbeatErr != nil {
@@ -260,11 +283,27 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		return true, heartbeatErr
 	}
 	if result.RunTransitioned {
+		if result.CancelOperation != nil && executionErr == nil {
+			completionCtx := context.WithoutCancel(runCtx)
+			err := w.completeAndProject(completionCtx, claimed.Run.ID, workflow.CompleteRunInput{
+				RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning, TargetStatus: workflow.RunStatusCanceled,
+				Lease: claimed.Token, ErrorMessage: "cancel requested", TraceQuality: result.TraceQuality, TraceID: result.TraceID,
+				OperationID: result.CancelOperation.Operation.OperationID, OperationAction: result.CancelOperation.Operation.Action,
+				OperationReason: "cancel_safe_point",
+			})
+			_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, errorText(err))
+			return true, err
+		}
+		if result.CancelOperation != nil && executionErr != nil && w.store != nil {
+			// A failed safe-point request must close the command as failed while
+			// leaving the Run available for a later explicit cancellation retry.
+			_ = w.store.FailRecoveryOperation(context.WithoutCancel(runCtx), *result.CancelOperation, "cancel_safe_point_failed", "cancel_safe_point_failed")
+		}
 		_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, errorText(executionErr))
 		return true, executionErr
 	}
 	if executionErr == nil {
-		err = w.completeAndProject(runCtx, claimed.Run.ID, workflow.CompleteRunInput{
+		err = w.completeAndProject(context.WithoutCancel(runCtx), claimed.Run.ID, workflow.CompleteRunInput{
 			RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning,
 			TargetStatus: workflow.RunStatusSucceeded, Lease: claimed.Token,
 			OutputPayload: result.OutputPayload, RevisionStateJSON: result.RevisionStateJSON,
@@ -278,7 +317,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 
 	var classified *classifiedExecutionError
 	if errors.As(executionErr, &classified) && classified.parkReason != "" {
-		err = w.transition(runCtx, workflow.RunTransition{
+		err = w.transition(context.WithoutCancel(runCtx), workflow.RunTransition{
 			RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning,
 			TargetStatus: workflow.RunStatusParked, ParkReason: classified.parkReason, Lease: claimed.Token,
 			Event: workflow.WorkflowEventInput{Type: workflow.EventRunParked, TraceID: result.TraceID,
@@ -290,7 +329,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		return true, err
 	}
 	if errors.As(executionErr, &classified) && classified.retryable && claimed.Run.Attempt < claimed.Run.MaxAttempts {
-		err = w.transition(runCtx, workflow.RunTransition{
+		err = w.transition(context.WithoutCancel(runCtx), workflow.RunTransition{
 			RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning,
 			TargetStatus: workflow.RunStatusRetryableFailed, AvailableAt: time.Now().Add(w.retryBackoff(claimed.Run.Attempt)),
 			Lease: claimed.Token, Event: workflow.WorkflowEventInput{Type: workflow.EventRunFailed, TraceID: result.TraceID,
@@ -305,7 +344,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 	if errors.Is(executionErr, context.Canceled) {
 		target = workflow.RunStatusCanceled
 	}
-	err = w.completeAndProject(runCtx, claimed.Run.ID, workflow.CompleteRunInput{
+	err = w.completeAndProject(context.WithoutCancel(runCtx), claimed.Run.ID, workflow.CompleteRunInput{
 		RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning, TargetStatus: target,
 		Lease: claimed.Token, ErrorMessage: executionErr.Error(), TraceQuality: result.TraceQuality, TraceID: result.TraceID,
 	})
@@ -313,6 +352,68 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, executionErr.Error())
 	}
 	return true, err
+}
+
+// consumeRecoveryOperation polls at most one accepted/reclaimable command per
+// loop iteration. HTTP never reaches this path; Worker owns execution and
+// terminal operation persistence.
+func (w *Worker) consumeRecoveryOperation(ctx context.Context) (bool, error) {
+	if w == nil || w.store == nil {
+		return false, nil
+	}
+	claim, ok, err := w.store.ClaimNextRecoveryOperation(ctx, w.config.Owner, w.config.LeaseDuration)
+	if err != nil || !ok {
+		return ok, err
+	}
+	recoveryCtx, _, _, identityErr := claimedRunIdentityContext(ctx, claim.Run)
+	if identityErr != nil {
+		return true, identityErr
+	}
+	if err := w.store.StartRecoveryOperation(recoveryCtx, *claim); err != nil {
+		return true, err
+	}
+	if claim.Operation.Action == workflow.OperationActionRestore {
+		return true, w.store.RestoreRecoveryOperation(recoveryCtx, *claim)
+	}
+	if w.consumeRecoveryResult != nil {
+		result, execErr := w.consumeRecoveryResult(recoveryCtx, claim)
+		if result.OperationFinalized {
+			return true, nil
+		}
+		if execErr != nil && claim.Operation.Action == workflow.OperationActionCancel && claim.Run.Status == workflow.RunStatusRunning {
+			// Active Run heartbeat owns the safe-point and will finish this
+			// started operation after the Eino executor drains.
+			return true, nil
+		}
+		if execErr != nil && result.Status == "" {
+			result.Status = workflow.OperationStatusFailed
+			if result.ErrorCode == "" {
+				result.ErrorCode = "recovery_execution_failed"
+			}
+			result.ErrorMessage = execErr.Error()
+		}
+		if result.RunTransitioned {
+			return true, w.store.FailRecoveryOperationAfterTransition(context.WithoutCancel(recoveryCtx), *claim, "recovery_transition_unclosed", "recovery_transition_unclosed")
+		}
+		if result.Status == "" {
+			result.Status = workflow.OperationStatusSucceeded
+		}
+		return true, w.store.FinishRecoveryOperationWithResult(recoveryCtx, *claim, result)
+	}
+	if w.consumeRecovery == nil {
+		return true, w.store.FinishRecoveryOperation(recoveryCtx, *claim, workflow.OperationStatusFailed, "recovery_executor_unconfigured", "executor_unconfigured")
+	}
+	status, errorCode, reason, execErr := w.consumeRecovery(recoveryCtx, claim)
+	if execErr != nil && status == "" {
+		status = workflow.OperationStatusFailed
+		if errorCode == "" {
+			errorCode = "recovery_execution_failed"
+		}
+	}
+	if status == "" {
+		status = workflow.OperationStatusSucceeded
+	}
+	return true, w.store.FinishRecoveryOperation(recoveryCtx, *claim, status, errorCode, reason)
 }
 
 func errorText(err error) string {
@@ -467,6 +568,32 @@ func (w *Worker) withLeaseHeartbeat(ctx context.Context, token workflow.LeaseTok
 					cancel(err)
 					heartbeatResult <- err
 					return
+				}
+				if w.store != nil {
+					requested, cancelErr := w.store.CancelRequested(leaseCtx, token)
+					if cancelErr != nil {
+						cancel(cancelErr)
+						heartbeatResult <- cancelErr
+						return
+					}
+					if requested {
+						// Keep heartbeating until the cancel command itself has a
+						// fenced started Event. A transient claim/start failure must
+						// never cancel the Eino Runner without an operation identity.
+						cancelClaim, claimOK, claimErr := w.store.ClaimNextRecoveryOperation(leaseCtx, token.Owner, w.config.LeaseDuration)
+						if claimErr != nil || !claimOK || cancelClaim == nil || cancelClaim.Operation.Action != workflow.OperationActionCancel {
+							continue
+						}
+						if startErr := w.store.StartRecoveryOperation(leaseCtx, *cancelClaim); startErr != nil {
+							continue
+						}
+						w.cancelMu.Lock()
+						w.activeCancel = cancelClaim
+						w.cancelMu.Unlock()
+						cancel(workflow.ErrCancelRequested)
+						heartbeatResult <- nil
+						return
+					}
 				}
 				if err := w.heartbeatCurrentSnapshot(leaseCtx); err != nil {
 					cancel(err)

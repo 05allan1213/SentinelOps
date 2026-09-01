@@ -105,6 +105,14 @@ type OperationEventMetadata struct {
 	RequestFingerprint   string
 	ActorID              string
 	Reason               string
+	// ExpectedGeneration/CompatibilityHash are controlled acceptance facts used
+	// by a Worker to revalidate a command after a process crash. They are not
+	// client secrets and are mirrored only on operation.accepted.
+	ExpectedGeneration        uint64
+	ExpectedCompatibilityHash string
+	ExecutionGeneration       uint64
+	ErrorCode                 string
+	ResultReason              string
 	// CorrelationSeq 指向该 lifecycle Event 对应且已先写入的 Run Event seq；不是固定 accepted seq。
 	CorrelationSeq uint64
 }
@@ -133,10 +141,26 @@ func marshalDurableEvent(input WorkflowEventInput) (string, error) {
 	if isOperationEventType(input.Type) && input.Operation != nil {
 		// Operation Event 采用最小兼容 payload；命令身份字段写入专用列，
 		// 仅镜像安全关联值供现有 Event mapper 读取。
-		input.Payload = EventPayload{Attributes: map[string]any{
+		attrs := map[string]any{
 			"operation_id": input.Operation.OperationID,
 			"action":       input.Operation.CommandAction,
-		}}
+		}
+		if input.Type == EventOperationAccepted {
+			attrs["expected_generation"] = input.Operation.ExpectedGeneration
+			if input.Operation.ExpectedCompatibilityHash != "" {
+				attrs["expected_compatibility_hash"] = input.Operation.ExpectedCompatibilityHash
+			}
+		}
+		if input.Operation.ExecutionGeneration != 0 {
+			attrs["execution_generation"] = input.Operation.ExecutionGeneration
+		}
+		if input.Operation.ErrorCode != "" {
+			attrs["error_code"] = input.Operation.ErrorCode
+		}
+		if input.Operation.ResultReason != "" {
+			attrs["reason_code"] = input.Operation.ResultReason
+		}
+		input.Payload = EventPayload{Attributes: attrs}
 	}
 	if len(input.TraceID) > 64 {
 		return "", fmt.Errorf("event trace id exceeds 64 bytes")

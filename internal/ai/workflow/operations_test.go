@@ -522,6 +522,41 @@ func TestOperationMetadataPairingRejectsSmuggling(t *testing.T) {
 	}
 }
 
+func TestOperationAcceptedMetadataRoundTripControlledFacts(t *testing.T) {
+	id := "op-" + strings.Repeat("a", 64)
+	hash := strings.Repeat("b", 64)
+	input, err := (OperationEventInput{
+		Type: EventOperationAccepted, OperationID: id, Action: OperationActionResume,
+		IdempotencyKeyDigest: strings.Repeat("c", 64), RequestFingerprint: strings.Repeat("d", 64),
+		ActorID: "admin", Reason: "resume", ExpectedGeneration: 7, ExpectedCompatibilityHash: hash,
+	}).WorkflowEventInput()
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := marshalDurableEvent(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opID, action := id, OperationActionResume
+	digest, fingerprint, actor, reason := strings.Repeat("c", 64), strings.Repeat("d", 64), "admin", "resume"
+	row := mysql.WorkflowEvent{RunID: "run-roundtrip", Seq: 1, EventType: EventOperationAccepted, Payload: payload,
+		OperationID: &opID, CommandAction: &action, IdempotencyKeyDigest: &digest, RequestFingerprint: &fingerprint,
+		ActorID: &actor, ReasonRedacted: &reason}
+	facts, err := decodeOperationPayloadFacts(row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if facts.ExpectedGeneration != 7 || facts.ExpectedCompatibilityHash != hash {
+		t.Fatalf("facts = %#v", facts)
+	}
+	if !strings.Contains(payload, "expected_generation") || !strings.Contains(payload, hash) {
+		t.Fatalf("controlled facts missing from payload: %s", payload)
+	}
+	if strings.Contains(payload, "resume") == false {
+		t.Fatal("operation payload lost action mirror")
+	}
+}
+
 func fixtureOperationRows(runID, operationID, action string, eventTypes ...string) []mysql.WorkflowEvent {
 	if !operationIDPattern.MatchString(operationID) {
 		operationID = "op-" + strings.Repeat("a", 64)
