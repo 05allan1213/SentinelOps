@@ -8,6 +8,7 @@ import (
 	"time"
 
 	v1 "SentinelOps/api/runtime/v1"
+	"SentinelOps/internal/ai/policy"
 	airuntime "SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
@@ -75,12 +76,15 @@ func BuildContextDTO(s workflow.DurableContextSnapshot, revUsed, revCommitted ui
 			return v1.ContextDTO{}, err
 		}
 	}
-	scope := s.Identity.Scope.UserID
-	if s.Identity.Scope.All {
+	serverIdentity, err := policy.IdentityFromContext(ctx)
+	if err != nil {
+		return v1.ContextDTO{}, ErrRuntimeForbidden
+	}
+	scope := serverIdentity.Scope.UserID
+	if serverIdentity.Scope.All {
 		scope = "all"
 	}
-	identity := v1.IdentityDTO{UserID: s.Identity.UserID, Username: s.Identity.Username, Role: string(s.Identity.Role), Scope: scope, AuthDisabled: s.Identity.AuthDisabled}
-	// Resource ownership is authoritative from the server-side run owner, never snapshot input.
+	identity := v1.IdentityDTO{UserID: serverIdentity.UserID, Username: serverIdentity.Username, Role: string(serverIdentity.Role), Scope: scope, AuthDisabled: serverIdentity.AuthDisabled}
 	if owner != "" {
 		identity.UserID = owner
 	}
@@ -95,6 +99,8 @@ func BuildContextDTO(s workflow.DurableContextSnapshot, revUsed, revCommitted ui
 		var h []any
 		if json.Unmarshal(s.History, &h) == nil {
 			count = len(h)
+		} else {
+			meta.Availability, meta.DataQuality, meta.ReasonCode = v1.AvailabilityPartial, v1.DataQualityUnknown, "invalid_context_history"
 		}
 	}
 	hash := sha256.Sum256(s.History)
@@ -110,8 +116,8 @@ func BuildCompatibilityDTO(run mysql.WorkflowRun, attempt *mysql.WorkflowAttempt
 	if attempt != nil && attempt.CheckpointCompatibilityHash != nil && *attempt.CheckpointCompatibilityHash != "" {
 		r.CheckpointFingerprint = *attempt.CheckpointCompatibilityHash
 	}
-	if attempt != nil && attempt.RunCompatibilityHash != nil && *attempt.RunCompatibilityHash != "" {
-		r.AttemptFingerprint = *attempt.RunCompatibilityHash
+	if attempt != nil && attempt.ExecutingWorkerFingerprint != nil && *attempt.ExecutingWorkerFingerprint != "" {
+		r.AttemptFingerprint = *attempt.ExecutingWorkerFingerprint
 	}
 	if worker != nil && worker.RuntimeCompatibilityHash != nil && *worker.RuntimeCompatibilityHash != "" {
 		r.ExecutingWorkerFingerprint = *worker.RuntimeCompatibilityHash
@@ -121,6 +127,9 @@ func BuildCompatibilityDTO(run mysql.WorkflowRun, attempt *mysql.WorkflowAttempt
 	}
 	if r.RunFingerprint != "" && attempt != nil && attempt.RunCompatibilityHash != nil {
 		r.RunMatch = *attempt.RunCompatibilityHash == r.RunFingerprint
+	}
+	if r.RunFingerprint != "" && r.CheckpointFingerprint != "" {
+		r.CheckpointMatch = r.CheckpointFingerprint == r.RunFingerprint
 	}
 	r.ExactRestoreAllowed = r.RunMatch && r.CheckpointMatch && r.WorkerMatch
 	return r
@@ -146,7 +155,11 @@ func AllowedRecoveryActions(status string, compatibility v1.RuntimeCompatibility
 		}
 		return nil
 	case string(v1.RuntimeStatusRetryableFailed):
-		return []v1.RecoveryAction{v1.RecoveryActionResume, v1.RecoveryActionReplay, v1.RecoveryActionCancel}
+		actions := []v1.RecoveryAction{v1.RecoveryActionReplay, v1.RecoveryActionCancel}
+		if compatibility.ExactRestoreAllowed {
+			actions = append([]v1.RecoveryAction{v1.RecoveryActionResume}, actions...)
+		}
+		return actions
 	case string(v1.RuntimeStatusWaitingApproval):
 		return []v1.RecoveryAction{v1.RecoveryActionCancel}
 	case string(v1.RuntimeStatusRunning), string(v1.RuntimeStatusPending):
