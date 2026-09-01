@@ -74,6 +74,7 @@ func (s *RuntimeService) ListTimeline(ctx context.Context, runID string, f Timel
 		size = 100
 	}
 	items := make([]v1.RuntimeEventDTO, 0, len(rows))
+	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
 	for _, row := range rows {
 		dto := MapRuntimeEvent(row)
 		if f.Attempt > 0 && dto.Attempt != f.Attempt {
@@ -81,6 +82,13 @@ func (s *RuntimeService) ListTimeline(ctx context.Context, runID string, f Timel
 		}
 		if f.Generation > 0 && dto.Generation != f.Generation {
 			continue
+		}
+		if dto.Availability != v1.AvailabilityAvailable || dto.DataQuality != v1.DataQualityComplete {
+			meta.Availability = v1.AvailabilityPartial
+			meta.DataQuality = v1.DataQualityPartial
+			if meta.ReasonCode == "" {
+				meta.ReasonCode = dto.ReasonCode
+			}
 		}
 		items = append(items, dto)
 	}
@@ -96,7 +104,7 @@ func (s *RuntimeService) ListTimeline(ctx context.Context, runID string, f Timel
 		end = len(items)
 	}
 	items = items[start:end]
-	return v1.TimelineRes{Items: items, Page: v1.PageMeta{Page: page, PageSize: size, Total: total, HasNext: int64(page*size) < total}, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}}, nil
+	return v1.TimelineRes{Items: items, Page: v1.PageMeta{Page: page, PageSize: size, Total: total, HasNext: int64(page*size) < total}, ResourceMeta: meta}, nil
 }
 
 func (s *RuntimeService) ListAttempts(ctx context.Context, runID string, p v1.PageRequest) (v1.AttemptsRes, error) {
@@ -126,7 +134,7 @@ func (s *RuntimeService) ListAttempts(ctx context.Context, runID string, p v1.Pa
 		return v1.AttemptsRes{}, err
 	}
 	quality := "complete"
-	if len(rows) == 0 {
+	if total == 0 {
 		rows, quality, err = s.Store.RebuildAttemptsFromEvents(ctx, runID)
 		if err != nil {
 			return v1.AttemptsRes{}, err
@@ -210,7 +218,7 @@ func checkpointStateProjection(c checkpointProjection, run *mysql.WorkflowRun, n
 	if c.ExpiresAt != nil && !c.ExpiresAt.After(now) {
 		return "expired", "expired"
 	}
-	if run.RuntimeCompatibilityHash != nil && *c.RuntimeCompatibilityHash != *run.RuntimeCompatibilityHash {
+	if run.RuntimeCompatibilityHash == nil || *c.RuntimeCompatibilityHash != *run.RuntimeCompatibilityHash {
 		return "incompatible", "runtime_incompatible"
 	}
 	if c.BlobSHA == nil || strings.TrimSpace(*c.BlobSHA) == "" || !strings.EqualFold(*c.BlobSHA, *c.PayloadSHA256) {
@@ -295,7 +303,7 @@ func isTerminalRunStatus(status string) bool {
 }
 
 func isTailStop(t string, payload any) bool {
-	if t == workflow.EventRunCompleted || t == workflow.EventRunParked || t == workflow.EventOperationSucceeded || t == workflow.EventOperationFailed || t == workflow.EventOperationCanceled {
+	if t == workflow.EventRunCompleted || t == workflow.EventRunParked || t == workflow.EventOperationSucceeded || t == workflow.EventOperationFailed || t == workflow.EventOperationCanceled || t == workflow.EventOperationRejected {
 		return true
 	}
 	if t == workflow.EventRunFailed {
