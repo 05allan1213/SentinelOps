@@ -28,6 +28,14 @@ type GORMStore struct{ db *gorm.DB }
 
 func NewGORMStore(db *gorm.DB) *GORMStore { return &GORMStore{db: db} }
 
+func ListRuntimeRuns(ctx context.Context, db *gorm.DB, f RuntimeRunFilter) ([]WorkflowRun, int64, error) {
+	return NewGORMStore(db).ListRuntimeRuns(ctx, f)
+}
+
+func GetRuntimeRun(ctx context.Context, db *gorm.DB, runID string, includeLegacy bool) (*WorkflowRun, error) {
+	return NewGORMStore(db).GetRuntimeRun(ctx, runID, includeLegacy)
+}
+
 var runtimeRunSortColumns = map[string]string{
 	"created_at": "created_at", "updated_at": "updated_at", "started_at": "started_at",
 	"finished_at": "finished_at", "status": "status", "attempt": "attempt",
