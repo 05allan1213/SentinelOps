@@ -144,13 +144,17 @@ func BuildCompatibilityDTO(run mysql.WorkflowRun, attempt *mysql.WorkflowAttempt
 func BuildRunSummary(run mysql.WorkflowRun) v1.RunSummaryDTO {
 	p := MapCanonicalStatus(run.Status, run.RuntimeMode)
 	phase := CurrentPhaseFromFacts(RunFacts{Status: run.Status, RuntimeMode: run.RuntimeMode}, AttemptFacts{}, EventFacts{})
+	budget := BuildBudgetDTO(run.BudgetLimitsJSON, run.BudgetUsageJSON, run.BudgetReservationsJSON)
+	// Duration is persisted run truth; expose it as elapsed budget time without
+	// inferring from wall clock (which would make reads non-deterministic).
+	budget.ElapsedMs = &run.DurationMs
 	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: p.DataQuality}
 	if !p.Known {
 		meta.Availability = v1.AvailabilityPartial
 		meta.DataQuality = v1.DataQualityUnknown
 		meta.ReasonCode = "unknown_status"
 	}
-	return v1.RunSummaryDTO{RunID: run.ID, SessionID: run.SessionID, WorkflowKey: run.WorkflowKey, RuntimeMode: run.RuntimeMode, Status: p.Status, CurrentPhase: phase, Agent: run.RuntimeAgent, Attempt: int(run.Attempt), WorkerID: value(run.LeaseOwner), LeaseGeneration: run.LeaseGeneration, LeaseState: leaseState(run), HeartbeatAt: run.HeartbeatAt, ParkReason: value(run.ParkReason), RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), QueryHash: hashText(run.QueryText), Budget: BuildBudgetDTO(run.BudgetLimitsJSON, run.BudgetUsageJSON, run.BudgetReservationsJSON), UsageQuality: v1.DataQuality(run.UsageQuality), TraceQuality: v1.DataQuality(run.TraceQuality), StartedAt: &run.StartedAt, FinishedAt: run.FinishedAt, DurationMs: run.DurationMs, ResourceMeta: meta}
+	return v1.RunSummaryDTO{RunID: run.ID, SessionID: run.SessionID, WorkflowKey: run.WorkflowKey, RuntimeMode: run.RuntimeMode, Status: p.Status, CurrentPhase: phase, Agent: run.RuntimeAgent, Attempt: int(run.Attempt), WorkerID: value(run.LeaseOwner), LeaseGeneration: run.LeaseGeneration, LeaseState: leaseState(run), HeartbeatAt: run.HeartbeatAt, ParkReason: value(run.ParkReason), RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), QueryHash: hashText(run.QueryText), Budget: budget, UsageQuality: v1.DataQuality(run.UsageQuality), TraceQuality: v1.DataQuality(run.TraceQuality), StartedAt: &run.StartedAt, FinishedAt: run.FinishedAt, DurationMs: run.DurationMs, ResourceMeta: meta}
 }
 
 func AllowedRecoveryActions(status string, compatibility v1.RuntimeCompatibilityDTO) []v1.RecoveryAction {
