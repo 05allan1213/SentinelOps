@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"testing"
 	"time"
 
@@ -25,17 +27,19 @@ func TestTimelineFiltersDoNotChangeTruth(t *testing.T) {
 }
 
 func TestAttemptReconstructionMarksPartial(t *testing.T) {
-	if _, reason := checkpointState(mysql.WorkflowCheckpoint{}, &mysql.WorkflowRun{}, time.Now()); reason != "missing_metadata" {
+	if _, reason := checkpointState(mysql.WorkflowCheckpoint{}, &mysql.WorkflowRun{}, time.Now()); reason != "invalid_metadata" {
 		t.Fatalf("reason=%s", reason)
 	}
 }
 
 func TestCheckpointDTOExcludesOpaqueBytes(t *testing.T) {
 	now := time.Now()
-	hash, ver, compat, gen := "h", "v", "c", uint64(1)
-	c := mysql.WorkflowCheckpoint{CheckpointKey: "k", PayloadSHA256: &hash, RuntimeVersion: &ver, RuntimeCompatibilityHash: &compat, LeaseGeneration: &gen, CommittedAt: &now, CheckpointBlob: []byte("secret")}
+	d := sha256.Sum256([]byte("secret"))
+	hash, ver, compat, gen := hex.EncodeToString(d[:]), "v", "c", uint64(1)
+	einoID := "k"
+	c := mysql.WorkflowCheckpoint{ID: einoRowID(&einoID), EinoCheckpointID: &einoID, CheckpointKey: "k", PayloadSHA256: &hash, RuntimeVersion: &ver, RuntimeCompatibilityHash: &compat, LeaseGeneration: &gen, CommittedAt: &now, CheckpointBlob: []byte("secret")}
 	state, reason := checkpointState(c, &mysql.WorkflowRun{}, now)
-	if state != "valid" || reason != "opaque_unverified" {
+	if state != "valid" || reason != "opaque_verified" {
 		t.Fatalf("state=%s reason=%s", state, reason)
 	}
 }
