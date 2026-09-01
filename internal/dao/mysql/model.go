@@ -392,6 +392,9 @@ type WorkflowRun struct {
 	CreatedAt                time.Time      `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt                time.Time      `gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt                gorm.DeletedAt `gorm:"column:deleted_at;index"`
+	// RuntimeAgent/RuntimeAgentQuality are read-only query projections, never persisted.
+	RuntimeAgent        string `gorm:"-"`
+	RuntimeAgentQuality string `gorm:"-"`
 }
 
 func (WorkflowRun) TableName() string { return "workflow_runs" }
@@ -484,6 +487,8 @@ type WorkflowCheckpoint struct {
 	CreatedAt                time.Time      `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt                time.Time      `gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt                gorm.DeletedAt `gorm:"column:deleted_at;index"`
+	RuntimeAgent             string         `gorm:"-"`
+	RuntimeAgentQuality      string         `gorm:"-"`
 }
 
 func (WorkflowCheckpoint) TableName() string { return "workflow_checkpoints" }

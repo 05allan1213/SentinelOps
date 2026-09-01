@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -60,14 +59,11 @@ func (s *GORMStore) ListRuntimeRuns(ctx context.Context, f RuntimeRunFilter) ([]
 		return nil, 0, err
 	}
 	q := db.Model(&WorkflowRun{})
-	mode := f.RuntimeMode
-	if mode == "" {
-		mode = "durable_v1"
-	}
+	mode := "durable_v1"
 	if !f.IncludeLegacy {
 		q = q.Where("runtime_mode = ?", mode)
 	} else if f.RuntimeMode != "" {
-		q = q.Where("runtime_mode = ?", mode)
+		q = q.Where("runtime_mode = ?", f.RuntimeMode)
 	}
 	if !identity.Scope.All {
 		q = q.Where("user_id = ?", identity.Scope.UserID)
@@ -102,7 +98,8 @@ func (s *GORMStore) ListRuntimeRuns(ctx context.Context, f RuntimeRunFilter) ([]
 	if strings.EqualFold(f.Direction, "asc") {
 		dir = "ASC"
 	}
-	q = q.Select(strings.Join(runtimeRunListColumns, ", ")).Order(sortCol + " " + dir).Order("id ASC")
+	projection := strings.Join(runtimeRunListColumns, ", ") + ", CASE WHEN immutable_input_json IS NULL OR immutable_input_json = '' THEN '' WHEN JSON_VALID(immutable_input_json) THEN COALESCE(JSON_UNQUOTE(JSON_EXTRACT(immutable_input_json, '$.agent')), '') ELSE '' END AS runtime_agent, CASE WHEN immutable_input_json IS NULL OR immutable_input_json = '' THEN 'missing' WHEN JSON_VALID(immutable_input_json) THEN 'complete' ELSE 'partial' END AS runtime_agent_quality"
+	q = q.Select(projection).Order(sortCol + " " + dir).Order("id ASC")
 	page, size := f.Page, f.PageSize
 	if page < 1 {
 		page = 1
@@ -124,7 +121,7 @@ func (f RuntimeRunFilter) ScopeIsAll() bool {
 	return strings.EqualFold(strings.TrimSpace(f.Scope), "all")
 }
 
-func (s *GORMStore) GetRuntimeRun(ctx context.Context, runID string) (*WorkflowRun, error) {
+func (s *GORMStore) GetRuntimeRun(ctx context.Context, runID string, includeLegacy ...bool) (*WorkflowRun, error) {
 	db, identity, err := s.query(ctx)
 	if err != nil {
 		return nil, err
@@ -132,7 +129,10 @@ func (s *GORMStore) GetRuntimeRun(ctx context.Context, runID string) (*WorkflowR
 	if strings.TrimSpace(runID) == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
-	q := db.Where("id = ? AND runtime_mode = ?", runID, "durable_v1")
+	q := db.Where("id = ?", runID)
+	if len(includeLegacy) == 0 || !includeLegacy[0] {
+		q = q.Where("runtime_mode = ?", "durable_v1")
+	}
 	if !identity.Scope.All {
 		q = q.Where("user_id = ?", identity.Scope.UserID)
 	}
@@ -141,18 +141,4 @@ func (s *GORMStore) GetRuntimeRun(ctx context.Context, runID string) (*WorkflowR
 		return nil, err
 	}
 	return &row, nil
-}
-
-// RuntimeRunAgent decodes the immutable agent label for service mapping.
-func RuntimeRunAgent(run WorkflowRun) (string, bool) {
-	if run.ImmutableInputJSON == nil || *run.ImmutableInputJSON == "" {
-		return "", false
-	}
-	var v struct {
-		Agent string `json:"agent"`
-	}
-	if json.Unmarshal([]byte(*run.ImmutableInputJSON), &v) != nil {
-		return "", false
-	}
-	return v.Agent, v.Agent != ""
 }
