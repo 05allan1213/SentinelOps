@@ -343,7 +343,28 @@ type GetEffectsReq struct {
 	PageSize   int    `json:"page_size"`
 }
 
-func (r GetEffectsReq) Valid() error { return validPagedRun(r.RunID, r.Page, r.PageSize) }
+func (r GetEffectsReq) Valid() error {
+	if err := validPagedRun(r.RunID, r.Page, r.PageSize); err != nil {
+		return err
+	}
+	if r.Status != "" {
+		switch r.Status {
+		case "pending", "running", "succeeded", "failed", "unknown", "reconciling":
+		default:
+			return validationErrorf("invalid effect status")
+		}
+	}
+	if r.EffectRole != "" && r.EffectRole != "primary" && r.EffectRole != "derived" {
+		return validationErrorf("invalid effect role")
+	}
+	if strings.TrimSpace(r.EffectStep) != r.EffectStep || len(r.EffectStep) > 128 {
+		return validationErrorf("invalid effect step")
+	}
+	if r.Attempt < 0 {
+		return validationErrorf("attempt must be >= 0")
+	}
+	return nil
+}
 
 type GetEvidenceReq struct {
 	g.Meta   `path:"/runtime/v1/runs/{run_id}/evidence" method:"GET"`
