@@ -118,3 +118,51 @@ func TestListRuntimeRunsStablePagination(t *testing.T) {
 		t.Fatalf("pagination unstable: %v vs %v", a, b)
 	}
 }
+
+func TestRuntimeRunBoundaryContracts(t *testing.T) {
+	store, db := runtimeQueryStore(t, "runtime_query_boundaries")
+	seedRuntimeRuns(t, db)
+	viewer := policy.WithIdentity(context.Background(), policy.Identity{UserID: "alice", Role: policy.RoleViewer, Scope: policy.Scope{UserID: "alice"}})
+	rows, _, err := store.ListRuntimeRuns(viewer, RuntimeRunFilter{RuntimeMode: "legacy", Scope: "all", Sort: "bogus", Direction: "bogus"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		if row.RuntimeMode != "durable_v1" || row.InputPayload != "" || row.OutputPayload != "" {
+			t.Fatalf("boundary row=%+v", row)
+		}
+	}
+	if _, err := store.GetRuntimeRun(viewer, "legacy-owned"); err != gorm.ErrRecordNotFound {
+		t.Fatalf("default legacy err=%v", err)
+	}
+	legacy, err := store.GetRuntimeRun(viewer, "legacy-owned", true)
+	if err != nil || legacy.RuntimeMode != "legacy" {
+		t.Fatalf("explicit legacy=%v err=%v", legacy, err)
+	}
+	admin := policy.WithIdentity(context.Background(), policy.Identity{UserID: "admin", Role: policy.RoleAdmin, Scope: policy.Scope{All: true}})
+	if _, err := store.GetRuntimeRun(admin, "legacy-owned", true); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRuntimeRunPaginationTieBreaksByID(t *testing.T) {
+	store, db := runtimeQueryStore(t, "runtime_query_ties")
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	for _, id := range []string{"tie-b", "tie-a"} {
+		if err := db.Create(&WorkflowRun{ID: id, WorkflowKey: "wf", UserID: "alice", Status: "running", RuntimeMode: "durable_v1", StartedAt: now, CreatedAt: now, UpdatedAt: now}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx := policy.WithIdentity(context.Background(), policy.Identity{UserID: "alice", Role: policy.RoleViewer, Scope: policy.Scope{UserID: "alice"}})
+	a, _, err := store.ListRuntimeRuns(ctx, RuntimeRunFilter{Page: 1, PageSize: 1, Sort: "created_at", Direction: "asc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, err := store.ListRuntimeRuns(ctx, RuntimeRunFilter{Page: 2, PageSize: 1, Sort: "created_at", Direction: "asc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a) != 1 || len(b) != 1 || a[0].ID == b[0].ID || a[0].ID != "tie-a" || b[0].ID != "tie-b" {
+		t.Fatalf("tie pages=%v %v", a, b)
+	}
+}
