@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -182,7 +183,18 @@ func (s *RuntimeService) ListCheckpoints(ctx context.Context, runID string, p v1
 	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
 	for _, c := range rows {
 		state, reason := checkpointStateProjection(c, run, time.Now())
-		items = append(items, v1.CheckpointDTO{CheckpointID: c.ID, CheckpointKey: c.CheckpointKey, PayloadSHA256: value(c.PayloadSHA256), RuntimeVersion: value(c.RuntimeVersion), RuntimeCompatibilityHash: value(c.RuntimeCompatibilityHash), LeaseGeneration: valueU64(c.LeaseGeneration), State: state, CommittedAt: c.CommittedAt, ExpiresAt: c.ExpiresAt, CreatedAt: c.CreatedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityPartial, ReasonCode: reason}})
+		itemMeta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
+		if state != "valid" {
+			itemMeta.Availability = v1.AvailabilityPartial
+			itemMeta.DataQuality = v1.DataQualityPartial
+			itemMeta.ReasonCode = reason
+			meta.Availability = v1.AvailabilityPartial
+			meta.DataQuality = v1.DataQualityPartial
+			if meta.ReasonCode == "" {
+				meta.ReasonCode = reason
+			}
+		}
+		items = append(items, v1.CheckpointDTO{CheckpointID: c.ID, CheckpointKey: c.CheckpointKey, PayloadSHA256: value(c.PayloadSHA256), RuntimeVersion: value(c.RuntimeVersion), RuntimeCompatibilityHash: value(c.RuntimeCompatibilityHash), LeaseGeneration: valueU64(c.LeaseGeneration), State: state, CommittedAt: c.CommittedAt, ExpiresAt: c.ExpiresAt, CreatedAt: c.CreatedAt, ResourceMeta: itemMeta})
 	}
 	if len(items) == 0 {
 		meta.DataQuality = v1.DataQualityUnknown
@@ -201,7 +213,7 @@ func checkpointStateProjection(c checkpointProjection, run *mysql.WorkflowRun, n
 	if run.RuntimeCompatibilityHash != nil && *c.RuntimeCompatibilityHash != *run.RuntimeCompatibilityHash {
 		return "incompatible", "runtime_incompatible"
 	}
-	if c.BlobSHA != nil && *c.BlobSHA != "" && !strings.EqualFold(*c.BlobSHA, *c.PayloadSHA256) {
+	if c.BlobSHA == nil || strings.TrimSpace(*c.BlobSHA) == "" || !strings.EqualFold(*c.BlobSHA, *c.PayloadSHA256) {
 		return "corrupt", "payload_digest_mismatch"
 	}
 	return "valid", "opaque_verified"
@@ -287,10 +299,31 @@ func isTailStop(t string, payload any) bool {
 		return true
 	}
 	if t == workflow.EventRunFailed {
-		m, _ := payload.(map[string]any)
-		d, _ := m["data"].(map[string]any)
-		r, _ := d["retryable"].(bool)
+		r, ok := retryableFromPayload(payload)
+		if !ok {
+			return true
+		}
 		return !r
 	}
 	return false
+}
+
+func retryableFromPayload(payload any) (bool, bool) {
+	if raw, ok := payload.(string); ok {
+		var decoded any
+		if json.Unmarshal([]byte(raw), &decoded) != nil {
+			return false, false
+		}
+		payload = decoded
+	}
+	m, ok := payload.(map[string]any)
+	if !ok {
+		return false, false
+	}
+	d, ok := m["data"].(map[string]any)
+	if !ok {
+		return false, false
+	}
+	r, ok := d["retryable"].(bool)
+	return r, ok
 }
