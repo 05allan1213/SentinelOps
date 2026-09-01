@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 	"time"
 
@@ -9,6 +11,12 @@ import (
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
 )
+
+type checkpointProjection struct {
+	mysql.WorkflowCheckpoint
+	BlobLen *int64  `gorm:"column:blob_len"`
+	BlobSHA *string `gorm:"column:blob_sha"`
+}
 
 type TimelineFilter struct {
 	EventTypes      []string
@@ -161,8 +169,8 @@ func (s *RuntimeService) ListCheckpoints(ctx context.Context, runID string, p v1
 	if p.PageSize > 100 {
 		p.PageSize = 100
 	}
-	var rows []mysql.WorkflowCheckpoint
-	q := s.Store.DB().WithContext(ctx).Select("id,run_id,checkpoint_key,payload_sha256,runtime_version,runtime_compatibility_hash,lease_generation,committed_at,expires_at,created_at").Where("run_id = ?", runID).Order("created_at DESC")
+	var rows []checkpointProjection
+	q := s.Store.DB().WithContext(ctx).Select("id,run_id,checkpoint_key,payload_sha256,runtime_version,runtime_compatibility_hash,lease_generation,committed_at,expires_at,created_at,eino_checkpoint_id,OCTET_LENGTH(checkpoint_blob) AS blob_len,SHA2(checkpoint_blob,256) AS blob_sha").Where("run_id = ?", runID).Order("created_at DESC")
 	var total int64
 	if err = q.Model(&mysql.WorkflowCheckpoint{}).Count(&total).Error; err != nil {
 		return v1.CheckpointsRes{}, err
@@ -173,7 +181,7 @@ func (s *RuntimeService) ListCheckpoints(ctx context.Context, runID string, p v1
 	items := make([]v1.CheckpointDTO, 0, len(rows))
 	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
 	for _, c := range rows {
-		state, reason := checkpointState(c, run, time.Now())
+		state, reason := checkpointStateProjection(c, run, time.Now())
 		items = append(items, v1.CheckpointDTO{CheckpointID: c.ID, CheckpointKey: c.CheckpointKey, PayloadSHA256: value(c.PayloadSHA256), RuntimeVersion: value(c.RuntimeVersion), RuntimeCompatibilityHash: value(c.RuntimeCompatibilityHash), LeaseGeneration: valueU64(c.LeaseGeneration), State: state, CommittedAt: c.CommittedAt, ExpiresAt: c.ExpiresAt, CreatedAt: c.CreatedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityPartial, ReasonCode: reason}})
 	}
 	if len(items) == 0 {
@@ -182,17 +190,42 @@ func (s *RuntimeService) ListCheckpoints(ctx context.Context, runID string, p v1
 	return v1.CheckpointsRes{Items: items, Page: v1.PageMeta{Page: p.Page, PageSize: p.PageSize, Total: total, HasNext: int64(p.Page*p.PageSize) < total}, ResourceMeta: meta}, nil
 }
 
-func checkpointState(c mysql.WorkflowCheckpoint, run *mysql.WorkflowRun, now time.Time) (string, string) {
-	if c.CheckpointKey == "" || c.PayloadSHA256 == nil || c.RuntimeVersion == nil || c.RuntimeCompatibilityHash == nil || c.LeaseGeneration == nil || c.CommittedAt == nil {
-		return "corrupt", "missing_metadata"
+func checkpointStateProjection(c checkpointProjection, run *mysql.WorkflowRun, now time.Time) (string, string) {
+	expected, err := workflow.EinoCheckpointID(run.ID)
+	if err != nil || c.ID != einoRowID(c.EinoCheckpointID) || c.EinoCheckpointID == nil || *c.EinoCheckpointID != expected || c.CheckpointKey != expected || c.BlobLen == nil || *c.BlobLen == 0 || c.PayloadSHA256 == nil || len(*c.PayloadSHA256) != 64 || c.RuntimeVersion == nil || run.RuntimeVersion == nil || *c.RuntimeVersion != *run.RuntimeVersion || c.RuntimeCompatibilityHash == nil || c.LeaseGeneration == nil || *c.LeaseGeneration == 0 || *c.LeaseGeneration > run.LeaseGeneration || c.CommittedAt == nil {
+		return "corrupt", "invalid_metadata"
 	}
 	if c.ExpiresAt != nil && !c.ExpiresAt.After(now) {
 		return "expired", "expired"
 	}
-	if c.RuntimeCompatibilityHash != nil && run.RuntimeCompatibilityHash != nil && *c.RuntimeCompatibilityHash != *run.RuntimeCompatibilityHash {
+	if run.RuntimeCompatibilityHash != nil && *c.RuntimeCompatibilityHash != *run.RuntimeCompatibilityHash {
 		return "incompatible", "runtime_incompatible"
 	}
-	return "valid", "opaque_unverified"
+	if c.BlobSHA != nil && *c.BlobSHA != "" && !strings.EqualFold(*c.BlobSHA, *c.PayloadSHA256) {
+		return "corrupt", "payload_digest_mismatch"
+	}
+	return "valid", "opaque_verified"
+}
+
+// checkpointState is retained for unit-level metadata checks.
+func checkpointState(c mysql.WorkflowCheckpoint, run *mysql.WorkflowRun, now time.Time) (string, string) {
+	p := checkpointProjection{WorkflowCheckpoint: c}
+	if len(c.CheckpointBlob) > 0 {
+		n := int64(len(c.CheckpointBlob))
+		p.BlobLen = &n
+		h := sha256.Sum256(c.CheckpointBlob)
+		s := hex.EncodeToString(h[:])
+		p.BlobSHA = &s
+	}
+	return checkpointStateProjection(p, run, now)
+}
+
+func einoRowID(id *string) string {
+	if id == nil {
+		return ""
+	}
+	h := sha256.Sum256([]byte(*id))
+	return hex.EncodeToString(h[:])
 }
 
 func (s *RuntimeService) TailRuntimeEvents(ctx context.Context, runID string, afterSeq int64, send func(v1.RuntimeEventDTO) error) error {
