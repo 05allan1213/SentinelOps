@@ -246,7 +246,11 @@ func MapRuntimeEvent(event mysql.WorkflowEvent) v1.RuntimeEventDTO {
 		}
 	}
 	if result.OperationID == "" && event.OperationID != nil {
-		result.OperationID = redactor.RedactText(*event.OperationID)
+		if redactor.RedactText(*event.OperationID) != *event.OperationID {
+			result.ResourceMeta = partialEventMeta("invalid_event_correlation")
+		} else {
+			result.OperationID = *event.OperationID
+		}
 	}
 	if event.CommandAction != nil && result.Attributes["operation_id"] == "" {
 		result.Attributes["command_action"] = redactor.RedactText(*event.CommandAction)

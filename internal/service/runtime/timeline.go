@@ -50,8 +50,8 @@ func (s *RuntimeService) ListTimeline(ctx context.Context, runID string, f Timel
 		}
 		q = q.Order("seq " + dir)
 	}
-	var total int64
-	if err = q.Model(&mysql.WorkflowEvent{}).Count(&total).Error; err != nil {
+	var rows []mysql.WorkflowEvent
+	if err = q.Find(&rows).Error; err != nil {
 		return v1.TimelineRes{}, err
 	}
 	page, size := f.Page, f.PageSize
@@ -63,10 +63,6 @@ func (s *RuntimeService) ListTimeline(ctx context.Context, runID string, f Timel
 	}
 	if size > 100 {
 		size = 100
-	}
-	var rows []mysql.WorkflowEvent
-	if err = q.Offset((page - 1) * size).Limit(size).Find(&rows).Error; err != nil {
-		return v1.TimelineRes{}, err
 	}
 	items := make([]v1.RuntimeEventDTO, 0, len(rows))
 	for _, row := range rows {
@@ -81,9 +77,16 @@ func (s *RuntimeService) ListTimeline(ctx context.Context, runID string, f Timel
 	}
 	// Correlation filters are applied after canonical mapping so malformed and
 	// unknown events remain visible when no filter is requested.
-	if f.Attempt > 0 || f.Generation > 0 {
-		total = int64(len(items))
+	total := int64(len(items))
+	start := (page - 1) * size
+	if start > len(items) {
+		start = len(items)
 	}
+	end := start + size
+	if end > len(items) {
+		end = len(items)
+	}
+	items = items[start:end]
 	return v1.TimelineRes{Items: items, Page: v1.PageMeta{Page: page, PageSize: size, Total: total, HasNext: int64(page*size) < total}, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}}, nil
 }
 
@@ -107,8 +110,12 @@ func (s *RuntimeService) ListAttempts(ctx context.Context, runID string, p v1.Pa
 	var rows []mysql.WorkflowAttempt
 	q := s.Store.DB().WithContext(ctx).Where("run_id = ?", runID).Order("attempt ASC")
 	var total int64
-	q.Model(&mysql.WorkflowAttempt{}).Count(&total)
-	q.Offset((p.Page - 1) * p.PageSize).Limit(p.PageSize).Find(&rows)
+	if err = q.Model(&mysql.WorkflowAttempt{}).Count(&total).Error; err != nil {
+		return v1.AttemptsRes{}, err
+	}
+	if err = q.Offset((p.Page - 1) * p.PageSize).Limit(p.PageSize).Find(&rows).Error; err != nil {
+		return v1.AttemptsRes{}, err
+	}
 	quality := "complete"
 	if len(rows) == 0 {
 		rows, quality, err = s.Store.RebuildAttemptsFromEvents(ctx, runID)
@@ -116,12 +123,25 @@ func (s *RuntimeService) ListAttempts(ctx context.Context, runID string, p v1.Pa
 			return v1.AttemptsRes{}, err
 		}
 	}
+	if quality != "complete" {
+		total = int64(len(rows))
+		start := (p.Page - 1) * p.PageSize
+		if start > len(rows) {
+			start = len(rows)
+		}
+		end := start + p.PageSize
+		if end > len(rows) {
+			end = len(rows)
+		}
+		rows = rows[start:end]
+	}
 	items := make([]v1.AttemptDTO, 0, len(rows))
 	for _, a := range rows {
 		status := v1.RuntimeStatus(value(a.Status))
 		items = append(items, v1.AttemptDTO{AttemptID: a.ID, RunID: a.RunID, Attempt: int(a.Attempt), Mode: value(a.Mode), Status: status, CurrentPhase: v1.CurrentPhase(value(a.CurrentPhase)), WorkerID: value(a.WorkerID), LeaseGeneration: valueU64(a.LeaseGeneration), RuntimeVersion: value(a.RuntimeVersion), RunCompatibilityHash: value(a.RunCompatibilityHash), CheckpointCompatibilityHash: value(a.CheckpointCompatibilityHash), ExecutingWorkerFingerprint: value(a.ExecutingWorkerFingerprint), TraceID: value(a.TraceID), OperationID: value(a.OperationID), RetryCount: int(valueU(a.RetryCount)), FailoverCount: int(valueU(a.FailoverCount)), FailureCode: value(a.FailureCode), FailureMessage: value(a.FailureMessageRedacted), UsageQuality: v1.DataQuality(value(a.UsageQuality)), TraceQuality: v1.DataQuality(value(a.TraceQuality)), StartedAt: a.StartedAt, FinishedAt: a.FinishedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQuality(quality)}})
 	}
-	return v1.AttemptsRes{Items: items, Page: v1.PageMeta{Page: p.Page, PageSize: p.PageSize, Total: total}}, nil
+	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQuality(quality)}
+	return v1.AttemptsRes{Items: items, Page: v1.PageMeta{Page: p.Page, PageSize: p.PageSize, Total: total, HasNext: int64(p.Page*p.PageSize) < total}, ResourceMeta: meta}, nil
 }
 
 func (s *RuntimeService) ListCheckpoints(ctx context.Context, runID string, p v1.PageRequest) (v1.CheckpointsRes, error) {
@@ -144,11 +164,25 @@ func (s *RuntimeService) ListCheckpoints(ctx context.Context, runID string, p v1
 	var rows []mysql.WorkflowCheckpoint
 	q := s.Store.DB().WithContext(ctx).Select("id,run_id,checkpoint_key,payload_sha256,runtime_version,runtime_compatibility_hash,lease_generation,committed_at,expires_at,created_at").Where("run_id = ?", runID).Order("created_at DESC")
 	var total int64
-	q.Model(&mysql.WorkflowCheckpoint{}).Count(&total)
-	q.Offset((p.Page - 1) * p.PageSize).Limit(p.PageSize).Find(&rows)
+	if err = q.Model(&mysql.WorkflowCheckpoint{}).Count(&total).Error; err != nil {
+		return v1.CheckpointsRes{}, err
+	}
+	if err = q.Offset((p.Page - 1) * p.PageSize).Limit(p.PageSize).Find(&rows).Error; err != nil {
+		return v1.CheckpointsRes{}, err
+	}
 	items := make([]v1.CheckpointDTO, 0, len(rows))
 	for _, c := range rows {
-		items = append(items, v1.CheckpointDTO{CheckpointID: c.ID, CheckpointKey: c.CheckpointKey, PayloadSHA256: value(c.PayloadSHA256), RuntimeVersion: value(c.RuntimeVersion), RuntimeCompatibilityHash: value(c.RuntimeCompatibilityHash), LeaseGeneration: valueU64(c.LeaseGeneration), State: "committed", CommittedAt: c.CommittedAt, ExpiresAt: c.ExpiresAt, CreatedAt: c.CreatedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}})
+		state, reason := "valid", ""
+		if c.ExpiresAt != nil && !c.ExpiresAt.After(time.Now()) {
+			state, reason = "expired", "expired"
+		}
+		if c.PayloadSHA256 == nil || c.RuntimeVersion == nil || c.RuntimeCompatibilityHash == nil || c.LeaseGeneration == nil || c.CommittedAt == nil {
+			state, reason = "corrupt", "missing_metadata"
+		}
+		if c.RuntimeCompatibilityHash != nil && run.RuntimeCompatibilityHash != nil && *c.RuntimeCompatibilityHash != *run.RuntimeCompatibilityHash {
+			state, reason = "incompatible", "runtime_incompatible"
+		}
+		items = append(items, v1.CheckpointDTO{CheckpointID: c.ID, CheckpointKey: c.CheckpointKey, PayloadSHA256: value(c.PayloadSHA256), RuntimeVersion: value(c.RuntimeVersion), RuntimeCompatibilityHash: value(c.RuntimeCompatibilityHash), LeaseGeneration: valueU64(c.LeaseGeneration), State: state, CommittedAt: c.CommittedAt, ExpiresAt: c.ExpiresAt, CreatedAt: c.CreatedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete, ReasonCode: reason}})
 	}
 	return v1.CheckpointsRes{Items: items, Page: v1.PageMeta{Page: p.Page, PageSize: p.PageSize, Total: total}}, nil
 }
@@ -163,6 +197,9 @@ func (s *RuntimeService) TailRuntimeEvents(ctx context.Context, runID string, af
 	}
 	cursor := afterSeq
 	for {
+		if fresh, e := s.Store.GetRuntimeRun(ctx, runID); e == nil {
+			run = fresh
+		}
 		events, err := s.Store.ListEventsAfter(ctx, runID, cursor)
 		if err != nil {
 			return err
