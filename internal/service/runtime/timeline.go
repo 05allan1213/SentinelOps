@@ -171,20 +171,23 @@ func (s *RuntimeService) ListCheckpoints(ctx context.Context, runID string, p v1
 		return v1.CheckpointsRes{}, err
 	}
 	items := make([]v1.CheckpointDTO, 0, len(rows))
+	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
 	for _, c := range rows {
-		state, reason := "valid", ""
-		if c.ExpiresAt != nil && !c.ExpiresAt.After(time.Now()) {
-			state, reason = "expired", "expired"
-		}
-		if c.PayloadSHA256 == nil || c.RuntimeVersion == nil || c.RuntimeCompatibilityHash == nil || c.LeaseGeneration == nil || c.CommittedAt == nil {
+		state, reason := "valid", "opaque_unverified"
+		if c.CheckpointKey == "" || c.PayloadSHA256 == nil || c.RuntimeVersion == nil || c.RuntimeCompatibilityHash == nil || c.LeaseGeneration == nil || c.CommittedAt == nil {
 			state, reason = "corrupt", "missing_metadata"
+		} else if c.ExpiresAt != nil && !c.ExpiresAt.After(time.Now()) {
+			state, reason = "expired", "expired"
 		}
 		if c.RuntimeCompatibilityHash != nil && run.RuntimeCompatibilityHash != nil && *c.RuntimeCompatibilityHash != *run.RuntimeCompatibilityHash {
 			state, reason = "incompatible", "runtime_incompatible"
 		}
-		items = append(items, v1.CheckpointDTO{CheckpointID: c.ID, CheckpointKey: c.CheckpointKey, PayloadSHA256: value(c.PayloadSHA256), RuntimeVersion: value(c.RuntimeVersion), RuntimeCompatibilityHash: value(c.RuntimeCompatibilityHash), LeaseGeneration: valueU64(c.LeaseGeneration), State: state, CommittedAt: c.CommittedAt, ExpiresAt: c.ExpiresAt, CreatedAt: c.CreatedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete, ReasonCode: reason}})
+		items = append(items, v1.CheckpointDTO{CheckpointID: c.ID, CheckpointKey: c.CheckpointKey, PayloadSHA256: value(c.PayloadSHA256), RuntimeVersion: value(c.RuntimeVersion), RuntimeCompatibilityHash: value(c.RuntimeCompatibilityHash), LeaseGeneration: valueU64(c.LeaseGeneration), State: state, CommittedAt: c.CommittedAt, ExpiresAt: c.ExpiresAt, CreatedAt: c.CreatedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityPartial, ReasonCode: reason}})
 	}
-	return v1.CheckpointsRes{Items: items, Page: v1.PageMeta{Page: p.Page, PageSize: p.PageSize, Total: total}}, nil
+	if len(items) == 0 {
+		meta.DataQuality = v1.DataQualityUnknown
+	}
+	return v1.CheckpointsRes{Items: items, Page: v1.PageMeta{Page: p.Page, PageSize: p.PageSize, Total: total, HasNext: int64(p.Page*p.PageSize) < total}, ResourceMeta: meta}, nil
 }
 
 func (s *RuntimeService) TailRuntimeEvents(ctx context.Context, runID string, afterSeq int64, send func(v1.RuntimeEventDTO) error) error {
@@ -196,6 +199,12 @@ func (s *RuntimeService) TailRuntimeEvents(ctx context.Context, runID string, af
 		return err
 	}
 	cursor := afterSeq
+	if cursor > 0 {
+		var boundary mysql.WorkflowEvent
+		if e := s.Store.DB().WithContext(ctx).Where("run_id=? AND seq=?", runID, cursor).First(&boundary).Error; e == nil && isTailStop(boundary.EventType, boundary.Payload) {
+			return nil
+		}
+	}
 	for {
 		if fresh, e := s.Store.GetRuntimeRun(ctx, runID); e == nil {
 			run = fresh
