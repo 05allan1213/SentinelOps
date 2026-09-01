@@ -392,9 +392,12 @@ type WorkflowRun struct {
 	CreatedAt                time.Time      `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt                time.Time      `gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt                gorm.DeletedAt `gorm:"column:deleted_at;index"`
-	// RuntimeAgent/RuntimeAgentQuality are read-only query projections, never persisted.
-	RuntimeAgent        string `gorm:"column:runtime_agent;->"`
-	RuntimeAgentQuality string `gorm:"column:runtime_agent_quality;->"`
+	// RuntimeAgent/RuntimeAgentQuality are transient values populated only by
+	// the explicit RuntimeRunProjection query.  They are deliberately ignored
+	// by GORM so ordinary WorkflowRun reads (including First(&run)) never try to
+	// select columns that do not exist in workflow_runs.
+	RuntimeAgent        string `gorm:"-"`
+	RuntimeAgentQuality string `gorm:"-"`
 }
 
 func (WorkflowRun) TableName() string { return "workflow_runs" }
