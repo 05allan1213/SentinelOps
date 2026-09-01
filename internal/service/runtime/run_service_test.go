@@ -40,9 +40,26 @@ func TestCompatibilitySeparatesThreeFingerprints(t *testing.T) {
 	run := mysql.WorkflowRun{RuntimeCompatibilityHash: strp("run")}
 	attempt := &mysql.WorkflowAttempt{RunCompatibilityHash: strp("run"), CheckpointCompatibilityHash: strp("run"), ExecutingWorkerFingerprint: strp("worker")}
 	worker := &mysql.RuntimeWorkerSnapshot{RuntimeCompatibilityHash: strp("worker")}
-	c := BuildCompatibilityDTO(run, attempt, worker)
+	cp := &mysql.WorkflowCheckpoint{RuntimeCompatibilityHash: strp("run")}
+	c := BuildCompatibilityDTO(run, attempt, worker, cp)
 	if !c.RunMatch || !c.CheckpointMatch || !c.WorkerMatch || !c.ExactRestoreAllowed {
 		t.Fatalf("compat=%+v", c)
+	}
+}
+
+func TestCompatibilityCheckpointUsesPersistedCheckpointHash(t *testing.T) {
+	run := mysql.WorkflowRun{RuntimeCompatibilityHash: strp("run")}
+	attempt := &mysql.WorkflowAttempt{RunCompatibilityHash: strp("run"), CheckpointCompatibilityHash: strp("cp"), ExecutingWorkerFingerprint: strp("worker")}
+	worker := &mysql.RuntimeWorkerSnapshot{RuntimeCompatibilityHash: strp("worker")}
+	cp := &mysql.WorkflowCheckpoint{RuntimeCompatibilityHash: strp("cp")}
+	if got := BuildCompatibilityDTO(run, attempt, worker, cp); !got.ExactRestoreAllowed || !got.CheckpointMatch {
+		t.Fatalf("compat=%+v", got)
+	}
+	// A differing run hash must not invalidate an otherwise matching checkpoint.
+	run.RuntimeCompatibilityHash = strp("different-run")
+	got := BuildCompatibilityDTO(run, attempt, worker, cp)
+	if !got.CheckpointMatch || got.RunMatch {
+		t.Fatalf("fingerprints must compare independently: %+v", got)
 	}
 }
 

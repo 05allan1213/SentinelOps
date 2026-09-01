@@ -85,9 +85,6 @@ func BuildContextDTO(s workflow.DurableContextSnapshot, revUsed, revCommitted ui
 		scope = "all"
 	}
 	identity := v1.IdentityDTO{UserID: serverIdentity.UserID, Username: serverIdentity.Username, Role: string(serverIdentity.Role), Scope: scope, AuthDisabled: serverIdentity.AuthDisabled}
-	if owner != "" {
-		identity.UserID = owner
-	}
 	count := 0
 	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
 	if s.Schema != workflow.DurableContextSnapshotSchema || s.DeadlineAt.IsZero() {
@@ -108,7 +105,7 @@ func BuildContextDTO(s workflow.DurableContextSnapshot, revUsed, revCommitted ui
 	return v1.ContextDTO{Identity: identity, SessionRevisionUsed: revUsed, SessionRevisionCommitted: revCommitted, SummaryHash: hex.EncodeToString(hash[:]), HistoryCount: count, BudgetLimitsHash: hex.EncodeToString(bh[:]), DeadlineAt: &s.DeadlineAt, RuntimeCompatibilityHash: "", ResourceMeta: meta}, nil
 }
 
-func BuildCompatibilityDTO(run mysql.WorkflowRun, attempt *mysql.WorkflowAttempt, worker *mysql.RuntimeWorkerSnapshot) v1.RuntimeCompatibilityDTO {
+func BuildCompatibilityDTO(run mysql.WorkflowRun, attempt *mysql.WorkflowAttempt, worker *mysql.RuntimeWorkerSnapshot, checkpoints ...*mysql.WorkflowCheckpoint) v1.RuntimeCompatibilityDTO {
 	r := v1.RuntimeCompatibilityDTO{ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityPartial, DataQuality: v1.DataQualityPartial}}
 	if run.RuntimeCompatibilityHash != nil && *run.RuntimeCompatibilityHash != "" {
 		r.RunFingerprint = *run.RuntimeCompatibilityHash
@@ -128,8 +125,17 @@ func BuildCompatibilityDTO(run mysql.WorkflowRun, attempt *mysql.WorkflowAttempt
 	if r.RunFingerprint != "" && attempt != nil && attempt.RunCompatibilityHash != nil {
 		r.RunMatch = *attempt.RunCompatibilityHash == r.RunFingerprint
 	}
-	if r.RunFingerprint != "" && r.CheckpointFingerprint != "" {
-		r.CheckpointMatch = r.CheckpointFingerprint == r.RunFingerprint
+	// Checkpoint compatibility is compared against the persisted checkpoint
+	// snapshot, never against the run hash (these are independent dimensions).
+	if attempt != nil && attempt.CheckpointCompatibilityHash != nil {
+		if len(checkpoints) > 0 && checkpoints[0] != nil && checkpoints[0].RuntimeCompatibilityHash != nil {
+			r.CheckpointMatch = *attempt.CheckpointCompatibilityHash == *checkpoints[0].RuntimeCompatibilityHash
+		} else {
+			r.CheckpointMatch = false
+			if r.ReasonCode == "" {
+				r.ReasonCode = "checkpoint_not_observed"
+			}
+		}
 	}
 	r.ExactRestoreAllowed = r.RunMatch && r.CheckpointMatch && r.WorkerMatch
 	return r
@@ -144,7 +150,7 @@ func BuildRunSummary(run mysql.WorkflowRun) v1.RunSummaryDTO {
 		meta.DataQuality = v1.DataQualityUnknown
 		meta.ReasonCode = "unknown_status"
 	}
-	return v1.RunSummaryDTO{RunID: run.ID, SessionID: run.SessionID, WorkflowKey: run.WorkflowKey, RuntimeMode: run.RuntimeMode, Status: p.Status, CurrentPhase: phase, Agent: run.RuntimeAgent, Attempt: int(run.Attempt), LeaseGeneration: run.LeaseGeneration, LeaseState: leaseState(run), HeartbeatAt: run.HeartbeatAt, ParkReason: value(run.ParkReason), RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), QueryHash: hashText(run.QueryText), Budget: BuildBudgetDTO(run.BudgetLimitsJSON, run.BudgetUsageJSON, run.BudgetReservationsJSON), UsageQuality: v1.DataQuality(run.UsageQuality), TraceQuality: v1.DataQuality(run.TraceQuality), StartedAt: &run.StartedAt, FinishedAt: run.FinishedAt, DurationMs: run.DurationMs, ResourceMeta: meta}
+	return v1.RunSummaryDTO{RunID: run.ID, SessionID: run.SessionID, WorkflowKey: run.WorkflowKey, RuntimeMode: run.RuntimeMode, Status: p.Status, CurrentPhase: phase, Agent: run.RuntimeAgent, Attempt: int(run.Attempt), WorkerID: value(run.LeaseOwner), LeaseGeneration: run.LeaseGeneration, LeaseState: leaseState(run), HeartbeatAt: run.HeartbeatAt, ParkReason: value(run.ParkReason), RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), QueryHash: hashText(run.QueryText), Budget: BuildBudgetDTO(run.BudgetLimitsJSON, run.BudgetUsageJSON, run.BudgetReservationsJSON), UsageQuality: v1.DataQuality(run.UsageQuality), TraceQuality: v1.DataQuality(run.TraceQuality), StartedAt: &run.StartedAt, FinishedAt: run.FinishedAt, DurationMs: run.DurationMs, ResourceMeta: meta}
 }
 
 func AllowedRecoveryActions(status string, compatibility v1.RuntimeCompatibilityDTO) []v1.RecoveryAction {
@@ -185,8 +191,10 @@ func (s *RuntimeService) GetRun(ctx context.Context, runID string) (v1.RunDetail
 	var attempt mysql.WorkflowAttempt
 	var worker mysql.RuntimeWorkerSnapshot
 	var event mysql.WorkflowEvent
+	var checkpoint mysql.WorkflowCheckpoint
 	_ = db.WithContext(ctx).Where("run_id = ?", runID).Order("attempt DESC").First(&attempt).Error
 	_ = db.WithContext(ctx).Where("run_id = ?", runID).Order("seq DESC").First(&event).Error
+	_ = db.WithContext(ctx).Where("run_id = ?", runID).Order("committed_at DESC, created_at DESC").First(&checkpoint).Error
 	if run.LeaseOwner != nil {
 		_ = db.WithContext(ctx).Where("worker_id = ?", *run.LeaseOwner).First(&worker).Error
 	}
@@ -196,7 +204,11 @@ func (s *RuntimeService) GetRun(ctx context.Context, runID string) (v1.RunDetail
 		_ = json.Unmarshal([]byte(*run.ContextSnapshotJSON), &snap)
 	}
 	c, _ := BuildContextDTO(snap, valueU64(run.SessionRevision), valueU64(run.SessionRevision), false, run.UserID, ctx)
-	comp := BuildCompatibilityDTO(*run, &attempt, &worker)
+	var checkpointPtr *mysql.WorkflowCheckpoint
+	if checkpoint.ID != "" {
+		checkpointPtr = &checkpoint
+	}
+	comp := BuildCompatibilityDTO(*run, &attempt, &worker, checkpointPtr)
 	if attempt.ID == "" {
 		comp.ResourceMeta = v1.ResourceMeta{Availability: v1.AvailabilityPartial, DataQuality: v1.DataQualityUnknown, ReasonCode: "attempt_not_observed"}
 	}
