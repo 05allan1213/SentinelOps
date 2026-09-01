@@ -196,18 +196,31 @@ func (s *RuntimeService) GetRun(ctx context.Context, runID string) (v1.RunDetail
 	var worker mysql.RuntimeWorkerSnapshot
 	var event mysql.WorkflowEvent
 	var checkpoint mysql.WorkflowCheckpoint
+	var committedRevision mysql.SessionStateRevision
 	_ = db.WithContext(ctx).Where("run_id = ?", runID).Order("attempt DESC").First(&attempt).Error
 	_ = db.WithContext(ctx).Where("run_id = ?", runID).Order("seq DESC").First(&event).Error
 	_ = db.WithContext(ctx).Where("run_id = ?", runID).Order("committed_at DESC, created_at DESC").First(&checkpoint).Error
+	revisionErr := db.WithContext(ctx).Where("session_id = ?", run.SessionID).Order("revision DESC").First(&committedRevision).Error
 	if run.LeaseOwner != nil {
 		_ = db.WithContext(ctx).Where("worker_id = ?", *run.LeaseOwner).First(&worker).Error
+	}
+	if worker.WorkerID == "" && attempt.WorkerID != nil {
+		_ = db.WithContext(ctx).Where("worker_id = ?", *attempt.WorkerID).First(&worker).Error
 	}
 	sum.CurrentPhase = CurrentPhaseFromFacts(RunFacts{Status: run.Status, RuntimeMode: run.RuntimeMode}, AttemptFacts{Active: attempt.Status != nil && *attempt.Status == workflow.RunStatusRunning, Recovery: attempt.Mode != nil && isRecoveryMode(*attempt.Mode), Mode: value(attempt.Mode), OperationActive: attempt.OperationID != nil}, EventFacts{Type: event.EventType})
 	var snap workflow.DurableContextSnapshot
 	if run.ContextSnapshotJSON != nil {
 		_ = json.Unmarshal([]byte(*run.ContextSnapshotJSON), &snap)
 	}
-	c, _ := BuildContextDTO(snap, valueU64(run.SessionRevision), valueU64(run.SessionRevision), false, run.UserID, ctx)
+	usedRevision := valueU64(run.SessionRevision)
+	committed := usedRevision
+	if revisionErr == nil {
+		committed = committedRevision.Revision
+	}
+	c, _ := BuildContextDTO(snap, usedRevision, committed, false, run.UserID, ctx)
+	if revisionErr != nil {
+		c.ResourceMeta = v1.ResourceMeta{Availability: v1.AvailabilityPartial, DataQuality: v1.DataQualityReconstructed, ReasonCode: "session_revision_not_observed"}
+	}
 	var checkpointPtr *mysql.WorkflowCheckpoint
 	if checkpoint.ID != "" {
 		checkpointPtr = &checkpoint
@@ -242,7 +255,8 @@ func (s *RuntimeService) GetRun(ctx context.Context, runID string) (v1.RunDetail
 		status := v1.RuntimeStatus(value(attempt.Status))
 		currentAttempt = &v1.AttemptDTO{AttemptID: attempt.ID, RunID: attempt.RunID, Attempt: int(attempt.Attempt), Mode: value(attempt.Mode), Status: status, CurrentPhase: sum.CurrentPhase, WorkerID: value(attempt.WorkerID), LeaseGeneration: valueU64(attempt.LeaseGeneration), RuntimeVersion: value(attempt.RuntimeVersion), RunCompatibilityHash: value(attempt.RunCompatibilityHash), CheckpointCompatibilityHash: value(attempt.CheckpointCompatibilityHash), ExecutingWorkerFingerprint: value(attempt.ExecutingWorkerFingerprint), TraceID: value(attempt.TraceID), OperationID: value(attempt.OperationID), RetryCount: int(valueU(attempt.RetryCount)), FailoverCount: int(valueU(attempt.FailoverCount)), FailureCode: value(attempt.FailureCode), FailureMessage: value(attempt.FailureMessageRedacted), UsageQuality: v1.DataQuality(value(attempt.UsageQuality)), TraceQuality: v1.DataQuality(value(attempt.TraceQuality)), StartedAt: attempt.StartedAt, FinishedAt: attempt.FinishedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}}
 	}
-	return v1.RunDetailDTO{Summary: sum, Overview: v1.RunOverviewDTO{Status: sum.Status, CurrentPhase: sum.CurrentPhase, ResourceMeta: sum.ResourceMeta}, CurrentAttempt: currentAttempt, Budget: sum.Budget, Compatibility: comp, ContextSummary: v1.RuntimeContextSummaryDTO{Identity: c.Identity, SessionRevisionUsed: c.SessionRevisionUsed, SessionRevisionCommitted: c.SessionRevisionCommitted, SummaryHash: c.SummaryHash, HistoryCount: c.HistoryCount, ResourceMeta: c.ResourceMeta}, GateSummary: gate, AllowedRecoveryActions: AllowedRecoveryActions(string(sum.Status), comp), ResourceMeta: sum.ResourceMeta}, nil
+	ctxSummary := v1.RuntimeContextSummaryDTO{Identity: c.Identity, SessionRevisionUsed: c.SessionRevisionUsed, SessionRevisionCommitted: c.SessionRevisionCommitted, SummaryHash: c.SummaryHash, HistoryCount: c.HistoryCount, BudgetLimitsHash: c.BudgetLimitsHash, DeadlineAt: c.DeadlineAt, RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), PolicyHash: value(run.PolicyHash), ConfigHash: value(run.ConfigHash), ResourceMeta: c.ResourceMeta}
+	return v1.RunDetailDTO{Summary: sum, Overview: v1.RunOverviewDTO{Status: sum.Status, CurrentPhase: sum.CurrentPhase, ResourceMeta: sum.ResourceMeta}, CurrentAttempt: currentAttempt, Budget: sum.Budget, Compatibility: comp, ContextSummary: ctxSummary, GateSummary: gate, AllowedRecoveryActions: AllowedRecoveryActions(string(sum.Status), comp), ResourceMeta: sum.ResourceMeta}, nil
 }
 
 func (s *RuntimeService) ListRuns(ctx context.Context, f mysql.RuntimeRunFilter) (v1.ListRunsRes, error) {
