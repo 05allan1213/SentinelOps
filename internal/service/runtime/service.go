@@ -30,12 +30,19 @@ func NewRuntimeServiceWithEvaluator(store *workflow.GORMStore, gates *airuntime.
 func BuildBudgetDTO(limitsJSON, usageJSON, reservationsJSON *string) v1.RuntimeBudgetDTO {
 	var l workflow.BaseBudgetLimits
 	var u workflow.BaseBudgetUsage
+	var rs workflow.BaseBudgetReservations
 	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
-	if limitsJSON == nil || json.Unmarshal([]byte(*limitsJSON), &l) != nil {
-		meta.Availability = v1.AvailabilityPartial
-		meta.DataQuality = v1.DataQualityUnknown
-		meta.ReasonCode = "invalid_budget_json"
-	} else if usageJSON == nil || json.Unmarshal([]byte(*usageJSON), &u) != nil {
+	valid := true
+	if limitsJSON == nil || json.Unmarshal([]byte(*limitsJSON), &l) != nil || l.MaxModelCalls <= 0 || l.MaxL0ToolCalls <= 0 || l.MaxDurationMS <= 0 {
+		valid = false
+	}
+	if usageJSON == nil || json.Unmarshal([]byte(*usageJSON), &u) != nil || u.Schema != workflow.BaseBudgetSchema || u.ModelCalls < 0 || u.L0ToolCalls < 0 {
+		valid = false
+	}
+	if reservationsJSON == nil || json.Unmarshal([]byte(*reservationsJSON), &rs) != nil || rs.Schema != workflow.BaseBudgetSchema || rs.Items == nil {
+		valid = false
+	}
+	if !valid {
 		meta.Availability = v1.AvailabilityPartial
 		meta.DataQuality = v1.DataQualityUnknown
 		meta.ReasonCode = "invalid_budget_json"
@@ -43,15 +50,22 @@ func BuildBudgetDTO(limitsJSON, usageJSON, reservationsJSON *string) v1.RuntimeB
 	toInt := func(v int64) *int { x := int(v); return &x }
 	toI64 := func(v int64) *int64 { return &v }
 	toF := func(v float64) *float64 { return &v }
-	r := v1.RuntimeBudgetDTO{MaxModelCalls: toInt(l.MaxModelCalls), MaxL0ToolCalls: toInt(l.MaxL0ToolCalls), MaxDurationMs: toI64(l.MaxDurationMS), ModelCalls: toInt(u.ModelCalls), ToolCalls: toInt(u.L0ToolCalls), Iterations: toInt(u.PlannerRounds + u.ExecutorRounds + u.ReplannerRounds), InputTokens: toI64(u.InputTokens), OutputTokens: toI64(u.OutputTokens), CostCNY: toF(u.CostCNY), MCPCalls: toInt(u.MCPCalls), RAGCalls: toInt(u.RAGDocuments), ResourceMeta: meta}
-	if reservationsJSON != nil {
-		var raw map[string]any
-		if json.Unmarshal([]byte(*reservationsJSON), &raw) != nil {
-			meta.Availability = v1.AvailabilityPartial
-			meta.DataQuality = v1.DataQualityUnknown
-			meta.ReasonCode = "invalid_budget_json"
+	reservedModel, reservedTool := 0, 0
+	exhaustedReason := ""
+	for _, x := range rs.Items {
+		if x.State == workflow.BaseBudgetReservationPending {
+			if x.Kind == workflow.BaseBudgetKindModelCall {
+				reservedModel++
+			}
+			if x.Kind == workflow.BaseBudgetKindL0ToolCall {
+				reservedTool++
+			}
+		}
+		if x.State == workflow.BaseBudgetReservationExhausted && exhaustedReason == "" {
+			exhaustedReason = x.ExhaustedReason
 		}
 	}
+	r := v1.RuntimeBudgetDTO{MaxModelCalls: toInt(l.MaxModelCalls), MaxL0ToolCalls: toInt(l.MaxL0ToolCalls), MaxDurationMs: toI64(l.MaxDurationMS), ModelCalls: toInt(u.ModelCalls), ToolCalls: toInt(u.L0ToolCalls), Iterations: toInt(u.PlannerRounds + u.ExecutorRounds + u.ReplannerRounds), InputTokens: toI64(u.InputTokens), OutputTokens: toI64(u.OutputTokens), CostCNY: toF(u.CostCNY), MCPCalls: toInt(u.MCPCalls), RAGCalls: toInt(u.RAGDocuments), ReservedModelCalls: toInt(int64(reservedModel)), ReservedToolCalls: toInt(int64(reservedTool)), Exhausted: exhaustedReason != "", ExhaustedReason: exhaustedReason, ResourceMeta: meta}
 	return r
 }
 
@@ -66,6 +80,10 @@ func BuildContextDTO(s workflow.DurableContextSnapshot, revUsed, revCommitted ui
 		scope = "all"
 	}
 	identity := v1.IdentityDTO{UserID: s.Identity.UserID, Username: s.Identity.Username, Role: string(s.Identity.Role), Scope: scope, AuthDisabled: s.Identity.AuthDisabled}
+	// Resource ownership is authoritative from the server-side run owner, never snapshot input.
+	if owner != "" {
+		identity.UserID = owner
+	}
 	count := 0
 	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
 	if s.Schema != workflow.DurableContextSnapshotSchema || s.DeadlineAt.IsZero() {
@@ -88,20 +106,21 @@ func BuildCompatibilityDTO(run mysql.WorkflowRun, attempt *mysql.WorkflowAttempt
 	r := v1.RuntimeCompatibilityDTO{ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityPartial, DataQuality: v1.DataQualityPartial}}
 	if run.RuntimeCompatibilityHash != nil && *run.RuntimeCompatibilityHash != "" {
 		r.RunFingerprint = *run.RuntimeCompatibilityHash
-		r.RunMatch = true
 	}
 	if attempt != nil && attempt.CheckpointCompatibilityHash != nil && *attempt.CheckpointCompatibilityHash != "" {
 		r.CheckpointFingerprint = *attempt.CheckpointCompatibilityHash
-		r.CheckpointMatch = true
 	}
-	if attempt != nil && attempt.ExecutingWorkerFingerprint != nil && *attempt.ExecutingWorkerFingerprint != "" {
-		r.AttemptFingerprint = *attempt.ExecutingWorkerFingerprint
+	if attempt != nil && attempt.RunCompatibilityHash != nil && *attempt.RunCompatibilityHash != "" {
+		r.AttemptFingerprint = *attempt.RunCompatibilityHash
 	}
-	if worker != nil && worker.RuntimeCompatibilityHash != nil {
+	if worker != nil && worker.RuntimeCompatibilityHash != nil && *worker.RuntimeCompatibilityHash != "" {
 		r.ExecutingWorkerFingerprint = *worker.RuntimeCompatibilityHash
-		r.WorkerMatch = true
+		r.WorkerMatch = r.AttemptFingerprint != "" && r.AttemptFingerprint == r.ExecutingWorkerFingerprint
 	} else {
 		r.ReasonCode = "not_observed"
+	}
+	if r.RunFingerprint != "" && attempt != nil && attempt.RunCompatibilityHash != nil {
+		r.RunMatch = *attempt.RunCompatibilityHash == r.RunFingerprint
 	}
 	r.ExactRestoreAllowed = r.RunMatch && r.CheckpointMatch && r.WorkerMatch
 	return r
@@ -116,7 +135,7 @@ func BuildRunSummary(run mysql.WorkflowRun) v1.RunSummaryDTO {
 		meta.DataQuality = v1.DataQualityUnknown
 		meta.ReasonCode = "unknown_status"
 	}
-	return v1.RunSummaryDTO{RunID: run.ID, SessionID: run.SessionID, WorkflowKey: run.WorkflowKey, RuntimeMode: run.RuntimeMode, Status: p.Status, CurrentPhase: phase, Agent: run.RuntimeAgent, Attempt: int(run.Attempt), WorkerID: value(run.LeaseOwner), LeaseGeneration: run.LeaseGeneration, LeaseState: leaseState(run), HeartbeatAt: run.HeartbeatAt, ParkReason: value(run.ParkReason), RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), QueryHash: hashText(run.QueryText), Budget: BuildBudgetDTO(run.BudgetLimitsJSON, run.BudgetUsageJSON, run.BudgetReservationsJSON), UsageQuality: v1.DataQuality(run.UsageQuality), TraceQuality: v1.DataQuality(run.TraceQuality), StartedAt: &run.StartedAt, FinishedAt: run.FinishedAt, DurationMs: run.DurationMs, ResourceMeta: meta}
+	return v1.RunSummaryDTO{RunID: run.ID, SessionID: run.SessionID, WorkflowKey: run.WorkflowKey, RuntimeMode: run.RuntimeMode, Status: p.Status, CurrentPhase: phase, Agent: run.RuntimeAgent, Attempt: int(run.Attempt), LeaseGeneration: run.LeaseGeneration, LeaseState: leaseState(run), HeartbeatAt: run.HeartbeatAt, ParkReason: value(run.ParkReason), RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), QueryHash: hashText(run.QueryText), Budget: BuildBudgetDTO(run.BudgetLimitsJSON, run.BudgetUsageJSON, run.BudgetReservationsJSON), UsageQuality: v1.DataQuality(run.UsageQuality), TraceQuality: v1.DataQuality(run.TraceQuality), StartedAt: &run.StartedAt, FinishedAt: run.FinishedAt, DurationMs: run.DurationMs, ResourceMeta: meta}
 }
 
 func AllowedRecoveryActions(status string, compatibility v1.RuntimeCompatibilityDTO) []v1.RecoveryAction {
@@ -171,15 +190,17 @@ func (s *RuntimeService) GetRun(ctx context.Context, runID string) (v1.RunDetail
 	gate := v1.RuntimeGateSummaryDTO{ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityUnavailable, DataQuality: v1.DataQualityUnknown, ReasonCode: "not_observed"}}
 	if s.Gates != nil {
 		if gs, e := s.Gates.CurrentState(ctx); e == nil {
-			sm, dm, em := gs.StaticCaps.Map(), gs.DynamicCaps.Map(), gs.CurrentEffective.Map()
-			gate.StaticCaps = airuntime.CanonicalGateKeys()
-			gate.DynamicCaps = airuntime.CanonicalGateKeys()
-			gate.EffectiveCaps = airuntime.CanonicalGateKeys()
-			for i, k := range gate.StaticCaps {
-				_ = i
-				_ = sm[k]
-				_ = dm[k]
-				_ = em[k]
+			keys := airuntime.CanonicalGateKeys()
+			for _, k := range keys {
+				if gs.StaticCaps.Enabled(k) {
+					gate.StaticCaps = append(gate.StaticCaps, k)
+				}
+				if gs.DynamicCaps.Enabled(k) {
+					gate.DynamicCaps = append(gate.DynamicCaps, k)
+				}
+				if gs.CurrentEffective.Enabled(k) {
+					gate.EffectiveCaps = append(gate.EffectiveCaps, k)
+				}
 			}
 			gate.ShadowMode = gs.CurrentEffective.Enabled(airuntime.GateAgentRuntimeShadowMode)
 			gate.L1WriteAllowed = gs.CurrentEffective.Enabled(airuntime.GateAgentRuntimeL1Writes)
@@ -187,7 +208,12 @@ func (s *RuntimeService) GetRun(ctx context.Context, runID string) (v1.RunDetail
 			gate.ResourceMeta = v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
 		}
 	}
-	return v1.RunDetailDTO{Summary: sum, Overview: v1.RunOverviewDTO{Status: sum.Status, CurrentPhase: sum.CurrentPhase, ResourceMeta: sum.ResourceMeta}, Budget: sum.Budget, Compatibility: comp, ContextSummary: v1.RuntimeContextSummaryDTO{Identity: c.Identity, SessionRevisionUsed: c.SessionRevisionUsed, SessionRevisionCommitted: c.SessionRevisionCommitted, SummaryHash: c.SummaryHash, HistoryCount: c.HistoryCount, ResourceMeta: c.ResourceMeta}, GateSummary: gate, AllowedRecoveryActions: AllowedRecoveryActions(string(sum.Status), comp), ResourceMeta: sum.ResourceMeta}, nil
+	var currentAttempt *v1.AttemptDTO
+	if attempt.ID != "" {
+		status := v1.RuntimeStatus(value(attempt.Status))
+		currentAttempt = &v1.AttemptDTO{AttemptID: attempt.ID, RunID: attempt.RunID, Attempt: int(attempt.Attempt), Mode: value(attempt.Mode), Status: status, CurrentPhase: sum.CurrentPhase, WorkerID: value(attempt.WorkerID), LeaseGeneration: valueU64(attempt.LeaseGeneration), RuntimeVersion: value(attempt.RuntimeVersion), RunCompatibilityHash: value(attempt.RunCompatibilityHash), CheckpointCompatibilityHash: value(attempt.CheckpointCompatibilityHash), ExecutingWorkerFingerprint: value(attempt.ExecutingWorkerFingerprint), TraceID: value(attempt.TraceID), OperationID: value(attempt.OperationID), RetryCount: int(valueU(attempt.RetryCount)), FailoverCount: int(valueU(attempt.FailoverCount)), FailureCode: value(attempt.FailureCode), FailureMessage: value(attempt.FailureMessageRedacted), UsageQuality: v1.DataQuality(value(attempt.UsageQuality)), TraceQuality: v1.DataQuality(value(attempt.TraceQuality)), StartedAt: attempt.StartedAt, FinishedAt: attempt.FinishedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}}
+	}
+	return v1.RunDetailDTO{Summary: sum, Overview: v1.RunOverviewDTO{Status: sum.Status, CurrentPhase: sum.CurrentPhase, ResourceMeta: sum.ResourceMeta}, CurrentAttempt: currentAttempt, Budget: sum.Budget, Compatibility: comp, ContextSummary: v1.RuntimeContextSummaryDTO{Identity: c.Identity, SessionRevisionUsed: c.SessionRevisionUsed, SessionRevisionCommitted: c.SessionRevisionCommitted, SummaryHash: c.SummaryHash, HistoryCount: c.HistoryCount, ResourceMeta: c.ResourceMeta}, GateSummary: gate, AllowedRecoveryActions: AllowedRecoveryActions(string(sum.Status), comp), ResourceMeta: sum.ResourceMeta}, nil
 }
 
 func (s *RuntimeService) ListRuns(ctx context.Context, f mysql.RuntimeRunFilter) (v1.ListRunsRes, error) {
@@ -217,6 +243,12 @@ func value(p *string) string {
 	return *p
 }
 func valueU64(p *uint64) uint64 {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+func valueU(p *uint) uint {
 	if p == nil {
 		return 0
 	}
