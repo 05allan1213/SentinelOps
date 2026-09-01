@@ -149,12 +149,25 @@ func (s *RuntimeService) GetRun(ctx context.Context, runID string) (v1.RunDetail
 		return v1.RunDetailDTO{}, err
 	}
 	sum := BuildRunSummary(*run)
+	db := s.Store.DB()
+	var attempt mysql.WorkflowAttempt
+	var worker mysql.RuntimeWorkerSnapshot
+	var event mysql.WorkflowEvent
+	_ = db.WithContext(ctx).Where("run_id = ?", runID).Order("attempt DESC").First(&attempt).Error
+	_ = db.WithContext(ctx).Where("run_id = ?", runID).Order("seq DESC").First(&event).Error
+	if run.LeaseOwner != nil {
+		_ = db.WithContext(ctx).Where("worker_id = ?", *run.LeaseOwner).First(&worker).Error
+	}
+	sum.CurrentPhase = CurrentPhaseFromFacts(RunFacts{Status: run.Status, RuntimeMode: run.RuntimeMode}, AttemptFacts{Active: attempt.Status != nil && *attempt.Status == workflow.RunStatusRunning, Recovery: attempt.Mode != nil && isRecoveryMode(*attempt.Mode), Mode: value(attempt.Mode), OperationActive: attempt.OperationID != nil}, EventFacts{Type: event.EventType})
 	var snap workflow.DurableContextSnapshot
 	if run.ContextSnapshotJSON != nil {
 		_ = json.Unmarshal([]byte(*run.ContextSnapshotJSON), &snap)
 	}
 	c, _ := BuildContextDTO(snap, valueU64(run.SessionRevision), valueU64(run.SessionRevision), false, run.UserID, ctx)
-	comp := BuildCompatibilityDTO(*run, nil, nil)
+	comp := BuildCompatibilityDTO(*run, &attempt, &worker)
+	if attempt.ID == "" {
+		comp.ResourceMeta = v1.ResourceMeta{Availability: v1.AvailabilityPartial, DataQuality: v1.DataQualityUnknown, ReasonCode: "attempt_not_observed"}
+	}
 	gate := v1.RuntimeGateSummaryDTO{ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityUnavailable, DataQuality: v1.DataQualityUnknown, ReasonCode: "not_observed"}}
 	if s.Gates != nil {
 		if gs, e := s.Gates.CurrentState(ctx); e == nil {

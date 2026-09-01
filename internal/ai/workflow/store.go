@@ -42,6 +42,14 @@ type GORMStore struct {
 	db *gorm.DB
 }
 
+// DB exposes the canonical query handle for read-only service projections.
+func (s *GORMStore) DB() *gorm.DB {
+	if s == nil {
+		return nil
+	}
+	return s.db
+}
+
 // NewGORMStore 创建 GORM 工作流存储实例。
 func NewGORMStore(db *gorm.DB) *GORMStore {
 	return &GORMStore{db: db}
