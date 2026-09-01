@@ -151,7 +151,7 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 	resumeParams, resumeErr := e.approvalResumeParams(attemptCtx, attempt)
 	if resumeErr != nil {
 		if errors.Is(resumeErr, workflow.ErrApprovalCheckpointMismatch) || errors.Is(resumeErr, workflow.ErrApprovalInvalidated) {
-			return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true}, resumeErr
+			return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true, OperationFinalized: attempt.OperationID != ""}, resumeErr
 		}
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, resumeErr
 	}
@@ -164,7 +164,7 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 	}
 	started, startErr := StartRecovery(attemptCtx, e.store, runner, attempt, expectedCompatibility, resumeParams)
 	if started != nil && started.Decision.Mode == workflow.RecoveryModeParked {
-		return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true}, startErr
+		return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true, OperationFinalized: attempt.OperationID != ""}, startErr
 	}
 	if startErr != nil {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, classifyRunnerError(startErr)
@@ -197,7 +197,7 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 			if err := e.publishApprovalInterrupt(attemptCtx, attempt, event.Action.Interrupted.InterruptContexts); err != nil {
 				return RunExecutionResult{TraceID: attempt.Trace.ID}, err
 			}
-			return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true}, nil
+			return RunExecutionResult{TraceID: attempt.Trace.ID, RunTransitioned: true, OperationFinalized: attempt.OperationID != ""}, nil
 		}
 		message, _, messageErr := adk.GetMessage(event)
 		if messageErr != nil {
@@ -316,7 +316,7 @@ func (e *DurableExecutor) attemptLangfuse(ctx context.Context, frozen FrozenRunt
 }
 
 func (e *DurableExecutor) approvalResumeParams(ctx context.Context, attempt *AttemptContext) (*adk.ResumeParams, error) {
-	target, err := e.store.LoadApprovalResumeTarget(ctx, attempt.Lease)
+	target, err := e.store.LoadApprovalResumeTarget(ctx, attempt.Lease, attempt.OperationID, attempt.OperationAction)
 	if err != nil || target == nil {
 		return nil, err
 	}
@@ -364,6 +364,8 @@ func (e *DurableExecutor) publishApprovalInterrupt(ctx context.Context, attempt 
 		InterruptID: selected.ID, InterruptAddress: selected.Address.String(),
 		CheckpointID: checkpointID, CheckpointPayloadSHA256: fingerprint.PayloadSHA256,
 		CheckpointLeaseGeneration: fingerprint.LeaseGeneration, TraceID: attempt.Trace.ID,
+		OperationID: attempt.OperationID, OperationAction: attempt.OperationAction,
+		OperationErrorCode: "approval_required", OperationReason: "approval_required",
 	})
 	return err
 }
@@ -524,6 +526,8 @@ func StartRecovery(
 		if err := store.ParkRecovery(ctx, workflow.RecoveryParkInput{
 			Lease: attempt.Lease, ExpectedStatus: workflow.RunStatusRunning, Reason: decision.ParkReason,
 			Attempt: attempt.Run.Attempt, TraceID: attempt.Trace.ID, RuntimeVersion: attempt.Run.RuntimeVersion,
+			OperationID: attempt.OperationID, OperationAction: attempt.OperationAction,
+			OperationErrorCode: "recovery_parked", OperationReason: decision.ParkReason,
 		}); err != nil {
 			return nil, err
 		}
@@ -532,6 +536,7 @@ func StartRecovery(
 	if err := store.RecordRecoverySelection(ctx, workflow.RecoverySelectionRecord{
 		Lease: attempt.Lease, Mode: decision.Mode, Attempt: attempt.Run.Attempt,
 		TraceID: attempt.Trace.ID, RuntimeVersion: attempt.Run.RuntimeVersion,
+		OperationID: attempt.OperationID,
 	}); err != nil {
 		return nil, err
 	}
@@ -546,6 +551,8 @@ func StartRecovery(
 	if parkErr := store.ParkRecovery(ctx, workflow.RecoveryParkInput{
 		Lease: attempt.Lease, ExpectedStatus: workflow.RunStatusRunning, Reason: parkDecision.ParkReason,
 		Attempt: attempt.Run.Attempt, TraceID: attempt.Trace.ID, RuntimeVersion: attempt.Run.RuntimeVersion,
+		OperationID: attempt.OperationID, OperationAction: attempt.OperationAction,
+		OperationErrorCode: "checkpoint_corrupt", OperationReason: parkDecision.ParkReason,
 	}); parkErr != nil {
 		return nil, fmt.Errorf("runner Resume failed (%v) and fenced park failed: %w", err, parkErr)
 	}

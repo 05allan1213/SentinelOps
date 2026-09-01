@@ -68,16 +68,21 @@ type RecoverySelectionRecord struct {
 	Attempt        uint
 	TraceID        string
 	RuntimeVersion string
+	OperationID    string
 }
 
 // RecoveryParkInput 描述恢复失败后的 fail-closed parked 转换。
 type RecoveryParkInput struct {
-	Lease          LeaseToken
-	ExpectedStatus string
-	Reason         string
-	Attempt        uint
-	TraceID        string
-	RuntimeVersion string
+	Lease              LeaseToken
+	ExpectedStatus     string
+	Reason             string
+	Attempt            uint
+	TraceID            string
+	RuntimeVersion     string
+	OperationID        string
+	OperationAction    string
+	OperationErrorCode string
+	OperationReason    string
 }
 
 // RecoveryRestoreInput 描述 runtime_incompatible 的唯一 fenced 解锁证明。
@@ -117,6 +122,9 @@ func (s *GORMStore) RecordRecoverySelection(ctx context.Context, input RecoveryS
 		return err
 	}
 	event := recoveryEvent(eventType, input.Mode, input.Attempt, input.Lease.Generation, input.RuntimeVersion, input.TraceID, "")
+	if input.OperationID != "" {
+		event.Payload.Attributes["operation_id"] = input.OperationID
+	}
 	payload, err := marshalDurableEvent(event)
 	if err != nil {
 		return err
@@ -145,12 +153,37 @@ func (s *GORMStore) RecordRecoverySelection(ctx context.Context, input RecoveryS
 		if err := attachAttemptTraceTx(tx, run, input.Lease, input.TraceID); err != nil {
 			return err
 		}
+		if input.OperationID != "" {
+			already, err := recoverySelectionRecordedTx(tx, run.ID, eventType, input.OperationID)
+			if err != nil {
+				return err
+			}
+			if already {
+				return nil
+			}
+		}
 		seq, err := updateFencedDurableRunAndAllocateSeq(tx, run.ID, run.Status, input.Lease, map[string]any{})
 		if err != nil {
 			return err
 		}
 		return insertDurableEvent(tx, run.ID, seq, event, payload)
 	})
+}
+
+func recoverySelectionRecordedTx(tx *gorm.DB, runID, eventType, operationID string) (bool, error) {
+	var events []mysql.WorkflowEvent
+	if err := tx.Where("run_id = ? AND event_type = ? AND operation_id IS NULL", runID, eventType).
+		Order("seq DESC").Find(&events).Error; err != nil {
+		return false, err
+	}
+	for _, event := range events {
+		if attrs := eventAttributes(event.Payload); attrs != nil {
+			if value, ok := attrs["operation_id"].(string); ok && value == operationID {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 // ParkRecovery 原子提交恢复失败原因和 run.parked Event。
@@ -167,6 +200,9 @@ func (s *GORMStore) ParkRecovery(ctx context.Context, input RecoveryParkInput) e
 		return fmt.Errorf("unsupported phase12 park reason %q", input.Reason)
 	}
 	event := recoveryEvent(EventRunParked, RecoveryModeParked, input.Attempt, input.Lease.Generation, input.RuntimeVersion, input.TraceID, input.Reason)
+	if input.OperationID != "" {
+		event.Payload.Attributes["operation_id"] = input.OperationID
+	}
 	payload, err := marshalDurableEvent(event)
 	if err != nil {
 		return err
@@ -184,10 +220,26 @@ func (s *GORMStore) ParkRecovery(ctx context.Context, input RecoveryParkInput) e
 		if err != nil {
 			return err
 		}
-		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: RunStatusParked, CurrentPhase: "unknown", FailureCode: input.Reason, FinishedAt: time.Now()}); err != nil {
+		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: RunStatusParked, CurrentPhase: "unknown", FailureCode: input.Reason, FinishedAt: time.Now(), OperationID: input.OperationID}); err != nil {
 			return err
 		}
-		return insertDurableEvent(tx, run.ID, seq, event, payload)
+		if err := insertDurableEvent(tx, run.ID, seq, event, payload); err != nil {
+			return err
+		}
+		if input.OperationID != "" {
+			errorCode := input.OperationErrorCode
+			if errorCode == "" {
+				errorCode = "recovery_parked"
+			}
+			reason := input.OperationReason
+			if reason == "" {
+				reason = input.Reason
+			}
+			if err := insertOperationTerminalEventTx(tx, run.ID, input.OperationID, input.OperationAction, EventOperationFailed, seq, errorCode, reason); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

@@ -60,6 +60,10 @@ type PublishApprovalInput struct {
 	CheckpointPayloadSHA256   string
 	CheckpointLeaseGeneration uint64
 	TraceID                   string
+	OperationID               string
+	OperationAction           string
+	OperationErrorCode        string
+	OperationReason           string
 }
 
 // ApprovalResumeTarget 是数据库决定映射到官方 ResumeWithParams 的最小值。
@@ -274,7 +278,20 @@ func (s *GORMStore) PublishApprovalAndWait(ctx context.Context, input PublishApp
 		if err := insertDurableEvent(tx, run.ID, secondSeq, requested, requestedPayload); err != nil {
 			return err
 		}
-		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: RunStatusWaitingApproval, CurrentPhase: "waiting_approval", TraceQuality: "unknown", FinishedAt: time.Now()}); err != nil {
+		if input.OperationID != "" {
+			errorCode := input.OperationErrorCode
+			if errorCode == "" {
+				errorCode = "approval_required"
+			}
+			reason := input.OperationReason
+			if reason == "" {
+				reason = "approval_required"
+			}
+			if err := insertOperationTerminalEventTx(tx, run.ID, input.OperationID, input.OperationAction, EventOperationFailed, secondSeq, errorCode, reason); err != nil {
+				return err
+			}
+		}
+		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: RunStatusWaitingApproval, CurrentPhase: "waiting_approval", TraceQuality: "unknown", FinishedAt: time.Now(), OperationID: input.OperationID}); err != nil {
 			return err
 		}
 		if err := tx.First(&approval, "id = ?", approval.ID).Error; err != nil {
@@ -289,7 +306,14 @@ func (s *GORMStore) PublishApprovalAndWait(ctx context.Context, input PublishApp
 
 // LoadApprovalResumeTarget 在 Runner Resume 前验证持久化 fingerprint，并构造显式 target。
 // preparing orphan 返回空 InterruptID，调用方必须使用空 Targets 让叶子 Tool 重新 Interrupt。
-func (s *GORMStore) LoadApprovalResumeTarget(ctx context.Context, lease LeaseToken) (*ApprovalResumeTarget, error) {
+func (s *GORMStore) LoadApprovalResumeTarget(ctx context.Context, lease LeaseToken, operation ...string) (*ApprovalResumeTarget, error) {
+	operationID, operationAction := "", ""
+	if len(operation) > 0 {
+		operationID = operation[0]
+	}
+	if len(operation) > 1 {
+		operationAction = operation[1]
+	}
 	var target *ApprovalResumeTarget
 	var resultErr error
 	err := s.withFencedRunTransaction(ctx, lease, RunStatusRunning, func(tx *gorm.DB, run *mysql.WorkflowRun) error {
@@ -317,7 +341,7 @@ func (s *GORMStore) LoadApprovalResumeTarget(ctx context.Context, lease LeaseTok
 				return nil
 			}
 			if _, err := lockCheckpoint(tx, run, checkpointID); err != nil {
-				if parkErr := invalidateApprovalAndParkTx(tx, run, lease, &approval, "preparing_checkpoint_invalid"); parkErr != nil {
+				if parkErr := invalidateApprovalAndParkTx(tx, run, lease, &approval, "preparing_checkpoint_invalid", operationID, operationAction); parkErr != nil {
 					return parkErr
 				}
 				resultErr = ErrApprovalCheckpointMismatch
@@ -327,14 +351,14 @@ func (s *GORMStore) LoadApprovalResumeTarget(ctx context.Context, lease LeaseTok
 			return nil
 		}
 		if approval.Status == ApprovalStatusPending || approval.InterruptID == nil || strings.TrimSpace(*approval.InterruptID) == "" {
-			if parkErr := invalidateApprovalAndParkTx(tx, run, lease, &approval, "approval_resume_binding_missing"); parkErr != nil {
+			if parkErr := invalidateApprovalAndParkTx(tx, run, lease, &approval, "approval_resume_binding_missing", operationID, operationAction); parkErr != nil {
 				return parkErr
 			}
 			resultErr = ErrApprovalCheckpointMismatch
 			return nil
 		}
 		if err := validateApprovalCheckpointBinding(tx, run, &approval); err != nil {
-			if parkErr := invalidateApprovalAndParkTx(tx, run, lease, &approval, "checkpoint_fingerprint_mismatch"); parkErr != nil {
+			if parkErr := invalidateApprovalAndParkTx(tx, run, lease, &approval, "checkpoint_fingerprint_mismatch", operationID, operationAction); parkErr != nil {
 				return parkErr
 			}
 			resultErr = ErrApprovalCheckpointMismatch
@@ -527,7 +551,14 @@ func validateApprovalCheckpointBinding(tx *gorm.DB, run *mysql.WorkflowRun, appr
 	return nil
 }
 
-func invalidateApprovalAndParkTx(tx *gorm.DB, run *mysql.WorkflowRun, lease LeaseToken, approval *mysql.AgentApproval, reason string) error {
+func invalidateApprovalAndParkTx(tx *gorm.DB, run *mysql.WorkflowRun, lease LeaseToken, approval *mysql.AgentApproval, reason string, operation ...string) error {
+	operationID, operationAction := "", ""
+	if len(operation) > 0 {
+		operationID = operation[0]
+	}
+	if len(operation) > 1 {
+		operationAction = operation[1]
+	}
 	if approval.Status == ApprovalStatusPreparing || approval.Status == ApprovalStatusPending {
 		result := tx.Model(&mysql.AgentApproval{}).Where("id = ? AND status IN ?", approval.ID, []string{ApprovalStatusPreparing, ApprovalStatusPending}).Updates(map[string]any{
 			"status": ApprovalStatusInvalidated, "version": gorm.Expr("version + 1"),
@@ -571,10 +602,18 @@ func invalidateApprovalAndParkTx(tx *gorm.DB, run *mysql.WorkflowRun, lease Leas
 	if err != nil {
 		return err
 	}
-	if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: lease, Status: RunStatusParked, CurrentPhase: "unknown", FailureCode: reason, FinishedAt: time.Now()}); err != nil {
+	if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: lease, Status: RunStatusParked, CurrentPhase: "unknown", FailureCode: reason, FinishedAt: time.Now(), OperationID: operationID}); err != nil {
 		return err
 	}
-	return insertDurableEvent(tx, run.ID, secondSeq, parkedEvent, parkedPayload)
+	if err := insertDurableEvent(tx, run.ID, secondSeq, parkedEvent, parkedPayload); err != nil {
+		return err
+	}
+	if operationID != "" {
+		if err := insertOperationTerminalEventTx(tx, run.ID, operationID, operationAction, EventOperationFailed, secondSeq, "approval_invalidated", reason); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func validLowerSHA256(value string) bool {

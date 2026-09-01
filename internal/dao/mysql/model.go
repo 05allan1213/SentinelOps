@@ -381,6 +381,7 @@ type WorkflowRun struct {
 	UsageQuality             string         `gorm:"column:usage_quality;size:32;not null;default:unknown"`
 	TraceQuality             string         `gorm:"column:trace_quality;size:32;not null;default:unknown"`
 	LastEventSeq             uint64         `gorm:"column:last_event_seq;not null;default:0"`
+	CancelRequestedAt        *time.Time     `gorm:"column:cancel_requested_at;type:datetime(3)"`
 	ParkReason               *string        `gorm:"column:park_reason;size:128"`
 	InputPayload             string         `gorm:"column:input_payload;type:text"`
 	OutputPayload            string         `gorm:"column:output_payload;type:text"`

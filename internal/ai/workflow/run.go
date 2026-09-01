@@ -87,6 +87,13 @@ type CompleteRunInput struct {
 	TraceQuality      string
 	TraceID           string
 	RevisionStateJSON json.RawMessage
+	// Optional Recovery operation correlation. When set, the terminal
+	// operation Event is appended in this same transaction after the Run
+	// terminal Event, preserving one completion boundary.
+	OperationID        string
+	OperationAction    string
+	OperationErrorCode string
+	OperationReason    string
 }
 
 const (
@@ -328,6 +335,22 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 	errorMessage := policy.NewRedactor().RedactText(input.ErrorMessage)
 
 	return s.withFencedRunTransaction(ctx, input.Lease, input.ExpectedStatus, func(tx *gorm.DB, run *mysql.WorkflowRun) error {
+		if input.OperationID != "" {
+			// A terminal operation is only valid after this Worker has durably
+			// started the accepted command.  Keep this check inside the same
+			// fenced transaction so a stale/replayed completion cannot publish
+			// an operation terminal event by itself.
+			var started mysql.WorkflowEvent
+			if err := tx.Where("run_id = ? AND operation_id = ? AND event_type = ?", run.ID, input.OperationID, EventOperationStarted).First(&started).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return fmt.Errorf("recovery operation has not started: %w", ErrOperationPrecondition)
+				}
+				return fmt.Errorf("读取 recovery operation.started: %w", err)
+			}
+			if started.CommandAction == nil || *started.CommandAction != input.OperationAction {
+				return fmt.Errorf("recovery operation action changed: %w", ErrOperationPrecondition)
+			}
+		}
 		parkReason := ""
 		if run.ParkReason != nil {
 			parkReason = *run.ParkReason
@@ -404,6 +427,7 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 			"trace_quality":      input.TraceQuality,
 			"park_reason":        nil,
 		}
+		terminalRunSeq := uint64(0)
 		for index, event := range completionEvents {
 			eventPayload, err := marshalDurableEvent(event)
 			if err != nil {
@@ -420,13 +444,32 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 			if err := insertDurableEvent(tx, run.ID, seq, event, eventPayload); err != nil {
 				return err
 			}
+			if event.Type == EventRunCompleted || event.Type == EventRunFailed {
+				terminalRunSeq = seq
+			}
 		}
 		phase := attemptPhaseForStatus(input.TargetStatus)
 		if err := attachAttemptTraceTx(tx, run, input.Lease, input.TraceID); err != nil {
 			return err
 		}
-		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: input.TargetStatus, CurrentPhase: phase, FailureMessage: input.ErrorMessage, TraceQuality: input.TraceQuality, FinishedAt: now}); err != nil {
+		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: input.TargetStatus, CurrentPhase: phase, FailureMessage: input.ErrorMessage, TraceQuality: input.TraceQuality, FinishedAt: now, OperationID: input.OperationID}); err != nil {
 			return err
+		}
+		if input.OperationID != "" {
+			if input.OperationAction == "" || terminalRunSeq == 0 {
+				return fmt.Errorf("recovery operation correlation is incomplete")
+			}
+			opType := EventOperationFailed
+			switch input.TargetStatus {
+			case RunStatusSucceeded:
+				opType = EventOperationSucceeded
+			case RunStatusCanceled:
+				opType = EventOperationCanceled
+			}
+			if err := insertOperationTerminalEventTx(tx, run.ID, input.OperationID, input.OperationAction,
+				opType, terminalRunSeq, input.OperationErrorCode, input.OperationReason); err != nil {
+				return err
+			}
 		}
 		return nil
 	})

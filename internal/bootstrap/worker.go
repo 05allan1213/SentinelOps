@@ -122,12 +122,49 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 		Execute: executor.ExecuteClaimedRun, QueryEffectTargetState: queryEffectTargetState,
 		Retention: retention, RuntimeVersion: airuntime.CurrentRuntimeVersion(), Gates: evaluator,
 		SnapshotDB: db, Observation: observation,
+		ConsumeRecoveryResult: func(recoveryCtx context.Context, claim *workflow.RecoveryOperationClaim) (workflow.FinishRecoveryOperationResult, error) {
+			if claim == nil {
+				return workflow.FinishRecoveryOperationResult{Status: workflow.OperationStatusFailed, ErrorCode: "recovery_claim_missing", Reason: "claim_missing"}, fmt.Errorf("recovery claim is required")
+			}
+			if claim.Operation.Action == workflow.OperationActionCancel {
+				// Running cancellation is signalled by the lease heartbeat and
+				// the active Eino cancel handle; this callback only closes the
+				// operation once the safe-point has been reached.
+				if claim.Run.Status == workflow.RunStatusRunning {
+					// A recovery poll can only reach this branch after a previous
+					// worker lease was reclaimed, so there is no in-process Eino
+					// cancel handle left to drain. The reclaimed worker owns the
+					// fenced terminal transition directly.
+					return workflow.FinishRecoveryOperationResult{Status: workflow.OperationStatusCanceled, Reason: "cancel_after_worker_reclaim"}, nil
+				}
+				return workflow.FinishRecoveryOperationResult{Status: workflow.OperationStatusCanceled, Reason: "cancel_requested"}, nil
+			}
+			claimed := &workflow.ClaimedRun{Run: claim.Run, Token: claim.Lease}
+			claimed.OperationID = claim.Operation.OperationID
+			claimed.OperationAction = claim.Operation.Action
+			runResult, runErr := executor.ExecuteClaimedRun(recoveryCtx, claimed)
+			if runResult.RunTransitioned {
+				// Approval publication and fail-closed parking close the recovery
+				// operation in the same transaction as their Run transition. Never
+				// reinterpret a transitioned Run with no output as success.
+				return workflow.FinishRecoveryOperationResult{
+					OperationFinalized: runResult.OperationFinalized,
+					RunTransitioned:    true,
+					TraceID:            runResult.TraceID,
+					TraceQuality:       runResult.TraceQuality,
+				}, runErr
+			}
+			if runErr != nil {
+				return workflow.FinishRecoveryOperationResult{Status: workflow.OperationStatusFailed, ErrorCode: "recovery_execution_failed", Reason: "runner_failed", ErrorMessage: runErr.Error(), TraceID: runResult.TraceID, TraceQuality: runResult.TraceQuality}, runErr
+			}
+			return workflow.FinishRecoveryOperationResult{Status: workflow.OperationStatusSucceeded, OutputPayload: runResult.OutputPayload, RevisionStateJSON: runResult.RevisionStateJSON, TraceQuality: runResult.TraceQuality, TraceID: runResult.TraceID}, nil
+		},
 	})
 }
 
 func configuredWorkerObservation(ctx context.Context, config *appconfig.Config, evaluator *airuntime.GateEvaluator, owner string) (airuntime.WorkerObservation, error) {
 	if config == nil || evaluator == nil {
-		return airuntime.WorkerObservation{}, fmt.Errorf("Worker snapshot configuration and Gate evaluator are required")
+		return airuntime.WorkerObservation{}, fmt.Errorf("worker snapshot configuration and Gate evaluator are required")
 	}
 	gates, err := evaluator.Current(ctx)
 	if err != nil {
