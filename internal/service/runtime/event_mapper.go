@@ -254,7 +254,7 @@ func partialEventMeta(reason string) v1.ResourceMeta {
 
 func eventAttributeAllowed(key string) bool {
 	switch strings.ToLower(key) {
-	case "phase", "status", "reason", "reason_code", "cause", "source", "effect_id", "resolution", "resolved_by", "park_reason", "approval_id", "proposal_hash", "risk_level", "interrupt_id", "trace_quality", "tool_name", "executor", "query_hash", "attempt", "generation", "lease_generation", "operation_id", "mode", "agent_name", "step_count", "retryable",
+	case "phase", "status", "reason", "reason_code", "cause", "source", "effect_id", "resolution", "resolved_by", "park_reason", "approval_id", "proposal_hash", "risk_level", "interrupt_id", "trace_quality", "tool_name", "executor", "query_hash", "attempt", "generation", "lease_generation", "execution_generation", "operation_id", "mode", "agent_name", "step_count", "retryable",
 		"checkpoint_id", "checkpoint_key", "checkpoint_payload_sha256", "checkpoint_lease_generation",
 		"effect_role", "effect_step", "effect_type", "parent_effect_id", "external_reference",
 		"decision", "decision_reason", "kind", "state", "usage_quality", "runtime_version", "runtime_compatibility_hash",
