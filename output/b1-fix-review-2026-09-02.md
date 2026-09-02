@@ -35,7 +35,8 @@
 - `f1ce886`：separate attempt and worker fingerprints
 - `8542022`：add bounded redacted history expansion
 - `cd66487`：keep invalid budget counters nil
-- 第 4 组（tools/docs）提交见 git log；全程未 push。
+- `34e0485`：remove dead helpers and record B1 fix review
+- 全程未 push。
 
 ## 验证证据
 
@@ -45,7 +46,10 @@
 - `SENTINELOPS_TEST_DSN=... go test ./internal/ai/workflow -run 'TestAttempt(PersistsExecuting|ClaimRejectsMismatched)|TestC06RecoveryFirstClaim' -count=1 -v`
 - `SENTINELOPS_TEST_DSN=... go test ./internal/service/runtime -run 'TestGetContextRealRunHistoryCountIsNonZero' -count=1 -v`
 - `go test ./internal/service/runtime -run 'Test(Context|Compatibility|RunDetail|BudgetInvalid|RunSummary)'`
-- 最终聚焦包测试与 `go vet`/`staticcheck`/`goimports` 复查见提交后最终验证。
+- `SENTINELOPS_TEST_DSN=... go test ./internal/ai/workflow -run 'Test(Attempt|C06)' -count=1 -timeout 30m`
+- `SENTINELOPS_TEST_DSN=... go test ./api/runtime/... ./internal/service/runtime ./internal/controller/runtime ./internal/dao/mysql ./internal/ai/runtime -count=1`
+- `go test -race ./internal/service/runtime ./internal/controller/runtime`、`go vet ./...`、`staticcheck`（目标包）、`git diff --check` 均 PASS。
+- 全量 `internal/ai/workflow` 在 `TestRecoveryLegalityMatrix` 的 Goose disposable DB 初始化处未在 10 分钟默认超时内完成，归类为 NOT RUN TO COMPLETION（既有环境/迁移瓶颈），不据此宣称全量 PASS。
 
 ## 未执行
 
