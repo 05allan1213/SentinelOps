@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -125,17 +126,108 @@ func BuildContextDTO(s workflow.DurableContextSnapshot, revUsed, revCommitted ui
 		meta.DataQuality = v1.DataQualityUnknown
 		meta.ReasonCode = "invalid_context_snapshot"
 	}
-	if len(s.History) > 0 {
-		var h []any
-		if json.Unmarshal(s.History, &h) == nil {
-			count = len(h)
-		} else {
+	var messages []v1.RuntimeHistoryMessageDTO
+	historyTruncated := false
+	redactionApplied := false
+	if len(bytes.TrimSpace(s.History)) > 0 {
+		entries, valid := runtimeContextHistoryEntries(s.History)
+		if !valid {
 			meta.Availability, meta.DataQuality, meta.ReasonCode = v1.AvailabilityPartial, v1.DataQualityUnknown, "invalid_context_history"
+		} else {
+			count = len(entries)
+			if includeHistory {
+				start := 0
+				if count > runtimeContextHistoryLimit {
+					start = count - runtimeContextHistoryLimit
+					historyTruncated = true
+				}
+				malformed := false
+				for _, raw := range entries[start:] {
+					message, ok := runtimeContextHistoryMessage(raw)
+					if !ok {
+						malformed = true
+						continue
+					}
+					redacted, changed := sanitizeRuntimeHistoryMessage(message)
+					if changed {
+						redactionApplied = true
+					}
+					messages = append(messages, redacted)
+				}
+				if malformed {
+					meta.Availability, meta.DataQuality, meta.ReasonCode = v1.AvailabilityPartial, v1.DataQualityUnknown, "invalid_context_history"
+				}
+			}
 		}
 	}
 	hash := sha256.Sum256(s.History)
 	bh := sha256.Sum256(s.BudgetLimits)
-	return v1.ContextDTO{Identity: identity, SessionRevisionUsed: revUsed, SessionRevisionCommitted: revCommitted, SummaryHash: hex.EncodeToString(hash[:]), HistoryCount: count, BudgetLimitsHash: hex.EncodeToString(bh[:]), DeadlineAt: &s.DeadlineAt, RuntimeCompatibilityHash: "", ResourceMeta: meta}, nil
+	return v1.ContextDTO{
+		Identity: identity, SessionRevisionUsed: revUsed, SessionRevisionCommitted: revCommitted,
+		SummaryHash: hex.EncodeToString(hash[:]), HistoryCount: count,
+		History: messages, HistoryTruncated: historyTruncated, RedactionApplied: redactionApplied,
+		BudgetLimitsHash: hex.EncodeToString(bh[:]), DeadlineAt: &s.DeadlineAt,
+		RuntimeCompatibilityHash: "", ResourceMeta: meta,
+	}, nil
+}
+
+// Runtime history expansion is deliberately single-page and bounded: the last
+// runtimeContextHistoryLimit messages with per-content rune caps are returned
+// only on explicit include=history content authorization.
+const (
+	runtimeContextHistoryLimit     = 50
+	runtimeContextContentRuneLimit = 8000
+)
+
+func runtimeContextHistoryEntries(raw json.RawMessage) ([]json.RawMessage, bool) {
+	payload := bytes.TrimSpace(raw)
+	if len(payload) == 0 {
+		return nil, false
+	}
+	if payload[0] == '[' {
+		var entries []json.RawMessage
+		if json.Unmarshal(payload, &entries) != nil {
+			return nil, false
+		}
+		return entries, true
+	}
+	// Real durable history is stored as the fo/session-state/v1 object whose
+	// history[] field is the bounded message array.  Older fixtures used a bare
+	// array; both shapes are accepted above.
+	var envelope struct {
+		History json.RawMessage `json:"history"`
+	}
+	if json.Unmarshal(payload, &envelope) != nil {
+		return nil, false
+	}
+	history := bytes.TrimSpace(envelope.History)
+	if len(history) == 0 || history[0] != '[' {
+		return nil, false
+	}
+	var entries []json.RawMessage
+	if json.Unmarshal(history, &entries) != nil {
+		return nil, false
+	}
+	return entries, true
+}
+
+func runtimeContextHistoryMessage(raw json.RawMessage) (v1.RuntimeHistoryMessageDTO, bool) {
+	var message v1.RuntimeHistoryMessageDTO
+	if json.Unmarshal(raw, &message) != nil || message.Role == "" {
+		return v1.RuntimeHistoryMessageDTO{}, false
+	}
+	return message, true
+}
+
+func sanitizeRuntimeHistoryMessage(message v1.RuntimeHistoryMessageDTO) (v1.RuntimeHistoryMessageDTO, bool) {
+	redactor := policy.NewRedactor()
+	role := redactor.RedactText(message.Role)
+	content := redactor.RedactText(message.Content)
+	changed := role != message.Role || content != message.Content
+	if runes := []rune(content); len(runes) > runtimeContextContentRuneLimit {
+		content = string(runes[:runtimeContextContentRuneLimit]) + "..."
+	}
+	return v1.RuntimeHistoryMessageDTO{Role: role, Content: content}, changed
 }
 
 func BuildCompatibilityDTO(run mysql.WorkflowRun, attempt *mysql.WorkflowAttempt, worker *mysql.RuntimeWorkerSnapshot, checkpoints ...*mysql.WorkflowCheckpoint) v1.RuntimeCompatibilityDTO {
@@ -333,6 +425,48 @@ func (s *RuntimeService) GetRun(ctx context.Context, runID string) (v1.RunDetail
 	}
 	ctxSummary := v1.RuntimeContextSummaryDTO{Identity: c.Identity, SessionRevisionUsed: c.SessionRevisionUsed, SessionRevisionCommitted: c.SessionRevisionCommitted, SummaryHash: c.SummaryHash, HistoryCount: c.HistoryCount, BudgetLimitsHash: c.BudgetLimitsHash, DeadlineAt: c.DeadlineAt, RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), PolicyHash: value(run.PolicyHash), ConfigHash: value(run.ConfigHash), ResourceMeta: c.ResourceMeta}
 	return v1.RunDetailDTO{Summary: sum, Overview: v1.RunOverviewDTO{Status: sum.Status, CurrentPhase: sum.CurrentPhase, ResourceMeta: sum.ResourceMeta}, CurrentAttempt: currentAttempt, Budget: sum.Budget, Compatibility: comp, ContextSummary: ctxSummary, GateSummary: gate, AllowedRecoveryActions: AllowedRecoveryActions(string(sum.Status), comp), ResourceMeta: sum.ResourceMeta}, nil
+}
+
+// GetContext returns the owned Run Context projection.  includeHistory is the
+// only caller-supplied expansion flag and is validated by BuildContextDTO's
+// content authorization before any message text is parsed or returned.
+func (s *RuntimeService) GetContext(ctx context.Context, runID string, includeHistory bool) (v1.ContextDTO, error) {
+	if s == nil || s.Store == nil || s.Store.DB() == nil {
+		return v1.ContextDTO{}, ErrRuntimeNotFound
+	}
+	run, err := s.Store.GetRuntimeRun(ctx, runID)
+	if err != nil {
+		return v1.ContextDTO{}, MapRecoveryError(err)
+	}
+	if err := AuthorizeRun(ctx, run.UserID); err != nil {
+		return v1.ContextDTO{}, err
+	}
+	var snap workflow.DurableContextSnapshot
+	if run.ContextSnapshotJSON != nil {
+		_ = json.Unmarshal([]byte(*run.ContextSnapshotJSON), &snap)
+	}
+	used := valueU64(run.SessionRevision)
+	committed := used
+	var revision mysql.SessionStateRevision
+	revisionErr := s.Store.DB().WithContext(ctx).
+		Where("session_id = ?", run.SessionID).
+		Order("revision DESC").
+		First(&revision).Error
+	if revisionErr == nil {
+		committed = revision.Revision
+	}
+	item, err := BuildContextDTO(snap, used, committed, includeHistory, run.UserID, ctx)
+	if err != nil {
+		return v1.ContextDTO{}, err
+	}
+	item.RuntimeVersion = value(run.RuntimeVersion)
+	item.RuntimeCompatibilityHash = value(run.RuntimeCompatibilityHash)
+	item.PolicyHash = value(run.PolicyHash)
+	item.ConfigHash = value(run.ConfigHash)
+	if revisionErr != nil {
+		item.ResourceMeta = v1.ResourceMeta{Availability: v1.AvailabilityPartial, DataQuality: v1.DataQualityReconstructed, ReasonCode: "session_revision_not_observed"}
+	}
+	return item, nil
 }
 
 func (s *RuntimeService) ListRuns(ctx context.Context, f mysql.RuntimeRunFilter) (v1.ListRunsRes, error) {

@@ -274,37 +274,9 @@ func (c *ControllerV1) GetContext(ctx context.Context, req *v1.GetContextReq) (*
 	if err := c.requireService(ctx); err != nil {
 		return nil, err
 	}
-	// Run detail already builds the metadata-only Context projection and keeps
-	// raw history/snapshot bytes out of the response.  The v1 Context route is a
-	// narrow view of that same projection, so it cannot diverge in field or
-	// redaction semantics.
-	detail, err := c.service.GetRun(ctx, req.RunID)
+	item, err := c.service.GetContext(ctx, req.RunID, req.Include == string(runtimesvc.ContentKindHistory))
 	if err != nil {
 		return nil, c.fail(ctx, err)
-	}
-	if req.Include == string(runtimesvc.ContentKindHistory) {
-		// The current v1 ContextDTO is metadata-only.  Still enforce the explicit
-		// content gate when a caller asks for history so the query parameter can
-		// never become an authorization-free no-op as the DTO evolves.
-		if err := runtimesvc.AuthorizeRuntimeContent(ctx, detail.ContextSummary.Identity.UserID, runtimesvc.ContentKindHistory); err != nil {
-			return nil, c.fail(ctx, err)
-		}
-	}
-	summary := detail.ContextSummary
-	item := v1.ContextDTO{
-		Identity:                 summary.Identity,
-		SessionRevisionUsed:      summary.SessionRevisionUsed,
-		SessionRevisionCommitted: summary.SessionRevisionCommitted,
-		SummaryHash:              summary.SummaryHash,
-		HistoryCount:             summary.HistoryCount,
-		BudgetLimitsHash:         summary.BudgetLimitsHash,
-		DeadlineAt:               summary.DeadlineAt,
-		RuntimeVersion:           summary.RuntimeVersion,
-		RuntimeCompatibilityHash: summary.RuntimeCompatibilityHash,
-		PolicyHash:               summary.PolicyHash,
-		ConfigHash:               summary.ConfigHash,
-		GateKeys:                 summary.GateKeys,
-		ResourceMeta:             summary.ResourceMeta,
 	}
 	return &v1.GetContextRes{Item: item, ResourceMeta: item.ResourceMeta}, nil
 }

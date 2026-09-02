@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +35,77 @@ func TestContextExpansionRequiresPermission(t *testing.T) {
 	ctx := policy.WithIdentity(context.Background(), policy.Identity{UserID: "other", Role: policy.RoleViewer, Scope: policy.Scope{UserID: "other"}})
 	if _, err := BuildContextDTO(s, 1, 1, true, "owner", ctx); err == nil {
 		t.Fatal("expected content expansion denial")
+	}
+}
+
+func TestContextHistoryParsesSessionStateObjectAndBareArray(t *testing.T) {
+	object := runtimeContextTestSnapshot(`{"schema":"fo/session-state/v1","revision":4,"history":[{"role":"user","content":"first"},{"role":"assistant","content":"second"}]}`)
+	array := runtimeContextTestSnapshot(`[{"role":"user","content":"first"},{"role":"assistant","content":"second"}]`)
+	for name, snap := range map[string]workflow.DurableContextSnapshot{"object": object, "array": array} {
+		t.Run(name, func(t *testing.T) {
+			c, err := BuildContextDTO(snap, 1, 2, true, "owner", runtimeContextTestIdentity("owner"))
+			if err != nil {
+				t.Fatalf("include history: %v", err)
+			}
+			if c.HistoryCount != 2 || len(c.History) != 2 || c.HistoryTruncated || c.RedactionApplied {
+				t.Fatalf("context=%+v", c)
+			}
+			if c.History[0].Role != "user" || c.History[0].Content != "first" || c.History[1].Content != "second" {
+				t.Fatalf("history=%+v", c.History)
+			}
+		})
+	}
+}
+
+func TestContextHistoryDefaultOmitsMessagesAndExpansionIsBoundedRedacted(t *testing.T) {
+	var entries []string
+	for index := 0; index < 54; index++ {
+		entries = append(entries, fmt.Sprintf(`{"role":"user","content":"message-%02d"}`, index))
+	}
+	entries = append(entries, `{"role":"assistant","content":"Authorization: Bearer super-secret-token"}`)
+	snap := runtimeContextTestSnapshot("[" + strings.Join(entries, ",") + "]")
+	ctx := runtimeContextTestIdentity("owner")
+
+	metaOnly, err := BuildContextDTO(snap, 1, 1, false, "owner", ctx)
+	if err != nil || metaOnly.HistoryCount != 55 || len(metaOnly.History) != 0 || metaOnly.HistoryTruncated || metaOnly.RedactionApplied {
+		t.Fatalf("metadata-only context=%+v err=%v", metaOnly, err)
+	}
+	expanded, err := BuildContextDTO(snap, 1, 1, true, "owner", ctx)
+	if err != nil {
+		t.Fatalf("expanded context: %v", err)
+	}
+	if expanded.HistoryCount != 55 || len(expanded.History) != 50 || !expanded.HistoryTruncated || !expanded.RedactionApplied {
+		t.Fatalf("bounded history=%+v", expanded)
+	}
+	last := expanded.History[len(expanded.History)-1].Content
+	if !strings.Contains(last, "[REDACTED]") || strings.Contains(last, "super-secret-token") {
+		t.Fatalf("last content was not redacted: %q", last)
+	}
+}
+
+func TestContextHistoryCapsContentRunes(t *testing.T) {
+	longContent := strings.Repeat("界", 9000)
+	snap := runtimeContextTestSnapshot(fmt.Sprintf(`[{"role":"user","content":%q}]`, longContent))
+	c, err := BuildContextDTO(snap, 1, 1, true, "owner", runtimeContextTestIdentity("owner"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len([]rune(c.History[0].Content)) != 8003 || !strings.HasSuffix(c.History[0].Content, "...") {
+		t.Fatalf("content cap len=%d content tail=%q", len([]rune(c.History[0].Content)), c.History[0].Content[len(c.History[0].Content)-3:])
+	}
+}
+
+func TestContextHistoryMalformedMessageIsLocalDegradation(t *testing.T) {
+	snap := runtimeContextTestSnapshot(`[{"role":"user","content":"valid"},{"role":"tool","content":{"blob":"invalid"}},{"role":"assistant","content":"after"}]`)
+	c, err := BuildContextDTO(snap, 1, 1, true, "owner", runtimeContextTestIdentity("owner"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.HistoryCount != 3 || len(c.History) != 2 || c.History[0].Content != "valid" || c.History[1].Content != "after" {
+		t.Fatalf("history=%+v count=%d", c.History, c.HistoryCount)
+	}
+	if c.Availability != v1.AvailabilityPartial || c.DataQuality != v1.DataQualityUnknown || c.ReasonCode != "invalid_context_history" {
+		t.Fatalf("malformed history metadata=%+v", c.ResourceMeta)
 	}
 }
 
@@ -129,3 +202,16 @@ func TestAllowedRecoveryActionsFollowStatus(t *testing.T) {
 
 func strp(s string) *string { return &s }
 func timeNow() time.Time    { return time.Now() }
+
+func runtimeContextTestSnapshot(history string) workflow.DurableContextSnapshot {
+	return workflow.DurableContextSnapshot{
+		Schema: workflow.DurableContextSnapshotSchema, DeadlineAt: timeNow().Add(time.Hour),
+		History: []byte(history), BudgetLimits: []byte(`{}`),
+	}
+}
+
+func runtimeContextTestIdentity(owner string) context.Context {
+	return policy.WithIdentity(context.Background(), policy.Identity{
+		UserID: owner, Role: policy.RoleOperator, Scope: policy.Scope{UserID: owner},
+	})
+}

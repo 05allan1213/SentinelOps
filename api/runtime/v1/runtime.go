@@ -729,19 +729,26 @@ type EvidenceContentDTO struct {
 	RedactionApplied bool   `json:"redaction_applied"`
 	ResourceMeta
 }
+type RuntimeHistoryMessageDTO struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
 type ContextDTO struct {
-	Identity                 IdentityDTO `json:"identity"`
-	SessionRevisionUsed      uint64      `json:"session_revision_used"`
-	SessionRevisionCommitted uint64      `json:"session_revision_committed"`
-	SummaryHash              string      `json:"summary_hash"`
-	HistoryCount             int         `json:"history_count"`
-	BudgetLimitsHash         string      `json:"budget_limits_hash"`
-	DeadlineAt               *time.Time  `json:"deadline_at,omitempty"`
-	RuntimeVersion           string      `json:"runtime_version"`
-	RuntimeCompatibilityHash string      `json:"runtime_compatibility_hash"`
-	PolicyHash               string      `json:"policy_hash"`
-	ConfigHash               string      `json:"config_hash"`
-	GateKeys                 []string    `json:"gate_keys"`
+	Identity                 IdentityDTO                `json:"identity"`
+	SessionRevisionUsed      uint64                     `json:"session_revision_used"`
+	SessionRevisionCommitted uint64                     `json:"session_revision_committed"`
+	SummaryHash              string                     `json:"summary_hash"`
+	HistoryCount             int                        `json:"history_count"`
+	History                  []RuntimeHistoryMessageDTO `json:"history,omitempty"`
+	HistoryTruncated         bool                       `json:"history_truncated,omitempty"`
+	RedactionApplied         bool                       `json:"redaction_applied,omitempty"`
+	BudgetLimitsHash         string                     `json:"budget_limits_hash"`
+	DeadlineAt               *time.Time                 `json:"deadline_at,omitempty"`
+	RuntimeVersion           string                     `json:"runtime_version"`
+	RuntimeCompatibilityHash string                     `json:"runtime_compatibility_hash"`
+	PolicyHash               string                     `json:"policy_hash"`
+	ConfigHash               string                     `json:"config_hash"`
+	GateKeys                 []string                   `json:"gate_keys"`
 	ResourceMeta
 }
 type TraceAggregateDTO struct {
