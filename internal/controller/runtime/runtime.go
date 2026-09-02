@@ -373,23 +373,40 @@ func (c *ControllerV1) GetOperation(ctx context.Context, req *v1.GetOperationReq
 	return &v1.GetOperationRes{Item: item, ResourceMeta: item.ResourceMeta}, nil
 }
 
-// H-01/H-02/H-03 read models are intentionally outside B1.  Keep their
-// interface methods routeable, but make the missing fact source explicit so a
-// client cannot mistake a zero-value response for healthy runtime state.
 func (c *ControllerV1) GetCapabilities(ctx context.Context, req *v1.GetCapabilitiesReq) (*v1.CapabilitiesRes, error) {
 	if req == nil {
 		return nil, c.fail(ctx, v1.ErrRuntimeRequestValidation)
 	}
-	meta := unavailableNotRunMeta()
-	return &v1.CapabilitiesRes{Items: []v1.CapabilityDTO{}, Page: unavailablePage(), ResourceMeta: meta}, nil
+	if c.service == nil {
+		meta := unavailableNotRunMeta()
+		return &v1.CapabilitiesRes{Items: []v1.CapabilityDTO{}, Page: unavailablePage(), ResourceMeta: meta}, nil
+	}
+	if err := c.requireService(ctx); err != nil {
+		return nil, err
+	}
+	res, err := c.service.GetCapabilities(ctx)
+	if err != nil {
+		return nil, c.fail(ctx, err)
+	}
+	return &res, nil
 }
 
 func (c *ControllerV1) GetSafety(ctx context.Context, req *v1.GetSafetyReq) (*v1.SafetyRes, error) {
 	if req == nil {
 		return nil, c.fail(ctx, v1.ErrRuntimeRequestValidation)
 	}
-	meta := unavailableNotRunMeta()
-	return &v1.SafetyRes{Item: v1.SafetyDTO{ResourceMeta: meta}, ResourceMeta: meta}, nil
+	if c.service == nil {
+		meta := unavailableNotRunMeta()
+		return &v1.SafetyRes{Item: v1.SafetyDTO{ResourceMeta: meta}, ResourceMeta: meta}, nil
+	}
+	if err := c.requireService(ctx); err != nil {
+		return nil, err
+	}
+	res, err := c.service.GetSafety(ctx)
+	if err != nil {
+		return nil, c.fail(ctx, err)
+	}
+	return &res, nil
 }
 
 func (c *ControllerV1) GetWorkerHealth(ctx context.Context, req *v1.GetWorkerHealthReq) (*v1.WorkerHealthRes, error) {

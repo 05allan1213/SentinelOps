@@ -266,6 +266,21 @@ func RequiredDurableToolNames() []string {
 	return names
 }
 
+// DurableToolAgents returns the authoritative durable Agent-to-tool
+// inventory, inverted by tool name. Returned slices/maps are copies.
+func DurableToolAgents() map[string][]string {
+	result := make(map[string][]string)
+	for agent, names := range durableInventories {
+		for _, name := range names {
+			result[name] = append(result[name], agent)
+		}
+	}
+	for name := range result {
+		sort.Strings(result[name])
+	}
+	return result
+}
+
 // DurableFrameworkToolNames 返回 Executor 暴露的官方 AgentTool Catalog 名称。
 // framework Tool 只计量编排调用，不拥有 Effect step。
 func DurableFrameworkToolNames() []string {

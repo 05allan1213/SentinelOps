@@ -57,7 +57,11 @@ func bindAPI(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	runtimeService := runtimesvc.NewRuntimeServiceWithEvaluator(store, evaluator)
+	runtimeService := runtimesvc.NewRuntimeServiceWithEvaluatorAndConfig(store, evaluator, config)
+	runtimeService.GateAuditAvailable = func(auditCtx context.Context) bool {
+		_, auditErr := dao.ListRuntimeGateAudit(auditCtx, 1)
+		return auditErr == nil
+	}
 	s := g.Server()
 	if FrontendHostingEnabled(ctx) {
 		s.SetServerRoot("web/dist")

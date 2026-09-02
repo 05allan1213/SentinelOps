@@ -12,14 +12,18 @@ import (
 	"SentinelOps/internal/ai/policy"
 	airuntime "SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/ai/workflow"
+	appconfig "SentinelOps/internal/config"
 	"SentinelOps/internal/dao/mysql"
 )
 
 // RuntimeService is the read-only aggregate service for durable runs.
 type RuntimeService struct {
-	Store    *workflow.GORMStore
-	Gates    *airuntime.GateEvaluator
-	TraceDAO *mysql.TraceDAO
+	Store              *workflow.GORMStore
+	Gates              *airuntime.GateEvaluator
+	TraceDAO           *mysql.TraceDAO
+	Config             *appconfig.Config
+	Snapshot           airuntime.FrozenRuntimeSnapshot
+	GateAuditAvailable func(context.Context) bool
 }
 
 func NewRuntimeService(store *workflow.GORMStore) *RuntimeService {
@@ -28,6 +32,12 @@ func NewRuntimeService(store *workflow.GORMStore) *RuntimeService {
 
 func NewRuntimeServiceWithEvaluator(store *workflow.GORMStore, gates *airuntime.GateEvaluator) *RuntimeService {
 	return &RuntimeService{Store: store, Gates: gates, TraceDAO: runtimeTraceDAO(store)}
+}
+
+// NewRuntimeServiceWithEvaluatorAndConfig injects the already validated
+// application configuration used by read-only capability projections.
+func NewRuntimeServiceWithEvaluatorAndConfig(store *workflow.GORMStore, gates *airuntime.GateEvaluator, config *appconfig.Config) *RuntimeService {
+	return &RuntimeService{Store: store, Gates: gates, Config: config, TraceDAO: runtimeTraceDAO(store)}
 }
 
 // NewRuntimeServiceWithTraceDAO binds the Runtime read service to the same
