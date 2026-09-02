@@ -49,7 +49,8 @@
 - `SENTINELOPS_TEST_DSN=... go test ./internal/ai/workflow -run 'Test(Attempt|C06)' -count=1 -timeout 30m`
 - `SENTINELOPS_TEST_DSN=... go test ./api/runtime/... ./internal/service/runtime ./internal/controller/runtime ./internal/dao/mysql ./internal/ai/runtime -count=1`
 - `go test -race ./internal/service/runtime ./internal/controller/runtime`、`go vet ./...`、`staticcheck`（目标包）、`git diff --check` 均 PASS。
-- 全量 `internal/ai/workflow` 在 `TestRecoveryLegalityMatrix` 的 Goose disposable DB 初始化处未在 10 分钟默认超时内完成，归类为 NOT RUN TO COMPLETION（既有环境/迁移瓶颈），不据此宣称全量 PASS。
+- 最终全量复查：`SENTINELOPS_TEST_DSN=... go test -p 1 ./api/runtime/... ./internal/service/runtime ./internal/controller/runtime ./internal/dao/mysql ./internal/ai/workflow ./internal/ai/runtime -count=1 -timeout 30m` PASS；其中 `internal/ai/workflow` 787.037s，`internal/ai/runtime` 61.064s，`internal/dao/mysql` 41.276s。
+- Final review（2026-09-02）：无 Critical/Important 缺陷；四组契约修复均与 frozen 计划一致，边界（旧 NULL 行、默认无 history、越权 403、invalid JSON、malformed agent）由新增测试覆盖。
 
 ## 未执行
 
