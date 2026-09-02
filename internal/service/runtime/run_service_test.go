@@ -183,8 +183,38 @@ func TestCompatibilityCheckpointUsesPersistedCheckpointHash(t *testing.T) {
 
 func TestBudgetInvalidJSONIsPartial(t *testing.T) {
 	c := BuildBudgetDTO(strp("{"), strp("{}"), strp("{}"))
-	if c.Availability != v1.AvailabilityPartial || c.DataQuality != v1.DataQualityUnknown || c.ReasonCode == "" {
+	if c.Availability != v1.AvailabilityPartial || c.DataQuality != v1.DataQualityUnknown || c.ReasonCode != "invalid_budget_json" {
 		t.Fatalf("budget=%+v", c)
+	}
+	if c.MaxModelCalls != nil || c.MaxL0ToolCalls != nil || c.MaxDurationMs != nil || c.ModelCalls != nil ||
+		c.ToolCalls != nil || c.Iterations != nil || c.InputTokens != nil || c.OutputTokens != nil ||
+		c.CostCNY != nil || c.ElapsedMs != nil || c.MCPCalls != nil || c.RAGCalls != nil ||
+		c.ReservedModelCalls != nil || c.ReservedToolCalls != nil {
+		t.Fatalf("invalid budget fabricated zero-valued counters: %+v", c)
+	}
+}
+
+func TestRunSummaryMissingAgentIsPartialUnknown(t *testing.T) {
+	run := mysql.WorkflowRun{RuntimeMode: workflow.RuntimeModeDurableV1, Status: workflow.RunStatusSucceeded, RuntimeAgentQuality: "missing"}
+	sum := BuildRunSummary(run)
+	if sum.Availability != v1.AvailabilityPartial || sum.DataQuality != v1.DataQualityUnknown || sum.ReasonCode != "agent_missing" {
+		t.Fatalf("missing agent summary=%+v", sum.ResourceMeta)
+	}
+}
+
+func TestRunSummaryMalformedAgentIsPartialUnknown(t *testing.T) {
+	run := mysql.WorkflowRun{RuntimeMode: workflow.RuntimeModeDurableV1, Status: workflow.RunStatusSucceeded, RuntimeAgentQuality: "partial"}
+	sum := BuildRunSummary(run)
+	if sum.Availability != v1.AvailabilityPartial || sum.DataQuality != v1.DataQualityUnknown || sum.ReasonCode != "malformed_agent_input" {
+		t.Fatalf("malformed agent summary=%+v", sum.ResourceMeta)
+	}
+}
+
+func TestRunSummaryCompleteAgentKeepsAvailableMeta(t *testing.T) {
+	run := mysql.WorkflowRun{RuntimeMode: workflow.RuntimeModeDurableV1, Status: workflow.RunStatusSucceeded, RuntimeAgentQuality: "complete"}
+	sum := BuildRunSummary(run)
+	if sum.Availability != v1.AvailabilityAvailable || sum.ReasonCode != "" {
+		t.Fatalf("complete agent summary=%+v", sum.ResourceMeta)
 	}
 }
 

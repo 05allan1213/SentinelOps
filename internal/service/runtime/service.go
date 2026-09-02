@@ -81,6 +81,7 @@ func BuildBudgetDTO(limitsJSON, usageJSON, reservationsJSON *string) v1.RuntimeB
 		meta.Availability = v1.AvailabilityPartial
 		meta.DataQuality = v1.DataQualityUnknown
 		meta.ReasonCode = "invalid_budget_json"
+		return v1.RuntimeBudgetDTO{ResourceMeta: meta}
 	}
 	toInt := func(v int64) *int { x := int(v); return &x }
 	toI64 := func(v int64) *int64 { return &v }
@@ -317,6 +318,16 @@ func BuildRunSummary(run mysql.WorkflowRun) v1.RunSummaryDTO {
 		meta.Availability = v1.AvailabilityPartial
 		meta.DataQuality = v1.DataQualityUnknown
 		meta.ReasonCode = "unknown_status"
+	}
+	switch run.RuntimeAgentQuality {
+	case "missing":
+		meta.Availability = v1.AvailabilityPartial
+		meta.DataQuality = v1.DataQualityUnknown
+		meta.ReasonCode = "agent_missing"
+	case "partial":
+		meta.Availability = v1.AvailabilityPartial
+		meta.DataQuality = v1.DataQualityUnknown
+		meta.ReasonCode = "malformed_agent_input"
 	}
 	queryHash := run.RuntimeQueryHash
 	if queryHash == "" && run.QueryText != "" {
