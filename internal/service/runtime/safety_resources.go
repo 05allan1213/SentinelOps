@@ -5,14 +5,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	v1 "SentinelOps/api/runtime/v1"
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
+
+	"gorm.io/gorm"
 )
 
 // EffectFilter is the Runtime service's read-only Effect ledger filter.  The
@@ -61,6 +65,7 @@ func (s *RuntimeService) ListApprovals(ctx context.Context, runID string, p v1.P
 	meta := completeSafetyMeta()
 	for index := range rows {
 		item, itemMeta := mapRuntimeApproval(rows[index], events)
+		mergeSafetyMeta(&itemMeta, s.validateApprovalCheckpointFact(ctx, run, rows[index]))
 		item.ResourceMeta = itemMeta
 		if itemMeta.DataQuality != v1.DataQualityComplete || itemMeta.Availability != v1.AvailabilityAvailable {
 			mergeSafetyMeta(&meta, itemMeta)
@@ -69,7 +74,7 @@ func (s *RuntimeService) ListApprovals(ctx context.Context, runID string, p v1.P
 	}
 	return v1.ApprovalsRes{
 		Items:        items,
-		Page:         v1.PageMeta{Page: page, PageSize: pageSize, Total: total, HasNext: int64(page*pageSize) < total},
+		Page:         v1.PageMeta{Page: page, PageSize: pageSize, Total: total, HasNext: runtimePageHasNext(page, pageSize, total)},
 		ResourceMeta: meta,
 	}, nil
 }
@@ -91,17 +96,16 @@ func (s *RuntimeService) ListEffects(ctx context.Context, runID string, f Effect
 	if err != nil {
 		return v1.EffectsRes{}, err
 	}
-	events, err := s.Store.ListRuntimeEventsForRun(ctx, run.ID)
-	if err != nil {
-		return v1.EffectsRes{}, err
-	}
-
 	items := make([]v1.EffectDTO, 0, len(rows))
 	meta := completeSafetyMeta()
 	parents := s.loadEffectParents(ctx, rows)
 	for index := range rows {
 		parent, parentChecked := parents[pointerString(rows[index].ParentEffectID)]
-		item, itemMeta := mapRuntimeEffectWithParent(rows[index], events, parent, parentChecked)
+		eventResult, eventErr := s.Store.ListRuntimeEffectEventsBounded(ctx, run.ID, rows[index].ID)
+		item, itemMeta := mapRuntimeEffectWithParentAndTruncation(rows[index], eventResult.Events, parent, parentChecked, eventResult.Truncated)
+		if eventErr != nil {
+			mergeSafetyMeta(&itemMeta, partialSafetyMeta("effect_event_source_error"))
+		}
 		item.ResourceMeta = itemMeta
 		if itemMeta.DataQuality != v1.DataQualityComplete || itemMeta.Availability != v1.AvailabilityAvailable {
 			mergeSafetyMeta(&meta, itemMeta)
@@ -110,7 +114,7 @@ func (s *RuntimeService) ListEffects(ctx context.Context, runID string, f Effect
 	}
 	return v1.EffectsRes{
 		Items:        items,
-		Page:         v1.PageMeta{Page: page, PageSize: pageSize, Total: total, HasNext: int64(page*pageSize) < total},
+		Page:         v1.PageMeta{Page: page, PageSize: pageSize, Total: total, HasNext: runtimePageHasNext(page, pageSize, total)},
 		ResourceMeta: meta,
 	}, nil
 }
@@ -155,11 +159,11 @@ func (s *RuntimeService) EffectHistory(ctx context.Context, effectID string) ([]
 	if err != nil {
 		return nil, MapRecoveryError(err)
 	}
-	events, err := s.Store.ListRuntimeEffectEvents(ctx, effect.RunID, effect.ID)
+	eventResult, err := s.Store.ListRuntimeEffectEventsBounded(ctx, effect.RunID, effect.ID)
 	if err != nil {
 		return nil, MapRecoveryError(err)
 	}
-	history, _ := buildEffectHistory(*effect, events)
+	history, _, _ := buildEffectHistoryWithMeta(*effect, eventResult.Events)
 	return history, nil
 }
 
@@ -300,10 +304,14 @@ func mapRuntimeApproval(row mysql.AgentApproval, events []mysql.WorkflowEvent) (
 }
 
 func mapRuntimeEffect(row mysql.AgentEffect, events []mysql.WorkflowEvent) (v1.EffectDTO, v1.ResourceMeta) {
-	return mapRuntimeEffectWithParent(row, events, nil, false)
+	return mapRuntimeEffectWithParentAndTruncation(row, events, nil, false, false)
 }
 
 func mapRuntimeEffectWithParent(row mysql.AgentEffect, events []mysql.WorkflowEvent, parent *mysql.AgentEffect, parentChecked bool) (v1.EffectDTO, v1.ResourceMeta) {
+	return mapRuntimeEffectWithParentAndTruncation(row, events, parent, parentChecked, false)
+}
+
+func mapRuntimeEffectWithParentAndTruncation(row mysql.AgentEffect, events []mysql.WorkflowEvent, parent *mysql.AgentEffect, parentChecked, truncated bool) (v1.EffectDTO, v1.ResourceMeta) {
 	meta := completeSafetyMeta()
 	if !validRuntimeEffectIdentity(row) {
 		return v1.EffectDTO{ID: safeIdentity(row.ID), RunID: safeIdentity(row.RunID), Status: safeText(row.Status)}, partialSafetyMeta("invalid_effect_identity")
@@ -332,11 +340,15 @@ func mapRuntimeEffectWithParent(row mysql.AgentEffect, events []mysql.WorkflowEv
 			}
 		}
 	}
-	history, historyOK, historyMeta := buildEffectHistoryWithMeta(row, events)
+	history, historyOK, historyMeta, eventQualityComplete := buildEffectHistoryWithQuality(row, events)
 	mergeSafetyMeta(&meta, historyMeta)
+	if truncated {
+		mergeSafetyMeta(&meta, partialSafetyMeta("effect_history_truncated"))
+	}
 	if !historyOK {
 		mergeSafetyMeta(&meta, partialSafetyMeta("effect_history_not_observed"))
 	}
+	canonicalStatus := canonicalRuntimeEffectStatus(row.Status, history, historyOK, truncated, &meta, !eventQualityComplete)
 	item := v1.EffectDTO{
 		ID:                     safeIdentity(row.ID),
 		RunID:                  safeIdentity(row.RunID),
@@ -348,7 +360,7 @@ func mapRuntimeEffectWithParent(row mysql.AgentEffect, events []mysql.WorkflowEv
 		ToolSchemaHash:         safeHash(row.ToolSchemaHash, &meta),
 		TargetHash:             safeHash(row.TargetHash, &meta),
 		EffectType:             safeText(row.EffectType),
-		Status:                 safeText(row.Status),
+		Status:                 safeText(canonicalStatus),
 		Version:                safeVersion(row.Version, &meta),
 		LeaseGeneration:        row.LeaseGeneration,
 		Attempt:                int(row.Attempt),
@@ -371,6 +383,147 @@ func mapRuntimeEffectWithParent(row mysql.AgentEffect, events []mysql.WorkflowEv
 	}
 	item.UpdatedAt = &row.UpdatedAt
 	return item, meta
+}
+
+// canonicalRuntimeEffectStatus derives the public status from the newest
+// associated Event.  AgentEffect.status is a mutable projection and therefore
+// cannot overwrite an observed unknown/reconciling outcome (or claim success
+// when no canonical history was observed).
+func canonicalRuntimeEffectStatus(persisted string, history []v1.EffectHistoryDTO, observed, truncated bool, meta *v1.ResourceMeta, eventQualityIssue ...bool) string {
+	if truncated {
+		return workflow.EffectStatusUnknown
+	}
+	if !observed || len(history) == 0 {
+		if meta != nil {
+			mergeSafetyMeta(meta, partialSafetyMeta("effect_status_not_observed"))
+		}
+		return workflow.EffectStatusUnknown
+	}
+	canonical := history[len(history)-1].Status
+	if _, ok := effectLedgerStatuses[canonical]; !ok {
+		canonical = workflow.EffectStatusUnknown
+	}
+	// A canonical history that contains malformed, unknown, or conflicting
+	// event facts cannot support a success conclusion.  Reconciling remains
+	// visible because it is itself a fail-closed state; every other state is
+	// reduced to unknown while retaining the partial metadata reason.  The
+	// explicit flag is intentionally separate from row-level hash/identity
+	// quality: an invalid ancillary projection must not hide a valid event state.
+	if len(eventQualityIssue) > 0 && eventQualityIssue[0] {
+		if meta != nil {
+			mergeSafetyMeta(meta, partialSafetyMeta("effect_event_quality_incomplete"))
+		}
+		if canonical == workflow.EffectStatusReconciling {
+			return canonical
+		}
+		return workflow.EffectStatusUnknown
+	}
+	if persisted != canonical {
+		// The write that emits effect.started can be observed before the mutable
+		// AgentEffect projection advances from pending to running.  Treat that
+		// one expected ordering gap as non-conflicting; all other mismatches are
+		// retained as partial and cannot produce a success conclusion.
+		if !(persisted == workflow.EffectStatusPending && canonical == workflow.EffectStatusRunning) {
+			if meta != nil {
+				mergeSafetyMeta(meta, partialSafetyMeta("effect_status_projection_mismatch"))
+			}
+			if canonical == workflow.EffectStatusSucceeded {
+				return workflow.EffectStatusUnknown
+			}
+		}
+	}
+	return canonical
+}
+
+// validateApprovalCheckpointFact re-checks the opaque Eino checkpoint binding
+// against metadata calculated by MySQL.  Approval rows intentionally carry a
+// copied fingerprint, so a list response must not treat that copy as proof
+// that the current checkpoint still exists or belongs to this Run.
+func (s *RuntimeService) validateApprovalCheckpointFact(ctx context.Context, run *mysql.WorkflowRun, approval mysql.AgentApproval) v1.ResourceMeta {
+	meta := completeSafetyMeta()
+	if run == nil || s == nil || s.Store == nil || s.Store.DB() == nil {
+		return partialSafetyMeta("checkpoint_source_unavailable")
+	}
+	if strings.TrimSpace(approval.RunID) == "" || approval.RunID != run.ID {
+		return partialSafetyMeta("approval_run_identity_mismatch")
+	}
+	checkpointID := pointerString(approval.CheckpointID)
+	checkpointSHA := pointerString(approval.CheckpointPayloadSHA256)
+	checkpointGeneration := uint64(0)
+	if approval.CheckpointLeaseGeneration != nil {
+		checkpointGeneration = *approval.CheckpointLeaseGeneration
+	}
+	if checkpointID == "" || checkpointSHA == "" || checkpointGeneration == 0 {
+		// A preparing Approval is intentionally allowed to exist before the
+		// checkpoint is committed.  Every other lifecycle state needs a complete
+		// binding before it can be presented as current.
+		if approval.Status == workflow.ApprovalStatusPreparing && checkpointID == "" && checkpointSHA == "" && checkpointGeneration == 0 {
+			return meta
+		}
+		return partialSafetyMeta("approval_checkpoint_incomplete")
+	}
+
+	expectedCheckpointID, err := workflow.EinoCheckpointID(run.ID)
+	if err != nil || checkpointID != expectedCheckpointID {
+		return partialSafetyMeta("invalid_checkpoint_id")
+	}
+	if !validSHA256Hex(checkpointSHA) {
+		return partialSafetyMeta("invalid_checkpoint_digest")
+	}
+	if run.RuntimeVersion == nil || strings.TrimSpace(*run.RuntimeVersion) == "" ||
+		run.RuntimeCompatibilityHash == nil || !validSHA256Hex(*run.RuntimeCompatibilityHash) {
+		return partialSafetyMeta("run_checkpoint_identity_missing")
+	}
+
+	fact, err := s.Store.GetRuntimeCheckpointFact(ctx, run.ID, checkpointID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return partialSafetyMeta("checkpoint_not_observed")
+		}
+		return partialSafetyMeta("checkpoint_source_error")
+	}
+	if fact == nil {
+		return partialSafetyMeta("checkpoint_not_observed")
+	}
+	if fact.ID != deterministicCheckpointRowID(checkpointID) || fact.RunID != run.ID ||
+		fact.CheckpointKey != checkpointID || fact.EinoCheckpointID == nil || *fact.EinoCheckpointID != checkpointID {
+		return partialSafetyMeta("checkpoint_identity_mismatch")
+	}
+	if fact.PayloadSHA256 == nil || !validSHA256Hex(*fact.PayloadSHA256) || *fact.PayloadSHA256 != checkpointSHA ||
+		fact.BlobSHA256 == nil || !validSHA256Hex(*fact.BlobSHA256) || *fact.BlobSHA256 != *fact.PayloadSHA256 {
+		return partialSafetyMeta("checkpoint_digest_mismatch")
+	}
+	if fact.BlobLength == nil || *fact.BlobLength <= 0 {
+		return partialSafetyMeta("checkpoint_blob_missing")
+	}
+	if fact.LeaseGeneration == nil || *fact.LeaseGeneration == 0 || *fact.LeaseGeneration != checkpointGeneration || *fact.LeaseGeneration > run.LeaseGeneration {
+		return partialSafetyMeta("checkpoint_generation_mismatch")
+	}
+	if fact.RuntimeVersion == nil || *fact.RuntimeVersion != *run.RuntimeVersion {
+		return partialSafetyMeta("checkpoint_runtime_version_mismatch")
+	}
+	if fact.RuntimeCompatibilityHash == nil || *fact.RuntimeCompatibilityHash != *run.RuntimeCompatibilityHash {
+		return partialSafetyMeta("checkpoint_compatibility_mismatch")
+	}
+	if fact.CommittedAt == nil {
+		return partialSafetyMeta("checkpoint_not_committed")
+	}
+	if fact.ExpiresAt != nil && !fact.ExpiresAt.After(time.Now().UTC()) {
+		return partialSafetyMeta("checkpoint_expired")
+	}
+	return meta
+}
+
+func validSHA256Hex(value string) bool {
+	return len(value) == sha256.Size*2 && strings.ToLower(value) == value && func() bool {
+		_, err := hex.DecodeString(value)
+		return err == nil
+	}()
+}
+
+func deterministicCheckpointRowID(checkpointID string) string {
+	digest := sha256.Sum256([]byte(checkpointID))
+	return hex.EncodeToString(digest[:])
 }
 
 func validRuntimeApprovalIdentity(row mysql.AgentApproval) bool {
@@ -568,20 +721,31 @@ func buildEffectHistory(effect mysql.AgentEffect, events []mysql.WorkflowEvent) 
 }
 
 func buildEffectHistoryWithMeta(effect mysql.AgentEffect, events []mysql.WorkflowEvent) ([]v1.EffectHistoryDTO, bool, v1.ResourceMeta) {
+	history, observed, meta, _ := buildEffectHistoryWithQuality(effect, events)
+	return history, observed, meta
+}
+
+func buildEffectHistoryWithQuality(effect mysql.AgentEffect, events []mysql.WorkflowEvent) ([]v1.EffectHistoryDTO, bool, v1.ResourceMeta, bool) {
 	result := make([]v1.EffectHistoryDTO, 0)
 	meta := completeSafetyMeta()
+	eventQualityComplete := true
 	for _, row := range events {
 		if !eventReferencesID(row, effect.ID, "effect_id") {
 			continue
 		}
 		parsed := parseSafetyEvent(row)
 		mergeSafetyMeta(&meta, parsed.dto.ResourceMeta)
+		if parsed.dto.ResourceMeta.DataQuality != v1.DataQualityComplete || parsed.dto.ResourceMeta.Availability != v1.AvailabilityAvailable {
+			eventQualityComplete = false
+		}
 		if !effectHistoryEvent(row.EventType) {
 			mergeSafetyMeta(&meta, partialSafetyMeta("unknown_effect_event"))
+			eventQualityComplete = false
 		}
 		status := safeEventStatus(row.EventType, parsed)
 		if eventStatusConflict(row.EventType, parsed) {
 			mergeSafetyMeta(&meta, partialSafetyMeta("effect_event_status_conflict"))
+			eventQualityComplete = false
 		}
 		if _, ok := effectLedgerStatuses[status]; !ok {
 			status = workflow.EffectStatusUnknown
@@ -608,7 +772,7 @@ func buildEffectHistoryWithMeta(effect mysql.AgentEffect, events []mysql.Workflo
 	})
 	// A history is a canonical Event projection.  Do not manufacture a row
 	// from the mutable AgentEffect status when Events are absent.
-	return result, len(result) > 0, meta
+	return result, len(result) > 0, meta, eventQualityComplete
 }
 
 func effectHistoryEvent(eventType string) bool {

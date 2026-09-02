@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -49,6 +50,62 @@ var runtimeRunListColumns = []string{
 	"runtime_compatibility_hash", "agent_revision", "mcp_catalog_hash", "prompt_hash", "policy_hash",
 	"config_hash", "usage_quality", "trace_quality", "last_event_seq", "cancel_requested_at", "park_reason",
 	"started_at", "finished_at", "duration_ms", "created_at", "updated_at",
+}
+
+// runtimeApprovalProjection contains only fields consumed by the Runtime
+// approval metadata mapper.  In particular, interrupt addresses and any
+// future approval columns are not pulled into a read response by a wildcard.
+const runtimeApprovalProjection = "agent_approvals.id, agent_approvals.run_id, " +
+	"agent_approvals.tool_name, agent_approvals.tool_revision, agent_approvals.tool_schema_hash, " +
+	"agent_approvals.risk_level, agent_approvals.proposal_json_redacted, agent_approvals.proposal_hash, " +
+	"agent_approvals.policy_hash, agent_approvals.runtime_compatibility_hash, agent_approvals.requested_by, " +
+	"agent_approvals.decided_by, agent_approvals.status, agent_approvals.version, agent_approvals.decision_reason, " +
+	"agent_approvals.checkpoint_id, agent_approvals.checkpoint_payload_sha256, agent_approvals.checkpoint_lease_generation, " +
+	"agent_approvals.published_at, agent_approvals.expires_at, agent_approvals.decided_at, agent_approvals.preparing_at, agent_approvals.created_at"
+
+// runtimeRunProjection is the only query shape that may populate the two
+// derived agent fields.  WorkflowRun intentionally marks those fields with
+// gorm:"-" so every other read remains a real workflow_runs projection.
+// Keeping the alias columns on a separate destination lets GORM scan them
+// without teaching the persistence model about non-existent database columns.
+type runtimeRunProjection struct {
+	WorkflowRun              `gorm:"embedded"`
+	RuntimeAgentValue        string `gorm:"column:runtime_agent"`
+	RuntimeAgentQualityValue string `gorm:"column:runtime_agent_quality"`
+	RuntimeQueryHashValue    string `gorm:"column:query_hash"`
+}
+
+func (p runtimeRunProjection) workflowRun() WorkflowRun {
+	run := p.WorkflowRun
+	run.RuntimeAgent = p.RuntimeAgentValue
+	run.RuntimeAgentQuality = p.RuntimeAgentQualityValue
+	run.RuntimeQueryHash = p.RuntimeQueryHashValue
+	return run
+}
+
+// runtimeRunDetailColumns is intentionally separate from the list projection.
+// Runtime detail needs persisted facts (Context, Budget and answer citation
+// metadata) to build its read-only subresources.  Omitting those columns here
+// silently turns a valid Run into an apparently missing/partial Run, while
+// selecting them in the list would unnecessarily load raw payloads for every
+// row.  The service never serializes the raw columns themselves.
+var runtimeRunDetailColumns = []string{
+	"id", "workflow_key", "user_id", "session_id", "parent_run_id", "active_session_key",
+	"status", "available_at", "priority", "runtime_mode", "attempt", "max_attempts",
+	"lease_owner", "lease_until", "lease_generation", "heartbeat_at", "immutable_input_json",
+	"query_text", "context_snapshot_json", "session_revision", "checkpoint_id", "interrupt_address", "recovery_mode", "runtime_version",
+	"runtime_compatibility_hash", "agent_revision", "model_snapshot", "tool_snapshot",
+	"mcp_catalog_hash", "skill_snapshot", "prompt_hash", "policy_hash", "config_hash",
+	"feature_snapshot", "budget_limits_json", "budget_usage_json", "budget_reservations_json",
+	"usage_quality", "trace_quality", "last_event_seq", "cancel_requested_at", "park_reason",
+	"input_payload", "output_payload", "error_message", "started_at", "finished_at",
+	"duration_ms", "created_at", "updated_at", "deleted_at",
+}
+
+func runtimeAgentProjection() string {
+	return "CASE WHEN immutable_input_json IS NULL OR immutable_input_json = '' THEN '' WHEN JSON_VALID(immutable_input_json) THEN COALESCE(JSON_UNQUOTE(JSON_EXTRACT(immutable_input_json, '$.agent')), '') ELSE '' END AS runtime_agent, " +
+		"CASE WHEN immutable_input_json IS NULL OR immutable_input_json = '' THEN 'missing' WHEN JSON_VALID(immutable_input_json) THEN 'complete' ELSE 'partial' END AS runtime_agent_quality, " +
+		"CASE WHEN query_text IS NULL OR query_text = '' THEN '' ELSE SHA2(query_text, 256) END AS query_hash"
 }
 
 func (s *GORMStore) query(ctx context.Context) (*gorm.DB, policy.Identity, error) {
@@ -107,7 +164,7 @@ func (s *GORMStore) ListRuntimeRuns(ctx context.Context, f RuntimeRunFilter) ([]
 	if strings.EqualFold(f.Direction, "asc") {
 		dir = "ASC"
 	}
-	projection := strings.Join(runtimeRunListColumns, ", ") + ", CASE WHEN immutable_input_json IS NULL OR immutable_input_json = '' THEN '' WHEN JSON_VALID(immutable_input_json) THEN COALESCE(JSON_UNQUOTE(JSON_EXTRACT(immutable_input_json, '$.agent')), '') ELSE '' END AS runtime_agent, CASE WHEN immutable_input_json IS NULL OR immutable_input_json = '' THEN 'missing' WHEN JSON_VALID(immutable_input_json) THEN 'complete' ELSE 'partial' END AS runtime_agent_quality"
+	projection := strings.Join(runtimeRunListColumns, ", ") + ", " + runtimeAgentProjection()
 	q = q.Select(projection).Order(sortCol + " " + dir).Order("id ASC")
 	page, size := f.Page, f.PageSize
 	if page < 1 {
@@ -119,9 +176,13 @@ func (s *GORMStore) ListRuntimeRuns(ctx context.Context, f RuntimeRunFilter) ([]
 	if size > 200 {
 		size = 200
 	}
-	var rows []WorkflowRun
-	if err := q.Offset((page - 1) * size).Limit(size).Find(&rows).Error; err != nil {
+	var projected []runtimeRunProjection
+	if err := q.Offset(runtimeQueryOffset(page, size)).Limit(size).Find(&projected).Error; err != nil {
 		return nil, 0, err
+	}
+	rows := make([]WorkflowRun, len(projected))
+	for i := range projected {
+		rows[i] = projected[i].workflowRun()
 	}
 	return rows, total, nil
 }
@@ -138,17 +199,19 @@ func (s *GORMStore) GetRuntimeRun(ctx context.Context, runID string, includeLega
 	if strings.TrimSpace(runID) == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
-	q := db.Where("id = ?", runID)
+	q := db.Model(&WorkflowRun{}).Where("id = ?", runID)
 	if len(includeLegacy) == 0 || !includeLegacy[0] {
 		q = q.Where("runtime_mode = ?", "durable_v1")
 	}
 	if !identity.Scope.All {
 		q = q.Where("user_id = ?", identity.Scope.UserID)
 	}
-	var row WorkflowRun
-	if err := q.First(&row).Error; err != nil {
+	projection := strings.Join(runtimeRunDetailColumns, ", ") + ", " + runtimeAgentProjection()
+	var projected runtimeRunProjection
+	if err := q.Select(projection).First(&projected).Error; err != nil {
 		return nil, err
 	}
+	row := projected.workflowRun()
 	return &row, nil
 }
 
@@ -161,6 +224,19 @@ type RuntimeEffectFilter struct {
 	Generation                     uint64
 	Page, PageSize                 int
 }
+
+// RuntimeEffectEventQuery is a bounded canonical association read.  Truncated
+// is part of the result because an incomplete history cannot be treated as a
+// successful terminal fact by the Runtime service.
+type RuntimeEffectEventQuery struct {
+	Events    []WorkflowEvent
+	Truncated bool
+}
+
+// Keep the bound deliberately small: an Effect history is an audit projection,
+// not a general-purpose event export.  The service can still expose the
+// durable Run Timeline for a full, separately paged event view.
+const runtimeEffectEventLimit = 512
 
 // EffectFilter is kept as a short package-level name for callers which build
 // Runtime query filters outside the DAO package.
@@ -177,6 +253,16 @@ func normalizeRuntimePage(page, size int) (int, int) {
 		size = 100
 	}
 	return page, size
+}
+
+func runtimeQueryOffset(page, pageSize int) int {
+	if page <= 1 || pageSize <= 0 {
+		return 0
+	}
+	if page-1 > math.MaxInt/pageSize {
+		return math.MaxInt
+	}
+	return (page - 1) * pageSize
 }
 
 // runtimeEffectProjection intentionally omits request/response bodies and
@@ -228,9 +314,9 @@ func (s *GORMStore) ListRuntimeApprovals(ctx context.Context, runID string, page
 	}
 	page, pageSize = normalizeRuntimePage(page, pageSize)
 	var rows []AgentApproval
-	if err := q.Select("agent_approvals.*").
+	if err := q.Select(runtimeApprovalProjection).
 		Order("agent_approvals.created_at ASC, agent_approvals.id ASC").
-		Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error; err != nil {
+		Offset(runtimeQueryOffset(page, pageSize)).Limit(pageSize).Find(&rows).Error; err != nil {
 		return nil, 0, fmt.Errorf("list runtime approvals: %w", err)
 	}
 	return rows, total, nil
@@ -273,7 +359,7 @@ func (s *GORMStore) ListRuntimeEffects(ctx context.Context, runID string, f Runt
 		// when timestamps were written by separate transactions.
 		Order("CASE WHEN agent_effects.effect_role = 'primary' THEN 0 ELSE 1 END ASC").
 		Order("agent_effects.created_at ASC, agent_effects.effect_step ASC, agent_effects.id ASC").
-		Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error; err != nil {
+		Offset(runtimeQueryOffset(page, pageSize)).Limit(pageSize).Find(&rows).Error; err != nil {
 		return nil, 0, fmt.Errorf("list runtime effects: %w", err)
 	}
 	return rows, total, nil
@@ -322,19 +408,53 @@ func (s *GORMStore) ListRuntimeEventsForRun(ctx context.Context, runID string) (
 // effect event catalog happens in the mapper, not in SQL, so malformed or
 // future events remain auditable as partial facts.
 func (s *GORMStore) ListRuntimeEffectEvents(ctx context.Context, runID, effectID string) ([]WorkflowEvent, error) {
-	if strings.TrimSpace(effectID) == "" {
-		return nil, gorm.ErrRecordNotFound
+	result, err := s.ListRuntimeEffectEventsBounded(ctx, runID, effectID)
+	if err != nil {
+		return nil, err
 	}
+	return result.Events, nil
+}
+
+// ListRuntimeEffectEventsBounded associates events with an Effect in SQL using
+// bound parameters.  Canonical envelope fields are preferred; the bounded
+// INSTR fallback deliberately retains legacy/malformed rows containing the
+// validated effect ID so the mapper can report a partial diagnostic instead
+// of silently dropping an audit fact.
+func (s *GORMStore) ListRuntimeEffectEventsBounded(ctx context.Context, runID, effectID string) (RuntimeEffectEventQuery, error) {
+	if strings.TrimSpace(effectID) == "" {
+		return RuntimeEffectEventQuery{}, gorm.ErrRecordNotFound
+	}
+	if strings.TrimSpace(runID) == "" {
+		return RuntimeEffectEventQuery{}, gorm.ErrRecordNotFound
+	}
+	// First bind the Effect ID to the requested, visible Run.  This also keeps
+	// cross-owner IDs from becoming an event-search oracle.
 	effect, err := s.GetRuntimeEffect(ctx, effectID)
 	if err != nil {
-		return nil, err
+		return RuntimeEffectEventQuery{}, err
 	}
 	if effect.RunID != runID {
-		return nil, gorm.ErrRecordNotFound
+		return RuntimeEffectEventQuery{}, gorm.ErrRecordNotFound
 	}
-	rows, err := s.ListRuntimeEventsForRun(ctx, runID)
+	q, err := s.runtimeScopedQuery(ctx, runID, &WorkflowEvent{}, "workflow_events")
 	if err != nil {
-		return nil, err
+		return RuntimeEffectEventQuery{}, err
 	}
-	return rows, nil
+	association := "(JSON_VALID(workflow_events.payload) AND (" +
+		"JSON_UNQUOTE(JSON_EXTRACT(workflow_events.payload, '$.reference')) = ? OR " +
+		"JSON_UNQUOTE(JSON_EXTRACT(workflow_events.payload, '$.data.effect_id')) = ?)) OR " +
+		"INSTR(COALESCE(workflow_events.payload, ''), ?) > 0"
+	q = q.Where("workflow_events.run_id = ? AND ("+association+")", runID, effectID, effectID, effectID).
+		Order("workflow_events.seq ASC")
+	var rows []WorkflowEvent
+	if err := q.Limit(runtimeEffectEventLimit + 1).Find(&rows).Error; err != nil {
+		return RuntimeEffectEventQuery{}, fmt.Errorf("list runtime effect events: %w", err)
+	}
+	result := RuntimeEffectEventQuery{}
+	if len(rows) > runtimeEffectEventLimit {
+		result.Truncated = true
+		rows = rows[:runtimeEffectEventLimit]
+	}
+	result.Events = rows
+	return result, nil
 }

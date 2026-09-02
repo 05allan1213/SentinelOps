@@ -19,6 +19,13 @@ type TraceDAO struct {
 	db *gorm.DB
 }
 
+// TraceNodeRetrievalMetadata is the bounded retrieval summary persisted by
+// the trace callback.  It intentionally has no prompt, completion, query or
+// tool payload fields so Runtime evidence scoring cannot load raw content.
+type TraceNodeRetrievalMetadata struct {
+	RetrievedDocs string `gorm:"column:retrieved_docs"`
+}
+
 // EvidenceTraceQualityPredicate 保留 incomplete Trace 的诊断查询能力，同时将其排除出 Eval、发布证据和指标聚合。
 const EvidenceTraceQualityPredicate = "COALESCE(CASE WHEN JSON_VALID(agent_trace_runs.tags) THEN JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.trace_quality')) ELSE NULL END, 'unknown') <> 'incomplete'"
 
@@ -109,7 +116,7 @@ func physicalDeleteTraceMetadata(ctx context.Context, db *gorm.DB, cutoff time.T
 
 func terminalTraceIDs(db *gorm.DB, cutoff time.Time, limit int) ([]string, error) {
 	var ids []string
-	runIDExpr := "JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.run_id'))"
+	runIDExpr := traceRunIDFromTagsExpr()
 	err := db.Model(&TraceRun{}).
 		Joins("JOIN workflow_runs ON workflow_runs.id = "+runIDExpr).
 		Where("JSON_VALID(agent_trace_runs.tags) AND workflow_runs.status IN ? AND workflow_runs.finished_at IS NOT NULL AND workflow_runs.finished_at < ?",
@@ -153,6 +160,10 @@ func scopedEvidenceTraceRuns(ctx context.Context, db *gorm.DB) (*gorm.DB, error)
 		return nil, err
 	}
 	return query.Where(EvidenceTraceQualityPredicate), nil
+}
+
+func traceRunIDFromTagsExpr() string {
+	return "CASE WHEN JSON_VALID(agent_trace_runs.tags) THEN JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.run_id')) ELSE NULL END"
 }
 
 // ListRuns 分页查询链路运行记录
@@ -223,12 +234,80 @@ func (d *TraceDAO) GetRunByWorkflowRunID(ctx context.Context, runID string) (*Tr
 	if err != nil {
 		return nil, err
 	}
+	identity, err := policy.IdentityFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	runIDExpr := traceRunIDFromTagsExpr()
+	query = query.Joins("JOIN workflow_runs ON workflow_runs.id = "+runIDExpr).
+		Where("workflow_runs.id = ? AND workflow_runs.runtime_mode = ? AND workflow_runs.deleted_at IS NULL", runID, "durable_v1")
+	if !identity.Scope.All {
+		query = query.Where("workflow_runs.user_id = ?", identity.Scope.UserID)
+	}
 	var run TraceRun
-	if result := query.Where("JSON_VALID(tags) AND JSON_UNQUOTE(JSON_EXTRACT(tags, '$.run_id')) = ?", runID).
-		Order("start_time DESC, id DESC").First(&run); result.Error != nil {
+	if result := query.Where("JSON_VALID(agent_trace_runs.tags) AND "+runIDExpr+" = ?", runID).
+		Select("agent_trace_runs.id, agent_trace_runs.trace_id, agent_trace_runs.trace_name, agent_trace_runs.entry_point, " +
+			"agent_trace_runs.session_id, agent_trace_runs.status, agent_trace_runs.error_code, " +
+			"agent_trace_runs.start_time, agent_trace_runs.end_time, agent_trace_runs.duration_ms, " +
+			"agent_trace_runs.total_input_tokens, agent_trace_runs.cached_input_tokens, " +
+			"agent_trace_runs.total_output_tokens, agent_trace_runs.reasoning_tokens, " +
+			"agent_trace_runs.estimated_cost_cny, agent_trace_runs.tags, agent_trace_runs.created_at, agent_trace_runs.updated_at").
+		Order("agent_trace_runs.start_time DESC, agent_trace_runs.id DESC").First(&run); result.Error != nil {
 		return nil, result.Error
 	}
 	return &run, nil
+}
+
+// ListRunsByWorkflowRunID returns every Attempt Trace associated with a
+// durable workflow Run.  GetRunByWorkflowRunID intentionally remains the
+// legacy "latest trace" primitive; Runtime Detail must use this aggregate
+// query so Resume/Replay Attempts are not silently dropped.
+func (d *TraceDAO) ListRunsByWorkflowRunID(ctx context.Context, runID string) ([]TraceRun, error) {
+	db, err := d.queryDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		return nil, gorm.ErrInvalidData
+	}
+	query, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	identity, err := policy.IdentityFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// The durable Run is the business identity.  Requiring the tag relation to
+	// resolve to that Run prevents a guessed run_id in an unrelated Trace row
+	// from becoming visible, while the scopedTraceRuns predicate still enforces
+	// the server-side owner tag for non-admin identities.
+	runIDExpr := traceRunIDFromTagsExpr()
+	query = query.Joins("JOIN workflow_runs ON workflow_runs.id = "+runIDExpr).
+		Where("workflow_runs.id = ? AND workflow_runs.runtime_mode = ? AND workflow_runs.deleted_at IS NULL", runID, "durable_v1")
+	if !identity.Scope.All {
+		query = query.Where("workflow_runs.user_id = ?", identity.Scope.UserID)
+	}
+	query = query.Where("JSON_VALID(agent_trace_runs.tags) AND "+runIDExpr+" = ?", runID)
+	var rows []TraceRun
+	if err := query.Select("agent_trace_runs.id, agent_trace_runs.trace_id, agent_trace_runs.trace_name, " +
+		"agent_trace_runs.entry_point, agent_trace_runs.session_id, agent_trace_runs.status, " +
+		"agent_trace_runs.error_code, agent_trace_runs.start_time, agent_trace_runs.end_time, " +
+		"agent_trace_runs.duration_ms, agent_trace_runs.total_input_tokens, " +
+		"agent_trace_runs.cached_input_tokens, agent_trace_runs.total_output_tokens, " +
+		"agent_trace_runs.reasoning_tokens, agent_trace_runs.estimated_cost_cny, " +
+		"agent_trace_runs.tags, agent_trace_runs.created_at, agent_trace_runs.updated_at").
+		Order("agent_trace_runs.start_time ASC, agent_trace_runs.id ASC").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("list runtime trace attempts: %w", err)
+	}
+	return rows, nil
+}
+
+// ListTraceRunsByWorkflowRunID is a descriptive alias for callers that keep
+// the Trace/Run aggregate terminology in their service API.
+func (d *TraceDAO) ListTraceRunsByWorkflowRunID(ctx context.Context, runID string) ([]TraceRun, error) {
+	return d.ListRunsByWorkflowRunID(ctx, runID)
 }
 
 // ListNodesByTraceID 查询指定链路的所有节点
@@ -247,6 +326,56 @@ func (d *TraceDAO) ListNodesByTraceID(ctx context.Context, traceID string) ([]Tr
 		return nil, err
 	}
 	return nodes, nil
+}
+
+// CountNodesByTraceID returns only the node cardinality for a visible Trace.
+// Runtime metadata DTOs must not load or serialize Prompt/Completion/Tool
+// payload columns merely to render a node count.
+func (d *TraceDAO) CountNodesByTraceID(ctx context.Context, traceID string) (int64, error) {
+	db, err := d.queryDB(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if strings.TrimSpace(traceID) == "" {
+		return 0, gorm.ErrRecordNotFound
+	}
+	allowedRuns, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return 0, err
+	}
+	var count int64
+	if err := db.WithContext(ctx).Model(&TraceNode{}).
+		Where("trace_id = ? AND trace_id IN (?)", traceID, allowedRuns.Select("trace_id")).
+		Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("count runtime trace nodes: %w", err)
+	}
+	return count, nil
+}
+
+// ListRetrievalMetadataByTraceID returns only persisted retrieval summaries
+// for a visible Trace.  Runtime Evidence uses this projection for scores;
+// callers that need the legacy raw Trace detail must use the separately
+// authorized trace service.
+func (d *TraceDAO) ListRetrievalMetadataByTraceID(ctx context.Context, traceID string) ([]TraceNodeRetrievalMetadata, error) {
+	db, err := d.queryDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(traceID) == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	allowedRuns, err := scopedTraceRuns(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	var rows []TraceNodeRetrievalMetadata
+	if err := db.WithContext(ctx).Table("agent_trace_nodes").
+		Select("agent_trace_nodes.retrieved_docs").
+		Where("agent_trace_nodes.trace_id = ? AND agent_trace_nodes.trace_id IN (?)", traceID, allowedRuns.Select("trace_id")).
+		Order("agent_trace_nodes.start_time ASC, agent_trace_nodes.id ASC").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("list runtime retrieval metadata: %w", err)
+	}
+	return rows, nil
 }
 
 // GetStatsAgg 获取基础统计聚合数据

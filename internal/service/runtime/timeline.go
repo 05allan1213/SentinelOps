@@ -95,7 +95,7 @@ func (s *RuntimeService) ListTimeline(ctx context.Context, runID string, f Timel
 	// Correlation filters are applied after canonical mapping so malformed and
 	// unknown events remain visible when no filter is requested.
 	total := int64(len(items))
-	start := (page - 1) * size
+	start := runtimePageOffset(page, size)
 	if start > len(items) {
 		start = len(items)
 	}
@@ -104,7 +104,7 @@ func (s *RuntimeService) ListTimeline(ctx context.Context, runID string, f Timel
 		end = len(items)
 	}
 	items = items[start:end]
-	return v1.TimelineRes{Items: items, Page: v1.PageMeta{Page: page, PageSize: size, Total: total, HasNext: int64(page*size) < total}, ResourceMeta: meta}, nil
+	return v1.TimelineRes{Items: items, Page: v1.PageMeta{Page: page, PageSize: size, Total: total, HasNext: runtimePageHasNext(page, size, total)}, ResourceMeta: meta}, nil
 }
 
 func (s *RuntimeService) ListAttempts(ctx context.Context, runID string, p v1.PageRequest) (v1.AttemptsRes, error) {
@@ -142,7 +142,7 @@ func (s *RuntimeService) ListAttempts(ctx context.Context, runID string, p v1.Pa
 	}
 	if quality != "complete" {
 		total = int64(len(rows))
-		start := (p.Page - 1) * p.PageSize
+		start := runtimePageOffset(p.Page, p.PageSize)
 		if start > len(rows) {
 			start = len(rows)
 		}
@@ -158,7 +158,7 @@ func (s *RuntimeService) ListAttempts(ctx context.Context, runID string, p v1.Pa
 		items = append(items, v1.AttemptDTO{AttemptID: a.ID, RunID: a.RunID, Attempt: int(a.Attempt), Mode: value(a.Mode), Status: status, CurrentPhase: v1.CurrentPhase(value(a.CurrentPhase)), WorkerID: value(a.WorkerID), LeaseGeneration: valueU64(a.LeaseGeneration), RuntimeVersion: value(a.RuntimeVersion), RunCompatibilityHash: value(a.RunCompatibilityHash), CheckpointCompatibilityHash: value(a.CheckpointCompatibilityHash), ExecutingWorkerFingerprint: value(a.ExecutingWorkerFingerprint), TraceID: value(a.TraceID), OperationID: value(a.OperationID), RetryCount: int(valueU(a.RetryCount)), FailoverCount: int(valueU(a.FailoverCount)), FailureCode: value(a.FailureCode), FailureMessage: value(a.FailureMessageRedacted), UsageQuality: v1.DataQuality(value(a.UsageQuality)), TraceQuality: v1.DataQuality(value(a.TraceQuality)), StartedAt: a.StartedAt, FinishedAt: a.FinishedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQuality(quality)}})
 	}
 	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQuality(quality)}
-	return v1.AttemptsRes{Items: items, Page: v1.PageMeta{Page: p.Page, PageSize: p.PageSize, Total: total, HasNext: int64(p.Page*p.PageSize) < total}, ResourceMeta: meta}, nil
+	return v1.AttemptsRes{Items: items, Page: v1.PageMeta{Page: p.Page, PageSize: p.PageSize, Total: total, HasNext: runtimePageHasNext(p.Page, p.PageSize, total)}, ResourceMeta: meta}, nil
 }
 
 func (s *RuntimeService) ListCheckpoints(ctx context.Context, runID string, p v1.PageRequest) (v1.CheckpointsRes, error) {
@@ -207,7 +207,7 @@ func (s *RuntimeService) ListCheckpoints(ctx context.Context, runID string, p v1
 	if len(items) == 0 {
 		meta.DataQuality = v1.DataQualityUnknown
 	}
-	return v1.CheckpointsRes{Items: items, Page: v1.PageMeta{Page: p.Page, PageSize: p.PageSize, Total: total, HasNext: int64(p.Page*p.PageSize) < total}, ResourceMeta: meta}, nil
+	return v1.CheckpointsRes{Items: items, Page: v1.PageMeta{Page: p.Page, PageSize: p.PageSize, Total: total, HasNext: runtimePageHasNext(p.Page, p.PageSize, total)}, ResourceMeta: meta}, nil
 }
 
 func checkpointStateProjection(c checkpointProjection, run *mysql.WorkflowRun, now time.Time) (string, string) {

@@ -398,6 +398,9 @@ type WorkflowRun struct {
 	// select columns that do not exist in workflow_runs.
 	RuntimeAgent        string `gorm:"-"`
 	RuntimeAgentQuality string `gorm:"-"`
+	// RuntimeQueryHash is populated by the digest-only Runtime projection; the
+	// raw query remains outside list DTOs.
+	RuntimeQueryHash string `gorm:"-"`
 }
 
 func (WorkflowRun) TableName() string { return "workflow_runs" }

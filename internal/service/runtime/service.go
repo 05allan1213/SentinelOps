@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"math"
 	"time"
 
 	v1 "SentinelOps/api/runtime/v1"
@@ -16,16 +17,38 @@ import (
 
 // RuntimeService is the read-only aggregate service for durable runs.
 type RuntimeService struct {
-	Store *workflow.GORMStore
-	Gates *airuntime.GateEvaluator
+	Store    *workflow.GORMStore
+	Gates    *airuntime.GateEvaluator
+	TraceDAO *mysql.TraceDAO
 }
 
 func NewRuntimeService(store *workflow.GORMStore) *RuntimeService {
-	return &RuntimeService{Store: store}
+	return &RuntimeService{Store: store, TraceDAO: runtimeTraceDAO(store)}
 }
 
 func NewRuntimeServiceWithEvaluator(store *workflow.GORMStore, gates *airuntime.GateEvaluator) *RuntimeService {
-	return &RuntimeService{Store: store, Gates: gates}
+	return &RuntimeService{Store: store, Gates: gates, TraceDAO: runtimeTraceDAO(store)}
+}
+
+// NewRuntimeServiceWithTraceDAO binds the Runtime read service to the same
+// database connection as the supplied TraceDAO.  It is primarily useful for
+// isolated tests and for callers that already own a configured TraceDAO.
+func NewRuntimeServiceWithTraceDAO(store *workflow.GORMStore, traceDAO *mysql.TraceDAO) *RuntimeService {
+	return &RuntimeService{Store: store, TraceDAO: traceDAO}
+}
+
+// NewRuntimeServiceWithEvaluatorAndTraceDAO is the fully injectable Runtime
+// constructor.  Existing constructors keep their public shape for callers
+// that do not need a custom TraceDAO.
+func NewRuntimeServiceWithEvaluatorAndTraceDAO(store *workflow.GORMStore, gates *airuntime.GateEvaluator, traceDAO *mysql.TraceDAO) *RuntimeService {
+	return &RuntimeService{Store: store, Gates: gates, TraceDAO: traceDAO}
+}
+
+func runtimeTraceDAO(store *workflow.GORMStore) *mysql.TraceDAO {
+	if store == nil || store.DB() == nil {
+		return nil
+	}
+	return mysql.NewTraceDAOWithDB(store.DB())
 }
 
 func BuildBudgetDTO(limitsJSON, usageJSON, reservationsJSON *string) v1.RuntimeBudgetDTO {
@@ -154,7 +177,11 @@ func BuildRunSummary(run mysql.WorkflowRun) v1.RunSummaryDTO {
 		meta.DataQuality = v1.DataQualityUnknown
 		meta.ReasonCode = "unknown_status"
 	}
-	return v1.RunSummaryDTO{RunID: run.ID, SessionID: run.SessionID, WorkflowKey: run.WorkflowKey, RuntimeMode: run.RuntimeMode, Status: p.Status, CurrentPhase: phase, Agent: run.RuntimeAgent, Attempt: int(run.Attempt), WorkerID: value(run.LeaseOwner), LeaseGeneration: run.LeaseGeneration, LeaseState: leaseState(run), HeartbeatAt: run.HeartbeatAt, ParkReason: value(run.ParkReason), RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), QueryHash: hashText(run.QueryText), Budget: budget, UsageQuality: v1.DataQuality(run.UsageQuality), TraceQuality: v1.DataQuality(run.TraceQuality), StartedAt: &run.StartedAt, FinishedAt: run.FinishedAt, DurationMs: run.DurationMs, ResourceMeta: meta}
+	queryHash := run.RuntimeQueryHash
+	if queryHash == "" && run.QueryText != "" {
+		queryHash = hashText(run.QueryText)
+	}
+	return v1.RunSummaryDTO{RunID: run.ID, SessionID: run.SessionID, WorkflowKey: run.WorkflowKey, RuntimeMode: run.RuntimeMode, Status: p.Status, CurrentPhase: phase, Agent: run.RuntimeAgent, Attempt: int(run.Attempt), WorkerID: value(run.LeaseOwner), LeaseGeneration: run.LeaseGeneration, LeaseState: leaseState(run), HeartbeatAt: run.HeartbeatAt, ParkReason: value(run.ParkReason), RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), QueryHash: queryHash, Budget: budget, UsageQuality: v1.DataQuality(run.UsageQuality), TraceQuality: v1.DataQuality(run.TraceQuality), StartedAt: &run.StartedAt, FinishedAt: run.FinishedAt, DurationMs: run.DurationMs, ResourceMeta: meta}
 }
 
 func AllowedRecoveryActions(status string, compatibility v1.RuntimeCompatibilityDTO) []v1.RecoveryAction {
@@ -276,7 +303,31 @@ func (s *RuntimeService) ListRuns(ctx context.Context, f mysql.RuntimeRunFilter)
 	if size < 1 {
 		size = 50
 	}
-	return v1.ListRunsRes{Items: out, Page: v1.PageMeta{Page: page, PageSize: size, Total: total, HasNext: int64(page*size) < total}, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}}, nil
+	return v1.ListRunsRes{Items: out, Page: v1.PageMeta{Page: page, PageSize: size, Total: total, HasNext: runtimePageHasNext(page, size, total)}, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}}, nil
+}
+
+// runtimePageOffset/HasNext keep untrusted page values from overflowing an
+// int or int64 before they reach a SQL offset or a wire-level page marker.
+// Page validation supplies the lower bound; these helpers handle the upper
+// boundary without turning a large request into a wrapped/negative offset.
+func runtimePageOffset(page, pageSize int) int {
+	if page <= 1 || pageSize <= 0 {
+		return 0
+	}
+	if page-1 > math.MaxInt/pageSize {
+		return math.MaxInt
+	}
+	return (page - 1) * pageSize
+}
+
+func runtimePageHasNext(page, pageSize int, total int64) bool {
+	if total <= 0 || page <= 0 || pageSize <= 0 {
+		return false
+	}
+	if uint64(page) > uint64(math.MaxInt64)/uint64(pageSize) {
+		return false
+	}
+	return int64(page)*int64(pageSize) < total
 }
 
 func value(p *string) string {

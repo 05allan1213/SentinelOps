@@ -223,6 +223,10 @@ func (r ListRunsReq) Valid() error {
 	return nil
 }
 
+func validTimelineSort(v string) bool {
+	return v == "seq" || v == "created_at"
+}
+
 func validRunSort(v string) bool {
 	switch v {
 	case "created_at", "updated_at", "started_at", "finished_at", "status", "attempt":
@@ -268,7 +272,7 @@ func (r GetTimelineReq) Valid() error {
 	if r.Direction != "" && !r.Direction.Valid() {
 		return validationErrorf("invalid direction")
 	}
-	if r.Sort != "" && !validRunSort(r.Sort) {
+	if r.Sort != "" && !validTimelineSort(r.Sort) {
 		return validationErrorf("invalid sort")
 	}
 	for _, eventType := range r.EventTypes {
