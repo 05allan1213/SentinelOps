@@ -432,6 +432,13 @@ func (c *ControllerV1) GetEval(ctx context.Context, req *v1.GetEvalReq) (*v1.Eva
 	if err := req.Valid(); err != nil {
 		return nil, c.fail(ctx, err)
 	}
+	if c.service != nil {
+		res, err := c.service.GetEval(ctx, runtimesvc.EvalFilter{Suite: req.Suite, Page: req.Page, PageSize: req.PageSize})
+		if err != nil {
+			return nil, c.fail(ctx, err)
+		}
+		return &res, nil
+	}
 	meta := unavailableNotRunMeta()
 	return &v1.EvalRes{Item: v1.EvalDTO{Suite: req.Suite, ResourceMeta: meta}, ResourceMeta: meta}, nil
 }
@@ -439,6 +446,13 @@ func (c *ControllerV1) GetEval(ctx context.Context, req *v1.GetEvalReq) (*v1.Eva
 func (c *ControllerV1) GetRelease(ctx context.Context, req *v1.GetReleaseReq) (*v1.ReleaseRes, error) {
 	if req == nil {
 		return nil, c.fail(ctx, v1.ErrRuntimeRequestValidation)
+	}
+	if c.service != nil {
+		res, err := c.service.GetRelease(ctx)
+		if err != nil {
+			return nil, c.fail(ctx, err)
+		}
+		return &res, nil
 	}
 	meta := unavailableNotRunMeta()
 	return &v1.ReleaseRes{Item: v1.ReleaseDTO{ResourceMeta: meta}, ResourceMeta: meta}, nil

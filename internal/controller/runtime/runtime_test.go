@@ -49,6 +49,26 @@ func TestRuntimeControllerHViewsAreExplicitlyUnavailable(t *testing.T) {
 	}
 }
 
+func TestRuntimeControllerH03ViewsUseServiceReadModels(t *testing.T) {
+	controller := NewV1(service.NewRuntimeService(nil))
+
+	eval, err := controller.GetEval(context.Background(), &v1.GetEvalReq{Page: 1, PageSize: 50, Suite: "runtime"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if eval.Item.Suite != service.EvalSuiteAgent || !eval.Item.NotRun || eval.Item.ReasonCode != "eval_not_executed" {
+		t.Fatalf("eval=%+v", eval)
+	}
+
+	release, err := controller.GetRelease(context.Background(), &v1.GetReleaseReq{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if release.Item.RuntimeVersion == "" || release.Item.GrayState != nil || release.Item.RollbackState != nil || !release.NotRun || release.ReasonCode != "not_observed" {
+		t.Fatalf("release=%+v", release)
+	}
+}
+
 func TestRuntimeControllerHViewsRejectNilRequests(t *testing.T) {
 	controller := NewV1(nil)
 	checks := []struct {
