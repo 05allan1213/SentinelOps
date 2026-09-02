@@ -24,7 +24,7 @@ PASS — `go test ./internal/service/runtime ./internal/controller/runtime -run 
 
 PASS — `go test ./internal/ai/policy ./internal/ai/tools/mcp`
 
-PASS — `SENTINELOPS_TEST_DSN='root:sentinel_test_pw@tcp(127.0.0.1:13307)/sentinelops_phase03?parseTime=true&multiStatements=true' go test ./internal/ai/runtime -run 'TestWorkerSnapshotPersistsHeartbeatWithDisposableDSN' -count=1`
+PASS — `SENTINELOPS_TEST_DSN='<disposable-phase03-dsn>' go test ./internal/ai/runtime -run 'TestWorkerSnapshotPersistsHeartbeatWithDisposableDSN' -count=1`
 
 NOT RUN — full `internal/ai/runtime` suite has additional integration tests requiring the disposable DSN; the targeted worker snapshot test passed with the disposable MySQL configuration above.
 

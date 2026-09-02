@@ -17,7 +17,7 @@ Implemented only H-02 (persisted Worker Health and retention facts). H-03/D/E/F 
 Command:
 
 ```text
-SENTINELOPS_TEST_DSN='root:sentinel_test_pw@tcp(127.0.0.1:13307)/sentinelops_phase03?parseTime=true&multiStatements=true' go test ./internal/service/runtime ./internal/dao/mysql ./internal/controller/runtime -run 'Test(WorkerHealth|Retention|RuntimeControllerHViews|RuntimeWorkerSnapshotQuery|RuntimeRunStatusQuery)'
+SENTINELOPS_TEST_DSN='<disposable-phase03-dsn>' go test ./internal/service/runtime ./internal/dao/mysql ./internal/controller/runtime -run 'Test(WorkerHealth|Retention|RuntimeControllerHViews|RuntimeWorkerSnapshotQuery|RuntimeRunStatusQuery)'
 ```
 
 Output:
@@ -57,7 +57,7 @@ ok   SentinelOps/internal/dao/mysql 0.106s
 Latest focused command output:
 
 ```text
-SENTINELOPS_TEST_DSN='root:sentinel_test_pw@tcp(127.0.0.1:13307)/sentinelops_phase03?parseTime=true&multiStatements=true' go test ./internal/service/runtime ./internal/dao/mysql ./internal/controller/runtime -run 'Test(WorkerHealth|Retention|RuntimeControllerHViews|RuntimeWorkerSnapshotQuery|RuntimeRunStatusQuery)' && go vet ./internal/service/runtime ./internal/dao/mysql ./internal/controller/runtime
+SENTINELOPS_TEST_DSN='<disposable-phase03-dsn>' go test ./internal/service/runtime ./internal/dao/mysql ./internal/controller/runtime -run 'Test(WorkerHealth|Retention|RuntimeControllerHViews|RuntimeWorkerSnapshotQuery|RuntimeRunStatusQuery)' && go vet ./internal/service/runtime ./internal/dao/mysql ./internal/controller/runtime
 ok   SentinelOps/internal/service/runtime 0.243s
 ok   SentinelOps/internal/dao/mysql 3.109s
 ok   SentinelOps/internal/controller/runtime 0.112s
