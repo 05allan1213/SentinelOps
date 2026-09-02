@@ -38,6 +38,47 @@ func GetRuntimeRun(ctx context.Context, db *gorm.DB, runID string, includeLegacy
 	return NewGORMStore(db).GetRuntimeRun(ctx, runID, includeLegacy)
 }
 
+func ListRuntimeWorkerSnapshots(ctx context.Context, db *gorm.DB) ([]RuntimeWorkerSnapshot, error) {
+	return NewGORMStore(db).ListRuntimeWorkerSnapshots(ctx)
+}
+
+func ListRuntimeRunStatuses(ctx context.Context, db *gorm.DB) ([]string, error) {
+	return NewGORMStore(db).ListRuntimeRunStatuses(ctx)
+}
+
+// ListRuntimeWorkerSnapshots returns only the persisted Worker heartbeat projection.
+// It intentionally has no process-local fallback.
+func (s *GORMStore) ListRuntimeWorkerSnapshots(ctx context.Context) ([]RuntimeWorkerSnapshot, error) {
+	if ctx == nil || s == nil || s.db == nil {
+		return nil, fmt.Errorf("database context/store is required")
+	}
+	var rows []RuntimeWorkerSnapshot
+	if err := s.db.WithContext(ctx).Order("worker_id ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+// ListRuntimeRunStatuses provides the status facts used by retention protection.
+// The service applies workflow.RunOccupiesSession so the primitive remains the
+// single authority for terminal/non-terminal semantics.
+func (s *GORMStore) ListRuntimeRunStatuses(ctx context.Context) ([]string, error) {
+	if ctx == nil || s == nil || s.db == nil {
+		return nil, fmt.Errorf("database context/store is required")
+	}
+	var rows []struct {
+		Status string `gorm:"column:status"`
+	}
+	if err := s.db.WithContext(ctx).Model(&WorkflowRun{}).Select("status").Where("runtime_mode = ?", "durable_v1").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	statuses := make([]string, 0, len(rows))
+	for _, row := range rows {
+		statuses = append(statuses, row.Status)
+	}
+	return statuses, nil
+}
+
 var runtimeRunSortColumns = map[string]string{
 	"created_at": "created_at", "updated_at": "updated_at", "started_at": "started_at",
 	"finished_at": "finished_at", "status": "status", "attempt": "attempt",

@@ -413,6 +413,13 @@ func (c *ControllerV1) GetWorkerHealth(ctx context.Context, req *v1.GetWorkerHea
 	if req == nil {
 		return nil, c.fail(ctx, v1.ErrRuntimeRequestValidation)
 	}
+	if c.service != nil {
+		res, err := c.service.GetWorkerHealth(ctx)
+		if err != nil {
+			return nil, c.fail(ctx, err)
+		}
+		return &res, nil
+	}
 	meta := unavailableNotRunMeta()
 	return &v1.WorkerHealthRes{Items: []v1.WorkerObservationDTO{}, Page: unavailablePage(), ResourceMeta: meta}, nil
 }
@@ -440,6 +447,13 @@ func (c *ControllerV1) GetRelease(ctx context.Context, req *v1.GetReleaseReq) (*
 func (c *ControllerV1) GetRetention(ctx context.Context, req *v1.GetRetentionReq) (*v1.RetentionRes, error) {
 	if req == nil {
 		return nil, c.fail(ctx, v1.ErrRuntimeRequestValidation)
+	}
+	if c.service != nil {
+		res, err := c.service.GetRetention(ctx)
+		if err != nil {
+			return nil, c.fail(ctx, err)
+		}
+		return &res, nil
 	}
 	meta := unavailableNotRunMeta()
 	return &v1.RetentionRes{Item: v1.RetentionDTO{ResourceMeta: meta}, ResourceMeta: meta}, nil
