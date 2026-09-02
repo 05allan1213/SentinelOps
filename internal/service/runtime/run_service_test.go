@@ -37,19 +37,64 @@ func TestContextExpansionRequiresPermission(t *testing.T) {
 }
 
 func TestCompatibilitySeparatesThreeFingerprints(t *testing.T) {
-	run := mysql.WorkflowRun{RuntimeCompatibilityHash: strp("run")}
-	attempt := &mysql.WorkflowAttempt{RunCompatibilityHash: strp("run"), CheckpointCompatibilityHash: strp("run"), ExecutingWorkerFingerprint: strp("worker")}
+	generation := uint64(7)
+	run := mysql.WorkflowRun{ID: "run-compat", RuntimeCompatibilityHash: strp("run")}
+	attempt := &mysql.WorkflowAttempt{Attempt: 2, LeaseGeneration: &generation, RunCompatibilityHash: strp("run"), CheckpointCompatibilityHash: strp("run"), ExecutingWorkerFingerprint: strp("worker")}
 	worker := &mysql.RuntimeWorkerSnapshot{RuntimeCompatibilityHash: strp("worker")}
 	cp := &mysql.WorkflowCheckpoint{RuntimeCompatibilityHash: strp("run")}
 	c := BuildCompatibilityDTO(run, attempt, worker, cp)
-	if !c.RunMatch || !c.CheckpointMatch || !c.WorkerMatch || !c.ExactRestoreAllowed {
+	if c.AttemptFingerprint != workflow.AttemptFingerprint(run.ID, attempt.Attempt, generation) {
+		t.Fatalf("attempt fingerprint=%q", c.AttemptFingerprint)
+	}
+	if c.ExecutingWorkerFingerprint != "worker" {
+		t.Fatalf("executing worker fingerprint=%q", c.ExecutingWorkerFingerprint)
+	}
+	if !c.RunMatch || !c.CheckpointMatch || !c.WorkerMatch || !c.ExactRestoreAllowed || c.ResourceMeta.Availability != v1.AvailabilityAvailable {
 		t.Fatalf("compat=%+v", c)
 	}
 }
 
-func TestCompatibilityCheckpointUsesPersistedCheckpointHash(t *testing.T) {
+func TestCompatibilityMissingWorkerFingerprintIsPartialNotExact(t *testing.T) {
+	generation := uint64(1)
 	run := mysql.WorkflowRun{RuntimeCompatibilityHash: strp("run")}
-	attempt := &mysql.WorkflowAttempt{RunCompatibilityHash: strp("run"), CheckpointCompatibilityHash: strp("cp"), ExecutingWorkerFingerprint: strp("worker")}
+	attempt := &mysql.WorkflowAttempt{LeaseGeneration: &generation, RunCompatibilityHash: strp("run"), CheckpointCompatibilityHash: strp("run")}
+	worker := &mysql.RuntimeWorkerSnapshot{RuntimeCompatibilityHash: strp("worker")}
+	cp := &mysql.WorkflowCheckpoint{RuntimeCompatibilityHash: strp("run")}
+	c := BuildCompatibilityDTO(run, attempt, worker, cp)
+	if c.WorkerMatch || c.ExactRestoreAllowed || c.ReasonCode != "worker_fingerprint_not_observed" ||
+		c.ResourceMeta.Availability != v1.AvailabilityPartial || c.ExecutingWorkerFingerprint != "" {
+		t.Fatalf("legacy attempt looked exact: %+v", c)
+	}
+}
+
+func TestCompatibilityWorkerFingerprintMismatchNeverExact(t *testing.T) {
+	generation := uint64(1)
+	run := mysql.WorkflowRun{RuntimeCompatibilityHash: strp("run")}
+	attempt := &mysql.WorkflowAttempt{LeaseGeneration: &generation, RunCompatibilityHash: strp("run"), CheckpointCompatibilityHash: strp("run"), ExecutingWorkerFingerprint: strp("worker-a")}
+	worker := &mysql.RuntimeWorkerSnapshot{RuntimeCompatibilityHash: strp("worker-b")}
+	cp := &mysql.WorkflowCheckpoint{RuntimeCompatibilityHash: strp("run")}
+	c := BuildCompatibilityDTO(run, attempt, worker, cp)
+	if c.WorkerMatch || c.ExactRestoreAllowed || c.ExecutingWorkerFingerprint != "worker-a" {
+		t.Fatalf("mismatched worker was treated exact: %+v", c)
+	}
+}
+
+func TestCompatibilityCurrentWorkerSnapshotAbsentIsNotObserved(t *testing.T) {
+	generation := uint64(1)
+	run := mysql.WorkflowRun{RuntimeCompatibilityHash: strp("run")}
+	attempt := &mysql.WorkflowAttempt{LeaseGeneration: &generation, RunCompatibilityHash: strp("run"), CheckpointCompatibilityHash: strp("run"), ExecutingWorkerFingerprint: strp("worker")}
+	cp := &mysql.WorkflowCheckpoint{RuntimeCompatibilityHash: strp("run")}
+	c := BuildCompatibilityDTO(run, attempt, nil, cp)
+	if c.WorkerMatch || c.ExactRestoreAllowed || c.ReasonCode != "not_observed" ||
+		c.ResourceMeta.Availability != v1.AvailabilityPartial || c.ExecutingWorkerFingerprint != "worker" {
+		t.Fatalf("absent worker snapshot looked compatible: %+v", c)
+	}
+}
+
+func TestCompatibilityCheckpointUsesPersistedCheckpointHash(t *testing.T) {
+	generation := uint64(1)
+	run := mysql.WorkflowRun{RuntimeCompatibilityHash: strp("run")}
+	attempt := &mysql.WorkflowAttempt{LeaseGeneration: &generation, RunCompatibilityHash: strp("run"), CheckpointCompatibilityHash: strp("cp"), ExecutingWorkerFingerprint: strp("worker")}
 	worker := &mysql.RuntimeWorkerSnapshot{RuntimeCompatibilityHash: strp("worker")}
 	cp := &mysql.WorkflowCheckpoint{RuntimeCompatibilityHash: strp("cp")}
 	if got := BuildCompatibilityDTO(run, attempt, worker, cp); !got.ExactRestoreAllowed || !got.CheckpointMatch {

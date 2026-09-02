@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,6 +70,61 @@ func TestAttemptProjectionRejectsStaleGeneration(t *testing.T) {
 	after := readAttempt(t, db, stale.RunID, 1)
 	if before.TraceID != nil || after.TraceID != nil || before.LeaseGeneration == nil || after.LeaseGeneration == nil || *before.LeaseGeneration != *after.LeaseGeneration {
 		t.Fatalf("stale generation changed Attempt: before=%+v after=%+v", before, after)
+	}
+}
+
+func TestAttemptPersistsExecutingWorkerFingerprintOnClaim(t *testing.T) {
+	db := newP07Database(t, "c02_attempt_fingerprint")
+	store := NewGORMStore(db)
+	ctx := fixture08UserContext("user-c02-attempt-fingerprint")
+	created, err := store.CreateRunWithSessionLock(ctx, fixture08CreateInput("run-c02-attempt-fingerprint", "session-c02-attempt-fingerprint"))
+	if err != nil {
+		t.Fatalf("create Run: %v", err)
+	}
+	fingerprint := *created.RuntimeCompatibilityHash
+	claimed, ok, err := store.ClaimNextRun(context.Background(), ClaimInput{
+		Owner: "worker-c02-fingerprint", LeaseDuration: time.Minute, ExecutingWorkerFingerprint: fingerprint,
+	})
+	if err != nil || !ok {
+		t.Fatalf("claim with fingerprint: claimed=%#v ok=%v err=%v", claimed, ok, err)
+	}
+	row := readAttempt(t, db, created.ID, 1)
+	if row.ExecutingWorkerFingerprint == nil || *row.ExecutingWorkerFingerprint != fingerprint {
+		t.Fatalf("executing worker fingerprint was not persisted: %+v", row)
+	}
+}
+
+func TestAttemptClaimRejectsMismatchedWorkerFingerprint(t *testing.T) {
+	db := newP07Database(t, "c02_attempt_fingerprint_mismatch")
+	store := NewGORMStore(db)
+	ctx := fixture08UserContext("user-c02-attempt-fingerprint-mismatch")
+	created, err := store.CreateRunWithSessionLock(ctx, fixture08CreateInput("run-c02-fingerprint-mismatch", "session-c02-fingerprint-mismatch"))
+	if err != nil {
+		t.Fatalf("create Run: %v", err)
+	}
+	mismatch := strings.Repeat("b", 64)
+	if *created.RuntimeCompatibilityHash == mismatch {
+		t.Fatalf("fixture fingerprint collision: %q", mismatch)
+	}
+	claimed, ok, err := store.ClaimNextRun(context.Background(), ClaimInput{
+		Owner: "worker-c02-mismatch", LeaseDuration: time.Minute, ExecutingWorkerFingerprint: mismatch,
+	})
+	if err == nil || ok || claimed != nil || !errors.Is(err, ErrRunCASConflict) {
+		t.Fatalf("mismatched claim=%#v ok=%v err=%v, want ErrRunCASConflict", claimed, ok, err)
+	}
+	var run mysql.WorkflowRun
+	if err := db.First(&run, "id = ?", created.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if run.LeaseOwner != nil || run.Status != RunStatusPending {
+		t.Fatalf("mismatched claim mutated Run=%+v", run)
+	}
+	var attempts int64
+	if err := db.Model(&mysql.WorkflowAttempt{}).Where("run_id = ?", created.ID).Count(&attempts).Error; err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 0 {
+		t.Fatalf("mismatched claim created %d Attempt rows", attempts)
 	}
 }
 

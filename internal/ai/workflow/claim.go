@@ -17,9 +17,10 @@ const maxLeaseDuration = 24 * time.Hour
 
 // ClaimInput 描述一次 Worker 原子认领请求；租约时间统一由 MySQL 计算。
 type ClaimInput struct {
-	Owner          string
-	LeaseDuration  time.Duration
-	RuntimeVersion string
+	Owner                      string
+	LeaseDuration              time.Duration
+	RuntimeVersion             string
+	ExecutingWorkerFingerprint string
 }
 
 // ClaimedRun 返回被认领的 Run 快照和唯一 fenced write token。
@@ -77,6 +78,10 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 			return fmt.Errorf("锁定可认领 workflow Run: %w", result.Error)
 		}
 
+		if err := validateClaimWorkerFingerprint(&run, input.ExecutingWorkerFingerprint); err != nil {
+			return err
+		}
+
 		if run.Status == RunStatusRetryableFailed {
 			if err := ValidateRunTransition(run.Status, RunStatusPending, TransitionIntentRetryReady, ""); err != nil {
 				return err
@@ -130,7 +135,7 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 		if err := insertDurableEvent(tx, run.ID, run.LastEventSeq, event, payload); err != nil {
 			return err
 		}
-		if err := beginAttemptTx(tx, &run, LeaseToken{RunID: run.ID, Owner: input.Owner, Generation: run.LeaseGeneration}, input.Owner); err != nil {
+		if err := beginAttemptTx(tx, &run, LeaseToken{RunID: run.ID, Owner: input.Owner, Generation: run.LeaseGeneration}, input.Owner, input.ExecutingWorkerFingerprint); err != nil {
 			return err
 		}
 		claimed = &ClaimedRun{
@@ -145,6 +150,16 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 		return nil, false, err
 	}
 	return claimed, claimed != nil, nil
+}
+
+func validateClaimWorkerFingerprint(run *mysql.WorkflowRun, executingWorkerFingerprint string) error {
+	if run == nil || strings.TrimSpace(executingWorkerFingerprint) == "" {
+		return nil
+	}
+	if run.RuntimeCompatibilityHash == nil || *run.RuntimeCompatibilityHash != strings.TrimSpace(executingWorkerFingerprint) {
+		return fmt.Errorf("%w: worker fingerprint does not match frozen run runtime compatibility hash", ErrRunCASConflict)
+	}
+	return nil
 }
 
 func validateLeaseOwner(owner string) error {

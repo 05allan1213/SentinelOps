@@ -207,7 +207,9 @@ func (w *Worker) ClaimNext(ctx context.Context) (*workflow.ClaimedRun, bool, err
 		}
 	}
 	return w.store.ClaimNextRun(ctx, workflow.ClaimInput{
-		Owner: w.config.Owner, LeaseDuration: w.config.LeaseDuration, RuntimeVersion: w.config.RuntimeVersion,
+		Owner: w.config.Owner, LeaseDuration: w.config.LeaseDuration,
+		RuntimeVersion:             w.config.RuntimeVersion,
+		ExecutingWorkerFingerprint: w.observation.RuntimeCompatibilityHash,
 	})
 }
 
@@ -361,7 +363,7 @@ func (w *Worker) consumeRecoveryOperation(ctx context.Context) (bool, error) {
 	if w == nil || w.store == nil {
 		return false, nil
 	}
-	claim, ok, err := w.store.ClaimNextRecoveryOperation(ctx, w.config.Owner, w.config.LeaseDuration)
+	claim, ok, err := w.store.ClaimNextRecoveryOperation(ctx, w.config.Owner, w.config.LeaseDuration, w.observation.RuntimeCompatibilityHash)
 	if err != nil || !ok {
 		return ok, err
 	}
@@ -580,7 +582,7 @@ func (w *Worker) withLeaseHeartbeat(ctx context.Context, token workflow.LeaseTok
 						// Keep heartbeating until the cancel command itself has a
 						// fenced started Event. A transient claim/start failure must
 						// never cancel the Eino Runner without an operation identity.
-						cancelClaim, claimOK, claimErr := w.store.ClaimNextRecoveryOperation(leaseCtx, token.Owner, w.config.LeaseDuration)
+						cancelClaim, claimOK, claimErr := w.store.ClaimNextRecoveryOperation(leaseCtx, token.Owner, w.config.LeaseDuration, w.observation.RuntimeCompatibilityHash)
 						if claimErr != nil || !claimOK || cancelClaim == nil || cancelClaim.Operation.Action != workflow.OperationActionCancel {
 							continue
 						}

@@ -140,35 +140,74 @@ func BuildContextDTO(s workflow.DurableContextSnapshot, revUsed, revCommitted ui
 
 func BuildCompatibilityDTO(run mysql.WorkflowRun, attempt *mysql.WorkflowAttempt, worker *mysql.RuntimeWorkerSnapshot, checkpoints ...*mysql.WorkflowCheckpoint) v1.RuntimeCompatibilityDTO {
 	r := v1.RuntimeCompatibilityDTO{ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityPartial, DataQuality: v1.DataQualityPartial}}
+	observed := true
+	reason := ""
 	if run.RuntimeCompatibilityHash != nil && *run.RuntimeCompatibilityHash != "" {
 		r.RunFingerprint = *run.RuntimeCompatibilityHash
-	}
-	if attempt != nil && attempt.CheckpointCompatibilityHash != nil && *attempt.CheckpointCompatibilityHash != "" {
-		r.CheckpointFingerprint = *attempt.CheckpointCompatibilityHash
-	}
-	if attempt != nil && attempt.ExecutingWorkerFingerprint != nil && *attempt.ExecutingWorkerFingerprint != "" {
-		r.AttemptFingerprint = *attempt.ExecutingWorkerFingerprint
-	}
-	if worker != nil && worker.RuntimeCompatibilityHash != nil && *worker.RuntimeCompatibilityHash != "" {
-		r.ExecutingWorkerFingerprint = *worker.RuntimeCompatibilityHash
-		r.WorkerMatch = r.AttemptFingerprint != "" && r.AttemptFingerprint == r.ExecutingWorkerFingerprint
 	} else {
-		r.ReasonCode = "not_observed"
+		observed = false
+		reason = "run_fingerprint_not_observed"
 	}
-	if r.RunFingerprint != "" && attempt != nil && attempt.RunCompatibilityHash != nil {
-		r.RunMatch = *attempt.RunCompatibilityHash == r.RunFingerprint
-	}
-	// Checkpoint compatibility is compared against the persisted checkpoint
-	// snapshot, never against the run hash (these are independent dimensions).
-	if attempt != nil && attempt.CheckpointCompatibilityHash != nil {
-		if len(checkpoints) > 0 && checkpoints[0] != nil && checkpoints[0].RuntimeCompatibilityHash != nil {
-			r.CheckpointMatch = *attempt.CheckpointCompatibilityHash == *checkpoints[0].RuntimeCompatibilityHash
+	if attempt == nil {
+		observed = false
+		reason = "attempt_not_observed"
+	} else {
+		if attempt.LeaseGeneration != nil {
+			r.AttemptFingerprint = workflow.AttemptFingerprint(run.ID, attempt.Attempt, *attempt.LeaseGeneration)
 		} else {
-			r.CheckpointMatch = false
-			if r.ReasonCode == "" {
-				r.ReasonCode = "checkpoint_not_observed"
+			observed = false
+			if reason == "" {
+				reason = "attempt_generation_not_observed"
 			}
 		}
+		if attempt.CheckpointCompatibilityHash != nil && *attempt.CheckpointCompatibilityHash != "" {
+			r.CheckpointFingerprint = *attempt.CheckpointCompatibilityHash
+		} else {
+			observed = false
+			if reason == "" {
+				reason = "checkpoint_fingerprint_not_observed"
+			}
+		}
+		// ExecutingWorkerFingerprint is the physical Worker snapshot recorded at
+		// claim time.  AttemptFingerprint above is the deterministic Attempt
+		// identity and must never be substituted for this persisted observation.
+		if attempt.ExecutingWorkerFingerprint != nil && *attempt.ExecutingWorkerFingerprint != "" {
+			r.ExecutingWorkerFingerprint = *attempt.ExecutingWorkerFingerprint
+			if worker != nil && worker.RuntimeCompatibilityHash != nil && *worker.RuntimeCompatibilityHash != "" {
+				r.WorkerMatch = r.ExecutingWorkerFingerprint == *worker.RuntimeCompatibilityHash
+			} else {
+				observed = false
+				if reason == "" {
+					reason = "not_observed"
+				}
+			}
+		} else {
+			observed = false
+			reason = "worker_fingerprint_not_observed"
+		}
+		if r.RunFingerprint != "" && attempt.RunCompatibilityHash != nil {
+			r.RunMatch = *attempt.RunCompatibilityHash == r.RunFingerprint
+		} else {
+			observed = false
+			if reason == "" {
+				reason = "run_fingerprint_not_observed"
+			}
+		}
+		// Checkpoint compatibility is compared against the persisted checkpoint
+		// snapshot, never against the run hash (these are independent dimensions).
+		if len(checkpoints) > 0 && checkpoints[0] != nil && checkpoints[0].RuntimeCompatibilityHash != nil {
+			r.CheckpointMatch = r.CheckpointFingerprint == *checkpoints[0].RuntimeCompatibilityHash
+		} else {
+			observed = false
+			if reason == "" {
+				reason = "checkpoint_not_observed"
+			}
+		}
+	}
+	if observed {
+		r.ResourceMeta = v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
+	} else {
+		r.ReasonCode = reason
 	}
 	r.ExactRestoreAllowed = r.RunMatch && r.CheckpointMatch && r.WorkerMatch
 	return r

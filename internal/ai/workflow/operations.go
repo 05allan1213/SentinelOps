@@ -115,8 +115,10 @@ type RecoveryOperationClaim struct {
 
 // ClaimNextRecoveryOperation 在 Run 行锁内选择一个 accepted 或可 reclaim 的
 // started operation。首次 accepted claim 才会创建恢复 Attempt；started
-// reclaim 只接管同一个 Attempt，绝不递增 Attempt 第二次。
-func (s *GORMStore) ClaimNextRecoveryOperation(ctx context.Context, owner string, leaseDuration time.Duration) (*RecoveryOperationClaim, bool, error) {
+// reclaim 只接管同一个 Attempt，绝不递增 Attempt 第二次。非空
+// executingWorkerFingerprint 表示真实 Worker 当前 Frozen Snapshot 的
+// runtime_compatibility_hash，首次 claim 时必须在同一行锁事务内与 Run 精确一致。
+func (s *GORMStore) ClaimNextRecoveryOperation(ctx context.Context, owner string, leaseDuration time.Duration, executingWorkerFingerprint string) (*RecoveryOperationClaim, bool, error) {
 	if err := validateLeaseOwner(owner); err != nil {
 		return nil, false, err
 	}
@@ -158,6 +160,11 @@ func (s *GORMStore) ClaimNextRecoveryOperation(ctx context.Context, owner string
 			return nil
 		}
 		firstClaim := op.Status == OperationStatusAccepted
+		if firstClaim {
+			if err := validateClaimWorkerFingerprint(&run, executingWorkerFingerprint); err != nil {
+				return fmt.Errorf("%w: worker fingerprint does not match frozen run runtime compatibility hash", ErrOperationPrecondition)
+			}
+		}
 		acceptedGeneration := run.LeaseGeneration
 		if firstClaim {
 			if (op.Action == OperationActionResume || op.Action == OperationActionReplay) && run.Attempt >= run.MaxAttempts {
@@ -241,7 +248,7 @@ func (s *GORMStore) ClaimNextRecoveryOperation(ctx context.Context, owner string
 			claimed.Operation.ExecutionGeneration = generation
 		}
 		if firstClaim && (op.Action == OperationActionResume || op.Action == OperationActionReplay) {
-			if err := beginAttemptTx(tx, &run, claimed.Lease, owner); err != nil {
+			if err := beginAttemptTx(tx, &run, claimed.Lease, owner, executingWorkerFingerprint); err != nil {
 				return err
 			}
 			if err := setAttemptOperationTx(tx, &run, claimed.Lease, op.OperationID); err != nil {

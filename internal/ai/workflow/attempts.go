@@ -2,10 +2,13 @@ package workflow
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +36,21 @@ type FinishAttemptInput struct {
 	OperationID    string
 }
 
+// AttemptFingerprintDomain separates the deterministic Attempt identity from
+// Run, Checkpoint and Worker fingerprints.
+const AttemptFingerprintDomain = "sentinelops/runtime-attempt/v1"
+
+// AttemptFingerprint derives a stable, secret-free Attempt identity from the
+// Run ID, Attempt number and fenced lease generation.  It never reuses
+// executing_worker_fingerprint, which records the physical Worker snapshot.
+func AttemptFingerprint(runID string, attempt uint, generation uint64) string {
+	payload := AttemptFingerprintDomain + "\x00" + runID + "\x00" +
+		strconv.FormatUint(uint64(attempt), 10) + "\x00" +
+		strconv.FormatUint(generation, 10)
+	digest := sha256.Sum256([]byte(payload))
+	return hex.EncodeToString(digest[:])
+}
+
 // BeginAttemptTx inserts the current Run attempt.  It is intentionally a
 // transaction-local primitive; callers that also mutate Run/Event truth pass
 // the same *gorm.DB transaction through the unexported helper below.
@@ -41,11 +59,11 @@ func (s *GORMStore) BeginAttemptTx(ctx context.Context, token LeaseToken, worker
 		return err
 	}
 	return s.withFencedRunTransaction(ctx, token, RunStatusRunning, func(tx *gorm.DB, run *mysql.WorkflowRun) error {
-		return beginAttemptTx(tx, run, token, workerID)
+		return beginAttemptTx(tx, run, token, workerID, "")
 	})
 }
 
-func beginAttemptTx(tx *gorm.DB, run *mysql.WorkflowRun, token LeaseToken, workerID string) error {
+func beginAttemptTx(tx *gorm.DB, run *mysql.WorkflowRun, token LeaseToken, workerID, executingWorkerFingerprint string) error {
 	if run == nil || run.ID != token.RunID || run.Attempt == 0 || run.LeaseGeneration != token.Generation {
 		return ErrLeaseLost
 	}
@@ -54,7 +72,7 @@ func beginAttemptTx(tx *gorm.DB, run *mysql.WorkflowRun, token LeaseToken, worke
 	if worker == "" && run.LeaseOwner != nil {
 		worker = *run.LeaseOwner
 	}
-	var runtimeVersion, runtimeHash, workerValue *string
+	var runtimeVersion, runtimeHash, workerValue, executingFingerprint *string
 	if run.RuntimeVersion != nil {
 		value := *run.RuntimeVersion
 		runtimeVersion = &value
@@ -66,14 +84,18 @@ func beginAttemptTx(tx *gorm.DB, run *mysql.WorkflowRun, token LeaseToken, worke
 	if worker != "" {
 		workerValue = &worker
 	}
+	if fingerprint := strings.TrimSpace(executingWorkerFingerprint); fingerprint != "" {
+		executingFingerprint = &fingerprint
+	}
 	generation := token.Generation
 	now := time.Now().UTC()
 	row := mysql.WorkflowAttempt{
 		ID: uuid.NewString(), RunID: run.ID, Attempt: run.Attempt,
 		Mode: &mode, Status: &status, CurrentPhase: &phase, WorkerID: workerValue,
 		LeaseGeneration: &generation, RuntimeVersion: runtimeVersion,
-		RunCompatibilityHash: runtimeHash,
-		UsageQuality:         stringPtr("unknown"), TraceQuality: stringPtr("unknown"),
+		RunCompatibilityHash:       runtimeHash,
+		ExecutingWorkerFingerprint: executingFingerprint,
+		UsageQuality:               stringPtr("unknown"), TraceQuality: stringPtr("unknown"),
 		StartedAt: &now, CreatedAt: &now, UpdatedAt: &now,
 	}
 	// A duplicate attempt is only acceptable when all fenced identity facts
