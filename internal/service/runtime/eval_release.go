@@ -2,11 +2,13 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"math"
 	"sort"
 	"strings"
 
 	v1 "SentinelOps/api/runtime/v1"
+	"SentinelOps/internal/ai/policy"
 	airuntime "SentinelOps/internal/ai/runtime"
 	"SentinelOps/internal/dao/mysql"
 	"SentinelOps/internal/service/rageval"
@@ -41,6 +43,9 @@ func (s *RuntimeService) GetEval(ctx context.Context, filter EvalFilter) (v1.Eva
 	if suite == EvalSuiteRAG {
 		metrics, err := rageval.GetDashboard(ctx, "24h")
 		if err != nil {
+			if errors.Is(err, policy.ErrForbidden) || errors.Is(err, policy.ErrUnauthenticated) {
+				return v1.EvalRes{}, ErrRuntimeForbidden
+			}
 			meta := ragEvalUnavailableMeta()
 			item := v1.EvalDTO{Suite: EvalSuiteRAG, ResourceMeta: meta}
 			return v1.EvalRes{Item: item, ResourceMeta: meta}, nil
@@ -102,7 +107,11 @@ func mapRAGEvalMetrics(metrics *rageval.DashboardMetrics) v1.EvalDTO {
 
 	total := metrics.TotalRuns
 	if total < 0 || total > int64(maxInt()) || math.IsNaN(metrics.SuccessRate) || math.IsInf(metrics.SuccessRate, 0) || metrics.SuccessRate < 0 || metrics.SuccessRate > 1 {
-		item.ResourceMeta = v1.ResourceMeta{Availability: v1.AvailabilityPartial, DataQuality: v1.DataQualityUnknown, ReasonCode: "malformed_rag_eval"}
+		item.ResourceMeta = v1.ResourceMeta{Availability: v1.AvailabilityPartial, DataQuality: v1.DataQualityUnknown, ReasonCode: "malformed_rag_eval", NotRun: true}
+		return item
+	}
+	if total == 0 {
+		item.ResourceMeta = ragEvalUnavailableMeta()
 		return item
 	}
 	passed := int(math.Round(metrics.SuccessRate * float64(total)))

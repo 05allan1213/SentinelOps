@@ -2,8 +2,10 @@ package runtime
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"SentinelOps/internal/ai/workflow"
 	"SentinelOps/internal/dao/mysql"
 	"SentinelOps/internal/service/rageval"
+	driver "github.com/go-sql-driver/mysql"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -57,6 +60,25 @@ func TestEvalMalformedOrAbsentSourceIsNotRun(t *testing.T) {
 	malformed := mapRAGEvalMetrics(nil)
 	if malformed.Suite != EvalSuiteRAG || malformed.Availability != v1.AvailabilityUnavailable || !malformed.NotRun || malformed.ReasonCode != "rag_eval_unavailable" {
 		t.Fatalf("malformed optional RAG source=%+v", malformed)
+	}
+	ragUnavailable, err := (&RuntimeService{}).GetEval(context.Background(), EvalFilter{Suite: EvalSuiteRAG})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ragUnavailable.Item.Suite != EvalSuiteRAG || ragUnavailable.Availability != v1.AvailabilityUnavailable || !ragUnavailable.NotRun || ragUnavailable.ReasonCode != "rag_eval_unavailable" {
+		t.Fatalf("missing RAG source metadata=%+v", ragUnavailable)
+	}
+	for name, metrics := range map[string]*rageval.DashboardMetrics{
+		"empty object":  {TotalRuns: 0, SuccessRate: 0},
+		"invalid count": {TotalRuns: -1, SuccessRate: 0},
+		"invalid rate":  {TotalRuns: 1, SuccessRate: 2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			res := mapRAGEvalMetrics(metrics)
+			if res.Availability == v1.AvailabilityAvailable || !res.NotRun || res.CaseCount != 0 || res.Passed != 0 || res.Failed != 0 {
+				t.Fatalf("malformed RAG source fabricated evidence=%+v", res)
+			}
+		})
 	}
 }
 
@@ -124,9 +146,40 @@ func TestReleaseServiceProjectsPersistedWorkerVersions(t *testing.T) {
 	if dsn == "" {
 		t.Skip("SENTINELOPS_TEST_DSN is required for disposable MySQL release projection evidence")
 	}
-	db, err := gorm.Open(gormmysql.Open(dsn), &gorm.Config{})
+	baseConfig, err := driver.ParseDSN(dsn)
+	if err != nil {
+		t.Fatalf("parse SENTINELOPS_TEST_DSN: %v", err)
+	}
+	if baseConfig.DBName != "sentinelops_phase03" {
+		t.Fatalf("refuse non-disposable database %q", baseConfig.DBName)
+	}
+	if !regexp.MustCompile(`^[a-z0-9_]+$`).MatchString(baseConfig.DBName) {
+		t.Fatalf("unsafe database name %q", baseConfig.DBName)
+	}
+	databaseName := "sentinelops_phase03_h03_release"
+	adminConfig := *baseConfig
+	adminConfig.DBName = "mysql"
+	adminDB, err := sql.Open("mysql", adminConfig.FormatDSN())
 	if err != nil {
 		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = adminDB.Close() })
+	quotedName := "`" + databaseName + "`"
+	if _, err := adminDB.Exec("DROP DATABASE IF EXISTS " + quotedName); err != nil {
+		t.Fatalf("drop stale disposable database: %v", err)
+	}
+	if _, err := adminDB.Exec("CREATE DATABASE " + quotedName + " CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci"); err != nil {
+		t.Fatalf("create disposable database: %v", err)
+	}
+	t.Cleanup(func() { _, _ = adminDB.Exec("DROP DATABASE IF EXISTS " + quotedName) })
+	testConfig := *baseConfig
+	testConfig.DBName = databaseName
+	db, err := gorm.Open(gormmysql.Open(testConfig.FormatDSN()), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sqlDB, err := db.DB(); err == nil {
+		t.Cleanup(func() { _ = sqlDB.Close() })
 	}
 	if err := db.AutoMigrate(&mysql.RuntimeWorkerSnapshot{}); err != nil {
 		t.Fatal(err)
@@ -192,7 +245,8 @@ func TestIncompleteTraceCannotPassRelease(t *testing.T) {
 	if res.Item.GrayState != nil || res.Item.RollbackState != nil || !res.Item.NotRun || res.Item.ReasonCode != "not_observed" {
 		t.Fatalf("incomplete evidence was treated as release success=%+v", res.Item)
 	}
-	if mysql.EvidenceTraceQualityPredicate == "" {
-		t.Fatal("release evidence lost the shared trace-quality contract")
+	const expectedPredicate = "COALESCE(CASE WHEN JSON_VALID(agent_trace_runs.tags) THEN JSON_UNQUOTE(JSON_EXTRACT(agent_trace_runs.tags, '$.trace_quality')) ELSE NULL END, 'unknown') <> 'incomplete'"
+	if mysql.EvidenceTraceQualityPredicate != expectedPredicate {
+		t.Fatalf("release evidence changed the shared trace-quality contract: %q", mysql.EvidenceTraceQualityPredicate)
 	}
 }

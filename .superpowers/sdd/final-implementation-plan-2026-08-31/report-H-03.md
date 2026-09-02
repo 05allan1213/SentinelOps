@@ -28,6 +28,9 @@ routes were preserved; D/E/F were not run.
 - Explicit `rag_eval` requests reuse the existing RAG dashboard aggregate;
   its result is labeled `rag_eval`, and deterministic Gate/LLM judge fields are
   `not_applicable`.
+- Empty, malformed, or unavailable RAG source data is never converted into a
+  zero-case success; it is returned with `not_run=true` and an explanatory
+  availability/reason code.
 - Agent Eval requests return a valid zero-valued DTO with
   `availability=unavailable`, `data_quality=unknown`,
   `reason_code=eval_not_executed`, and `not_run=true` when the versioned source
@@ -50,13 +53,15 @@ PASS — focused H-03 service/controller tests (`TestEval*`, `TestRelease*`,
 
 PASS — `go test ./internal/service/rageval -count=1`
 
-PASS — `go test ./internal/dao/mysql -run 'TestTraceIncompleteAggregateContract|TestRuntimeWorkerSnapshotQueryRequiresStore' -count=1`
+PASS — `go test ./internal/dao/mysql -run 'TestTraceIncompleteDashboardContract|TestRuntimeWorkerSnapshotQueryRequiresStore' -count=1`
 
 PASS — `go vet ./internal/service/runtime ./internal/controller/runtime`
 
-NOT RUN — `TestReleaseServiceProjectsPersistedWorkerVersions` was skipped because
-`SENTINELOPS_TEST_DSN` was not set in this session. No real provider, full Agent
-Eval, rollout, rollback, image, D, E, or F evidence was run.
+PASS — `TestReleaseServiceProjectsPersistedWorkerVersions` with the disposable
+phase03 MySQL DSN; the test creates and cleans an isolated H-03 database.
+
+NOT RUN — No real provider, full Agent Eval, rollout, rollback, image, D, E, or
+F evidence was run.
 
 ## Read-only and truthfulness checks
 
