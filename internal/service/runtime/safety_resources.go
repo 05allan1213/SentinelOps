@@ -639,12 +639,6 @@ func effectKeyDigest(value string) string {
 	return hex.EncodeToString(digest[:])
 }
 
-func latestApprovalEventSeq(approvalID string, events []mysql.WorkflowEvent) uint64 {
-	row := mysql.AgentApproval{ID: approvalID}
-	seq, _ := latestApprovalEventFacts(row, events)
-	return seq
-}
-
 func latestApprovalEventFacts(row mysql.AgentApproval, events []mysql.WorkflowEvent) (uint64, v1.ResourceMeta) {
 	meta := completeSafetyMeta()
 	var seq uint64

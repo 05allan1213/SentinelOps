@@ -55,3 +55,14 @@
 - Final verification: DSN-backed `go test -p 1 ./internal/service/runtime ./internal/controller/runtime ./internal/bootstrap ./internal/dao/mysql ./internal/ai/policy ./internal/ai/runtime ./internal/service/rageval` PASS (the long `internal/ai/runtime` package completed in 150.887s); `go test -p 1 ./internal/service/rageval -count=1` PASS; `go test -race ./internal/service/runtime ./internal/controller/runtime` PASS; `go vet ./internal/service/runtime ./internal/controller/runtime ./internal/bootstrap ./internal/dao/mysql ./internal/ai/policy ./internal/ai/runtime ./internal/service/rageval` PASS; `git diff --check` PASS.
 - H-03 optional Release persisted-worker integration test PASS with isolated disposable MySQL database. Real provider, versioned Agent Eval, rollout/rollback, hosted CI, images, P43, and all later D/E/F phases remain NOT RUN.
 - Post-closeout documentation cleanup: `29ffb26` replaced literal disposable DSN credentials in H-01/H-02 reports with non-sensitive placeholders; `19459ce` synchronized this ledger. No product behavior changed; final HEAD is `19459ce`.
+
+## B1-02 contract fix (post-H review)
+
+- Scope: only the review-identified B1-01/B1-02 contract gaps; no Route/IRuntimeV1 growth, no migration, no frontend/D/E/F changes. `grill-truth.md` remains untracked and is excluded from commits.
+- Commit 1 (fingerprint): `f1ce886` separates deterministic AttemptFingerprint from the persisted executing-worker fingerprint, validates Worker snapshot hashes at Claim/Recovery first claim inside the row lock, and persists the fingerprint on new Attempt rows.
+- Commit 2 (context): `8542022` adds bounded redacted `include=history` Context expansion and routes Context reads through `RuntimeService.GetContext`.
+- Commit 3 (budget/agent): `cd66487` keeps invalid Budget counters nil and degrades missing/malformed agent projections on `/runs` rows.
+- Commit 4 (tools/docs): staticcheck deletions, controller-test assertion cleanup, frozen-plan/ContextDTO refresh, and this review file; see git log for the final SHA. No push.
+- Focused verification: new deterministic fingerprint tests PASS; Claim and Recovery fingerprint persistence/mismatch DB tests PASS; real durable Run Context `HistoryCount=2` DB test PASS; `go test ./api/runtime/... ./internal/service/runtime ./internal/controller/runtime ./internal/dao/mysql` PASS.
+- Long verification: `internal/ai/runtime` PASS (238.738s). The full `internal/ai/workflow` package did not complete in the 10-minute default timeout: `TestRecoveryLegalityMatrix` was still waiting on Goose disposable-database initialization (the same environment/migration bottleneck recorded in the B1 progress report), so the package run is classified NOT RUN TO COMPLETION rather than PASS.
+- Remaining gates: D/E/F, Hosted CI, real providers/API/Worker execution, rollout/rollback, image contracts, and P43 remain NOT RUN.

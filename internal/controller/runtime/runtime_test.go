@@ -15,9 +15,7 @@ import (
 
 func TestRuntimeControllerImplementsFrozenInterface(t *testing.T) {
 	var controller apiRuntime.IRuntimeV1 = NewV1(nil)
-	if controller == nil {
-		t.Fatal("runtime controller must be bound")
-	}
+	_ = controller
 }
 
 func TestRuntimeControllerHViewsAreExplicitlyUnavailable(t *testing.T) {

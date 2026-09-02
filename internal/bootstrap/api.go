@@ -99,14 +99,6 @@ func bindAPI(ctx context.Context) error {
 	return nil
 }
 
-func newDurableAPIService(ctx context.Context, config *appconfig.Config, evaluator *airuntime.GateEvaluator) (*chatsvc.DurableService, error) {
-	db, err := dao.DB(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return newDurableAPIServiceWithStore(ctx, config, evaluator, workflow.NewGORMStore(db))
-}
-
 func newDurableAPIServiceWithStore(ctx context.Context, config *appconfig.Config, evaluator *airuntime.GateEvaluator, store *workflow.GORMStore) (*chatsvc.DurableService, error) {
 	if store == nil {
 		return nil, fmt.Errorf("durable workflow Store is required")
