@@ -179,6 +179,20 @@ func normalizeRuntimePage(page, size int) (int, int) {
 	return page, size
 }
 
+// runtimeEffectProjection intentionally omits request/response bodies and
+// projects both sensitive JSON-bearing columns as one-way digests.  The
+// aliases keep the existing AgentEffect model usable without adding writable
+// transient fields that GORM might accidentally include in ordinary writes.
+const runtimeEffectProjection = "agent_effects.id, agent_effects.run_id, " +
+	"CASE WHEN agent_effects.idempotency_key IS NULL OR agent_effects.idempotency_key = '' THEN '' ELSE SHA2(agent_effects.idempotency_key, 256) END AS idempotency_key, " +
+	"agent_effects.effect_role, agent_effects.effect_step, agent_effects.parent_effect_id, " +
+	"agent_effects.proposal_hash, agent_effects.tool_name, agent_effects.tool_revision, " +
+	"agent_effects.tool_schema_hash, agent_effects.target_hash, agent_effects.effect_type, " +
+	"agent_effects.status, agent_effects.version, agent_effects.external_reference, " +
+	"agent_effects.lease_generation, agent_effects.attempt, agent_effects.reconciliation_attempts, " +
+	"agent_effects.resolution, CASE WHEN agent_effects.resolution_evidence_redacted IS NULL OR agent_effects.resolution_evidence_redacted = '' THEN NULL ELSE CONCAT('sha256:', SHA2(agent_effects.resolution_evidence_redacted, 256)) END AS resolution_evidence_redacted, " +
+	"agent_effects.resolved_by, agent_effects.created_at, agent_effects.updated_at, agent_effects.last_error"
+
 // runtimeScopedQuery starts every Approval/Effect/Event read from the owned
 // durable Run.  The run ID is only a selector; identity.Scope remains the
 // authorization boundary, so a guessed ID cannot widen visibility.
@@ -223,8 +237,8 @@ func (s *GORMStore) ListRuntimeApprovals(ctx context.Context, runID string, page
 }
 
 // ListRuntimeEffects returns only metadata columns represented by AgentEffect
-// and applies all filters as bound values.  Request/response columns are
-// loaded for the in-process mapper but are never copied into a Runtime DTO.
+// and applies all filters as bound values.  Request/response bodies are never
+// selected; sensitive idempotency/evidence columns are projected as digests.
 func (s *GORMStore) ListRuntimeEffects(ctx context.Context, runID string, f RuntimeEffectFilter) ([]AgentEffect, int64, error) {
 	q, err := s.runtimeScopedQuery(ctx, runID, &AgentEffect{}, "agent_effects")
 	if err != nil {
@@ -254,7 +268,7 @@ func (s *GORMStore) ListRuntimeEffects(ctx context.Context, runID string, f Runt
 	}
 	page, pageSize := normalizeRuntimePage(f.Page, f.PageSize)
 	var rows []AgentEffect
-	if err := q.Select("agent_effects.*").
+	if err := q.Select(runtimeEffectProjection).
 		// Primary first makes the parent/derived relationship deterministic even
 		// when timestamps were written by separate transactions.
 		Order("CASE WHEN agent_effects.effect_role = 'primary' THEN 0 ELSE 1 END ASC").
@@ -282,7 +296,7 @@ func (s *GORMStore) GetRuntimeEffect(ctx context.Context, effectID string) (*Age
 		q = q.Where("workflow_runs.user_id = ?", identity.Scope.UserID)
 	}
 	var row AgentEffect
-	if err := q.Select("agent_effects.*").First(&row).Error; err != nil {
+	if err := q.Select(runtimeEffectProjection).First(&row).Error; err != nil {
 		return nil, err
 	}
 	return &row, nil

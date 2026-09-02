@@ -128,3 +128,16 @@ func TestRuntimeEffectLookupAndEventQueryRespectScope(t *testing.T) {
 		t.Fatalf("owned event query err=%v", err)
 	}
 }
+
+func TestRuntimeEffectProjectionIsMetadataOnly(t *testing.T) {
+	for _, forbidden := range []string{"agent_effects.*", "request_redacted", "response_redacted"} {
+		if strings.Contains(runtimeEffectProjection, forbidden) {
+			t.Fatalf("runtime effect projection contains forbidden column %q: %s", forbidden, runtimeEffectProjection)
+		}
+	}
+	for _, required := range []string{"SHA2(agent_effects.idempotency_key", "SHA2(agent_effects.resolution_evidence_redacted", "AS idempotency_key", "AS resolution_evidence_redacted"} {
+		if !strings.Contains(runtimeEffectProjection, required) {
+			t.Fatalf("runtime effect projection is missing %q: %s", required, runtimeEffectProjection)
+		}
+	}
+}

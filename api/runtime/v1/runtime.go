@@ -657,6 +657,7 @@ type ApprovalDTO struct {
 	PolicyHash                string            `json:"policy_hash"`
 	RuntimeCompatibilityHash  string            `json:"runtime_compatibility_hash"`
 	CheckpointID              string            `json:"checkpoint_id,omitempty"`
+	CheckpointPayloadSHA256   string            `json:"checkpoint_payload_sha256,omitempty"`
 	CheckpointLeaseGeneration uint64            `json:"checkpoint_lease_generation,omitempty"`
 	Proposal                  map[string]string `json:"proposal,omitempty"`
 	EventSeq                  uint64            `json:"event_seq,omitempty"`
