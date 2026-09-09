@@ -1,5 +1,5 @@
 import { Check, Copy } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { cn } from '@/utils'
 
@@ -9,9 +9,10 @@ export interface CodeBlockProps {
   code: string
   language?: string
   streaming?: boolean
+  children?: ReactNode
 }
 
-export default function CodeBlock({ code, language, streaming = false }: CodeBlockProps) {
+export default function CodeBlock({ code, language, streaming = false, children }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
   const normalizedLanguage = normalizeLanguage(language)
   const skipReason = highlightSkipReason(code, language, streaming)
@@ -51,7 +52,7 @@ export default function CodeBlock({ code, language, streaming = false }: CodeBlo
         </button>
       </div>
       <pre className="max-w-full overflow-x-auto p-4 text-sm leading-6">
-        <code className="font-mono">{code}</code>
+        <code className="font-mono">{skipReason === undefined ? (children ?? code) : code}</code>
       </pre>
     </div>
   )
