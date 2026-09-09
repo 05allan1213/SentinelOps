@@ -25,6 +25,8 @@ describe('Markdown URL safety', () => {
     'mailto:security@example.com',
     'https://',
     'http://[::1',
+    '\\\\evil.example/path',
+    '/\\evil.example/path',
     'not a url',
     '',
   ])('rejects dangerous or malformed link %j', (href) => {
@@ -50,6 +52,8 @@ describe('Markdown URL safety', () => {
     'vbscript:msgbox(1)',
     'file:///tmp/unsafe',
     'https://',
+    '\\\\evil.example/path',
+    '/\\evil.example/path',
     'not a url',
   ])('renders rejected link %j as non-clickable text', (href) => {
     const { container } = render(createElement(SafeLink, { href }, 'unsafe destination'))
@@ -214,6 +218,10 @@ describe('Markdown streaming fence safety', () => {
     ['```ts\n\\``` escaped close', false],
     ['```ts\n``` trailing text', false],
     ['```ts\n~~~\n```', true],
+    ['intro\r```ts\rconst open = true', false],
+    ['intro\r~~~sh\recho open', false],
+    ['intro\r```ts\rconst closed = true\r```\routro', true],
+    ['intro\r~~~sh\recho closed\r~~~\routro', true],
   ])('reports fence closure for %j', (markdown, closed) => {
     expect(isFenceClosed(markdown)).toBe(closed)
   })

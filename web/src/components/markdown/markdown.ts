@@ -58,7 +58,7 @@ const LANGUAGE_ALIASES: Readonly<Record<string, MarkdownLanguage>> = {
 }
 
 function hasInvalidUrlText(value: string): boolean {
-  if (value.length === 0 || value !== value.trim()) return true
+  if (value.length === 0 || value !== value.trim() || value.includes('\\')) return true
 
   for (const character of value) {
     const codePoint = character.codePointAt(0) ?? 0
@@ -99,7 +99,6 @@ export function isAllowedImageSource(src: string): boolean {
   if (
     hasInvalidUrlText(src)
     || src.startsWith('//')
-    || src.includes('\\')
   ) {
     return false
   }
@@ -145,7 +144,7 @@ function closesFence(line: string, fence: OpenFence): boolean {
 export function isFenceClosed(markdown: string): boolean {
   let openFence: OpenFence | undefined
 
-  for (const line of markdown.split(/\r?\n/u)) {
+  for (const line of markdown.split(/\r\n?|\n/u)) {
     if (openFence === undefined) {
       openFence = openingFence(line)
       continue
