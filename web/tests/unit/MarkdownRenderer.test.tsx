@@ -62,6 +62,11 @@ describe('MarkdownRenderer', () => {
   it.each([
     ['closed CRLF', '```ts\r\nconst a = 1\r\n\r\n```', 'const a = 1\r\n\r\n'],
     ['unterminated fence', '```ts\nconst a = 1', 'const a = 1'],
+    ['empty unterminated fence', '```text\n', ''],
+    ['four-space literal fence', '```text\nbody\n    ```', 'body\n    ```'],
+    ['quote literal fence', '```text\nbody\n> ```', 'body\n> ```'],
+    ['valid blockquote fence', '> ```text\n> body\n> ```', 'body\n'],
+    ['valid list fence', '- ```text\n  body\n  ```', 'body\n'],
   ])('preserves source newlines for %s when copying', async (_, content, raw) => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })

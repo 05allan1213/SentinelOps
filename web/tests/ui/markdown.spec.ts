@@ -41,6 +41,24 @@ test.describe('shared Markdown renderer desktop fixture', () => {
     })
   }
 
+  test('preserves fence context and EOF in the real clipboard', async ({ page, context }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.goto('/tests/ui/fixtures/markdown.html')
+    await expect(page.getByRole('heading', { name: 'Markdown fixture' })).toBeVisible()
+    for (const [content, raw] of [
+      ['```text\nbody\n    ```', 'body\n    ```'],
+      ['```text\nbody\n> ```', 'body\n> ```'],
+      ['> ```text\n> body\n> ```', 'body\n'],
+      ['- ```text\n  body\n  ```', 'body\n'],
+    ]) {
+      await page.evaluate((content) => window.renderMarkdownFixture({ content }), content)
+      await expect.poll(() => page.locator('pre code').textContent()).toBe(raw)
+      await page.getByTestId('code-block').getByRole('button').click()
+      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(raw)
+    }
+  })
+
   test('streaming guards and unsupported languages stay raw in the browser', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto('/tests/ui/fixtures/markdown.html')

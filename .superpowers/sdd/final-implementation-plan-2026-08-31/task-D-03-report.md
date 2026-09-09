@@ -81,3 +81,19 @@ Observed: 1938 transformed modules, `PASS restricted grammar modules: bash, css,
 Created `web/src/components/markdown/MarkdownRenderer.tsx`, `index.ts`, `lowlight-core.ts`, `web/tests/unit/MarkdownRenderer.test.tsx`, `web/tests/ui/markdown.spec.ts`, `web/tests/ui/fixtures/markdown.html`, `markdown.tsx`, and this report. Modified `web/package.json`, `web/package-lock.json`, `web/src/components/markdown/CodeBlock.tsx`, `web/vite.config.ts`, `web/vitest.config.ts`.
 
 Self-review corrected missing HAST metadata typings, avoided requiring new Node type dependencies in the existing Vite typecheck, and fixed exact-copy terminal newline preservation with RED/GREEN evidence. Changed-file lint is clean. No unresolved correctness issue identified. Maintenance constraint: pinned lowlight internal path/alias requires revalidation on upgrade. Existing global lint and bundle-size warnings remain. Coordinator progress edits and the user's `grill-truth.md` were not staged or changed by this task. No push, ledger/plan edits, consumer migration, or E/F work.
+
+## Review fix round 1 — exact-copy fence context (base f8f61ac)
+
+Result: PASS. Review correctly identified that the previous closing-fence regex accepted literal four-space indentation and `>` inside fenced code. For ` ```text\nbody\n    ``` ` and ` ```text\nbody\n> ``` ` (without surrounding example spaces, EOF without LF), CommonMark retains the last line as code; the previous copy metadata incorrectly appended LF.
+
+Removed the approximate closing-marker regex. Terminal separator recovery now compares the existing parser's code-content line count with its source-position line span: a real closing line is absent from parsed content, while a literal remains. Source EOF separators and empty unterminated fences are handled directly. This uses the same parsed HAST and existing VFile, adds no parser or business state, and leaves highlighting configuration/display AST unchanged.
+
+- RED: `npm run test:unit -- MarkdownRenderer` after adding the regression cases reported `2 failed | 34 passed (36)`; the failing cases were `four-space literal fence` and `quote literal fence`, both exact clipboard argument assertions. The valid blockquote/list fence cases passed.
+- GREEN: the same command after correction plus the empty-open-fence edge case reported `Test Files 1 passed (1)`, `Tests 37 passed (37)`, exit 0, no warnings.
+- PASS: `npx playwright test tests/ui/markdown.spec.ts --project=chromium -g 'preserves fence context'` reported `1 passed (5.3s)`, exit 0. At desktop 1280 this new browser test clicks the real CodeBlock button and reads `navigator.clipboard.readText()` for both reported literal cases and valid blockquote/list nested fences. Only existing NO_COLOR/FORCE_COLOR environment notices appeared.
+- PASS: `npx eslint src/components/markdown/MarkdownRenderer.tsx tests/unit/MarkdownRenderer.test.tsx tests/ui/markdown.spec.ts` exited 0 with no warnings/errors.
+- PASS: `npx tsc --noEmit --pretty false` exited 0 with no output.
+- PASS: `git diff --check`, no whitespace errors.
+- NOT RUN in this fix round: full unit suite, full lint/build, previous browser layout cases and bundle module assertions. Their prior PASS evidence above remains historical; this amendment changes only copy metadata and its focused tests, with no dependency/config/style/consumer changes.
+
+Files in this fix: renderer, renderer unit tests, focused browser spec, and this report appendix. No remaining issue identified in the reviewed defect; no ledger/plan/E/F changes.

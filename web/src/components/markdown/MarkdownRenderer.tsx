@@ -57,11 +57,15 @@ function originalCode(node: Element, rendered: string, file: VFile): string {
   // but recover the actual terminal separator for copying fenced source.
   const value = rendered.endsWith('\n') ? rendered.slice(0, -1) : rendered
   const lastLine = /(\r\n|\r|\n)([^\r\n]*)$/u.exec(source)
-  if (lastLine === null) return value
-  const closing = /^(?:[ \t]|>[ \t]*)*(`{3,}|~{3,})[ \t]*$/u.exec(lastLine[2])
-  const closed = closing !== null && closing[1][0] === opening[1][0] && closing[1].length >= opening[1].length
-  if (closed) return value + (lastLine.index >= opening[0].length ? lastLine[1] : '')
-  return value + (source.endsWith(lastLine[1]) ? lastLine[1] : '')
+  if (lastLine === null || source.length === opening[0].length) return value
+  if (lastLine[2] === '') return value + lastLine[1]
+
+  // The existing parser omits a real closing line from code content, while
+  // retaining fence-like literals (including their indentation/quote prefix).
+  // Compare line counts, not a second approximation of CommonMark's closers.
+  const sourceBreaks = node.position!.end.line - node.position!.start.line
+  const contentBreaks = value.split(/\r\n|\r|\n/u).length - 1
+  return sourceBreaks > contentBreaks + 1 ? value + lastLine[1] : value
 }
 
 function boundedHighlight(options: { streaming: boolean }) {
