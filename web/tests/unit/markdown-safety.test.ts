@@ -206,6 +206,14 @@ describe('Markdown fenced language safety', () => {
 describe('Markdown streaming fence safety', () => {
   it.each([
     ['plain text', true],
+    ['  ```ts\nconst pending = true', false],
+    ['  ```ts\nconst ready = true\n  ```', true],
+    ['> ```ts\n> const pending = true', false],
+    ['> ```ts\n> const ready = true\n> ```', true],
+    ['- ```ts\n  const pending = true', false],
+    ['- ```ts\n  const ready = true\n  ```', true],
+    ['```ts\nbody\n    ```', false],
+    ['```ts\nbody\n> ```', false],
     ['```ts\nconst safe = true\n```', true],
     ['~~~sh\necho safe\n~~~', true],
     ['````markdown\n``` remains content\n````', true],

@@ -77,7 +77,6 @@ describe('MarkdownRenderer', () => {
 
   it.each([
     ['rust', 'fn main() {}', false, 'unsupported-language'],
-    ['js', 'const active = true', true, 'streaming'],
     ['js', 'a'.repeat(32769), false, 'size-limit'],
     ['js', 'x\n'.repeat(1001), false, 'size-limit'],
   ])('skips highlighter work for case %# (%s)', (language, code, streaming, reason) => {
@@ -99,6 +98,12 @@ describe('MarkdownRenderer', () => {
     expect(container.querySelector('pre [class^="hljs-"]')).not.toBeNull()
     expect(container.querySelector('pre code')?.textContent).toBe(`${code}\n`)
     expect(faults.highlightCalls).toBe(1)
+  })
+
+  it('highlights a closed fence during a bounded streaming render', () => {
+    const { container } = render(createElement(MarkdownRenderer, { content: '```js\nconst active = true\n```', streaming: true, complete: false }))
+    expect(faults.highlightCalls).toBe(1)
+    expect(container.querySelector('.hljs-keyword')).toHaveTextContent('const')
   })
 
   it('keeps unlabeled fenced and indented blocks raw and copyable', () => {

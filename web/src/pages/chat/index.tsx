@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ChevronDown, ChevronRight, Loader2, ListChecks, ThumbsUp, ThumbsDown, Pencil, Copy, Check, Zap, BarChart2, FileText, Shield, Globe, BookOpen, Clock, Brain, Lightbulb } from 'lucide-react'
-import { normalizeMarkdown, cn } from '@/utils'
+import { cn } from '@/utils'
 import { MarkdownRenderer } from '@/components/markdown'
 import { chatService, ChatSession } from '@/services'
 import { ragevalService } from '@/services/rageval'
@@ -9,6 +9,7 @@ import { useContextStore } from '@/stores/contextStore'
 import SessionList from './components/SessionList'
 import WelcomeScreen from './components/WelcomeScreen'
 import ChatInput from './components/ChatInput'
+import { useStreamRenderScheduler } from './useStreamRenderScheduler'
 
 type MessageRole = 'user' | 'assistant'
 
@@ -49,7 +50,9 @@ export default function Chat() {
 
   const chatScrollRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const streamingContentRef = useRef('')
+  const { schedule, finish } = useStreamRenderScheduler()
+  const followBottomRef = useRef(true)
+  const messageContentRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   // 记录当前"正在 loading"的消息 ID，防止旧 stream 的 onDone 错误清除新 stream 的 loading 状态
   const loadingStreamRef = useRef<string | null>(null)
@@ -78,11 +81,23 @@ export default function Chat() {
     }
   }, [])
 
-  useEffect(() => {
-    if (chatScrollRef.current) {
+  useLayoutEffect(() => {
+    if (chatScrollRef.current && followBottomRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
     }
   }, [messages])
+
+  useEffect(() => {
+    const content = messageContentRef.current
+    if (!content || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      if (chatScrollRef.current && followBottomRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+      }
+    })
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [messages.length])
 
   // 从事件列表跳转：直接发送消息
   useEffect(() => {
@@ -296,7 +311,10 @@ export default function Chat() {
     }
     setMessages((prev) => [...prev, assistantMessage])
 
-    streamingContentRef.current = ''
+    // Each callback closes over its own message cursor, including background streams.
+    let streamingContent = ''
+    let streamingThinking = ''
+    followBottomRef.current = true
 
     // 中止上一个请求（如有），新建控制器
     abortControllerRef.current?.abort()
@@ -313,11 +331,15 @@ export default function Chat() {
     const MAX_RETRIES = 2
 
     const flushContent = () => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantMessage.id ? { ...m, content: streamingContentRef.current } : m
-        )
-      )
+      const content = streamingContent
+      setMessages((prev) => prev.map((m) => {
+        if (m.id !== capturedMessageId || m.content === content) return m
+        const planDuration = m.planStartAt && m.isPlanRunning
+          ? Math.round((Date.now() - m.planStartAt) / 1000) : undefined
+        return { ...m, content, isPlanRunning: false,
+          planDone: m.isPlanRunning ? true : m.planDone,
+          planDuration: m.planDuration ?? planDuration }
+      }))
     }
 
     try {
@@ -344,19 +366,15 @@ export default function Chat() {
                 try { return (JSON.parse(content) as { content?: string }).content ?? content }
                 catch { return content }
               })()
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMessage.id
-                    ? {
-                        ...m,
-                        thinking: (m.thinking ?? '') + chunkContent,
-                        isThinking: true,
-                        thinkStartAt: m.thinkStartAt ?? Date.now(),
-                      }
-                    : m
-                )
-              )
+              streamingThinking += chunkContent
+              const thinkStartAt = Date.now()
+              schedule(capturedMessageId, 'thinking', () => {
+                const thinking = streamingThinking
+                setMessages((prev) => prev.map((m) => m.id === capturedMessageId
+                  ? { ...m, thinking, isThinking: true, thinkStartAt: m.thinkStartAt ?? thinkStartAt } : m))
+              })
             } else {
+              finish(capturedMessageId)
               // 规划事件（plan_steps / tool_call / tool_result / exec）：
               // 若刚从 think 阶段过渡，先结束思考计时
               setMessages((prev) =>
@@ -397,31 +415,20 @@ export default function Chat() {
               }
             } catch { /* 忽略无法解析的事件 */ }
           } else {
-            // 内容到达时，结束规划阶段（如有），计算用时
-            setMessages((prev) =>
-              prev.map((m) => {
-                if (m.id !== assistantMessage.id) return m
-                const planDuration = m.planStartAt && m.isPlanRunning
-                  ? Math.round((Date.now() - m.planStartAt) / 1000)
-                  : undefined
-                return {
-                  ...m,
-                  isPlanRunning: false,
-                  planDone: m.isPlanRunning ? true : m.planDone,
-                  planDuration: m.planDuration ?? planDuration,
-                }
-              })
-            )
-            streamingContentRef.current += content
-            flushContent()
+            if (content) {
+              streamingContent += content
+              schedule(capturedMessageId, 'content', flushContent)
+            }
           }
         },
         () => {
+          finish(capturedMessageId)
           setMessages((prev) =>
             prev.map((m) =>
               m.id === capturedMessageId
                 ? {
                     ...m,
+                    content: streamingContent,
                     isStreaming: false,
                     isPlanRunning: false,
                     isThinking: false,
@@ -440,10 +447,10 @@ export default function Chat() {
             const raw = localStorage.getItem(`chat_messages_${capturedSessionId}`)
             if (raw) {
               const msgs = JSON.parse(raw) as Message[]
-              const finalContent = streamingContentRef.current
+              const finalContent = streamingContent
               const updated = msgs.map(m =>
                 m.id === capturedMessageId
-                  ? { ...m, content: finalContent, isStreaming: false, isPlanRunning: false, agentStatus: undefined }
+                  ? { ...m, content: finalContent, isStreaming: false, isThinking: false, isPlanRunning: false, agentStatus: undefined }
                   : m
               )
               localStorage.setItem(`chat_messages_${capturedSessionId}`, JSON.stringify(updated))
@@ -455,7 +462,7 @@ export default function Chat() {
     //   onError 触发时说明 SSE 连接异常中断（网络抖动、代理超时等）。
     //   此时 sessionStorage 中已有 run_id 和 last_seq（由 chat.ts 在每条事件到达时更新），
     //   重新调用 multiAgentChat 即可携带这两个游标，后端补发缺失事件，无需重跑 Agent。
-    //   重连回调只追加内容（不重置 streamingContentRef），保证已渲染内容不丢失。
+    //   重连回调只追加内容（不重置当前消息的 streamingContent），保证已渲染内容不丢失。
     //   最多重试 MAX_RETRIES 次，间隔随重试次数线性增长（1s、2s），
     //   避免后端压力过大；超出上限或用户主动取消（abortCtrl.signal.aborted）则终止。
     (err) => {
@@ -466,16 +473,17 @@ export default function Chat() {
               chatService.multiAgentChat(
                 messageContent, messageIndex, deepThinking, webSearch,
                 (agent, content) => {
-                  streamingContentRef.current += agent !== 'status' && agent !== 'meta' && agent !== 'plan_step' ? content : ''
-                  flushContent()
+                  streamingContent += agent !== 'status' && agent !== 'meta' && agent !== 'plan_step' ? content : ''
+                  schedule(capturedMessageId, 'content', flushContent)
                 },
                 () => {
+                  finish(capturedMessageId)
                   if (loadingStreamRef.current === capturedMessageId) {
                     setIsLoading(false)
                     loadingStreamRef.current = null
                   }
                   setMessages((prev) => prev.map((m) =>
-                    m.id === capturedMessageId ? { ...m, isStreaming: false, isPlanRunning: false, agentStatus: undefined } : m
+                    m.id === capturedMessageId ? { ...m, content: streamingContent, isStreaming: false, isThinking: false, isPlanRunning: false, agentStatus: undefined } : m
                   ))
                 },
                 undefined,
@@ -484,10 +492,11 @@ export default function Chat() {
               )
             }, 1000 * retryCount)
           } else {
+            finish(capturedMessageId)
             // 重试耗尽或主动取消，显示错误
             setMessages((prev) => prev.map((m) =>
               m.id === capturedMessageId
-                ? { ...m, isStreaming: false, isPlanRunning: false, agentStatus: undefined, content: streamingContentRef.current || `请求失败：${err.message}` }
+                ? { ...m, isStreaming: false, isThinking: false, isPlanRunning: false, agentStatus: undefined, content: streamingContent || `请求失败：${err.message}` }
                 : m
             ))
             if (loadingStreamRef.current === capturedMessageId) {
@@ -500,7 +509,13 @@ export default function Chat() {
         sid
       )
     } catch {
-      setIsLoading(false)
+      finish(capturedMessageId)
+      setMessages((prev) => prev.map((m) => m.id === capturedMessageId
+        ? { ...m, content: streamingContent || '请求失败，请重试', isStreaming: false, isThinking: false, isPlanRunning: false, agentStatus: undefined } : m))
+      if (loadingStreamRef.current === capturedMessageId) {
+        loadingStreamRef.current = null
+        setIsLoading(false)
+      }
     }
   }
 
@@ -607,14 +622,18 @@ export default function Chat() {
           <>
             <div
               ref={chatScrollRef}
+              data-testid="chat-scroll"
+              onScroll={(event) => {
+                const el = event.currentTarget
+                followBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+              }}
               className="relative flex-1 min-h-0 overflow-y-auto chat-sidebar-scroll"
             >
-              <div className="max-w-[760px] ml-[max(32px,calc(50vw-660px))] px-6 py-8 space-y-3">
+              <div ref={messageContentRef} className="min-w-0 max-w-[760px] ml-[max(32px,calc(50vw-660px))] px-6 py-8 space-y-3">
                 {messages.map((m, i) => (
                   <MessageBubble
                     key={m.id}
                     message={m}
-                    isLast={i === messages.length - 1}
                     messageIndex={i}
                     vote={votes[i]}
                     onVote={submitFeedback}
@@ -661,7 +680,6 @@ export default function Chat() {
 
 interface MessageBubbleProps {
   message: Message
-  isLast: boolean
   messageIndex: number
   vote?: 1 | -1
   onVote: (messageIndex: number, vote: 1 | -1, reasons?: string[]) => void
@@ -673,7 +691,7 @@ interface MessageBubbleProps {
   onEditingContentChange: (content: string) => void
 }
 
-function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing, editingContent, onStartEdit, onCancelEdit, onSaveEdit, onEditingContentChange }: MessageBubbleProps) {
+function MessageBubble({ message, messageIndex, vote, onVote, isEditing, editingContent, onStartEdit, onCancelEdit, onSaveEdit, onEditingContentChange }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const [showReasonPicker, setShowReasonPicker] = useState(false)
   const [selectedReasons, setSelectedReasons] = useState<string[]>([])
@@ -803,7 +821,7 @@ function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing,
 
   // 助手消息
   return (
-    <div className="flex items-start gap-3 mb-1">
+    <div data-message-id={message.id} className="flex min-w-0 max-w-full items-start gap-3 mb-1">
       {/* AI 头像 */}
       <div
         className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-white mt-1"
@@ -816,9 +834,9 @@ function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing,
 
       <div className="min-w-0 flex-1 space-y-2">
         {/* Agent 状态 */}
-        {message.agentStatus && (
+        {message.isStreaming && message.agentStatus && (
           <div className="inline-flex items-center gap-1.5 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1 text-xs text-[#2563EB]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#3B82F6] animate-pulse" />
+            <span className="h-1.5 w-1.5 rounded-full bg-[#3B82F6] motion-safe:animate-pulse" />
             {message.agentStatus}
           </div>
         )}
@@ -827,7 +845,7 @@ function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing,
         {(message.thinking !== undefined || message.isThinking) && (
           <ThinkingBlock
             thinking={message.thinking ?? ''}
-            isThinking={!!message.isThinking}
+            isThinking={!!message.isStreaming && !!message.isThinking}
             isDone={!!message.thinkDone}
             thinkDuration={message.thinkDuration}
           />
@@ -837,7 +855,7 @@ function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing,
         {(message.planning !== undefined) && (
           <PlanningBlock
             planning={message.planning || ''}
-            isPlanRunning={!!message.isPlanRunning}
+            isPlanRunning={!!message.isStreaming && !!message.isPlanRunning}
             isDone={!!message.planDone}
             planDuration={message.planDuration}
           />
@@ -845,7 +863,7 @@ function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing,
 
         {/* 主内容 */}
         {message.content ? (
-          <div className="inline-flex flex-col items-start gap-1">
+          <div className="flex min-w-0 max-w-full w-full flex-col items-start gap-1">
             {/* 深度规划徽章：规划完成后，标注在答案气泡上方 */}
             {message.planDone && !message.isStreaming && (
               <div className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#7C3AED]/10 to-[#6366F1]/10 border border-[#DDD6FE] px-2.5 py-1 text-[10px] font-medium text-[#6D28D9]">
@@ -853,25 +871,15 @@ function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing,
                 深度规划
               </div>
             )}
-            <div className="rounded-3xl rounded-tl-lg border border-[#F0F0F0] bg-white px-5 py-3.5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-              {isLast && message.isStreaming ? (
-                <>
-                  <MarkdownRenderer
-                    content={normalizeMarkdown(message.content)}
-                    variant="chat"
-                    streaming
-                    complete={false}
-                    className="text-[#1F2937]"
-                  />
-                  <span className="inline-block h-4 w-1.5 animate-pulse bg-[#3B82F6] ml-0.5 rounded-sm align-text-bottom" />
-                </>
-              ) : (
-                <MarkdownRenderer
-                  content={normalizeMarkdown(message.content)}
-                  variant="chat"
-                  className="text-[#1F2937]"
-                />
-              )}
+            <div className="min-w-0 max-w-full w-full rounded-3xl rounded-tl-lg border border-[#F0F0F0] bg-white px-5 py-3.5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+              <MarkdownRenderer
+                content={message.content}
+                variant="chat"
+                streaming={!!message.isStreaming}
+                complete={!message.isStreaming}
+                className="text-[#1F2937]"
+              />
+              {message.isStreaming && <span className="inline-block h-4 w-1.5 motion-safe:animate-pulse bg-[#3B82F6] ml-0.5 rounded-sm align-text-bottom" />}
             </div>
             {/* 点赞/踩按钮（流式完成后显示，置于气泡左下角下方） */}
             {!message.isStreaming && (
@@ -948,12 +956,12 @@ function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing,
             )}
           </div>
         ) : (
-          isLast && message.isStreaming && !message.isPlanRunning && (
+          message.isStreaming && !message.isPlanRunning && (
             <div className="inline-flex items-center gap-1.5 rounded-3xl rounded-tl-lg border border-[#F0F0F0] bg-white px-5 py-4 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
-                  className="h-2 w-2 rounded-full bg-[#CBD5E1]"
+                  className="h-2 w-2 rounded-full bg-[#CBD5E1] motion-reduce:!animate-none"
                   style={{ animation: `chat-bounce 1.2s ease-in-out ${i * 0.2}s infinite` }}
                 />
               ))}
@@ -1095,7 +1103,7 @@ function PlanningBlock({ planning, isPlanRunning, isDone, planDuration }: Planni
       <div className="rounded-2xl border border-[#A7F3D0] bg-[#ECFDF5] overflow-hidden">
         {/* 标题栏 */}
         <div className="flex items-center gap-2 px-4 py-3">
-          <Loader2 className="h-4 w-4 animate-spin text-[#059669] flex-shrink-0" />
+          <Loader2 className="h-4 w-4 motion-safe:animate-spin text-[#059669] flex-shrink-0" />
           <span className="text-sm font-semibold text-[#059669]">深度规划执行中</span>
           {totalSteps > 0 && (
             <span className="ml-auto rounded-full bg-[#A7F3D0] px-2 py-0.5 text-xs font-medium text-[#065F46] tabular-nums">
@@ -1120,7 +1128,7 @@ function PlanningBlock({ planning, isPlanRunning, isDone, planDuration }: Planni
                       <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-[#059669] text-white text-[9px] font-bold">✓</span>
                     ) : isCurrent ? (
                       <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-[#A7F3D0]">
-                        <Loader2 className="h-2.5 w-2.5 text-[#059669] animate-spin" />
+                        <Loader2 className="h-2.5 w-2.5 text-[#059669] motion-safe:animate-spin" />
                       </span>
                     ) : (
                       <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-[#D1FAE5] text-[#065F46] text-[10px] font-bold">{i + 1}</span>
@@ -1258,12 +1266,12 @@ function ExecUnitCard({ unit, isLast, isRunning }: { unit: ExecUnit; isLast: boo
         )}
       >
         <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#059669] text-white">
-          {isPending ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : icon}
+          {isPending ? <Loader2 className="h-2.5 w-2.5 motion-safe:animate-spin" /> : icon}
         </div>
         <span className="text-xs font-semibold text-[#065F46] flex-1">{unit.workerName}</span>
         <span className="text-[10px]">
           {isPending
-            ? <span className="text-[#059669] animate-pulse">正在执行...</span>
+            ? <span className="text-[#059669] motion-safe:animate-pulse">正在执行...</span>
             : isDone
               ? <span className="text-[#6EE7B7]">✓ 完成</span>
               : null
@@ -1316,60 +1324,35 @@ interface ThinkingBlockProps {
 // 执行中：实时流式显示 Agent 的推理内容（蓝色系，带光标闪烁）。
 // 完成后：可折叠，标题行显示用时和「已完成思考」标签。
 function ThinkingBlock({ thinking, isThinking, isDone, thinkDuration }: ThinkingBlockProps) {
-  const [expanded, setExpanded] = useState(!isDone) // 完成前默认展开
+  const [expanded, setExpanded] = useState(!isDone)
+  if (!isThinking && !isDone && !thinking) return null
 
-  if (!isThinking && !isDone) return null
-
-  if (isThinking) {
-    return (
-      <div className="rounded-2xl border border-[#BAE6FD] bg-[#F0F9FF] overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3">
-          <div className="relative flex-shrink-0">
-            <Lightbulb className="h-4 w-4 text-[#0284C7]" />
-            <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-[#38BDF8] animate-ping" />
-          </div>
-          <span className="text-sm font-semibold text-[#0284C7]">深度思考中...</span>
-        </div>
-        {thinking && (
-          <div className="border-t border-[#BAE6FD]/60 px-4 py-3">
-            <MarkdownRenderer
-              content={thinking}
-              variant="thinking"
-              streaming
-              complete={false}
-              className="text-[#0369A1]"
-            />
-            <span className="inline-block h-3.5 w-0.5 bg-[#0284C7] ml-0.5 align-middle animate-pulse rounded-sm" />
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // 完成态：可折叠
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#BAE6FD] bg-[#F0F9FF]">
+    <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#BAE6FD] bg-[#F0F9FF]">
       <button
         type="button"
         onClick={() => setExpanded(v => !v)}
+        disabled={isThinking}
         className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-[#BAE6FD]/30"
       >
-        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#BAE6FD]">
+        <div className="relative flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#BAE6FD]">
           <Lightbulb className="h-4 w-4 text-[#0284C7]" />
+          {isThinking && <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-[#38BDF8] motion-safe:animate-ping" />}
         </div>
         <div className="flex flex-1 flex-wrap items-center gap-1.5 min-w-0">
-          <span className="text-sm font-semibold text-[#0284C7]">已完成思考</span>
-          {thinkDuration !== undefined && (
+          <span className="text-sm font-semibold text-[#0284C7]">{isThinking ? '深度思考中...' : isDone ? '已完成思考' : '思考已停止'}</span>
+          {!isThinking && thinkDuration !== undefined && (
             <span className="rounded-full bg-[#BAE6FD] px-2 py-0.5 text-xs text-[#0369A1]">{thinkDuration} 秒</span>
           )}
         </div>
-        {expanded
+        {!isThinking && (expanded
           ? <ChevronDown className="h-4 w-4 flex-shrink-0 text-[#0284C7]" />
-          : <ChevronRight className="h-4 w-4 flex-shrink-0 text-[#0284C7]" />}
+          : <ChevronRight className="h-4 w-4 flex-shrink-0 text-[#0284C7]" />)}
       </button>
-      {expanded && thinking && (
-        <div className="border-t border-[#BAE6FD] px-4 py-3">
-          <MarkdownRenderer content={thinking} variant="thinking" className="text-[#0369A1]" />
+      {(isThinking || expanded) && thinking && (
+        <div className="min-w-0 max-w-full border-t border-[#BAE6FD] px-4 py-3">
+          <MarkdownRenderer content={thinking} variant="thinking" streaming={isThinking} complete={!isThinking} className="text-[#0369A1]" />
+          {isThinking && <span className="inline-block h-3.5 w-0.5 bg-[#0284C7] ml-0.5 align-middle motion-safe:animate-pulse rounded-sm" />}
         </div>
       )}
     </div>

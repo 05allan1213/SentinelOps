@@ -9,8 +9,8 @@ import { normalizeMarkdown } from '@/utils'
 const consumerContracts = [
   {
     path: '../../src/pages/chat/index.tsx',
-    calls: 4,
-    variants: { chat: 2, thinking: 2 },
+    calls: 2,
+    variants: { chat: 1, thinking: 1 },
   },
   {
     path: '../../src/pages/events/components/EventDetailModal.tsx',
@@ -102,11 +102,13 @@ describe('Markdown consumer migration contract', () => {
     expect(parserOwners).toEqual([implementationPath])
   })
 
-  it('marks both live chat and live thinking calls as streaming without owning throttling', () => {
+  it('passes message lifecycle on the specific chat and thinking tags', () => {
     const chat = source('../../src/pages/chat/index.tsx')
-
-    expect(chat).toMatch(/variant="chat"[\s\S]*?streaming[\s\S]*?complete=\{false\}/u)
-    expect(chat).toMatch(/variant="thinking"[\s\S]*?streaming[\s\S]*?complete=\{false\}/u)
-    expect(chat).not.toMatch(/requestAnimationFrame|last-render|lastRender/u)
+    const tags = chat.match(/<MarkdownRenderer\b[^>]*\/>/gu) ?? []
+    const liveChat = tags.find((tag) => tag.includes('variant="chat"'))
+    const liveThinking = tags.find((tag) => tag.includes('variant="thinking"') && tag.includes('streaming'))
+    expect(liveChat).toContain('streaming={!!message.isStreaming}')
+    expect(liveChat).toContain('complete={!message.isStreaming}')
+    expect(liveThinking).toContain('complete={!isThinking}')
   })
 })

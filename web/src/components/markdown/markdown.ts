@@ -120,10 +120,22 @@ export function normalizeLanguage(language: string | undefined): MarkdownLanguag
 interface OpenFence {
   marker: '`' | '~'
   length: number
+  quoteDepth: number
+  listIndent: number
 }
 
 function openingFence(line: string): OpenFence | undefined {
-  const match = /^(`{3,}|~{3,})(.*)$/u.exec(line)
+  let quoteDepth = 0
+  let quote = /^ {0,3}>[ \t]?/u.exec(line)
+  while (quote) {
+    quoteDepth += 1
+    line = line.slice(quote[0].length)
+    quote = /^ {0,3}>[ \t]?/u.exec(line)
+  }
+  const list = /^ {0,3}(?:[-+*]|\d{1,9}[.)]) +/u.exec(line)
+  const listIndent = list?.[0].length ?? 0
+  if (list) line = line.slice(listIndent)
+  const match = /^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(line)
   if (match === null) return undefined
 
   const markerRun = match[1]
@@ -131,10 +143,20 @@ function openingFence(line: string): OpenFence | undefined {
   const info = match[2]
   if (marker === '`' && info.includes('`')) return undefined
 
-  return { marker, length: markerRun.length }
+  return { marker, length: markerRun.length, quoteDepth, listIndent }
 }
 
 function closesFence(line: string, fence: OpenFence): boolean {
+  for (let depth = 0; depth < fence.quoteDepth; depth++) {
+    const quote = /^ {0,3}>[ \t]?/u.exec(line)
+    if (!quote) return false
+    line = line.slice(quote[0].length)
+  }
+  if (fence.listIndent) {
+    if (!line.startsWith(' '.repeat(fence.listIndent))) return false
+    line = line.slice(fence.listIndent)
+  }
+  line = line.replace(/^ {0,3}/u, '')
   let markerLength = 0
   while (line[markerLength] === fence.marker) markerLength += 1
 

@@ -1,4 +1,4 @@
-import { Children, Component, isValidElement, type ReactNode } from 'react'
+import { Children, Component, isValidElement, memo, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -101,7 +101,6 @@ function boundedHighlight(options: { streaming: boolean }) {
 const plugins = {
   remark: [remarkGfm] as PluggableList,
   rehype: [[boundedHighlight, { streaming: false }]] as PluggableList,
-  streaming: [[boundedHighlight, { streaming: true }]] as PluggableList,
 }
 
 const components: Components = {
@@ -145,11 +144,12 @@ const variants = {
 }
 const highlightColors = '[&_.hljs-keyword]:text-primary-300 [&_.hljs-built_in]:text-primary-300 [&_.hljs-string]:text-success-300 [&_.hljs-number]:text-warning-300 [&_.hljs-comment]:text-gray-400 [&_.hljs-title]:text-primary-200 [&_.hljs-attr]:text-warning-200 [&_.hljs-tag]:text-primary-300'
 
-class ParserBoundary extends Component<{ content: string; children: ReactNode }, { failed: boolean; content: string }> {
-  state = { failed: false, content: this.props.content }
+class ParserBoundary extends Component<{ content: string; complete: boolean; children: ReactNode }, { failed: boolean; content: string; complete: boolean }> {
+  state = { failed: false, content: this.props.content, complete: this.props.complete }
   static getDerivedStateFromError() { return { failed: true } }
-  static getDerivedStateFromProps(props: { content: string }, state: { content: string }) {
-    return props.content !== state.content ? { content: props.content, failed: false } : null
+  static getDerivedStateFromProps(props: { content: string; complete: boolean }, state: { content: string; complete: boolean }) {
+    return props.content !== state.content || props.complete !== state.complete
+      ? { content: props.content, complete: props.complete, failed: false } : null
   }
   render() {
     return this.state.failed ? <>
@@ -159,13 +159,13 @@ class ParserBoundary extends Component<{ content: string; children: ReactNode },
   }
 }
 
-export default function MarkdownRenderer({ content, variant = 'chat', streaming = false, complete = !streaming, className }: MarkdownRendererProps) {
+function MarkdownRenderer({ content, variant = 'chat', streaming = false, complete = !streaming, className }: MarkdownRendererProps) {
   const display = streamingMarkdown(content, complete)
   return <div data-markdown-variant={variant} className={cn('min-w-0 max-w-full text-gray-700 [overflow-wrap:anywhere] dark:text-gray-200', variants[variant], highlightColors, className)}>
-    <ParserBoundary content={content}>
-      {display.mode === 'plain' ? <pre className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{content}</pre> : <ReactMarkdown
+    <ParserBoundary content={content} complete={complete}>
+      {display.mode === 'plain' ? <pre data-streaming-markdown className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{content}</pre> : <ReactMarkdown
         remarkPlugins={plugins.remark}
-        rehypePlugins={streaming ? plugins.streaming : plugins.rehype}
+        rehypePlugins={plugins.rehype}
         components={components}
         urlTransform={preserveUrl}
         skipHtml
@@ -173,3 +173,6 @@ export default function MarkdownRenderer({ content, variant = 'chat', streaming 
     </ParserBoundary>
   </div>
 }
+
+// Status, feedback, or identical chunks must not re-run the parser.
+export default memo(MarkdownRenderer)
