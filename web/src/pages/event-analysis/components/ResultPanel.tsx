@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import ReactMarkdown from 'react-markdown'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { cn, normalizeMarkdown } from '@/utils'
 import { ExternalLink, Shield, ChevronRight, AlertTriangle, Scan, X, Loader2 } from 'lucide-react'
+import { MarkdownRenderer } from '@/components/markdown'
 
 interface EventData {
   id: number
@@ -67,7 +67,6 @@ function EventDetail({ event, solutionEntry, isStreaming, onClose }: {
 }) {
   const cfg = severityConfig[event.severity] || severityConfig.low
   const content = solutionEntry?.content || ''
-  const renderedSolution = useMemo(() => normalizeMarkdown(content), [content])
   const showSkeleton = isStreaming && !content
 
   return (
@@ -112,9 +111,13 @@ function EventDetail({ event, solutionEntry, isStreaming, onClose }: {
             {isStreaming && <Loader2 className="w-3 h-3 text-[#22C55E] animate-spin" />}
           </div>
           {content ? (
-            <div className="prose prose-sm max-w-none text-sm text-gray-700 dark:text-[#C9D1D9] leading-relaxed">
-              <ReactMarkdown>{renderedSolution}</ReactMarkdown>
-            </div>
+            <MarkdownRenderer
+              content={normalizeMarkdown(content)}
+              variant="analysis"
+              streaming={isStreaming}
+              complete={!isStreaming}
+              className="text-gray-700 dark:text-[#C9D1D9]"
+            />
           ) : showSkeleton ? (
             <div className="space-y-2 py-1">
               <div className="flex items-center gap-2 mb-3">

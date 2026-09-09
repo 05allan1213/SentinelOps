@@ -1,9 +1,8 @@
 import { X, Download, Copy, Check, Calendar, FileText, AlertTriangle } from 'lucide-react'
 import { useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { formatDate, parseReportPayload, normalizeMarkdown } from '@/utils'
 import ReportViewer from '@/components/report/ReportViewer'
+import { MarkdownRenderer } from '@/components/markdown'
 
 interface ReportDetailModalProps {
   report: {
@@ -146,11 +145,7 @@ ${displayMarkdown.replace(/\n/g, '<br>')}
           )}
           {payload
             ? <ReportViewer data={payload.risk_data} logs={payload.agent_logs} />
-            : (
-              <div className="prose max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMarkdown(displayMarkdown)}</ReactMarkdown>
-              </div>
-            )
+            : <MarkdownRenderer content={normalizeMarkdown(displayMarkdown)} variant="report" />
           }
         </div>
 

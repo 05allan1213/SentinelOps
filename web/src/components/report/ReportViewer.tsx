@@ -1,6 +1,6 @@
 import { ExternalLink } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
 import { cn, normalizeMarkdown } from '@/utils'
+import { MarkdownRenderer } from '@/components/markdown'
 
 export interface ReportViewerEvent {
   id: number
@@ -127,9 +127,11 @@ export default function ReportViewer({ data, logs }: Props) {
                     </div>
                     <div className="px-4 py-3">
                       <div className="text-xs text-gray-500 font-medium mb-2">AI 应急处置方案</div>
-                      <div className="prose prose-sm max-w-none text-xs text-gray-700 leading-relaxed">
-                        <ReactMarkdown>{normalizeMarkdown(e.recommendation || '')}</ReactMarkdown>
-                      </div>
+                      <MarkdownRenderer
+                        content={normalizeMarkdown(e.recommendation || '')}
+                        variant="report"
+                        className="text-xs text-gray-700"
+                      />
                     </div>
                   </div>
                 ))

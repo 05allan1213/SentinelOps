@@ -105,65 +105,9 @@ export function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-/**
- * 修复 LLM 输出中常见的 Markdown 格式问题，使 ReactMarkdown 能正确渲染。
- */
+/** 保留原始 Markdown（包括换行）；解析、安全策略与降级均由共享 Renderer 负责。 */
 export function normalizeMarkdown(md: string): string {
-  let result = md
-
-  // 1. 将段落中间出现的 ###标题 提到独立行
-  result = result.replace(/([^\n])\s*(#{1,6})([^\s#\n])/g, '$1\n\n$2 $3')
-  result = result.replace(/([^\n])\s*(#{1,6})\s+/g, (_, pre, hashes) => `${pre}\n\n${hashes} `)
-
-  // 2. 修复行首 ###标题（无空格）
-  result = result.replace(/^(#{1,6})([^\s#\n])/gm, '$1 $2')
-
-  // 3. 确保 ### 标题前后各有一个空行
-  result = result.replace(/([^\n])\n(#{1,6} )/g, '$1\n\n$2')
-  result = result.replace(/^(#{1,6} [^\n]+)\n([^\n#])/gm, '$1\n\n$2')
-
-  // 4. 修复「### 标题- 内容」：LLM 常将副标题内联在同一行，如「###应急响应步骤- 立即需要采取的行动」
-  //    拆为「### 应急响应步骤」+ 空行 + 「立即需要采取的行动」
-  result = result.replace(
-    /^(#{1,6}\s+)([\u4e00-\u9fa5\w]{2,20})-\s+(.+)$/gm,
-    '$1$2\n\n$3',
-  )
-
-  // 5. 处理 LLM 常见内联列表格式
-  result = result.split('\n').map(line => {
-    if (/^#{1,6}\s/.test(line) || /^[-*]\s/.test(line)) return line
-
-    // 模式 A：行首为纯中文短标题（2-12字）后紧跟「- 」
-    const titleDashMatch = line.match(/^([\u4e00-\u9fa5]{2,12})-\s+(.+)$/)
-    if (titleDashMatch) {
-      const [, title, rest] = titleDashMatch
-      const items = rest.split(/[。.]\s*-\s+|\s+-\s+/).map(s => s.trim()).filter(Boolean)
-      if (items.length >= 1) {
-        return `**${title}**\n\n` + items.map(p => `- ${p}`).join('\n')
-      }
-    }
-
-    if (line.length < 60) return line
-
-    // 模式 B：行内含 2+ 个「句号破折号」分隔符
-    const byPeriodDash = line.split(/[。.]\s*-\s+/)
-    if (byPeriodDash.length >= 3) {
-      return byPeriodDash[0] + '\n' + byPeriodDash.slice(1).map(p => `- ${p.trim()}`).join('\n')
-    }
-
-    // 模式 C：行内含 3+ 个「空白破折号空白」分隔符
-    const bySpaceDash = line.split(/\s+-\s+/)
-    if (bySpaceDash.length >= 3) {
-      return bySpaceDash[0] + '\n' + bySpaceDash.slice(1).map(p => `- ${p}`).join('\n')
-    }
-
-    return line
-  }).join('\n')
-
-  // 6. 清理连续超过两个的空行
-  result = result.replace(/\n{3,}/g, '\n\n')
-
-  return result
+  return md
 }
 
 export function formatCronInterval(cronExpr: string): string {  if (!cronExpr) return '-'

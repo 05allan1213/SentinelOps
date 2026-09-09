@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import ReactMarkdown from 'react-markdown'
 import {
   X,
   ExternalLink,
@@ -12,6 +11,7 @@ import type { SecurityEvent } from '@/types'
 import { eventService } from '@/services/event'
 import toast from 'react-hot-toast'
 import CustomSelect, { type SelectOption } from '@/components/common/CustomSelect'
+import { MarkdownRenderer } from '@/components/markdown'
 
 interface EventDetailModalProps {
   event: SecurityEvent | null
@@ -173,9 +173,7 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2">处置建议</h3>
               <div className="p-3 rounded-lg bg-gray-50 border border-gray-100 text-sm text-gray-700 leading-relaxed">
-                <div className="prose prose-sm max-w-none">
-                  <ReactMarkdown>{event.recommendation}</ReactMarkdown>
-                </div>
+                <MarkdownRenderer content={event.recommendation} variant="event" />
               </div>
             </div>
           )}

@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ChevronDown, ChevronRight, Loader2, ListChecks, ThumbsUp, ThumbsDown, Pencil, Copy, Check, Zap, BarChart2, FileText, Shield, Globe, BookOpen, Clock, Brain, Lightbulb } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { normalizeMarkdown, cn } from '@/utils'
+import { MarkdownRenderer } from '@/components/markdown'
 import { chatService, ChatSession } from '@/services'
 import { ragevalService } from '@/services/rageval'
 import { useContextStore } from '@/stores/contextStore'
@@ -855,20 +854,24 @@ function MessageBubble({ message, isLast, messageIndex, vote, onVote, isEditing,
               </div>
             )}
             <div className="rounded-3xl rounded-tl-lg border border-[#F0F0F0] bg-white px-5 py-3.5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-              <div className="chat-markdown text-sm leading-relaxed text-[#1F2937]">
-                {isLast && message.isStreaming ? (
-                  <>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {normalizeMarkdown(message.content)}
-                    </ReactMarkdown>
-                    <span className="inline-block h-4 w-1.5 animate-pulse bg-[#3B82F6] ml-0.5 rounded-sm align-text-bottom" />
-                  </>
-                ) : (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {normalizeMarkdown(message.content)}
-                  </ReactMarkdown>
-                )}
-              </div>
+              {isLast && message.isStreaming ? (
+                <>
+                  <MarkdownRenderer
+                    content={normalizeMarkdown(message.content)}
+                    variant="chat"
+                    streaming
+                    complete={false}
+                    className="text-[#1F2937]"
+                  />
+                  <span className="inline-block h-4 w-1.5 animate-pulse bg-[#3B82F6] ml-0.5 rounded-sm align-text-bottom" />
+                </>
+              ) : (
+                <MarkdownRenderer
+                  content={normalizeMarkdown(message.content)}
+                  variant="chat"
+                  className="text-[#1F2937]"
+                />
+              )}
             </div>
             {/* 点赞/踩按钮（流式完成后显示，置于气泡左下角下方） */}
             {!message.isStreaming && (
@@ -1329,9 +1332,13 @@ function ThinkingBlock({ thinking, isThinking, isDone, thinkDuration }: Thinking
         </div>
         {thinking && (
           <div className="border-t border-[#BAE6FD]/60 px-4 py-3">
-            <div className="think-markdown text-xs text-[#0369A1] leading-relaxed">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{thinking}</ReactMarkdown>
-            </div>
+            <MarkdownRenderer
+              content={thinking}
+              variant="thinking"
+              streaming
+              complete={false}
+              className="text-[#0369A1]"
+            />
             <span className="inline-block h-3.5 w-0.5 bg-[#0284C7] ml-0.5 align-middle animate-pulse rounded-sm" />
           </div>
         )}
@@ -1362,9 +1369,7 @@ function ThinkingBlock({ thinking, isThinking, isDone, thinkDuration }: Thinking
       </button>
       {expanded && thinking && (
         <div className="border-t border-[#BAE6FD] px-4 py-3">
-          <div className="think-markdown text-xs text-[#0369A1] leading-relaxed">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{thinking}</ReactMarkdown>
-          </div>
+          <MarkdownRenderer content={thinking} variant="thinking" className="text-[#0369A1]" />
         </div>
       )}
     </div>
