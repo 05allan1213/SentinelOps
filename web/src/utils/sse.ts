@@ -138,10 +138,12 @@ export function streamFetch(
         try { payload = JSON.parse(content) }
         catch { throw new SSEError('protocol', 'Invalid durable event JSON') }
         if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new SSEError('protocol', 'Invalid durable event envelope')
-        if (!cursor.accept(runId, Number(frameId))) return false
+        if (cursor.seen(runId, Number(frameId))) return false
       }
       emit(frameEvent, content, frameId || undefined)
       if (!durable) return false
+      // Commit only after successful delivery, including consumers that then abort.
+      cursor.accept(runId, Number(frameId))
       const envelope = payload as { data?: { retryable?: unknown } }
       return frameEvent === 'run.completed' || frameEvent === 'run.parked' ||
         (frameEvent === 'run.failed' && envelope.data?.retryable !== true)

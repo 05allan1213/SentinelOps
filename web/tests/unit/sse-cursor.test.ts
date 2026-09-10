@@ -75,3 +75,28 @@ it('switches Run cursors without replaying old content or retaining old transpor
   expect(fetch).toHaveBeenLastCalledWith('/events?after_seq=0', expect.anything())
   expect(result.current.cursor.lastSeq).toBe(1)
 })
+
+it('replays an undelivered event on manual retry after the consumer throws', async () => {
+  const event = 'id:1\nevent:message.delta\ndata:{"text":"deliver on retry"}\n\n'
+  vi.mocked(fetch).mockResolvedValueOnce(response(event)).mockResolvedValueOnce(response(event + 'data:[DONE]\n\n'))
+  const deliveries: string[] = []
+  const consumer = vi.fn((_type: string, content: string) => {
+    if (consumer.mock.calls.length === 1) throw new Error('consumer failed before recording content')
+    deliveries.push(content)
+  })
+  const { result, unmount } = renderHook(() => useSSECursor({ url: '/events', runId: 'r', onChunk: consumer }))
+  await act(async () => {})
+  expect(result.current.error?.code).toBe('consumer')
+  expect(result.current.cursor.lastSeq).toBe(0)
+  expect(deliveries).toEqual([])
+  expect(fetch).toHaveBeenCalledOnce()
+
+  await act(async () => { result.current.retry() })
+  expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual(['/events?after_seq=0', '/events?after_seq=0'])
+  expect(deliveries).toEqual(['{"text":"deliver on retry"}'])
+  expect(consumer).toHaveBeenCalledTimes(2)
+  expect(result.current.cursor.lastSeq).toBe(1)
+  expect(result.current.error).toBeNull()
+  expect(result.current.done).toBe(true)
+  unmount()
+})

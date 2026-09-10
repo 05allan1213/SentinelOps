@@ -99,3 +99,19 @@ The coordinator's prior DSN-backed prerequisite PASS is not recharacterized here
 Fixed an abort edge case found during self-review: if an event callback aborts while further frames are already buffered, dispatch now checks cancellation before delivering those frames. The added regression test confirms one delivery and retained cursor 1.
 
 Reviewed the final diff against server `isDurableStreamStopEvent` and its DONE-only reconnect behavior. Existing Chat service/parser migration remains D-07; no Chat service or page changes were made. The coordinator-owned `progress.md` modification and untracked `grill-truth.md` were preserved and excluded from staging. No push, no E/F work, no provider/production readiness claims.
+
+## Review fix round 1 — commit cursor after successful consumer delivery
+
+Base: `29d2011`. Status: DONE.
+
+Review identified that committing the durable cursor before `onChunk` returned could skip an undelivered event on an explicit retry when the callback threw before recording it. Dispatch now checks `cursor.seen` before delivery and calls `cursor.accept` only after the callback returns successfully. A successful callback that aborts the stream still commits its delivered event; later buffered frames remain suppressed by the existing abort guard.
+
+Added hook regression `replays an undelivered event on manual retry after the consumer throws`: first callback throws before recording content, leaving cursor 0 and a consumer error. Explicit `retry()` requests `after_seq=0` again, delivers the same event successfully, advances cursor to 1, and completes without error.
+
+TDD RED: `cd web && npm run test:unit -- sse` exited 1 with **1 failed / 37 passed**. The new hook test failed at `expect(result.current.cursor.lastSeq).toBe(0)` with `expected 1 to be +0`, confirming the premature cursor advancement.
+
+TDD GREEN: after the dispatch ordering fix, `cd web && npm run test:unit -- sse` exited 0 with **2 files / 38 tests PASS**, including the existing successful-callback-then-abort test that retains cursor 1.
+
+Touched lint: `cd web && npx eslint src/utils/sse.ts tests/unit/sse-cursor.test.ts` — **PASS**, exit 0, no warnings/errors. `git diff --check` — **PASS**.
+
+Full frontend/Go verification was **NOT RUN** again in this narrow fix round; the earlier implementation verification remains recorded above. No other parser/retry/terminal/positional behavior was changed. Coordinator ledger and user truth files remain excluded. No D-07/E/F work.
