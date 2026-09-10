@@ -68,3 +68,114 @@
 - Final full run with `-timeout 30m`: `SENTINELOPS_TEST_DSN=... go test -p 1 ./api/runtime/... ./internal/service/runtime ./internal/controller/runtime ./internal/dao/mysql ./internal/ai/workflow ./internal/ai/runtime -count=1 -timeout 30m` PASS; workflow 787.037s, ai/runtime 61.064s, dao/mysql 41.276s.
 - Final review verdict: PASS, no Critical/Important finding. Earlier 10-minute default-timeout run is superseded by the successful 30-minute serial run and is recorded only as an environment note.
 - Remaining gates: D/E/F, Hosted CI, real providers/API/Worker execution, rollout/rollback, image contracts, and P43 remain NOT RUN.
+
+
+## Phase D session 2026-09-08
+Scope: D-01 through D-07 only; stop before E. No push/implicit merge.
+Base c0b819158fad3fbe02132050d47c9261b65d1a4a. B1 six tasks PASS; H three tasks complete per original ledger and source; final commits verified HEAD ancestors. Latest B1 fixes and serial 30m PASS present.
+Original untracked grill-truth.md preserved. Ignored plan copied into isolated worktree.
+Ruling: reversible worktree creation authorized by task/developer autonomy; use existing sibling .worktrees.
+Ruling: scripts are not executable, task-brief recognizes numeric headings only; use bash and exact Python extraction for D headings.
+Ruling: planning-only constraint applies to authoring, not implementation.
+| Tasks | Interface | Audit/ruling |
+|---|---|---|
+| D-01 / all D | runner/setup | reviewed first |
+| D-01 / D-03 | package/lock | sequential exact versions |
+| D-02 / D-03 | helpers/CodeBlock | renderer owns restricted highlighting |
+| D-02 / D-05 | fences | preserve interface, matching markers |
+| D-03 / D-04 | variants | one parser import |
+| D-03 / D-05 | renderer lifecycle | pure display, caller stream state |
+| D-04 / D-05 / D-07 | Chat page | sequential ID order |
+| D-06 / D-07 | parser/cursor | GET retry cannot create Run |
+| D-01 own | red-green smoke | remove temporary failure |
+| D-02 own | names vs aliases | test all canonical names/common aliases |
+| D-03 own | lowlight/rehype | verify restricted registration |
+| D-04 own | 8 calls/16 tags | migrate actual calls |
+| D-05 own | throttle/terminal | message-ID scoped, immediate completion |
+| D-06 own | retry/visibility | no command retry, monotonic GET |
+| D-07 own | new turn vs resume | preserve explicit new turns, no silent replacement |
+Task D-01: in progress; BASE c0b819158fad3fbe02132050d47c9261b65d1a4a
+Tasks D-02 through D-07: pending
+
+- Prerequisite live regression PASS: disposable MySQL started from existing stopped container; DSN injected only into subprocess. go test -p 1 ./api/runtime/... ./internal/service/runtime ./internal/controller/runtime ./internal/controller/chat -count=1 -timeout=30m; all packages pass. Log prerequisite-tests.log.
+- Node 24.19.0, npx, Chromium caches verified available.
+
+Task D-01: implementation 968d2c542ecddda7af69bae68d45781a6dbcffb3; review pending. Unit 1 PASS; clean npm ci PASS; lint 68 baseline warnings/0 errors; build PASS baseline chunk warning. Old Playwright smoke FAIL 2/3, existing missing thinking header (F-02), no D-01 product changes.
+
+Task D-01: fix round 1/5 started. Important: new lock entries coupled fresh checkout to undeclared npmmirror registry. Repair registry-neutral resolved metadata preserving exact versions/integrities; npm ci + unit gate. Reviewer cannot verify no-push from diff; coordinator confirms no push tool/command issued. Baseline lint/build/smoke observations deferred to respective scope, no D-01 regression.
+
+Task D-01: fix round 1/5 (1 addressed, 0 open; 968d2c5..14e2022).
+Task D-01: complete (commits c0b8191..14e2022, review clean).
+Task D-02: in progress; BASE 14e2022b661984024344e86ca160310e8050a14a.
+
+## Resume 2026-09-09
+- User requested continue. Verified HEAD 14e2022, no partial D-02 product edits. D-02 original implementer resumed after usage-limit failure; D-01 not repeated. Main remains c0b8191 with original untracked grill-truth.md only.
+
+Task D-02: implementation eb232a5b2c194683d6e088086ada9c7768ebb4d6; review pending. Focused 103/full 104 unit PASS, touched ESLint clean, lint/build PASS baseline warnings unchanged. Browser gate scheduled with D-03.
+
+Task D-02: fix round 1/5 started (backslash URL classification and CR-only fence detection). Downstream review checks: D-03 must skip highlighting before processing oversized/streaming code; D-03 owns inline/fenced/browser integration, D-05 owns caller streaming. Baseline warnings remain same as D-01 report.
+
+Task D-02: fix round 1/5 (2 addressed, 0 open; eb232a5..a6b5ddd).
+Task D-02: complete (commits 14e2022..a6b5ddd, review clean). Re-review used exact base/head fallback after reporting package unavailable; coordinator package exists, same range inspected.
+Task D-03: in progress; BASE a6b5ddd19bf1d69b0575dcb5149b3ad2190bbf0e.
+
+Ruling: D-03 may add exact lowlight alias + core adapter/config changes — rehype-highlight imports lowlight.common and public lowlight barrel reexports common/all, so runtime language options alone do not satisfy restricted bundle requirement — cost if wrong: package-internal pinned core path requires revalidation on upgrade; keep Vite/Vitest resolution identical and test actual bundle.
+
+- User resumed D-03 after second usage-limit interruption; partial edits preserved and implementer resumed without repeating D-01/D-02.
+Task D-03: implementation f8f61ac; review pending. Unit focused 32/full 144 PASS; browser 3 PASS at 1280/1440; exact 12 grammar implementations/no common-all bundle verified; lint/build PASS baseline warnings.
+
+Task D-03: fix round 1/5 started. Important exact-copy edge: indented/quoted literal fence-like EOF line incorrectly treated as closer, adding absent newline. Reviewer reproduced via real remark pipeline. Implementer owns scoped fix/tests.
+
+Task D-03: fix round 1/5 (1 addressed, 0 open; f8f61ac..ba71dea).
+Task D-03: complete (commits a6b5ddd..ba71dea, review clean). Focused 37 unit + 1 new clipboard browser test PASS after fix; earlier 144 full unit + 3 browser PASS recorded.
+Task D-04: in progress; BASE ba71dea.
+
+Task D-04: implementation 70c2de7; review pending. Full unit 166 PASS; Markdown 165 PASS; all 8 calls migrated; parser imports only shared renderer; normalizeMarkdown identity preserves CR/LF bytes; lint/build PASS 68 baseline warnings. Automatic design hook surfaced 2 pre-existing gray-on-color Chat cases, unchanged/out of D-04.
+
+Task D-04: minor (deferred to D-05 touched test): streaming-prop source regex spans multiple JSX tags, allowing false positive; scope to individual tag.
+Task D-04: complete (commits ba71dea..70c2de7, review approved, one test-precision minor).
+Task D-05: in progress; BASE 70c2de7.
+
+- D-05 resumed after usage-limit interruption; verified no partial edits before resuming original implementer.
+Task D-05: implementation 3c9db3e; review pending. Full unit 181 PASS; 6 browser cases PASS including delayed actual Chat at 1280/1440; lint/build PASS with unchanged baseline warnings. D-04 cross-tag assertion minor fixed in this task; transport untouched.
+
+Task D-05: fix round 1/5 started (nested list/quote open fences prematurely highlighted; nonterminal planning finish() bypasses render budget).
+Ruling: ambiguous container-fence syntax may conservatively remain escaped raw text until completion — truth requires stable unclosed fences and no per-token full parse — cost if wrong: temporary highlighting may be delayed for ambiguous valid Markdown, final rendering remains complete.
+
+Task D-05: fix round 1/5 (2 addressed, 0 open; 3c9db3e..cbc2f5e). Fix resumed after usage-limit interruption with existing tests preserved.
+Task D-05: complete (commits 70c2de7..cbc2f5e, review clean). Full 187 unit + 6 browser PASS; D-04 assertion minor resolved.
+Task D-06: in progress; BASE cbc2f5e.
+
+Task D-06: implementation 29d2011; review pending. SSE focused 37/full frontend 224 unit PASS, touched lint clean, full lint/build PASS baseline warnings, Go Chat controller SSE tests PASS. Adds compatible control return and shared visibility binder for D-07; transport completion never creates server success.
+
+- D-06 review resumed after usage-limit interruption; implementation unchanged.
+Task D-06: fix round 1/5 started. Important: cursor advanced before successful consumer callback, causing explicit retry to skip undelivered event. Fix commits cursor after successful callback, keeps duplicate check before dispatch and success-then-abort cursor semantics.
+
+Task D-06: fix round 1/5 (1 addressed, 0 open; 29d2011..b63d390).
+Task D-06: complete (commits cbc2f5e..b63d390, review clean). SSE 38 PASS after fix; prior full frontend 224/Go controller PASS recorded.
+Task D-07: in progress; BASE b63d390.
+
+Ruling: D-07 may add a per-request 429 retry opt-out to existing api.ts for v2 creation — current global interceptor automatically repeats POST, conflicting with one-create semantics — cost if wrong: a rate-limited create needs explicit user retry; unrelated request behavior remains unchanged.
+Ruling: optional trailing multiAgentChat options may distinguish deliberate newTurn from stored-Run resume while retaining existing positional callback signatures — otherwise subsequent user messages remain trapped on prior terminal Run — cost if wrong: extra compatibility option needs coverage; failed create must retain prior recoverable binding.
+
+- D-07 resumed after usage-limit interruption; partial service/page/tests preserved, legacy identity-to-tail and final checks completed.
+Task D-07: implementation 1f7acf1; review pending. Full frontend 242 unit PASS; 14 controlled browser PASS; lint/build PASS baseline warnings; Go Chat controller PASS. Explicit missing-identity resume cannot create; lost create acknowledgment remains unconfirmed. Real Worker/provider E2E NOT RUN.
+
+Task D-07: fix round 1/5 started, 4 Important findings: real run.claimed/approval.requested envelopes not mapped; switch-back before pending create reply strands accepted Run; unconfirmed creation lost on switch/prior-turn binding; upload notice can overwrite accepted snapshot with stale rendered state while cursor remains advanced. Fixes require real-envelope and lifecycle/persistence ordering regressions.
+
+Task D-07: fix round 1 implementation 562a6c9; re-review pending. 245 unit and 22 desktop browser tests PASS; lint/build PASS baseline warnings. Fix resumed from preserved partial edits after usage limit. Transient pending-create promises and per-message accepted binding/uncertainty close the reported lifecycle gaps; upload uses accepted snapshot.
+
+Task D-07: fix round 1/5 (4 addressed, 0 Important open; 1f7acf1..562a6c9).
+Task D-07: minor (deferred to final review): legacy saved pending assistant with isStreaming=true and no Run identity/createUnconfirmed field loses uncertainty on restoration; convert old signal to new message marker once.
+Task D-07: complete (commits b63d390..562a6c9, review approved with one legacy-compatibility minor).
+
+## D whole-branch closeout
+- All D-01 through D-07 task gates complete. E/F NOT RUN. Final whole-branch review and final verification pending.
+- Review deferred items: D-04 source-regex minor resolved by D-05; D-07 legacy pending-snapshot migration minor remains for final triage. Lint 68 warnings/large bundle warning are baseline, old smoke 2/3 baseline failure belongs F-02. H historical minors are prior scope, not D work.
+- Final serial frontend verification: `npm run test:unit` 9 files / 245 PASS; `npm run lint` exit 0, 0 errors / 68 baseline warnings; `npm run build` PASS with existing chunk warning; controlled desktop Playwright 22/22 PASS after an earlier parallel-build timeout and exact-case rerun.
+- Final bundle/dependency verification: exact D pins and registry-neutral lockfile PASS; actual production bundle contains only 12 allowlisted highlight.js grammar implementations (HTML/XML shared), core + rehype-highlight present, no lowlight common/all registries.
+- Backend compatibility: `go test ./internal/controller/chat -count=1` PASS. DSN-backed prerequisite Runtime/Controller/Chat tests PASS. No api/internal/manifest migration or Runtime page file changed by D.
+- First parallel browser run had 1 timeout at 1280 `accepted create after session switch...` while a Vite bundle build ran concurrently; exact failing case rerun alone PASS (6.6s), then the full 22-case suite rerun serially PASS (55.7s). Classified as test-environment contention, not product regression.
+- Final cross-task scope checks: no `api/`, `internal/`, migration, manifest, or Runtime page file changed by D; no rehype-raw, second EventSource/client, debug logging or secret literals in D frontend paths. D-07 429 opt-out affects only the durable create request.
+- Final review adjudication: repeated reviewer-subagent dispatch attempts returned without executing; coordinator completed the whole-range diff/scope/test review directly. No Critical/Important finding remains. D-07 legacy pending-snapshot minor is real but not load-bearing for new flows or E; parked for optional F cleanup.
+- D phase complete. Stop before E-00/E/F as instructed. Branch remains local, unpushed; no merge performed.
