@@ -15,6 +15,7 @@ import RagEval from './pages/rag-eval'
 import Ingest from './pages/ingest'
 import Ops from './pages/ops'
 import RuntimeRuns from './pages/runtime'
+import RuntimeRunDetail from './pages/runtime/detail'
 import Login from './pages/login'
 import { useAuthStore } from './stores/authStore'
 
@@ -48,6 +49,7 @@ function App() {
           <Route path="ingest" element={<Ingest />} />
           <Route path="ops" element={<Ops />} />
           <Route path="runtime/runs" element={<RuntimeRuns />} />
+          <Route path="runtime/runs/:runId" element={<RuntimeRunDetail />} />
           {/* /cost-monitor 重定向到 /traces?tab=overview */}
           <Route path="cost-monitor" element={<Navigate to="/traces?tab=overview" replace />} />
         </Route>
