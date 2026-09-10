@@ -195,3 +195,66 @@ Task D-07: complete (commits b63d390..562a6c9, review approved with one legacy-c
 - Sensitivity verified: removing the restore migration fails the unit restore case; removing the switch-away migration fails the unit switch case.
 - Serial verification: `npm run test:unit` 10 files / 247 PASS; `npm run lint` 0 errors / 68 baseline warnings; `npm run build` PASS; controlled desktop Playwright 24/24 PASS on rerun (earlier run had one `locator.fill` timeout under parallel load, exact case PASS alone); hook detector re-scan of the page clean; `git diff --check` PASS.
 - D-07 review minor closed; no deferred D items remain. Product HEAD `0f2eeaa` on local branch `feat/phase-d-20260908`, unpushed, no merge. E/F NOT RUN.
+
+## Phase E session 2026-09-10
+
+Scope: E-00, E-01, E-02, E-03, E-04, E-05, E-06, E-07 only; stop before F. No push, no merge, no application images, mobile `OUT OF SCOPE`.
+
+### Prerequisite confirmation (D complete)
+
+- User scope: read `grill-truth.md` and `output/final-implementation-plan-2026-08-31.md`, confirm D is complete, then implement phase E with subagents.
+- `output/d-phase-review-2026-09-10.md` records D-01..D-07 all PASS with task-level reviews, fix rounds, and final serial verification; product HEAD `0f2eeaa`; the D branch tip is an ancestor of `main` (`f461a3c`).
+- Fresh check in the E worktree at `f461a3c`: D artifacts are present (`web/src/components/markdown/`, `web/tests/unit/chat-legacy-pending.test.tsx`, D-01..D-07 unit/UI suites) and `npm run test:unit` = 10 files / 247 tests PASS. D is treated as complete.
+- Foundation facts for E: `api/runtime/v1/runtime.go` + `internal/{controller,service}/runtime` exist (B1-06/H), `web/src/services/api.ts` is the sole Axios instance with `baseURL: '/api'`, `web/src/main.tsx` has the sole QueryClient.
+
+### Environment
+
+- Worktree `/home/monody/project/.worktrees/sentinelops-e`, branch `feat/phase-e-20260910`, base `f461a3c`.
+- `npm ci` executed in the worktree (`node_modules` copied from the main checkout was stale and was moved to `/tmp/sentinelops-e-stale-node-modules`; not deleted). Node 24.19.0, npm 12.0.2.
+- Playwright Chromium caches present. Desktop viewports 1280/1440 only.
+- MySQL container `sentinelops-phase03-mysql` started for later DSN-backed Runtime API verification (`127.0.0.1:13307`, root/`sentinel_test_pw`, databases `sentinelops` and `sentinelops_phase03`).
+
+### Preflight interface/conflict scan
+
+| Pair / task | Shared output or interface | Ruling |
+| --- | --- | --- |
+| E-00 ↔ E-01..E-07 | gpt-taste direction artifact vs Runtime page code | E-00 is documentation-only and must not touch product code. Plan requires E-00 before Runtime page implementation; E-01 (data layer, no pages) may proceed concurrently with the gate. |
+| E-01 ↔ E-02 | `web/src/hooks/useRuntimeQueries.ts` | E-02 depends on E-01 and modifies that hook; sequential. |
+| E-02 ↔ E-03/E-04 | SSE tail hook + page/cache wiring | E-03/E-04 consume E-02; sequential. |
+| E-04 ↔ E-05/E-06 | `web/src/pages/runtime/detail.tsx` tabs | E-05 and E-06 each extend the same detail shell; sequential after E-04. |
+| E-03 ↔ E-07 | `web/src/App.tsx`, `web/src/components/layout/Sidebar.tsx`, Runtime page directory | E-03 adds the Agent Runtime navigation group and the Runs route; E-07 adds the three read-only routes/panels. Sequential to avoid shared-file conflicts. |
+| E-05/E-06 ↔ backend | frozen `/api/runtime/v1` contract and controlled reconciliation paths | UI consumes existing B1/C endpoints only; no Go/API/migration change in E. Real Worker/provider execution remains `NOT RUN`. |
+
+### Task status
+
+- E-00: in progress (implementer `e00_visual_gate`).
+- E-01: in progress (implementer `e01_runtime_service`).
+- E-02..E-07: pending.
+
+### Coordination rulings
+
+- The plan's required `superpowers:subagent-driven-development` skill is not installed in this environment; the established SDD convention of this plan (brief → implementer subagent → independent reviewer subagent → scoped fixes → ledger) is used instead.
+- gpt-taste must be applied in Operate mode with the required deterministic Python-style selection record, and its AIDA/hero/bento/GSAP/random-layout/new-font mandates explicitly overridden by the frozen console direction.
+
+### Phase E execution (2026-09-10)
+
+Delegation: five subagent dispatch attempts (`e00_visual_gate`, `e01_runtime_service`, `e00_visual_gate_b`, `delivery_probe`, plus follow-ups) returned bootstrap-only turns; the task payload never reached the child agents, and one fork inherited coordinator context and misidentified itself. Ruling: continue with the coordinator as implementer + separate per-task review pass, and record the substitution honestly in every task report and in `output/e-phase-review-2026-09-10.md`.
+
+- E-00: complete `c65271e` (`docs(runtime): record visual direction gate`). gpt-taste Operate direction, deterministic selection record, explicit override table, no product-code change.
+- E-01: complete `4d79772` (`feat(web-runtime): add typed runtime service and query hooks`). RED (module resolution) -> GREEN 13 tests; DTO mirror, 18 frozen keys/hooks, single Axios client, `recoverRun` the only mutation with no optimistic state.
+- E-02: complete `08722be` (`feat(web-runtime): stream runtime events into query cache`). Reuses D-06 `useSSECursor`; single reader, monotonic cursor, `(run_id,seq)` dedupe, timeline merge + targeted invalidation, visibility refresh, terminal close, unmount abort; 9 unit + 2 controlled-browser cases.
+- E-03: complete `56040ac` (`feat(web-runtime): add desktop runtime runs console`). `/runtime/runs`, URL-only filters, canonical badges (only `succeeded` is success), legacy read-only chip, five distinct table states, `Agent Runtime` navigation group; bounded hook extension `placeholderData: keepPreviousData`; 5 browser cases.
+- E-04: complete `d2dbf24` (`feat(web-runtime): add run detail overview and timeline`). Seven URL-state tabs, Overview from server DTOs only, complete canonical Timeline with collapsed payloads, `RuntimeQualityState`, per-panel error boundary, tail only for non-terminal Runs; 5 browser cases.
+- E-05: complete `6d8050a` (`feat(web-runtime): add attempts checkpoints and recovery progress`). Attempts/Checkpoint metadata (no opaque bytes), admin-only server-gated Recovery dialog (reason + generation; compatibility for restore), `202 + operation_id`, non-terminal polling with terminal invalidation, sessionStorage reconnect, conflict/idempotent replay display; 7 browser cases.
+- E-06: complete `3848db2` (`feat(web-runtime): add effect evidence context and trace tabs`). Effects DAG/history with canonical controlled reconciliation, explicit Evidence quote expansion, permission-gated Context history, Trace raw-link gating; 4 browser cases + DSN-backed `go test -p 1 ./api/runtime/... ./internal/service/runtime ./internal/controller/runtime` PASS.
+- E-07: complete `817fa2c` (`feat(web-runtime): add capabilities safety and worker health views`). Capabilities configured/observed split, Safety shadow/effective/audit, Worker Health persisted observations with nullable aggregates, read-only Eval/Release/Retention, three routes registered (no dead navigation links); 3 browser cases.
+
+Phase E closeout verification (product HEAD `817fa2c`, serial):
+
+- `npm run test:unit`: PASS 13 files / 269 tests; `npm run lint`: PASS 0 errors / 68 baseline warnings; `npm run build`: PASS with the existing chunk warning.
+- Desktop Playwright `tests/ui --workers=1`: 55/56 PASS; the only failure is the pre-existing `approval-ui.spec.ts:112` case, reproduced identically at `f461a3c` in the untouched D worktree.
+- Existing smoke suite: 2/3 PASS; the dark-fixture "思考链路" case is the pre-existing baseline failure owned by F-02.
+- Backend Runtime contract with disposable MySQL DSN: PASS (`api/runtime/v1`, `internal/service/runtime`, `internal/controller/runtime`).
+- Scope: no `api/`, `internal/`, `migrations/`, `manifest/`, `main.go`, `go.mod` or `go.sum` change in E; `git diff --check` PASS; 63 files / +6186 lines total.
+- Real Worker/provider E2E, hosted CI, application images, rollout/rollback, P43 and all of F: `NOT RUN`. Mobile: `OUT OF SCOPE`.
+- Evidence documents: `output/e-implementation-progress-2026-09-10.md`, `output/e-phase-review-2026-09-10.md`. Branch `feat/phase-e-20260910` is local and unpushed; no merge performed. Stop before F as instructed.
