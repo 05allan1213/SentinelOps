@@ -839,7 +839,10 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
                   <button
                     type="button"
                     onClick={() => onStartEdit(messageIndex, message.content)}
-                    className="p-1.5 rounded-full text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                    className={cn(
+                      'p-1.5 rounded-full text-gray-500 transition-colors',
+                      'hover:bg-indigo-50 hover:text-indigo-600',
+                    )}
                   >
                     <Pencil className="w-3.5 h-3.5 flex-shrink-0" />
                   </button>
@@ -981,7 +984,9 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
                             }}
                             className={cn(
                               'w-full text-left px-2 py-1.5 text-[12px] rounded-lg transition-colors flex items-center gap-1.5',
-                              checked ? 'bg-red-50 text-red-600' : 'text-gray-700 hover:bg-gray-50',
+                              checked
+                                ? 'bg-red-50 text-red-600'
+                                : 'text-gray-700 hover:bg-gray-50',
                             )}
                           >
                             <span className={cn('flex h-3 w-3 flex-shrink-0 items-center justify-center rounded border text-[8px]', checked ? 'border-red-400 bg-red-400 text-white' : 'border-gray-300')}>
@@ -1010,7 +1015,7 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
                 <span
                   key={i}
                   className="h-2 w-2 rounded-full bg-[#CBD5E1] motion-reduce:!animate-none"
-                  style={{ animation: `chat-bounce 1.2s ease-in-out ${i * 0.2}s infinite` }}
+                  style={{ animation: `chat-dot-pulse 1.2s ease-in-out ${i * 0.2}s infinite` }}
                 />
               ))}
             </div>
