@@ -56,7 +56,7 @@ The first parallel browser run had one 1280px load timeout while a Vite bundle b
 
 All task-level reviews are complete, and the coordinator completed the cross-task diff, scope, security and compatibility checks. No Critical or Important finding remains.
 
-One D-07 minor is parked: a legacy saved assistant message that has `isStreaming=true` but no Run identity or new `createUnconfirmed` marker can lose its uncertainty label when restored. New D-07 messages carry the marker, so this does not affect new sessions or any E-phase dependency. Cost if wrong: a user with an old, pre-D pending local snapshot may see a less explicit recovery state until the message is replaced.
+One D-07 minor was parked at closeout and has since been resolved: a legacy saved assistant message that has `isStreaming=true` but no Run identity or new `createUnconfirmed` marker could lose its uncertainty label when restored. New D-07 messages carry the marker, so this never affected new sessions or any E-phase dependency. See the legacy-snapshot addendum below.
 
 The D phase is complete. Per instruction, implementation stops before E-00/E/F. The branch is local and unpushed; no merge was performed.
 
@@ -80,3 +80,26 @@ Committed as `cee7c83`; product HEAD is now `cee7c83`. Post-fix verification, ru
 | `git diff --check` | PASS |
 
 No detector ignore entries were persisted; all three items were resolved or reflowed in the source.
+
+## Addendum: D-07 Legacy Pending-Snapshot Minor Resolved
+
+The parked legacy-compatibility minor is closed. `web/src/pages/chat/index.tsx` now promotes a pre-D-07 pending snapshot (`role=assistant`, `isStreaming=true`, no `runId`, no `createUnconfirmed`) to the explicit `createUnconfirmed` marker in every place that reads persisted messages before clearing streaming flags:
+
+- restore (`loadMessages`), which then renders the existing "创建结果尚未确认" alert instead of an empty finished reply;
+- session switch (`handleSelectSession`) and new session (`handleNewSession`), so leaving a session cannot erase the only record of an unresolved create — including when an older build sharing the same origin rewrites the snapshot after restore.
+
+New regression coverage:
+
+| Check | Result |
+| --- | --- |
+| `tests/unit/chat-legacy-pending.test.tsx` | PASS: 2 tests (restore keeps uncertainty; leaving the session keeps it) |
+| Sensitivity check | Both tests fail when their respective migration call is removed |
+| `tests/ui/chat-reconnect.spec.ts` legacy case | PASS: alert shown after restore, no Run created, marker persisted |
+| `npm run test:unit` | PASS: 10 files, 247 tests |
+| `npm run lint` | PASS: 0 errors, 68 pre-existing warnings |
+| `npm run build` | PASS with the existing large-chunk warning |
+| Controlled desktop Playwright | PASS: 24/24 on rerun (one earlier run hit a `locator.fill` timeout under parallel load; the exact case passed alone and in the serial rerun) |
+| Detector re-scan of `src/pages/chat/index.tsx` | No deterministic findings |
+| `git diff --check` | PASS |
+
+Committed as `0f2eeaa`; product HEAD is now `0f2eeaa`. No detector ignore entries were added.

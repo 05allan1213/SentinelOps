@@ -171,7 +171,7 @@ Task D-07: complete (commits b63d390..562a6c9, review approved with one legacy-c
 
 ## D whole-branch closeout
 - All D-01 through D-07 task gates complete. E/F NOT RUN. Final whole-branch review and final verification pending.
-- Review deferred items: D-04 source-regex minor resolved by D-05; D-07 legacy pending-snapshot migration minor remains for final triage. Lint 68 warnings/large bundle warning are baseline, old smoke 2/3 baseline failure belongs F-02. H historical minors are prior scope, not D work.
+- Review deferred items: D-04 source-regex minor resolved by D-05; D-07 legacy pending-snapshot migration minor was resolved post-closeout (see the D-07 legacy minor section below). Lint 68 warnings/large bundle warning are baseline, old smoke 2/3 baseline failure belongs F-02. H historical minors are prior scope, not D work.
 - Final serial frontend verification: `npm run test:unit` 9 files / 245 PASS; `npm run lint` exit 0, 0 errors / 68 baseline warnings; `npm run build` PASS with existing chunk warning; controlled desktop Playwright 22/22 PASS after an earlier parallel-build timeout and exact-case rerun.
 - Final bundle/dependency verification: exact D pins and registry-neutral lockfile PASS; actual production bundle contains only 12 allowlisted highlight.js grammar implementations (HTML/XML shared), core + rehype-highlight present, no lowlight common/all registries.
 - Backend compatibility: `go test ./internal/controller/chat -count=1` PASS. DSN-backed prerequisite Runtime/Controller/Chat tests PASS. No api/internal/manifest migration or Runtime page file changed by D.
@@ -187,3 +187,11 @@ Task D-07: complete (commits b63d390..562a6c9, review approved with one legacy-c
 - Fix commit `cee7c83`; no detector ignore entries persisted.
 - Post-fix serial verification: `npm run test:unit` 245 PASS; `npm run lint` 0 errors/68 baseline warnings; `npm run build` PASS; controlled desktop Playwright 22/22 PASS; hook detector re-scan clean on both files; `git diff --check` PASS.
 - D phase closed at product HEAD `cee7c83`. Branch `feat/phase-d-20260908` remains local and unpushed; main checkout clean apart from the user's untracked `grill-truth.md`. E/F NOT RUN.
+
+## Post-closeout D-07 legacy minor resolved
+
+- Cleared the last parked D item: pre-D-07 snapshots (`isStreaming=true`, no Run identity, no `createUnconfirmed`) are promoted to the explicit marker on restore and on session switch/new session, so the "创建结果尚未确认" state survives instead of degrading to an empty finished reply.
+- Implementation `0f2eeaa` (`web/src/pages/chat/index.tsx`); new unit file `web/tests/unit/chat-legacy-pending.test.tsx` (2 cases) plus a legacy-restore case in `web/tests/ui/chat-reconnect.spec.ts`.
+- Sensitivity verified: removing the restore migration fails the unit restore case; removing the switch-away migration fails the unit switch case.
+- Serial verification: `npm run test:unit` 10 files / 247 PASS; `npm run lint` 0 errors / 68 baseline warnings; `npm run build` PASS; controlled desktop Playwright 24/24 PASS on rerun (earlier run had one `locator.fill` timeout under parallel load, exact case PASS alone); hook detector re-scan of the page clean; `git diff --check` PASS.
+- D-07 review minor closed; no deferred D items remain. Product HEAD `0f2eeaa` on local branch `feat/phase-d-20260908`, unpushed, no merge. E/F NOT RUN.
