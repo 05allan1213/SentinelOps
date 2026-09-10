@@ -16,6 +16,9 @@ import Ingest from './pages/ingest'
 import Ops from './pages/ops'
 import RuntimeRuns from './pages/runtime'
 import RuntimeRunDetail from './pages/runtime/detail'
+import RuntimeCapabilities from './pages/runtime/capabilities'
+import RuntimeSafety from './pages/runtime/safety'
+import RuntimeWorkerHealth from './pages/runtime/worker-health'
 import Login from './pages/login'
 import { useAuthStore } from './stores/authStore'
 
@@ -50,6 +53,9 @@ function App() {
           <Route path="ops" element={<Ops />} />
           <Route path="runtime/runs" element={<RuntimeRuns />} />
           <Route path="runtime/runs/:runId" element={<RuntimeRunDetail />} />
+          <Route path="runtime/capabilities" element={<RuntimeCapabilities />} />
+          <Route path="runtime/safety" element={<RuntimeSafety />} />
+          <Route path="runtime/worker-health" element={<RuntimeWorkerHealth />} />
           {/* /cost-monitor 重定向到 /traces?tab=overview */}
           <Route path="cost-monitor" element={<Navigate to="/traces?tab=overview" replace />} />
         </Route>

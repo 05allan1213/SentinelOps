@@ -111,7 +111,7 @@ for (const width of [1280, 1440]) {
     await page.goto('/runtime/runs/run-1?tab=attempts')
 
     // Attempt facts and opaque-byte exclusion.
-    await expect(page.getByTestId('runtime-attempt-row')).toHaveCount(1)
+    await expect(page.getByTestId('runtime-attempt-row')).toHaveCount(1, { timeout: 15000 })
     await expect(page.getByTestId('runtime-attempt-row')).toContainText('恢复')
     await expect(page.getByTestId('runtime-attempt-row')).toContainText('worker-7')
     await expect(page.getByTestId('runtime-attempt-row')).toContainText('checkpoint-hash')

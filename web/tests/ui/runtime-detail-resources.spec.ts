@@ -194,6 +194,8 @@ test('non-admin sees no controlled reconciliation and unavailable raw trace is l
   await page.setViewportSize({ width: 1280, height: 1000 })
 
   await page.goto('/runtime/runs/run-1?tab=effects')
+  await expect(page.getByTestId('runtime-effects-panel')).toBeVisible({ timeout: 15000 })
+  await expect(page.getByTestId('runtime-effect-row')).toHaveCount(2)
   await expect(page.getByTestId('runtime-effect-reconcile-readonly')).toContainText('仅 admin')
   await expect(page.getByTestId('runtime-effect-reconcile')).toHaveCount(0)
 

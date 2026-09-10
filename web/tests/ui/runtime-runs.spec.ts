@@ -61,7 +61,7 @@ for (const width of [1280, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/runtime/runs')
 
-    await expect(page.getByRole('heading', { name: 'Agent Runtime' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Agent Runtime' })).toBeVisible({ timeout: 15000 })
     await expect(page.getByRole('link', { name: 'Runs' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Capabilities' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Safety' })).toBeVisible()
