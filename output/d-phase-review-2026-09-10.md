@@ -59,3 +59,24 @@ All task-level reviews are complete, and the coordinator completed the cross-tas
 One D-07 minor is parked: a legacy saved assistant message that has `isStreaming=true` but no Run identity or new `createUnconfirmed` marker can lose its uncertainty label when restored. New D-07 messages carry the marker, so this does not affect new sessions or any E-phase dependency. Cost if wrong: a user with an old, pre-D pending local snapshot may see a less explicit recovery state until the message is replaced.
 
 The D phase is complete. Per instruction, implementation stops before E-00/E/F. The branch is local and unpushed; no merge was performed.
+
+## Addendum: Design-Hook Triage and Post-Fix Verification
+
+After this report was written, the session design hook flagged three items in `web/src/pages/chat/index.tsx`: two `gray-on-color` notices (L842, L984) and one `bounce-easing` notice (L1013). Triage result:
+
+- L842 was a false positive. The button's resting color is `text-gray-500`; the indigo background only exists in the hover state, paired with `hover:text-indigo-600`. The resting and hover utilities were split into two class strings so the static detector no longer reads them as a single state. No rendered class changed.
+- L984 was a false positive. In the unchecked vote-reason branch, `text-gray-700` pairs with a near-white `hover:bg-gray-50` background, so contrast is not a real problem. The ternary was only reflowed onto separate lines. No rendered class changed.
+- L1013 was a real naming defect. The keyframes were named `chat-bounce` while the animation easing is `ease-in-out`; the keyframes were renamed to `chat-dot-pulse` in `web/src/assets/styles/index.css` and the single call site was updated. Motion is unchanged.
+
+Committed as `cee7c83`; product HEAD is now `cee7c83`. Post-fix verification, run serially:
+
+| Check | Result |
+| --- | --- |
+| `npm run test:unit` | PASS: 9 files, 245 tests |
+| `npm run lint` | PASS: 0 errors, 68 pre-existing warnings |
+| `npm run build` | PASS with the existing large-chunk warning |
+| Controlled desktop Playwright | PASS: 22/22 |
+| Detector re-scan of both touched files | No deterministic findings |
+| `git diff --check` | PASS |
+
+No detector ignore entries were persisted; all three items were resolved or reflowed in the source.

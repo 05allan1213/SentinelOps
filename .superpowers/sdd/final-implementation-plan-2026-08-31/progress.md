@@ -179,3 +179,11 @@ Task D-07: complete (commits b63d390..562a6c9, review approved with one legacy-c
 - Final cross-task scope checks: no `api/`, `internal/`, migration, manifest, or Runtime page file changed by D; no rehype-raw, second EventSource/client, debug logging or secret literals in D frontend paths. D-07 429 opt-out affects only the durable create request.
 - Final review adjudication: repeated reviewer-subagent dispatch attempts returned without executing; coordinator completed the whole-range diff/scope/test review directly. No Critical/Important finding remains. D-07 legacy pending-snapshot minor is real but not load-bearing for new flows or E; parked for optional F cleanup.
 - D phase complete. Stop before E-00/E/F as instructed. Branch remains local, unpushed; no merge performed.
+
+## Post-closeout design-hook triage
+
+- Hook findings: 2 `gray-on-color` in `web/src/pages/chat/index.tsx` (L842 edit button resting vs hover utilities; L984 unchecked vote-reason branch) and 1 `bounce-easing` (L1013 keyframes name).
+- L842/L984 adjudicated as static-detector false positives: hover-only background and a near-white hover background respectively. Both were reflowed only; rendered class sets unchanged. L1013 was naming-only: keyframes `chat-bounce` renamed `chat-dot-pulse` with its single call site updated; easing stays `ease-in-out`.
+- Fix commit `cee7c83`; no detector ignore entries persisted.
+- Post-fix serial verification: `npm run test:unit` 245 PASS; `npm run lint` 0 errors/68 baseline warnings; `npm run build` PASS; controlled desktop Playwright 22/22 PASS; hook detector re-scan clean on both files; `git diff --check` PASS.
+- D phase closed at product HEAD `cee7c83`. Branch `feat/phase-d-20260908` remains local and unpushed; main checkout clean apart from the user's untracked `grill-truth.md`. E/F NOT RUN.
