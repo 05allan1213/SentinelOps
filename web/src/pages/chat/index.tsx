@@ -330,16 +330,32 @@ export default function Chat() {
     let retryCount = 0
     const MAX_RETRIES = 2
 
-    const flushContent = () => {
+    // Retain event order inside the existing message budget. Coalescing only
+    // the latest callback per field would reorder interleaved phase changes or
+    // lose planning events; the scheduled callback applies this batch once.
+    let pendingMessageUpdates: Array<(message: Message) => Message> = []
+    const queueMessageUpdate = (update: (message: Message) => Message) => {
+      const scheduled = schedule(capturedMessageId, 'message', () => {
+        const updates = pendingMessageUpdates
+        pendingMessageUpdates = []
+        setMessages((prev) => prev.map((m) => m.id === capturedMessageId
+          ? updates.reduce((message, apply) => apply(message), m) : m))
+      })
+      // Background streams may outlive Chat; do not retain render batches then.
+      if (scheduled) pendingMessageUpdates.push(update)
+    }
+
+    const queueContent = () => {
       const content = streamingContent
-      setMessages((prev) => prev.map((m) => {
-        if (m.id !== capturedMessageId || m.content === content) return m
+      const receivedAt = Date.now()
+      queueMessageUpdate((m) => {
+        if (m.content === content) return m
         const planDuration = m.planStartAt && m.isPlanRunning
-          ? Math.round((Date.now() - m.planStartAt) / 1000) : undefined
+          ? Math.round((receivedAt - m.planStartAt) / 1000) : undefined
         return { ...m, content, isPlanRunning: false,
           planDone: m.isPlanRunning ? true : m.planDone,
           planDuration: m.planDuration ?? planDuration }
-      }))
+      })
     }
 
     try {
@@ -368,32 +384,26 @@ export default function Chat() {
               })()
               streamingThinking += chunkContent
               const thinkStartAt = Date.now()
-              schedule(capturedMessageId, 'thinking', () => {
-                const thinking = streamingThinking
-                setMessages((prev) => prev.map((m) => m.id === capturedMessageId
-                  ? { ...m, thinking, isThinking: true, thinkStartAt: m.thinkStartAt ?? thinkStartAt } : m))
-              })
+              const thinking = streamingThinking
+              queueMessageUpdate((m) => ({
+                ...m, thinking, isThinking: true, thinkStartAt: m.thinkStartAt ?? thinkStartAt,
+              }))
             } else {
-              finish(capturedMessageId)
-              // 规划事件（plan_steps / tool_call / tool_result / exec）：
-              // 若刚从 think 阶段过渡，先结束思考计时
-              setMessages((prev) =>
-                prev.map((m) => {
-                  if (m.id !== assistantMessage.id) return m
-                  const thinkDuration = m.thinkStartAt && m.isThinking
-                    ? Math.round((Date.now() - m.thinkStartAt) / 1000)
-                    : undefined
-                  return {
-                    ...m,
-                    isThinking: false,
-                    thinkDone: m.isThinking ? true : m.thinkDone,
-                    thinkDuration: m.thinkDuration ?? thinkDuration,
-                    planning: (m.planning ? m.planning + '\n\n' : '') + content,
-                    isPlanRunning: true,
-                    planStartAt: m.planStartAt ?? Date.now(),
-                  }
-                })
-              )
+              // Nonterminal phase events share the same timer/RAF as text.
+              const receivedAt = Date.now()
+              queueMessageUpdate((m) => {
+                const thinkDuration = m.thinkStartAt && m.isThinking
+                  ? Math.round((receivedAt - m.thinkStartAt) / 1000) : undefined
+                return {
+                  ...m,
+                  isThinking: false,
+                  thinkDone: m.isThinking ? true : m.thinkDone,
+                  thinkDuration: m.thinkDuration ?? thinkDuration,
+                  planning: (m.planning ? m.planning + '\n\n' : '') + content,
+                  isPlanRunning: true,
+                  planStartAt: m.planStartAt ?? receivedAt,
+                }
+              })
             }
           } else if (agent === 'status') {
             setMessages((prev) =>
@@ -417,7 +427,7 @@ export default function Chat() {
           } else {
             if (content) {
               streamingContent += content
-              schedule(capturedMessageId, 'content', flushContent)
+              queueContent()
             }
           }
         },
@@ -474,7 +484,7 @@ export default function Chat() {
                 messageContent, messageIndex, deepThinking, webSearch,
                 (agent, content) => {
                   streamingContent += agent !== 'status' && agent !== 'meta' && agent !== 'plan_step' ? content : ''
-                  schedule(capturedMessageId, 'content', flushContent)
+                  queueContent()
                 },
                 () => {
                   finish(capturedMessageId)

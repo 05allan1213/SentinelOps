@@ -165,10 +165,23 @@ function closesFence(line: string, fence: OpenFence): boolean {
 
 export function isFenceClosed(markdown: string): boolean {
   let openFence: OpenFence | undefined
+  let hasContainer = false
 
   for (const line of markdown.split(/\r\n?|\n/u)) {
     if (openFence === undefined) {
       openFence = openingFence(line)
+      // A lightweight scanner cannot resolve every CommonMark container. Strip
+      // nested container prefixes only to detect ambiguity; never treat their
+      // apparent closing markers as proof that highlighting is safe. In
+      // particular, ordered-list continuations can indent fences by 4+ spaces.
+      let nested = line
+      let prefix = /^[ \t]*(?:>|[-+*](?=[ \t])|\d{1,9}[.)](?=[ \t]))[ \t]*/u.exec(nested)
+      while (prefix) {
+        hasContainer = true
+        nested = nested.slice(prefix[0].length)
+        prefix = /^[ \t]*(?:>|[-+*](?=[ \t])|\d{1,9}[.)](?=[ \t]))[ \t]*/u.exec(nested)
+      }
+      if (!openFence && hasContainer && openingFence(nested.trimStart())) return false
       continue
     }
 

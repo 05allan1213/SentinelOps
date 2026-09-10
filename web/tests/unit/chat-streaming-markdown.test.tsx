@@ -1,6 +1,7 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Chat from '@/pages/chat'
+import { useStreamRenderScheduler } from '@/pages/chat/useStreamRenderScheduler'
 
 const fixture = vi.hoisted(() => ({ chunk: undefined as undefined | ((agent: string, text: string) => void), done: undefined as undefined | (() => void), parses: 0, fail: false }))
 vi.mock('@/services', () => ({ chatService: {
@@ -138,4 +139,57 @@ it('retries a failed parser once on completion even when the final text is ident
   expect(screen.getByRole('heading', { name: 'Readable answer' })).toBeInTheDocument()
   expect(container.querySelector('[data-message-id] [class*="animate-"]')).toBeNull()
   error.mockRestore()
+})
+
+it('keeps interleaved text, thinking and planning inside the same message timing budget', () => {
+  const frames: FrameRequestCallback[] = []
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { frames.push(callback); return frames.length })
+  const { container } = start()
+  chunk('first answer ')
+  chunk(JSON.stringify({ type: 'think', content: 'first thought ' }), 'plan_step')
+  tick(30)
+  chunk(JSON.stringify({ type: 'tool_call', name: 'first tool' }), 'plan_step')
+  chunk(JSON.stringify({ type: 'exec', content: 'second planning event' }), 'plan_step')
+  expect(fixture.parses).toBe(0)
+  tick(69)
+  expect(frames).toHaveLength(0)
+  tick(1)
+  expect(fixture.parses).toBe(0)
+  expect(frames).toHaveLength(1)
+  act(() => frames[0](performance.now()))
+  expect(fixture.parses).toBe(1) // completed thinking starts collapsed
+  fireEvent.click(screen.getByRole('button', { name: /已完成思考/u }))
+  const firstParses = fixture.parses
+  expect(firstParses).toBe(2)
+  expect(container.textContent).toContain('first answer')
+  expect(container.textContent).toContain('first thought')
+  const saved = JSON.parse(localStorage.getItem('chat_messages_session')!) as { role: string; planning?: string }[]
+  expect(saved.find((message) => message.role === 'assistant')?.planning).toContain('first tool')
+  expect(saved.find((message) => message.role === 'assistant')?.planning).toContain('second planning event')
+
+  tick(20)
+  chunk('second answer ')
+  chunk(JSON.stringify({ type: 'think', content: 'second thought ' }), 'plan_step')
+  chunk(JSON.stringify({ type: 'tool_result', name: 'first tool', content: 'result' }), 'plan_step')
+  tick(79)
+  expect(fixture.parses).toBe(firstParses)
+  expect(frames).toHaveLength(1)
+  tick(1)
+  expect(frames).toHaveLength(2)
+  expect(fixture.parses).toBe(firstParses)
+  act(() => frames[1](performance.now()))
+  expect(fixture.parses).toBe(firstParses + 2)
+  expect(container.textContent).toContain('first answer second answer')
+  expect(container.textContent).toContain('first thought second thought')
+  act(() => fixture.done!())
+})
+
+it('rejects render batches after unmount while a background stream continues', () => {
+  const { result, unmount } = renderHook(useStreamRenderScheduler)
+  const renderMessage = vi.fn()
+  unmount()
+  expect(result.current.schedule('background-message', 'message', renderMessage)).toBe(false)
+  tick(1000)
+  expect(renderMessage).not.toHaveBeenCalled()
+  expect(vi.getTimerCount()).toBe(0)
 })

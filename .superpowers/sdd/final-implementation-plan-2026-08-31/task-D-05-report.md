@@ -89,3 +89,46 @@ An initial browser run failed because the fixture appended ordinary text on the 
 - The existing transport/reconnect behavior remains owned by D-06/D-07; this task does not establish replay correctness, provider success, or runtime readiness.
 - No new lint errors or warnings. Existing lint/build warnings and Playwright's environment `NO_COLOR`/`FORCE_COLOR` notices remain.
 - Shared `progress.md` edits and untracked `grill-truth.md` were preserved and excluded from the task commit. No ledger, truth file, dependency, service transport, or application route was changed.
+
+## Review fix round 1 — 2026-09-10
+
+Base: `3c9db3e`. Both Important review findings addressed. Result: PASS.
+
+### Changes
+
+1. The streaming fence guard now detects ambiguous nested container prefixes and list-continuation indentation. The reported `10. item\n\n    ```js\n    const unfinished = true` and `- > ```js\n  > const unfinished = true` examples stay in raw `pre[data-streaming-markdown]` mode and never invoke highlighting while streaming. Per the coordinator's explicit ruling, ambiguous container fences remain raw even after an apparent closing line until `complete=true`; completion delegates to the existing renderer/parser. This is a conservative display guard, not a second CommonMark parser, and introduces no per-token AST work.
+2. Nonterminal planning events no longer call `finish`. Text, thinking and planning transformations are retained in arrival order and applied to the existing messages state in one scheduled message batch. Intermediate planning events are retained, and both the timer/RAF gate and last-render timestamp survive phase changes. `finish` remains only on the existing terminal completion/failure paths.
+3. Self-review added an explicit scheduler rejection after unmount so background stream callbacks do not continue accumulating render batches. Existing background stream/transport behavior was not changed.
+
+### RED
+
+Command from repository root (equivalent to running the same test command in `web`):
+
+```sh
+npm --prefix web run test:unit -- tests/unit/chat-streaming-markdown.test.tsx tests/unit/markdown-safety.test.ts tests/unit/MarkdownRenderer.test.tsx
+```
+
+Before product fixes, recorded on the original fix-round turn:
+
+```text
+Test Files 3 failed (3)
+Tests 5 failed | 163 passed (168)
+```
+
+The two helper regressions returned `true` instead of `false`; the two renderer regressions had no raw streaming pre because they were parsed/highlighted prematurely; the interleaved phase-event regression observed one parser invocation before the 100 ms/RAF gate instead of zero.
+
+### GREEN and final checks
+
+| Command | Result | Exact relevant output |
+| --- | --- | --- |
+| Focused command above | PASS | `Test Files 3 passed (3)`; `Tests 169 passed (169)` |
+| `npm run test:unit` from `web` | PASS | `Test Files 5 passed (5)`; `Tests 187 passed (187)` |
+| `npm run lint` from `web` | PASS | Exit 0; `68 problems (0 errors, 68 warnings)`; unchanged existing count |
+| `npm run build` from `web` | PASS | TypeScript/Vite exit 0; JS `2149.96 kB`, gzip `671.99 kB`; existing >500 kB chunk warning |
+| `npx playwright test tests/ui/chat-streaming-markdown.spec.ts tests/ui/markdown.spec.ts --project=chromium` from `web` | PASS | `6 passed (10.7s)`; actual delayed Chat at 1280/1440 plus shared Markdown/copy/layout cases |
+| `git diff --check` | PASS | No output |
+| D-06/D-07 transport changes, E/F, real provider/runtime execution | NOT RUN | Remain outside this fix round |
+
+The timing regression spans two consecutive render intervals, verifies no early parse before either the elapsed-time gate or RAF, retains both planning events in persisted existing message state, and checks the accumulated answer/thinking text. Completed thinking starts collapsed under the existing UI contract, so the test explicitly expands it before measuring the second interval. A separate hook regression verifies that an unmounted scheduler refuses subsequent background render batches. The renderer regressions test both unfinished and apparently closed ambiguous containers before completion, then verify normal highlighting after completion.
+
+Files changed in this fix round: `web/src/components/markdown/markdown.ts`, `web/src/pages/chat/index.tsx`, `web/src/pages/chat/useStreamRenderScheduler.ts`, the three focused unit test files, and this report appendix. The browser specs, services, SSE transport, routes, dependencies, shared progress ledger, and user truth file were not changed. Full scoped diff reviewed; the intentional conservative container display behavior is the only presentation tradeoff added by this round.

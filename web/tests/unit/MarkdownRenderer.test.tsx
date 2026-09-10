@@ -139,6 +139,23 @@ describe('MarkdownRenderer', () => {
     expect(screen.getByText('图片不可用：Evidence')).toBeInTheDocument()
   })
 
+  it.each([
+    '10. item\n\n    ```js\n    const unfinished = true',
+    '- > ```js\n  > const unfinished = true',
+  ])('keeps an unfinished container fence raw until completion: %j', (content) => {
+    const { container, rerender } = render(createElement(MarkdownRenderer, { content, streaming: true, complete: false }))
+    expect(container.querySelector('pre[data-streaming-markdown]')?.textContent).toBe(content)
+    expect(faults.highlightCalls).toBe(0)
+    expect(container.querySelector('.hljs-keyword')).toBeNull()
+    const closed = content + (content.startsWith('10.') ? '\n    ```' : '\n  > ```')
+    rerender(createElement(MarkdownRenderer, { content: closed, streaming: true, complete: false }))
+    expect(container.querySelector('pre[data-streaming-markdown]')?.textContent).toBe(closed)
+    expect(faults.highlightCalls).toBe(0)
+    rerender(createElement(MarkdownRenderer, { content: closed, streaming: false, complete: true }))
+    expect(container.querySelector('pre[data-streaming-markdown]')).toBeNull()
+    expect(container.querySelector('.hljs-keyword')).toHaveTextContent('const')
+  })
+
   it('keeps an unfinished stream plain and renders Markdown when completed', () => {
     const content = '# Partial\n\n```ts\nconst a ='
     const { container, rerender } = render(createElement(MarkdownRenderer, { content, streaming: true, complete: false }))

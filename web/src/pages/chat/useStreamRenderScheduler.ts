@@ -25,19 +25,20 @@ export function useStreamRenderScheduler() {
     if (mounted.current) pending.forEach((render) => render())
   }, [])
   const schedule = useCallback((id: string, field: string, render: () => void) => {
-    if (!mounted.current) return
+    if (!mounted.current) return false
     let cursor = cursors.current.get(id)
     if (!cursor) {
       cursor = { lastRender: performance.now(), pending: new Map() }
       cursors.current.set(id, cursor)
     }
     cursor.pending.set(field, render)
-    if (cursor.timer !== undefined || cursor.frame !== undefined) return
+    if (cursor.timer !== undefined || cursor.frame !== undefined) return true
     const active = cursor
     active.timer = setTimeout(() => {
       active.timer = undefined
       active.frame = requestAnimationFrame(() => flush(id))
     }, Math.max(0, 100 - (performance.now() - active.lastRender)))
+    return true
   }, [flush])
   const finish = useCallback((id: string) => {
     flush(id)
