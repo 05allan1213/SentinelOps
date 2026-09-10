@@ -234,6 +234,27 @@ for (const width of [1280, 1440]) {
     })
   }
 
+  test(`legacy pending snapshot stays uncertain after restore at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    const creates = await setup(page)
+    // Snapshot written before the create outcome was recorded explicitly.
+    await page.evaluate(() => {
+      localStorage.setItem('current_session_id', 'legacy-session')
+      localStorage.setItem('chat_sessions', JSON.stringify([{ id: 'legacy-session', title: 'Legacy', createdAt: 1, lastMessageAt: 1, messageCount: 2 }]))
+      localStorage.setItem('chat_messages_legacy-session', JSON.stringify([
+        { id: 'prior-user', role: 'user', content: 'Legacy question', timestamp: 1 },
+        { id: 'prior-assistant', role: 'assistant', content: '', timestamp: 1, isStreaming: true },
+      ]))
+    })
+    await page.reload()
+
+    await expect(page.getByRole('alert')).toContainText('创建结果尚未确认')
+    expect(await page.evaluate(() => window.durableFixture.urls)).toEqual([])
+    expect(creates).toEqual([])
+    const [restored] = await page.evaluate(() => JSON.parse(localStorage.getItem('chat_messages_legacy-session')!).slice(-1))
+    expect(restored).toMatchObject({ createUnconfirmed: true, isStreaming: false })
+  })
+
   test(`upload preserves the accepted snapshot before the render frame at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await setup(page)

@@ -40,6 +40,17 @@ interface Message {
   thinkDuration?: number     // 思考用时（秒）
 }
 
+// Snapshots written before D-07 recorded a pending assistant turn only as
+// `isStreaming: true` with no Run identity. Promote that legacy signal to the
+// explicit `createUnconfirmed` marker, so restored history keeps saying the
+// creation outcome is unknown instead of looking like an empty finished answer.
+// It also runs before switching away, where clearing the streaming flag would
+// otherwise erase the only record of the unresolved create.
+const migrateLegacyPending = (m: Message): Message =>
+  m.role === 'assistant' && m.isStreaming === true && !m.runId && m.createUnconfirmed === undefined
+    ? { ...m, createUnconfirmed: true }
+    : m
+
 export default function Chat() {
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState('')
@@ -119,7 +130,7 @@ export default function Chat() {
   // ── 会话管理 ─────────────────────────────────────────────────────────────
   const loadMessages = (sid: string) => {
     const raw = localStorage.getItem(`chat_messages_${sid}`)
-    const saved = (raw ? JSON.parse(raw) : []) as Message[]
+    const saved = ((raw ? JSON.parse(raw) : []) as Message[]).map(migrateLegacyPending)
     const acceptedMessageId = sessionStorage.getItem(`chat_run_message_${sid}`)
     const acceptedRunId = sessionStorage.getItem(`chat_run_id_${sid}`)
     const restored = saved.map(m => {
@@ -172,9 +183,11 @@ export default function Chat() {
   const handleSelectSession = (sid: string) => {
     abortControllerRef.current?.abort()
     // 将进行中的流式消息标为完成后保存，防止切换回来时看到"卡住"的 streaming 状态
-    const finalMessages = (JSON.parse(localStorage.getItem(`chat_messages_${currentSessionId}`) || '[]') as Message[]).map(m =>
-      m.isStreaming ? { ...m, isStreaming: false, agentStatus: undefined, isPlanRunning: false, isThinking: false } : m
-    )
+    const finalMessages = (JSON.parse(localStorage.getItem(`chat_messages_${currentSessionId}`) || '[]') as Message[])
+      .map(migrateLegacyPending)
+      .map(m =>
+        m.isStreaming ? { ...m, isStreaming: false, agentStatus: undefined, isPlanRunning: false, isThinking: false } : m
+      )
     saveMessages(currentSessionId, finalMessages)
     loadingStreamRef.current = null  // 旧 stream 的 onDone 不再清除 loading
     setCurrentSessionId(sid)
@@ -186,9 +199,11 @@ export default function Chat() {
   const handleNewSession = () => {
     if (currentSessionId && messages.length === 0) return
     abortControllerRef.current?.abort()
-    const finalMessages = (JSON.parse(localStorage.getItem(`chat_messages_${currentSessionId}`) || '[]') as Message[]).map(m =>
-      m.isStreaming ? { ...m, isStreaming: false, agentStatus: undefined, isPlanRunning: false, isThinking: false } : m
-    )
+    const finalMessages = (JSON.parse(localStorage.getItem(`chat_messages_${currentSessionId}`) || '[]') as Message[])
+      .map(migrateLegacyPending)
+      .map(m =>
+        m.isStreaming ? { ...m, isStreaming: false, agentStatus: undefined, isPlanRunning: false, isThinking: false } : m
+      )
     saveMessages(currentSessionId, finalMessages)
     loadingStreamRef.current = null
     const s = chatService.createSession()
