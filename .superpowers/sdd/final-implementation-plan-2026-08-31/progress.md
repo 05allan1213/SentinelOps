@@ -258,3 +258,19 @@ Phase E closeout verification (product HEAD `817fa2c`, serial):
 - Scope: no `api/`, `internal/`, `migrations/`, `manifest/`, `main.go`, `go.mod` or `go.sum` change in E; `git diff --check` PASS; 63 files / +6186 lines total.
 - Real Worker/provider E2E, hosted CI, application images, rollout/rollback, P43 and all of F: `NOT RUN`. Mobile: `OUT OF SCOPE`.
 - Evidence documents: `output/e-implementation-progress-2026-09-10.md`, `output/e-phase-review-2026-09-10.md`. Branch `feat/phase-e-20260910` is local and unpushed; no merge performed. Stop before F as instructed.
+
+### Phase E re-check (2026-09-10, second pass at user request)
+
+Re-ran the full verification set and performed a code-level review of the E diff. Two Important defects were found and fixed in `186d624` (`fix(web-runtime): scope detail state and previous data per run`):
+
+1. **Detail state leaked across Run identities.** `RuntimeRunDetailPage` is the route element for `runtime/runs/:runId`, so React Router reuses the instance when only the param changes; `terminalSeen`, `afterSeq` and the accepted `operationOverride` persisted. A non-terminal Run opened right after a terminal Run would never start its event tail, and the operation panel could show the previous Run's operation. Fix: a route wrapper renders `<RuntimeRunDetailPage key={runId} runId={runId} />`, remounting all Run-scoped state.
+2. **`keepPreviousData` was applied to Run-scoped queries.** The detail and child hooks could render another Run's summary/rows under the new URL while the new fetch was in flight. Fix: `placeholderData: keepPreviousData` now applies only to `useRuntimeRuns` (list filters), where the E-03 requirement lives; same-key refetch failures still retain the last successful data by TanStack default.
+
+Regression coverage added in `web/tests/ui/runtime-detail-overview.spec.ts`: client-side history navigation from a terminal `run-1` to a running `run-2` must show run-2 identity, start exactly one run-2 tail, issue no run-1 tail, and contain no run-1 worker facts.
+
+Re-check verification after the fix (product HEAD `186d624`):
+
+- `npm run test:unit`: PASS 13 files / 269 tests; `npm run lint`: PASS 0 errors / 68 baseline warnings; `npm run build`: PASS (existing chunk warning).
+- Desktop Playwright `tests/ui --workers=1`: **56/57 PASS**; the only failure remains the pre-existing `approval-ui.spec.ts:112` baseline case. Runtime-specific suites: 27/27 PASS.
+- Backend Runtime contract with DSN: PASS (`api/runtime/v1`, `internal/service/runtime`, `internal/controller/runtime`).
+- Scope unchanged: `git diff --stat main..HEAD -- api internal migrations manifest main.go go.mod go.sum` empty; `git diff --check` clean.

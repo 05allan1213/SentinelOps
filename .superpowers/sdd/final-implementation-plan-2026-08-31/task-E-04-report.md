@@ -52,3 +52,12 @@ Base: `56040ac` (E-03).
 
 - The five later tabs are explicit anchored placeholders owned by E-05/E-06; no fake data is rendered.
 - Controlled API fixtures prove UI behaviour only; real host API/Worker execution is `NOT RUN`.
+
+## Post-verification re-check (2026-09-10)
+
+The phase re-check found that the detail route element was reused when only `:runId` changed, so `terminalSeen`,
+`afterSeq` and the accepted operation id persisted across Runs (a non-terminal Run could inherit a terminal flag
+and never open its tail; the operation panel could show the previous Run's operation). Fixed in `186d624` by
+keying the page component with the Run ID; the new regression case in `runtime-detail-overview.spec.ts`
+(client-side navigation from a terminal run-1 to a running run-2) asserts run-2 identity, exactly one run-2 tail,
+no run-1 tail and no leaked worker facts. `E-05`'s operation state is covered by the same remount.
