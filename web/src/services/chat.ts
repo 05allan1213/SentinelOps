@@ -13,8 +13,12 @@ const runStatuses = ['pending', 'running', 'waiting_approval', 'retryable_failed
 function canonicalStatus(status?: string) { return status && runStatuses.includes(status) ? status : undefined }
 function runEventStatus(type: string, payload: DurablePayload): string | undefined {
   if (type === 'run.failed') return payload.data?.retryable ? 'retryable_failed' : 'failed'
-  return ({ 'run.completed': 'succeeded', 'run.parked': 'parked', 'run.reconciling': 'reconciling', 'run.started': 'running', 'run.created': 'pending' } as Record<string, string>)[type]
+  return ({ 'run.completed': 'succeeded', 'run.parked': 'parked', 'run.reconciling': 'reconciling', 'run.claimed': 'running', 'run.resumed': 'running', 'run.replayed': 'running', 'approval.requested': 'waiting_approval', 'run.created': 'pending' } as Record<string, string>)[type]
 }
+
+// Only in-flight POST promises live here; settled results remain in the existing
+// session binding. Returning consumers can await the original request by message.
+const pendingCreates = new Map<string, { messageId?: string; promise: Promise<DurableRun> }>()
 
 // 会话接口
 export interface ChatSession {
@@ -52,6 +56,9 @@ const saveSessions = (sessions: ChatSession[]) => {
 }
 
 export const chatService = {
+  hasPendingCreate(sessionId: string, messageId: string) {
+    return pendingCreates.get(sessionId)?.messageId === messageId
+  },
   // 获取当前会话ID
   getSessionId: (): string => {
     let sessionId = getCurrentSessionId()
@@ -145,7 +152,7 @@ export const chatService = {
     }, (type, content, id) => {
       const payload = JSON.parse(content) as DurablePayload
       const summary = payload.summary ?? ''
-      if (type.startsWith('run.')) {
+      if (type.startsWith('run.') || type === 'approval.requested') {
         const status = payload.data?.to_status
           ? canonicalStatus(payload.data.to_status) ?? 'unknown' : runEventStatus(type, payload)
         if (status) onState?.({ kind: 'run', status,
@@ -164,7 +171,7 @@ export const chatService = {
     query: string, _messageIndex: number, _deepThinking: boolean, _webSearch: boolean,
     onMessage: (intent: string, content: string) => void, onDone: () => void,
     onError?: (error: Error) => void, signal?: AbortSignal, sessionId?: string,
-    options?: { newTurn?: boolean },
+    options?: { newTurn?: boolean; messageId?: string },
   ) {
     const sid = sessionId || getCurrentSessionId()
     let runId = sessionStorage.getItem(`chat_run_id_${sid}`) || ''
@@ -175,16 +182,26 @@ export const chatService = {
     }
     try {
       if (signal?.aborted) return
-      if (!runId && options?.newTurn === false) throw new Error('没有可恢复的工作流身份；重试连接不会创建新工作流')
-      if (!runId || options?.newTurn) {
-        // Do not cancel an in-flight create: its accepted identity must still be
-        // retained on session switch/unmount. Never automatically retry POST.
-        const run = await chatService.createDurableRun({ sessionId: sid, query })
-        runId = run.run_id
-        sessionStorage.setItem(`chat_run_id_${sid}`, runId)
-        sessionStorage.setItem(`chat_last_seq_${sid}`, '0')
-        sessionStorage.setItem(stateKey, JSON.stringify({ kind: 'run', status: run.status }))
+      let pending = pendingCreates.get(sid)
+      if (pending && (options?.newTurn || (options?.messageId && pending.messageId !== options.messageId))) {
+        throw new Error('当前会话的创建请求尚未返回，请等待原工作流身份')
       }
+      if (!pending && !runId && options?.newTurn === false) throw new Error('没有可恢复的工作流身份；重试连接不会创建新工作流')
+      if (!pending && (!runId || options?.newTurn)) {
+        // Retain the accepted message binding even if its original consumer left.
+        // No consumer aborts the POST or automatically retries it.
+        const promise = chatService.createDurableRun({ sessionId: sid, query }).then(run => {
+          sessionStorage.setItem(`chat_run_id_${sid}`, run.run_id)
+          sessionStorage.setItem(`chat_last_seq_${sid}`, '0')
+          sessionStorage.setItem(stateKey, JSON.stringify({ kind: 'run', status: run.status }))
+          if (options?.messageId) sessionStorage.setItem(`chat_run_message_${sid}`, options.messageId)
+          else sessionStorage.removeItem(`chat_run_message_${sid}`)
+          return run
+        }).finally(() => { pendingCreates.delete(sid) })
+        pending = { messageId: options?.messageId, promise }
+        pendingCreates.set(sid, pending)
+      }
+      if (pending) runId = (await pending.promise).run_id
       if (signal?.aborted) return
       onMessage('run_binding', runId)
       const savedState = sessionStorage.getItem(stateKey)

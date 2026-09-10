@@ -5,6 +5,7 @@ import { useStreamRenderScheduler } from '@/pages/chat/useStreamRenderScheduler'
 
 const fixture = vi.hoisted(() => ({ chunk: undefined as undefined | ((agent: string, text: string) => void), done: undefined as undefined | (() => void), parses: 0, fail: false }))
 vi.mock('@/services', () => ({ chatService: {
+  hasPendingCreate: () => false,
   listSessions: () => [{ id: 'session', title: 'Test' }], getSessionId: () => 'session', updateSession: vi.fn(),
   multiAgentChat: (_text: string, _index: number, _deep: boolean, _web: boolean, chunk: typeof fixture.chunk, done: typeof fixture.done) => { fixture.chunk = chunk; fixture.done = done },
 } }))
@@ -16,7 +17,7 @@ vi.mock('remark-gfm', async (original) => {
     return module.default.apply(this, args)
   } }
 })
-vi.mock('@/pages/chat/components/ChatInput', () => ({ default: ({ onSend }: { onSend: (text: string) => void }) => <button onClick={() => onSend('question')}>Send fixture</button> }))
+vi.mock('@/pages/chat/components/ChatInput', () => ({ default: ({ onSend, onFileUpload }: { onSend: (text: string) => void; onFileUpload: () => void }) => <><button onClick={() => onSend('question')}>Send fixture</button><button onClick={onFileUpload}>Upload fixture</button></> }))
 vi.mock('@/pages/chat/components/SessionList', () => ({ default: () => null }))
 vi.mock('@/pages/chat/components/WelcomeScreen', () => ({ default: ({ inputSlot }: { inputSlot: React.ReactNode }) => inputSlot }))
 
@@ -192,4 +193,20 @@ it('rejects render batches after unmount while a background stream continues', (
   tick(1000)
   expect(renderMessage).not.toHaveBeenCalled()
   expect(vi.getTimerCount()).toBe(0)
+})
+
+it('appends upload notice to accepted body and plan before their scheduled render', () => {
+  start()
+  chunk('accepted body')
+  chunk(JSON.stringify({ type: 'plan_steps', steps: ['accepted plan'] }), 'plan_step')
+  sessionStorage.setItem('chat_last_seq_session', '2')
+  fireEvent.click(screen.getByText('Upload fixture'))
+  const saved = JSON.parse(localStorage.getItem('chat_messages_session')!)
+  expect(saved[1].content).toBe('accepted body')
+  expect(saved[1].planning).toContain('accepted plan')
+  expect(saved.at(-1).content).toBe('文件已上传到知识库')
+  expect(sessionStorage.getItem('chat_last_seq_session')).toBe('2')
+  tick()
+  const after = JSON.parse(localStorage.getItem('chat_messages_session')!)
+  expect(after[1].planning).toBe(saved[1].planning)
 })

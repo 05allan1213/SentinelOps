@@ -113,3 +113,30 @@ it('an explicit resume never creates when its stored identity is missing', async
   expect(fetch).not.toHaveBeenCalled()
   expect(call.error).toHaveBeenCalledOnce()
 })
+it('maps real claim, approval publication and recovery envelopes without invented to_status', async () => {
+  // claim.go, approval_lifecycle.go and recovery.go write these data fields.
+  vi.mocked(fetch).mockResolvedValue(response(
+    frame(1, 'run.claimed', '', { owner: 'worker', lease_generation: 1, attempt: 1 }) +
+    frame(2, 'approval.requested', '', { approval_id: 'a', proposal_hash: 'hash', checkpoint_id: 'cp', checkpoint_payload_sha256: 'sha', checkpoint_lease_generation: 1 }) +
+    frame(3, 'run.resumed', '', { mode: 'resume', attempt: 2, lease_generation: 2, runtime_version: 'v1' }) +
+    frame(4, 'run.replayed', '', { mode: 'replay', attempt: 3, lease_generation: 3, runtime_version: 'v1' }) + 'data: [DONE]\n\n'))
+  const state = vi.fn()
+  await chatService.tailDurableRun({ runId: 'real-events', onEvent: vi.fn(), onState: state }).finished
+  expect(state.mock.calls.map(([value]) => value.status)).toEqual(['running', 'waiting_approval', 'running', 'running'])
+})
+it('a current consumer joins an unresolved create after the original consumer leaves', async () => {
+  let accept!: (value: unknown) => void
+  vi.mocked(api.post).mockImplementation(() => new Promise(resolve => { accept = resolve }))
+  vi.mocked(fetch).mockResolvedValue(response('data: [DONE]\n\n'))
+  const obsolete = new AbortController(), oldMessage = vi.fn(), currentMessage = vi.fn(), error = vi.fn()
+  const first = chatService.multiAgentChat('q', 1, false, false, oldMessage, vi.fn(), error, obsolete.signal, 'session', { newTurn: true, messageId: 'assistant' })
+  obsolete.abort()
+  const second = chatService.multiAgentChat('', 1, false, false, currentMessage, vi.fn(), error, undefined, 'session', { newTurn: false, messageId: 'assistant' })
+  accept({ data: { data: { run_id: 'accepted', session_id: 'session', status: 'pending' } } })
+  await Promise.all([first, second])
+  expect(api.post).toHaveBeenCalledOnce()
+  expect(fetch).toHaveBeenCalledOnce()
+  expect(currentMessage).toHaveBeenCalledWith('run_binding', 'accepted')
+  expect(oldMessage).not.toHaveBeenCalled()
+  expect(error).not.toHaveBeenCalled()
+})

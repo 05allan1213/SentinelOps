@@ -22,6 +22,7 @@ interface Message {
   isStreaming?: boolean
   agentStatus?: string
   runId?: string
+  createUnconfirmed?: boolean
   runStatus?: string
   operationStatus?: string
   streamError?: string
@@ -119,10 +120,17 @@ export default function Chat() {
   const loadMessages = (sid: string) => {
     const raw = localStorage.getItem(`chat_messages_${sid}`)
     const saved = (raw ? JSON.parse(raw) : []) as Message[]
-    setMessages(saved.map(m => ({ ...m, isStreaming: false, isThinking: false, isPlanRunning: false,
-      ...(m.isStreaming && !m.runId && !sessionStorage.getItem(`chat_run_id_${sid}`)
-        ? { streamError: '创建结果尚未确认，当前没有可恢复的工作流身份。请核对会话后再决定是否重新发送。' } : {}),
-    })))
+    const acceptedMessageId = sessionStorage.getItem(`chat_run_message_${sid}`)
+    const acceptedRunId = sessionStorage.getItem(`chat_run_id_${sid}`)
+    const restored = saved.map(m => {
+      const accepted = m.createUnconfirmed && m.id === acceptedMessageId && acceptedRunId
+      return { ...m, isStreaming: false, isThinking: false, isPlanRunning: false,
+        ...(accepted ? { runId: acceptedRunId, createUnconfirmed: false, streamError: undefined }
+          : m.createUnconfirmed ? { streamError: '创建结果尚未确认，当前消息没有可恢复的工作流身份。请核对会话后再决定是否重新发送。' } : {}),
+      }
+    })
+    saveMessages(sid, restored)
+    setMessages(restored)
     // 恢复输入框草稿
     setInput(localStorage.getItem(`chat_draft_${sid}`) ?? '')
     // 恢复点赞/踩状态
@@ -295,10 +303,10 @@ export default function Chat() {
       chatService.updateSession(sid, { title })
       setSessions((prev) => prev.map((s) => (s.id === sid ? { ...s, title } : s)))
     }
-    chatService.updateSession(sid, { lastMessageAt: Date.now(), messageCount: history.length + 1 })
+    chatService.updateSession(sid, { lastMessageAt: userMessage.timestamp.getTime(), messageCount: history.length + 1 })
     setSessions((prev) =>
       prev.map((s) =>
-        s.id === sid ? { ...s, lastMessageAt: Date.now(), messageCount: history.length + 1 } : s
+        s.id === sid ? { ...s, lastMessageAt: userMessage.timestamp.getTime(), messageCount: history.length + 1 } : s
       )
     )
 
@@ -308,6 +316,7 @@ export default function Chat() {
       content: '',
       timestamp: new Date(),
       isStreaming: true,
+      createUnconfirmed: true,
     }
     setMessages((prev) => [...prev, assistantMessage])
 
@@ -376,7 +385,7 @@ export default function Chat() {
         webSearch,
         (agent, content) => {
           if (agent === 'run_binding') {
-            queueMessageUpdate(m => ({ ...m, runId: content }))
+            queueMessageUpdate(m => ({ ...m, runId: content, createUnconfirmed: false, streamError: undefined }))
           } else if (agent === 'run_state' || agent === 'operation_state' || agent === 'transport_state') {
             const state = JSON.parse(content) as DurableChatState
             queueMessageUpdate(m => state.kind === 'run'
@@ -497,7 +506,7 @@ export default function Chat() {
         },
         abortCtrl.signal,
         sid,
-        { newTurn }
+        { newTurn, messageId: capturedMessageId }
       )
     } catch {
       finish(capturedMessageId)
@@ -515,12 +524,21 @@ export default function Chat() {
     void Promise.resolve().then(() => {
       if (disposed || !currentSessionId) return
       const runId = sessionStorage.getItem(`chat_run_id_${currentSessionId}`)
-      if (!runId) return
+      const acceptedMessageId = sessionStorage.getItem(`chat_run_message_${currentSessionId}`)
       const saved = JSON.parse(localStorage.getItem(`chat_messages_${currentSessionId}`) || '[]') as Message[]
-      let assistant = [...saved].reverse().find(m => m.role === 'assistant' && m.runId === runId)
-        ?? [...saved].reverse().find(m => m.role === 'assistant' && !m.runId)
+      const latestTurn = [...saved].reverse().find(m => m.role === 'assistant' && (m.createUnconfirmed !== undefined || m.runId))
+      let assistant: Message | undefined
+      if (latestTurn?.createUnconfirmed) {
+        if (!chatService.hasPendingCreate(currentSessionId, latestTurn.id) && !(runId && acceptedMessageId === latestTurn.id)) return
+        assistant = latestTurn
+      } else {
+        if (!runId) return
+        assistant = saved.find(m => m.id === acceptedMessageId)
+          ?? [...saved].reverse().find(m => m.role === 'assistant' && m.runId === runId)
+          ?? [...saved].reverse().find(m => m.role === 'assistant' && !m.runId && m.createUnconfirmed === undefined)
+      }
       if (!assistant) {
-        assistant = { id: genId(), role: 'assistant', content: '', timestamp: new Date(), runId }
+        assistant = { id: genId(), role: 'assistant', content: '', timestamp: new Date(), runId: runId ?? undefined }
         saved.push(assistant)
         saveMessages(currentSessionId, saved)
         setMessages(saved)
@@ -534,7 +552,11 @@ export default function Chat() {
 
   // ── 文件上传成功回调 ──────────────────────────────────────────────────────
   const handleFileUploadSuccess = () => {
-    const updated: Message[] = [...messages, { id: genId(), role: 'assistant', content: '文件已上传到知识库', timestamp: new Date() }]
+    const accepted = JSON.parse(localStorage.getItem(`chat_messages_${currentSessionId}`) || '[]') as Message[]
+    // Flush queued transforms before replacing rendered messages with the
+    // accepted snapshot, otherwise an already accepted plan could append twice.
+    if (loadingStreamRef.current) finish(loadingStreamRef.current)
+    const updated: Message[] = [...accepted, { id: genId(), role: 'assistant', content: '文件已上传到知识库', timestamp: new Date() }]
     saveMessages(currentSessionId, updated)
     setMessages(updated)
   }

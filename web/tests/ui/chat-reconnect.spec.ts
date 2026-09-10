@@ -177,4 +177,100 @@ for (const width of [1280, 1440]) {
     expect(requestCount).toBe(1)
   })
 
+  test(`switch back before create returns joins one request at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await setup(page)
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    let creates = 0
+    await page.route('**/api/chat/v2/runs', async route => {
+      creates++
+      const sid = route.request().postDataJSON().session_id
+      await gate
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data: { run_id: 'late-run', session_id: sid, status: 'pending' } }) })
+    })
+    await page.locator('textarea').fill('Return before response')
+    await page.locator('textarea').press('Enter')
+    await expect.poll(() => creates).toBe(1)
+    await page.getByRole('button', { name: '新建对话 从空白开始' }).click()
+    await page.getByText('Return before response', { exact: true }).click()
+    release()
+    await expect.poll(() => page.evaluate(() => window.durableFixture.urls), { timeout: 3000 }).toEqual(['/api/chat/v2/runs/late-run/events?after_seq=0'])
+    await page.evaluate(() => window.durableFixture.emit(1, 'run.claimed', '', { owner: 'worker', lease_generation: 1, attempt: 1 }))
+    await expect(page.getByTestId('run-status')).toContainText('执行中')
+    await page.evaluate(() => window.durableFixture.emit(2, 'approval.requested', '', { approval_id: 'a', proposal_hash: 'hash', checkpoint_id: 'cp', checkpoint_payload_sha256: 'sha', checkpoint_lease_generation: 1 }))
+    await expect(page.getByTestId('run-status')).toContainText('等待审批')
+    expect(creates).toBe(1)
+  })
+
+  for (const priorRun of [false, true]) {
+    test(`unacknowledged ${priorRun ? 'next' : 'first'} turn stays uncertain through switch and reload at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await setup(page)
+      if (priorRun) {
+        await send(page, 'Completed earlier turn')
+        await page.evaluate(() => window.durableFixture.emit(1, 'run.completed', '', { to_status: 'succeeded' }))
+        await expect(page.getByTestId('run-status')).toContainText('已成功完成')
+      }
+      let release!: () => void
+      const gate = new Promise<void>(resolve => { release = resolve })
+      let creates = 0
+      await page.route('**/api/chat/v2/runs', async route => {
+        creates++
+        await gate
+        await route.abort().catch(() => {})
+      })
+      await page.locator('textarea').fill('Unacknowledged turn')
+      await page.locator('textarea').press('Enter')
+      await expect.poll(() => creates).toBe(1)
+      await page.getByRole('button', { name: '新建对话 从空白开始' }).click()
+      await page.getByText(priorRun ? 'Completed earlier turn' : 'Unacknowledged turn', { exact: true }).click()
+      await page.reload()
+      try {
+        await expect(page.getByRole('alert')).toContainText('创建结果尚未确认', { timeout: 3000 })
+        expect(await page.evaluate(() => window.durableFixture.urls)).toEqual([])
+        expect(creates).toBe(1)
+      } finally { release() }
+    })
+  }
+
+  test(`upload preserves the accepted snapshot before the render frame at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await setup(page)
+    await send(page)
+    await expect(page.getByTestId('run-status')).toContainText('等待执行')
+    await page.locator('button').filter({ has: page.locator('svg.lucide-paperclip') }).click()
+    await page.locator('input[type="file"]').setInputFiles({ name: 'fixture.md', mimeType: 'text/markdown', buffer: Buffer.from('# uploaded fixture') })
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    let uploads = 0
+    await page.route('**/api/knowledge/v1/docs/upload', async route => {
+      uploads++
+      await gate
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data: { doc_id: 'fixture-doc' } }) })
+    })
+    await page.getByRole('button', { name: '上传并索引' }).click()
+    await expect.poll(() => uploads).toBe(1)
+    await page.clock.install()
+    await page.clock.pauseAt(Date.now() + 1000)
+    await page.evaluate(() => {
+      window.durableFixture.emit(1, 'agent.plan', '{"response":"Accepted before upload"}')
+      window.durableFixture.emit(2, 'agent.plan', '{"steps":["Preserved plan"]}')
+    })
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem(`chat_last_seq_${localStorage.getItem('current_session_id')}`))).toBe('2')
+    // Render time is paused: the callback sees the previous React message value.
+    release()
+    await expect(page.getByText('文件已上传到知识库', { exact: true })).toBeVisible()
+    const snapshot = await page.evaluate(() => JSON.parse(localStorage.getItem(`chat_messages_${localStorage.getItem('current_session_id')}`)!))
+    expect(snapshot[1].content).toBe('Accepted before upload')
+    expect(snapshot[1].planning).toContain('Preserved plan')
+    await page.clock.resume()
+    await page.reload()
+    await expect.poll(() => page.evaluate(() => window.durableFixture.urls[0])).toBe('/api/chat/v2/runs/run-1/events?after_seq=2')
+    await expect(page.locator('[data-markdown-variant="chat"]').first()).toContainText('Accepted before upload')
+    const restored = await page.evaluate(() => JSON.parse(localStorage.getItem(`chat_messages_${localStorage.getItem('current_session_id')}`)!))
+    expect(restored[1].planning).toBe(snapshot[1].planning)
+    await page.evaluate(() => window.durableFixture.done())
+  })
+
 }

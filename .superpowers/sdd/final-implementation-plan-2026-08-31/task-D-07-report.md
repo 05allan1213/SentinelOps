@@ -64,3 +64,36 @@ The controlled browser cases exercise the actual Chat page, actual service adapt
 - Durable v2 accepts the existing server agent configuration. Legacy `messageIndex/deepThinking/webSearch` positional arguments remain compatible; v2 does not introduce undocumented request fields.
 - Browser fixture success proves frontend integration and bounded transport behavior, not Worker/provider execution, Effect safety in a real deployment, or operational readiness.
 - Coordinator-owned `progress.md` and user-owned `grill-truth.md` remain outside staging. No push.
+
+## Review fix round 1 — base `1f7acf1`
+
+All four Important findings were fixed together within D-07. No new module, API client, store or event bus was introduced.
+
+1. **Actual server lifecycle events.** `run.claimed` now maps to `running`, using the event emitted by `internal/ai/workflow/claim.go:122` (data carries owner/lease/attempt, with no `to_status`). `approval.requested` maps to `waiting_approval`, matching `approval_lifecycle.go:250` and its checkpoint/proposal attributes. `run.resumed` and `run.replayed` map to `running`, matching `recovery.go:115` and the `mode/attempt/lease_generation/runtime_version` envelope constructed at `recovery.go:429`. The nonexistent `run.started` fallback was removed. Existing canonical terminal/operation semantics are unchanged. Tests use actual server attribute names and omit fabricated `to_status` fields for these events.
+2. **Return before create response.** The service retains only unresolved create promises in a transient session/message association. A returning consumer waits for the existing promise; it never posts again. The obsolete consumer stays aborted. Settled promises are removed. An accepted response retains `chat_run_message_<session>` alongside the existing Run binding even if its original consumer left; reopening uses that association to reconcile the correct saved message. This small transport lifecycle mechanism was expressly approved by the coordinator.
+3. **Per-message creation uncertainty.** Each deliberate assistant turn starts with `createUnconfirmed: true` in the existing saved message model. Stream presentation, session switching and the existence of a prior Run cannot clear it. A matching accepted Run/message binding clears the marker on delivery or restore. An unresolved latest turn with neither a pending promise nor its own accepted binding retains a clear uncertainty message; reload does not create a replacement or attach the preceding turn's Run to it. Existing old messages remain readable through the compatibility fallback.
+4. **Upload during buffered rendering.** The upload notice appends to the accepted local message snapshot, never the older rendered `messages` value. The existing message-ID scheduler is flushed before replacing the rendered snapshot, so an already accepted plan cannot be applied twice. Both body/planning content and the advanced seq survive upload and reload. Session metadata now reuses the send message timestamp rather than recomputing `Date.now()` inside the state update path; final lint warning count remains unchanged.
+
+Files changed in this round: `web/src/services/chat.ts`, `web/src/pages/chat/index.tsx`, `web/tests/unit/chat-service-reconnect.test.ts`, `web/tests/unit/chat-streaming-markdown.test.tsx`, `web/tests/ui/chat-reconnect.spec.ts`, and this report. The existing D-05 unit fixture gained the new service-method stub and an upload callback button; none of its existing behavioral assertions were weakened.
+
+### Regression RED and GREEN
+
+- **RED / unit:** `cd web && npm run test:unit -- chat-service-reconnect chat-streaming-markdown` exited 1: **3 failed, 25 passed**. The real lifecycle event sequence produced no states; the returning consumer produced zero GETs; upload replaced `accepted body` with an empty string. These failures were recorded before product fixes.
+- **RED / browser:** `cd web && npx playwright test tests/ui/chat-reconnect.spec.ts --project=chromium --grep 'switch back|unacknowledged'` exited 1: **6 failed** at 1280/1440. The precise send → switch away → switch back → release create response ordering produced no tail. Unacknowledged first/next turns lost the uncertainty alert after switch/reload.
+- **Intermediate fixture correction:** After implementation, all 28 focused assertions passed but Vitest correctly returned FAIL for eight unhandled rejections because the old mocked D-05 service did not yet expose `hasPendingCreate`. Adding its explicit false stub corrected the fixture boundary; no product fallback or assertion relaxation was used.
+- **GREEN / focused unit:** the same focused unit command returned **2 files, 28 tests PASS**, without unhandled errors.
+- **GREEN / targeted browser:** the same pending-create/uncertainty browser command returned **6/6 PASS**. `--grep 'upload preserves'` returned **2/2 PASS**, using the actual upload modal and a paused browser render clock: events/seq are accepted before upload completion, then the page reloads at `after_seq=2` with body and plan intact.
+
+### Final fix verification
+
+| Command / check | Result | Evidence |
+| --- | --- | --- |
+| `cd web && npm run test:unit` | PASS | 9 files, 245 tests; clean test output |
+| `cd web && npm run lint` | PASS | Exit 0; 0 errors, 68 warnings, same count as pre-fix baseline |
+| `cd web && npm run build` | PASS | TypeScript and Vite build; existing >500 kB chunk warning |
+| `cd web && npx playwright test tests/ui/chat-reconnect.spec.ts tests/ui/chat-streaming-markdown.spec.ts tests/ui/markdown.spec.ts --project=chromium` | PASS | 22/22 in 52.2 seconds: 16 actual-Chat controlled cases plus 6 existing Markdown/streaming cases, both desktop widths |
+| `git diff --check` | PASS | No whitespace errors |
+| Go controller / full Go suite rerun in this fix round | NOT RUN | Frontend-only changes; earlier focused controller PASS remains recorded above |
+| Real Worker/provider E2E, hosted CI, rollout/rollback and E/F | NOT RUN | Unchanged scope and evidence limits |
+
+The pending-create association does not survive a browser reload; the existing persisted message uncertainty and accepted identity association do. A create acknowledgment that was never received still cannot be recovered by inventing a new Run. Successful frontend fixtures continue to make no claim about real Worker/provider execution. Coordinator ledger and user truth files remain excluded from staging.
