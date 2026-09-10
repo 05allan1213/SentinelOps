@@ -51,8 +51,10 @@ export const runSummary = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
-export const runDetail = (overrides: Record<string, unknown> = {}) => ({
-  summary: runSummary(overrides.summary as Record<string, unknown> | undefined),
+export const runDetail = (overrides: Record<string, unknown> = {}) => {
+  const { summary, ...rest } = overrides
+  return {
+  summary: runSummary(summary as Record<string, unknown> | undefined),
   overview: { status: 'parked', current_phase: 'unknown', summary: '等待人工恢复', ...meta() },
   current_attempt: {
     attempt_id: 'attempt-2',
@@ -118,8 +120,9 @@ export const runDetail = (overrides: Record<string, unknown> = {}) => ({
   },
   allowed_recovery_actions: ['resume', 'cancel'],
   ...meta(),
-  ...overrides,
-})
+  ...rest,
+  }
+}
 
 export const runtimeEvent = (seq: number, eventType: string, overrides: Record<string, unknown> = {}) => ({
   seq,

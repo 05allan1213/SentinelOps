@@ -149,6 +149,16 @@ export function useRuntimeOperation(operationId: string, options?: RuntimeHookOp
   })
 }
 
+/** Polls the Operation endpoint only while the server reports a non-terminal operation. */
+export function useRuntimeOperationPolling(operationId: string, options?: RuntimeHookOptions) {
+  return useQuery({
+    queryKey: runtimeQueryKeys.operation(operationId),
+    queryFn: ({ signal }) => runtimeService.getOperation(operationId, { signal }),
+    enabled: enabledOr(options, Boolean(operationId)),
+    refetchInterval: query => (query.state.data?.item?.terminal ? false : 2000),
+  })
+}
+
 export function useRuntimeCapabilities(params: PageParams = {}, options?: RuntimeHookOptions) {
   return useQuery({
     queryKey: runtimeQueryKeys.capabilities(params),

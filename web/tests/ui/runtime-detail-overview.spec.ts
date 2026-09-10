@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { envelope, runDetailRes, timelineRes, runtimeEvent } from './fixtures/runtime-detail'
+import { envelope, meta, runDetailRes, timelineRes, runtimeEvent } from './fixtures/runtime-detail'
 
 async function installAuth(page: Page) {
   await page.addInitScript(() => localStorage.setItem('token', 'controlled-runtime-token'))
@@ -8,9 +8,23 @@ async function installAuth(page: Page) {
 const detailPath = '**/api/runtime/v1/runs/run-1'
 const timelinePath = '**/api/runtime/v1/runs/run-1/timeline**'
 
+/** Attempts/checkpoints/events sub-resources are E-05/E-02 surfaces; the detail spec only needs them mocked. */
+async function installSubresources(page: Page) {
+  await page.route('**/api/runtime/v1/runs/run-1/attempts**', route => route.fulfill({
+    contentType: 'application/json',
+    body: envelope({ items: [], page: { page: 1, page_size: 20, total: 0, has_next: false }, ...meta() }),
+  }))
+  await page.route('**/api/runtime/v1/runs/run-1/checkpoints**', route => route.fulfill({
+    contentType: 'application/json',
+    body: envelope({ items: [], page: { page: 1, page_size: 20, total: 0, has_next: false }, ...meta() }),
+  }))
+  await page.route('**/api/runtime/v1/runs/run-1/events**', route => route.fulfill({ contentType: 'text/event-stream', body: 'data: [DONE]\n\n' }))
+}
+
 for (const width of [1280, 1440]) {
   test(`run detail overview, tabs and full timeline at ${width}px`, async ({ page }) => {
     await installAuth(page)
+    await installSubresources(page)
     await page.route(timelinePath, route => route.fulfill({
       contentType: 'application/json',
       body: envelope(timelineRes([
@@ -54,7 +68,10 @@ for (const width of [1280, 1440]) {
 
     await expect(page.getByTestId('runtime-tab-placeholder')).toHaveCount(0)
     await page.getByTestId('runtime-detail-tab').filter({ hasText: 'Attempts' }).click()
-    await expect(page.getByTestId('runtime-tab-placeholder')).toHaveAttribute('data-tab', 'attempts')
+    // E-05 replaced the Attempts placeholder with the real panel; the untouched tabs keep theirs.
+    await expect(page.getByTestId('runtime-attempts-panel')).toBeVisible()
+    await page.getByTestId('runtime-detail-tab').filter({ hasText: 'Trace' }).click()
+    await expect(page.getByTestId('runtime-tab-placeholder')).toHaveAttribute('data-tab', 'trace')
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
     expect(errors).toEqual([])
@@ -62,6 +79,7 @@ for (const width of [1280, 1440]) {
 
   test(`run detail partial, unavailable and failed states at ${width}px`, async ({ page }) => {
     await installAuth(page)
+    await installSubresources(page)
     await page.route(timelinePath, route => route.fulfill({ contentType: 'application/json', body: envelope(timelineRes([])) }))
     let mode: 'partial' | 'unavailable' | 'fail' = 'partial'
     await page.route(detailPath, route => {
