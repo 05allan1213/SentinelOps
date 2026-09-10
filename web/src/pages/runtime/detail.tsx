@@ -48,8 +48,7 @@ const PLACEHOLDER_LABEL: Record<Exclude<RuntimeDetailTab, 'overview' | 'timeline
   trace: 'Trace',
 }
 
-export default function RuntimeRunDetailPage() {
-  const { runId = '' } = useParams()
+function RuntimeRunDetailPage({ runId }: { runId: string }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const role = useAuthStore(state => state.role)
@@ -248,4 +247,13 @@ export default function RuntimeRunDetailPage() {
       )}
     </div>
   )
+}
+
+/**
+ * Route wrapper: keying by Run ID resets every Run-scoped state (tail cursor/terminal flag,
+ * accepted operation, dialog) when the URL moves between two Run detail pages.
+ */
+export default function RuntimeRunDetailRoute() {
+  const { runId = '' } = useParams()
+  return <RuntimeRunDetailPage key={runId} runId={runId} />
 }

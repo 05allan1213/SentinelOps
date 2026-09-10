@@ -56,7 +56,6 @@ export function useRuntimeRun(runId: string, options?: RuntimeHookOptions) {
     queryFn: ({ signal }) => runtimeService.getRun(runId, { signal }),
     enabled: enabledOr(options, Boolean(runId)),
     refetchInterval: options?.refetchInterval,
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -66,7 +65,6 @@ export function useRuntimeTimeline(runId: string, params: TimelineParams = {}, o
     queryFn: ({ signal }) => runtimeService.getTimeline(runId, params, { signal }),
     enabled: enabledOr(options, Boolean(runId)),
     refetchInterval: options?.refetchInterval,
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -76,7 +74,6 @@ export function useRuntimeAttempts(runId: string, params: PageParams = {}, optio
     queryFn: ({ signal }) => runtimeService.getAttempts(runId, params, { signal }),
     enabled: enabledOr(options, Boolean(runId)),
     refetchInterval: options?.refetchInterval,
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -86,7 +83,6 @@ export function useRuntimeCheckpoints(runId: string, params: PageParams = {}, op
     queryFn: ({ signal }) => runtimeService.getCheckpoints(runId, params, { signal }),
     enabled: enabledOr(options, Boolean(runId)),
     refetchInterval: options?.refetchInterval,
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -96,7 +92,6 @@ export function useRuntimeApprovals(runId: string, params: PageParams = {}, opti
     queryFn: ({ signal }) => runtimeService.getApprovals(runId, params, { signal }),
     enabled: enabledOr(options, Boolean(runId)),
     refetchInterval: options?.refetchInterval,
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -106,7 +101,6 @@ export function useRuntimeEffects(runId: string, params: EffectsParams = {}, opt
     queryFn: ({ signal }) => runtimeService.getEffects(runId, params, { signal }),
     enabled: enabledOr(options, Boolean(runId)),
     refetchInterval: options?.refetchInterval,
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -116,7 +110,6 @@ export function useRuntimeEvidence(runId: string, params: PageParams = {}, optio
     queryFn: ({ signal }) => runtimeService.getEvidence(runId, params, { signal }),
     enabled: enabledOr(options, Boolean(runId)),
     refetchInterval: options?.refetchInterval,
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -126,7 +119,6 @@ export function useRuntimeContext(runId: string, include?: 'history', options?: 
     queryFn: ({ signal }) => runtimeService.getContext(runId, { include, signal }),
     enabled: enabledOr(options, Boolean(runId)),
     refetchInterval: options?.refetchInterval,
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -136,7 +128,6 @@ export function useRuntimeTraces(runId: string, params: PageParams = {}, options
     queryFn: ({ signal }) => runtimeService.getTraces(runId, params, { signal }),
     enabled: enabledOr(options, Boolean(runId)),
     refetchInterval: options?.refetchInterval,
-    placeholderData: keepPreviousData,
   })
 }
 

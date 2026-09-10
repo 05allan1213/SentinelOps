@@ -10,20 +10,20 @@ const timelinePath = '**/api/runtime/v1/runs/run-1/timeline**'
 
 /** Attempts/checkpoints/events sub-resources are E-05/E-02 surfaces; the detail spec only needs them mocked. */
 async function installSubresources(page: Page) {
-  await page.route('**/api/runtime/v1/runs/run-1/attempts**', route => route.fulfill({
-    contentType: 'application/json',
-    body: envelope({ items: [], page: { page: 1, page_size: 20, total: 0, has_next: false }, ...meta() }),
-  }))
-  await page.route('**/api/runtime/v1/runs/run-1/checkpoints**', route => route.fulfill({
-    contentType: 'application/json',
-    body: envelope({ items: [], page: { page: 1, page_size: 20, total: 0, has_next: false }, ...meta() }),
-  }))
-  await page.route('**/api/runtime/v1/runs/run-1/events**', route => route.fulfill({ contentType: 'text/event-stream', body: 'data: [DONE]\n\n' }))
-  for (const resource of ['effects', 'evidence', 'context', 'traces']) {
-    await page.route(`**/api/runtime/v1/runs/run-1/${resource}**`, route => route.fulfill({
-      contentType: 'application/json',
-      body: envelope({ items: [], item: { identity: {}, history_count: 0, gate_keys: [] }, page: { page: 1, page_size: 50, total: 0, has_next: false }, ...meta() }),
-    }))
+  for (const runId of ['run-1', 'run-2']) {
+    for (const resource of ['attempts', 'checkpoints', 'timeline']) {
+      await page.route(`**/api/runtime/v1/runs/${runId}/${resource}**`, route => route.fulfill({
+        contentType: 'application/json',
+        body: envelope({ items: [], page: { page: 1, page_size: 50, total: 0, has_next: false }, ...meta() }),
+      }))
+    }
+    await page.route(`**/api/runtime/v1/runs/${runId}/events**`, route => route.fulfill({ contentType: 'text/event-stream', body: 'data: [DONE]\n\n' }))
+    for (const resource of ['effects', 'evidence', 'context', 'traces']) {
+      await page.route(`**/api/runtime/v1/runs/${runId}/${resource}**`, route => route.fulfill({
+        contentType: 'application/json',
+        body: envelope({ items: [], item: { identity: {}, history_count: 0, gate_keys: [] }, page: { page: 1, page_size: 50, total: 0, has_next: false }, ...meta() }),
+      }))
+    }
   }
 }
 
@@ -159,4 +159,50 @@ test('tail starts only for a non-terminal run and never claims success', async (
   await page.waitForTimeout(300)
   // The reload resets the per-page counter; a terminal Run opens no reader at all.
   expect(await page.evaluate(() => (window as unknown as { __runtimeTailCalls: string[] }).__runtimeTailCalls.length)).toBe(0)
+})
+
+test('run identity, tail and operation state do not leak between runs on client-side navigation', async ({ page }) => {
+  await installAuth(page)
+  await page.addInitScript(() => {
+    const real = window.fetch.bind(window)
+    const calls: string[] = []
+    ;(window as unknown as { __runtimeTailCalls: string[] }).__runtimeTailCalls = calls
+    window.fetch = async (input, init) => {
+      const url = String(input)
+      if (url.includes('/api/runtime/v1/runs/') && url.includes('/events')) {
+        calls.push(url)
+        return new Response(new ReadableStream<Uint8Array>({ start() {} }), { headers: { 'Content-Type': 'text/event-stream' } })
+      }
+      return real(input, init)
+    }
+  })
+  await installSubresources(page)
+  await page.route('**/api/runtime/v1/runs/run-1', route => route.fulfill({
+    contentType: 'application/json',
+    body: envelope(runDetailRes({ summary: { run_id: 'run-1', status: 'succeeded', current_phase: 'completed', worker_id: 'worker-1' } })),
+  }))
+  await page.route('**/api/runtime/v1/runs/run-2', route => route.fulfill({
+    contentType: 'application/json',
+    body: envelope(runDetailRes({ summary: { run_id: 'run-2', status: 'running', current_phase: 'executing', worker_id: 'worker-2' } })),
+  }))
+  await page.setViewportSize({ width: 1280, height: 900 })
+
+  await page.goto('/runtime/runs/run-1')
+  await expect(page.getByRole('heading', { name: 'Run run-1' })).toBeVisible()
+  await expect(page.getByTestId('runtime-overview-worker')).toHaveText('worker-1')
+  await expect(page.getByTestId('runtime-tail-state')).toHaveAttribute('data-connected', 'false')
+
+  // Client-side param change (React Router history navigation) must remount Run-scoped state.
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/runtime/runs/run-2')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+
+  await expect(page.getByRole('heading', { name: 'Run run-2' })).toBeVisible()
+  await expect(page.getByTestId('runtime-overview-worker')).toHaveText('worker-2')
+  await expect(page.getByTestId('runtime-tail-state')).toHaveAttribute('data-connected', 'true')
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __runtimeTailCalls: string[] }).__runtimeTailCalls.some(url => url.includes('/runs/run-2/events')))).toBe(true)
+  expect(await page.evaluate(() => (window as unknown as { __runtimeTailCalls: string[] }).__runtimeTailCalls.some(url => url.includes('/runs/run-1/events')))).toBe(false)
+  // The previous Run's facts are not reused as placeholder data.
+  await expect(page.getByTestId('runtime-run-overview')).not.toContainText('worker-1')
 })
