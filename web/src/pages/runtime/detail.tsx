@@ -7,6 +7,9 @@ import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/utils'
 import AttemptsPanel from './components/AttemptsPanel'
 import CheckpointPanel from './components/CheckpointPanel'
+import ContextPanel from './components/ContextPanel'
+import EffectsPanel from './components/EffectsPanel'
+import EvidenceInspector from './components/EvidenceInspector'
 import OperationProgress from './components/OperationProgress'
 import RecoveryDialog from './components/RecoveryDialog'
 import RunDetailTabs from './components/RunDetailTabs'
@@ -14,6 +17,7 @@ import RunOverview from './components/RunOverview'
 import RunTimeline from './components/RunTimeline'
 import RuntimeQualityState from './components/RuntimeQualityState'
 import RuntimeStatusBadge from './components/RuntimeStatusBadge'
+import TracePanel from './components/TracePanel'
 import { isRuntimeDetailTab, type RuntimeDetailTab } from './components/detailTabs'
 import type { RecoveryAction } from '@/types/runtime'
 
@@ -227,6 +231,14 @@ export default function RuntimeRunDetailPage() {
                 />
               )}
             </div>
+          ) : tab === 'effects' ? (
+            <EffectsPanel runId={runId} />
+          ) : tab === 'evidence' ? (
+            <EvidenceInspector runId={runId} />
+          ) : tab === 'context' ? (
+            <ContextPanel runId={runId} />
+          ) : tab === 'trace' ? (
+            <TracePanel runId={runId} />
           ) : (
             <div data-testid="runtime-tab-placeholder" data-tab={tab} className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-sm text-gray-500">
               {PLACEHOLDER_LABEL[tab]} 面板尚未接入

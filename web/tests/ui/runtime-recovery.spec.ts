@@ -160,6 +160,7 @@ for (const width of [1280, 1440]) {
     await page.goto('/runtime/runs/run-1?tab=attempts')
 
     // operator/viewer never get an enabled Recovery control.
+    await expect(page.getByTestId('runtime-recovery-button')).toHaveCount(2)
     for (const button of await page.getByTestId('runtime-recovery-button').all()) {
       await expect(button).toBeDisabled()
     }

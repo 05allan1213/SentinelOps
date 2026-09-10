@@ -19,6 +19,12 @@ async function installSubresources(page: Page) {
     body: envelope({ items: [], page: { page: 1, page_size: 20, total: 0, has_next: false }, ...meta() }),
   }))
   await page.route('**/api/runtime/v1/runs/run-1/events**', route => route.fulfill({ contentType: 'text/event-stream', body: 'data: [DONE]\n\n' }))
+  for (const resource of ['effects', 'evidence', 'context', 'traces']) {
+    await page.route(`**/api/runtime/v1/runs/run-1/${resource}**`, route => route.fulfill({
+      contentType: 'application/json',
+      body: envelope({ items: [], item: { identity: {}, history_count: 0, gate_keys: [] }, page: { page: 1, page_size: 50, total: 0, has_next: false }, ...meta() }),
+    }))
+  }
 }
 
 for (const width of [1280, 1440]) {
@@ -70,8 +76,10 @@ for (const width of [1280, 1440]) {
     await page.getByTestId('runtime-detail-tab').filter({ hasText: 'Attempts' }).click()
     // E-05 replaced the Attempts placeholder with the real panel; the untouched tabs keep theirs.
     await expect(page.getByTestId('runtime-attempts-panel')).toBeVisible()
+    // E-06 replaced the remaining placeholders; every tab now renders a real panel.
     await page.getByTestId('runtime-detail-tab').filter({ hasText: 'Trace' }).click()
-    await expect(page.getByTestId('runtime-tab-placeholder')).toHaveAttribute('data-tab', 'trace')
+    await expect(page.getByTestId('runtime-trace-panel')).toBeVisible()
+    await expect(page.getByTestId('runtime-tab-placeholder')).toHaveCount(0)
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
     expect(errors).toEqual([])
