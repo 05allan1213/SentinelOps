@@ -17,6 +17,8 @@ import {
   FlaskConical,
   ChevronDown,
   Plug,
+  ShieldCheck,
+  ServerCog,
 } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -42,6 +44,16 @@ interface NavGroup {
 }
 
 const navGroups: NavGroup[] = [
+  {
+    title: 'Agent Runtime',
+    accent: '#818CF8',
+    items: [
+      { path: '/runtime/runs', icon: Activity, label: 'Runs' },
+      { path: '/runtime/capabilities', icon: Cpu, label: 'Capabilities' },
+      { path: '/runtime/safety', icon: ShieldCheck, label: 'Safety' },
+      { path: '/runtime/worker-health', icon: ServerCog, label: 'Worker Health' },
+    ],
+  },
   {
     title: 'AI 能力',
     accent: '#818CF8',
