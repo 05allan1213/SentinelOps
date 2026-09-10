@@ -23,6 +23,10 @@ export function getApiErrorStatus(error: unknown): number | undefined {
   return undefined
 }
 
+declare module 'axios' {
+  interface AxiosRequestConfig { skipRateLimitRetry?: boolean }
+}
+
 const api: AxiosInstance = axios.create({
   baseURL: '/api',
   timeout: 30000,
@@ -66,7 +70,7 @@ api.interceptors.response.use(
     }
 
     // 429 自动重试（指数退避，最多 3 次）
-    if (status === 429) {
+    if (status === 429 && !config?.skipRateLimitRetry) {
       config._retryCount = (config._retryCount ?? 0) + 1
       if (config._retryCount <= 3) {
         const delay = Math.min(1000 * 2 ** (config._retryCount - 1), 8000) // 重试间隔：1s、2s、4s

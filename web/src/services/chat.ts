@@ -1,10 +1,20 @@
 import api from './api'
-import { streamFetch } from '@/utils/sse'
+import { streamFetch, bindSSEVisibility, SSEError } from '@/utils/sse'
 import { useAuthStore } from '@/stores/authStore'
 import {
   ApiResponse,
   UploadConfig,
 } from '@/types'
+
+export interface DurableRun { run_id: string; session_id: string; status: string }
+export interface DurableChatState { kind: 'run' | 'operation' | 'transport'; status: string; error?: string }
+interface DurablePayload { summary?: string; data?: { to_status?: string; retryable?: boolean } }
+const runStatuses = ['pending', 'running', 'waiting_approval', 'retryable_failed', 'parked', 'reconciling', 'succeeded', 'failed', 'canceled']
+function canonicalStatus(status?: string) { return status && runStatuses.includes(status) ? status : undefined }
+function runEventStatus(type: string, payload: DurablePayload): string | undefined {
+  if (type === 'run.failed') return payload.data?.retryable ? 'retryable_failed' : 'failed'
+  return ({ 'run.completed': 'succeeded', 'run.parked': 'parked', 'run.reconciling': 'reconciling', 'run.started': 'running', 'run.created': 'pending' } as Record<string, string>)[type]
+}
 
 // 会话接口
 export interface ChatSession {
@@ -113,142 +123,127 @@ export const chatService = {
     }
   },
 
-  // ── 问题三：流式中断恢复能力（前端服务层）──────────────────────────────────
-  // 设计思路：
-  //   每次发起请求前从 sessionStorage 读取上次的 run_id 和 last_seq。
-  //   首次请求两者均为空，后端正常创建新 run 并从 seq=1 开始推送。
-  //   断线重连时携带非空的 run_id + last_seq，后端跳过 Agent 重新执行，
-  //   直接从 workflow_events 表补发 seq > last_seq 的历史事件。
-  //   meta 事件到达时保存 runId（首次请求后端新建 run，runId 在此确定）；
-  //   每条事件到达时更新 last_seq，确保游标始终指向最后一条已收到的事件。
-  // Intent 意图驱动多 Agent 对话（支持断线重连）
-  multiAgentChat: (
-    query: string,
-    messageIndex: number,
-    deepThinking: boolean,
-    webSearch: boolean,
-    onMessage: (intent: string, content: string) => void,
-    onDone: () => void,
-    onError?: (e: Error) => void,
-    signal?: AbortSignal,
-    sessionId?: string
-  ) => {
+  async createDurableRun({ sessionId, query, agent }: { sessionId: string; query: string; agent?: string }) {
+    const response = await api.post<ApiResponse<DurableRun>>('/chat/v2/runs', {
+      session_id: sessionId, query, ...(agent ? { agent } : {}),
+    }, { skipRateLimitRetry: true })
+    const run = response.data.data
+    if (!run?.run_id || run.session_id !== sessionId) throw new Error('工作流响应与当前会话不匹配')
+    return run
+  },
+
+  // This adapter only tails an existing authorized Run. D-06 owns parsing,
+  // deduplication, bounded retries, visibility and reader cleanup.
+  tailDurableRun({ runId, afterSeq = 0, onEvent, onState, onDone = () => {}, onError, signal }: {
+    runId: string; afterSeq?: number; onEvent: (type: string, content: string, seq: number) => void
+    onState?: (state: DurableChatState) => void; onDone?: () => void
+    onError?: (error: Error) => void; signal?: AbortSignal
+  }) {
+    const control = streamFetch(`/api/chat/v2/runs/${encodeURIComponent(runId)}/events`, {
+      method: 'GET', runId, initialAfterSeq: afterSeq, signal,
+      onRetry: (attempt) => onState?.({ kind: 'transport', status: 'reconnecting', error: `连接中断，正在重连（${attempt}/5）` }),
+    }, (type, content, id) => {
+      const payload = JSON.parse(content) as DurablePayload
+      const summary = payload.summary ?? ''
+      if (type.startsWith('run.')) {
+        const status = payload.data?.to_status
+          ? canonicalStatus(payload.data.to_status) ?? 'unknown' : runEventStatus(type, payload)
+        if (status) onState?.({ kind: 'run', status,
+          ...(['failed', 'retryable_failed', 'canceled', 'parked'].includes(status) ? { error: summary || '工作流尚未成功完成' } : {}),
+        })
+      } else if (type.startsWith('operation.')) onState?.({ kind: 'operation', status: type })
+      onEvent(type, content, Number(id))
+    }, onDone, onError)
+    bindSSEVisibility(control)
+    return control
+  },
+
+  // Existing positional callbacks remain compatible. Only an intentional new
+  // user turn may opt into creation while a session already has a Run binding.
+  async multiAgentChat(
+    query: string, _messageIndex: number, _deepThinking: boolean, _webSearch: boolean,
+    onMessage: (intent: string, content: string) => void, onDone: () => void,
+    onError?: (error: Error) => void, signal?: AbortSignal, sessionId?: string,
+    options?: { newTurn?: boolean },
+  ) {
     const sid = sessionId || getCurrentSessionId()
-    const runId = sessionStorage.getItem(`chat_run_id_${sid}`) || ''
-    const lastSeq = parseInt(sessionStorage.getItem(`chat_last_seq_${sid}`) || '0')
-    const userID = useAuthStore.getState().userID ?? ''
-
-    let durableRunId = runId
-    let durableStarted = false
-    const emittedAssistant = new Set<string>()
-
-    const streamDurableEvents = (activeRunId: string) => {
-      if (durableStarted || !activeRunId) return
-      durableStarted = true
-      const token = localStorage.getItem('token')
-      fetch(`/api/chat/v2/runs/${encodeURIComponent(activeRunId)}/events?after_seq=${lastSeq}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }).then(async response => {
-        if (!response.ok) throw new Error(`请求工作流事件失败（${response.status}）`)
-        const reader = response.body?.getReader()
-        if (!reader) throw new Error('工作流事件流不可用')
-        const decoder = new TextDecoder()
-        let buffer = ''
-        let eventType = ''
-        let eventData = ''
-        const flushEvent = () => {
-          if (!eventType || !eventData) return false
-          let payload: { summary?: string; data?: { agent_name?: string; retryable?: boolean } } = {}
-          try { payload = JSON.parse(eventData) } catch { payload = { summary: eventData } }
-          const summary = payload.summary ?? ''
-          if (eventType === 'agent.plan' && summary) {
-            // planner/replanner 的结构化计划进入规划面板；最终 response 回到正文。
-            try {
-              const parsed = JSON.parse(summary) as { response?: string; steps?: string[] }
-              if (parsed.response && !emittedAssistant.has(parsed.response)) {
-                emittedAssistant.add(parsed.response)
-                onMessage('assistant', parsed.response)
-              }
-              else if (Array.isArray(parsed.steps)) onMessage('plan_step', JSON.stringify({ type: 'plan_steps', steps: parsed.steps }))
-            } catch {
-              if (!emittedAssistant.has(summary)) {
-                emittedAssistant.add(summary)
-                onMessage('assistant', summary)
-              }
-            }
-          } else if (eventType === 'agent.tool_result' && summary) {
-            onMessage('tool_result', summary)
-          } else if (eventType === 'run.failed') {
-            throw new Error(summary || '工作流执行失败')
-          }
-          return eventType === 'run.completed' || eventType === 'run.parked' || eventType === 'run.failed'
-        }
-        let terminal = false
-        while (!terminal) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() ?? ''
-          for (const line of lines) {
-            if (line.startsWith('event: ')) eventType = line.slice(7).trim()
-            else if (line.startsWith('data: ')) eventData += (eventData ? '\n' : '') + line.slice(6)
-            else if (line === '') {
-              terminal = flushEvent()
-              eventType = ''
-              eventData = ''
-              if (terminal) break
-            }
-          }
-        }
-        onDone()
-      }).catch(error => onError?.(error instanceof Error ? error : new Error(String(error))))
+    let runId = sessionStorage.getItem(`chat_run_id_${sid}`) || ''
+    const stateKey = `chat_run_state_${sid}`
+    const emitState = (state: DurableChatState) => {
+      if (state.kind === 'run') sessionStorage.setItem(stateKey, JSON.stringify(state))
+      onMessage(`${state.kind}_state`, JSON.stringify(state))
     }
+    try {
+      if (signal?.aborted) return
+      if (!runId && options?.newTurn === false) throw new Error('没有可恢复的工作流身份；重试连接不会创建新工作流')
+      if (!runId || options?.newTurn) {
+        // Do not cancel an in-flight create: its accepted identity must still be
+        // retained on session switch/unmount. Never automatically retry POST.
+        const run = await chatService.createDurableRun({ sessionId: sid, query })
+        runId = run.run_id
+        sessionStorage.setItem(`chat_run_id_${sid}`, runId)
+        sessionStorage.setItem(`chat_last_seq_${sid}`, '0')
+        sessionStorage.setItem(stateKey, JSON.stringify({ kind: 'run', status: run.status }))
+      }
+      if (signal?.aborted) return
+      onMessage('run_binding', runId)
+      const savedState = sessionStorage.getItem(stateKey)
+      if (savedState) emitState(JSON.parse(savedState) as DurableChatState)
+      const savedSeq = Number(sessionStorage.getItem(`chat_last_seq_${sid}`) || '0')
+      const control = chatService.tailDurableRun({
+        runId, afterSeq: savedSeq, signal, onDone,
+        onState: emitState,
+        onError: (error) => { if (!(error instanceof SSEError && error.code === 'aborted')) onError?.(error) },
+        onEvent: (type, content, seq) => {
+          const payload = JSON.parse(content) as DurablePayload
+          const summary = payload.summary ?? ''
+          if (type === 'agent.plan' && summary) {
+            let plan: { response?: string; steps?: string[] } | undefined
+            try { plan = JSON.parse(summary) } catch { /* Unstructured planner response. */ }
+            if (plan?.response) onMessage('assistant', plan.response)
+            else if (Array.isArray(plan?.steps)) onMessage('plan_step', JSON.stringify({ type: 'plan_steps', steps: plan.steps }))
+            else onMessage('assistant', summary)
+          } else if (type === 'agent.tool_result' && summary) onMessage('tool_result', summary)
+          // Consumer delivery (including the page's durable message snapshot)
+          // precedes the accepted cursor; a reload cannot skip buffered text.
+          sessionStorage.setItem(`chat_last_seq_${sid}`, String(seq))
+        },
+      })
+      await control.finished
+    } catch (error) {
+      if (!signal?.aborted) onError?.(error instanceof Error ? error : new Error(String(error)))
+    }
+  },
 
-    streamFetch(
-      '/api/chat/v1/chat',
-      {
-        query,
-        session_id: sid,
-        message_index: messageIndex,
-        deep_thinking: deepThinking,
-        web_search: webSearch,
-        user_id: userID,
-        run_id: runId,
-        last_seq: lastSeq
-      },
-      (type, content, id) => {
-        if (type === 'run.created') {
-          try {
-            const meta = JSON.parse(content) as { runId?: string }
-            if (meta.runId) {
-              durableRunId = meta.runId
-              sessionStorage.setItem(`chat_run_id_${sid}`, meta.runId)
-              streamDurableEvents(meta.runId)
-            }
-          } catch { /* 忽略无效元数据 */ }
-          return
-        }
-        if (type === 'meta') {
-          try {
-            const meta = JSON.parse(content) as { runId?: string }
-            if (meta.runId) {
-              sessionStorage.setItem(`chat_run_id_${sid}`, meta.runId)
-            }
-          } catch { /* 忽略无法解析的事件 */ }
-        }
-        if (id) {
-          sessionStorage.setItem(`chat_last_seq_${sid}`, id)
-        }
-        onMessage(type, content)
-      },
-      () => {
-        if (durableRunId) streamDurableEvents(durableRunId)
-        else onDone()
-      },
-      onError,
-      signal
-    )
+  // Explicit legacy adapter retains the v1 payload and callback envelope.
+  async multiAgentChatV1(
+    query: string, messageIndex: number, deepThinking: boolean, webSearch: boolean,
+    onMessage: (intent: string, content: string) => void, onDone: () => void,
+    onError?: (error: Error) => void, signal?: AbortSignal, sessionId?: string,
+  ) {
+    const sid = sessionId || getCurrentSessionId()
+    let returnedRunId = ''
+    let failed = false
+    const legacy = streamFetch('/api/chat/v1/chat', {
+      query, session_id: sid, message_index: messageIndex, deep_thinking: deepThinking,
+      web_search: webSearch, user_id: useAuthStore.getState().userID ?? '',
+      run_id: sessionStorage.getItem(`chat_run_id_${sid}`) || '',
+      last_seq: Number(sessionStorage.getItem(`chat_last_seq_${sid}`) || '0'),
+    }, (type, content) => {
+      if (type !== 'run.created') { onMessage(type, content); return }
+      const meta = JSON.parse(content) as { runId?: string; sessionId?: string; status?: string; after_seq?: number }
+      if (!meta.runId || meta.sessionId !== sid) throw new Error('旧版工作流响应与当前会话不匹配')
+      returnedRunId = meta.runId
+      sessionStorage.setItem(`chat_run_id_${sid}`, returnedRunId)
+      // v1's synthetic identity event ID is not a workflow_events cursor.
+      sessionStorage.setItem(`chat_last_seq_${sid}`, String(meta.after_seq ?? 0))
+      sessionStorage.setItem(`chat_run_state_${sid}`, JSON.stringify({ kind: 'run', status: meta.status ?? 'unknown' }))
+    }, () => {}, (error) => { failed = true; onError?.(error) }, signal)
+    await legacy.finished
+    if (failed || signal?.aborted) return
+    if (returnedRunId) {
+      await chatService.multiAgentChat(query, messageIndex, deepThinking, webSearch, onMessage, onDone, onError, signal, sid)
+    } else onDone()
   },
 
   // 文件上传（支持多格式和分块配置）

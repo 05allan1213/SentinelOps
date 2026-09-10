@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, Loader2, ListChecks, ThumbsUp, ThumbsDown, P
 import { cn } from '@/utils'
 import { MarkdownRenderer } from '@/components/markdown'
 import { chatService, ChatSession } from '@/services'
+import type { DurableChatState } from '@/services/chat'
 import { ragevalService } from '@/services/rageval'
 import { useContextStore } from '@/stores/contextStore'
 import SessionList from './components/SessionList'
@@ -20,6 +21,10 @@ interface Message {
   timestamp: Date
   isStreaming?: boolean
   agentStatus?: string
+  runId?: string
+  runStatus?: string
+  operationStatus?: string
+  streamError?: string
   // Plan Agent 规划过程字段
   planning?: string          // 中间步骤内容（plan_step 事件累积，不含 think 类型）
   isPlanRunning?: boolean    // true = 规划执行中
@@ -60,11 +65,6 @@ export default function Chat() {
   const { currentEventId, currentEventTitle, setContext } = useContextStore()
   const navigate = useNavigate()
   const location = useLocation()
-
-  // ── 组件卸载时不 abort（让 stream 在后台跑完，onDone 会写入 localStorage）
-  useEffect(() => {
-    return () => { /* 不主动中止：后台流完成后仍需保存结果 */ }
-  }, [])
 
   // ── 初始化 ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -108,19 +108,21 @@ export default function Chat() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state])
 
-  // 组件卸载时清理：不中止请求，只清理引用
-  useEffect(() => {
-    return () => {
-      // 不调用 abort()，让后端完成执行
-      abortControllerRef.current = null
-      loadingStreamRef.current = null
-    }
+  // Disconnecting a browser tail never cancels the backend Run.
+  useEffect(() => () => {
+    abortControllerRef.current?.abort()
+    loadingStreamRef.current = null
   }, [])
+
 
   // ── 会话管理 ─────────────────────────────────────────────────────────────
   const loadMessages = (sid: string) => {
     const raw = localStorage.getItem(`chat_messages_${sid}`)
-    setMessages(raw ? JSON.parse(raw) : [])
+    const saved = (raw ? JSON.parse(raw) : []) as Message[]
+    setMessages(saved.map(m => ({ ...m, isStreaming: false, isThinking: false, isPlanRunning: false,
+      ...(m.isStreaming && !m.runId && !sessionStorage.getItem(`chat_run_id_${sid}`)
+        ? { streamError: '创建结果尚未确认，当前没有可恢复的工作流身份。请核对会话后再决定是否重新发送。' } : {}),
+    })))
     // 恢复输入框草稿
     setInput(localStorage.getItem(`chat_draft_${sid}`) ?? '')
     // 恢复点赞/踩状态
@@ -131,12 +133,6 @@ export default function Chat() {
   const saveMessages = (sid: string, msgs: Message[]) => {
     localStorage.setItem(`chat_messages_${sid}`, JSON.stringify(msgs))
   }
-
-  useEffect(() => {
-    if (currentSessionId && messages.length > 0) {
-      saveMessages(currentSessionId, messages)
-    }
-  }, [messages, currentSessionId])
 
   // 持久化深度思考 / 联网搜索开关（跨会话、跨刷新保持用户选择）
   useEffect(() => {
@@ -166,8 +162,9 @@ export default function Chat() {
   }, [votes, currentSessionId])
 
   const handleSelectSession = (sid: string) => {
+    abortControllerRef.current?.abort()
     // 将进行中的流式消息标为完成后保存，防止切换回来时看到"卡住"的 streaming 状态
-    const finalMessages = messages.map(m =>
+    const finalMessages = (JSON.parse(localStorage.getItem(`chat_messages_${currentSessionId}`) || '[]') as Message[]).map(m =>
       m.isStreaming ? { ...m, isStreaming: false, agentStatus: undefined, isPlanRunning: false, isThinking: false } : m
     )
     saveMessages(currentSessionId, finalMessages)
@@ -180,7 +177,8 @@ export default function Chat() {
 
   const handleNewSession = () => {
     if (currentSessionId && messages.length === 0) return
-    const finalMessages = messages.map(m =>
+    abortControllerRef.current?.abort()
+    const finalMessages = (JSON.parse(localStorage.getItem(`chat_messages_${currentSessionId}`) || '[]') as Message[]).map(m =>
       m.isStreaming ? { ...m, isStreaming: false, agentStatus: undefined, isPlanRunning: false, isThinking: false } : m
     )
     saveMessages(currentSessionId, finalMessages)
@@ -198,6 +196,7 @@ export default function Chat() {
   }
 
   const handleDeleteSession = (sid: string) => {
+    if (sid === currentSessionId) abortControllerRef.current?.abort()
     chatService.deleteSession(sid)
     localStorage.removeItem(`chat_messages_${sid}`)
     localStorage.removeItem(`chat_draft_${sid}`)
@@ -258,11 +257,12 @@ export default function Chat() {
     })
 
     // 重新发送编辑后的消息（force=true 跳过 isLoading 检查）
-    handleSend(editingContent.trim(), true)
+    handleSend(editingContent.trim(), true, newMessages)
   }
 
   // ── 发送消息（overrideText 来自技能卡片或事件跳转；force=true 跳过 isLoading 检查，用于编辑回溯） ──────────────────────────
-  const handleSend = async (overrideText?: string, force?: boolean) => {
+  const handleSend = async (overrideText?: string, force?: boolean, previousMessages?: Message[]) => {
+    const history = previousMessages ?? messages
     const rawContent = overrideText !== undefined ? overrideText : input
     if (!rawContent.trim() || (isLoading && !force)) return
 
@@ -290,15 +290,15 @@ export default function Chat() {
     setIsLoading(true)
 
     // 更新会话标题
-    if (messages.length === 0) {
+    if (history.length === 0) {
       const title = rawContent.trim().slice(0, 30) + (rawContent.trim().length > 30 ? '...' : '')
       chatService.updateSession(sid, { title })
       setSessions((prev) => prev.map((s) => (s.id === sid ? { ...s, title } : s)))
     }
-    chatService.updateSession(sid, { lastMessageAt: Date.now(), messageCount: messages.length + 1 })
+    chatService.updateSession(sid, { lastMessageAt: Date.now(), messageCount: history.length + 1 })
     setSessions((prev) =>
       prev.map((s) =>
-        s.id === sid ? { ...s, lastMessageAt: Date.now(), messageCount: messages.length + 1 } : s
+        s.id === sid ? { ...s, lastMessageAt: Date.now(), messageCount: history.length + 1 } : s
       )
     )
 
@@ -311,9 +311,16 @@ export default function Chat() {
     }
     setMessages((prev) => [...prev, assistantMessage])
 
-    // Each callback closes over its own message cursor, including background streams.
-    let streamingContent = ''
-    let streamingThinking = ''
+    saveMessages(sid, [...history, userMessage, assistantMessage])
+    startAssistantStream(sid, assistantMessage, messageContent, history.length + 1, true)
+  }
+
+  const startAssistantStream = (sid: string, assistantMessage: Message, messageContent: string, messageIndex: number, newTurn: boolean) => {
+    setIsLoading(true)
+    setMessages(prev => prev.map(m => m.id === assistantMessage.id ? { ...m, isStreaming: true, streamError: undefined } : m))
+    // Each tail owns one message ID and retains its previously accepted content.
+    let streamingContent = assistantMessage.content
+    let streamingThinking = assistantMessage.thinking ?? ''
     followBottomRef.current = true
 
     // 中止上一个请求（如有），新建控制器
@@ -326,22 +333,24 @@ export default function Chat() {
     const capturedMessageId = assistantMessage.id
     loadingStreamRef.current = capturedMessageId
 
-    // 断线重连：最多重试 2 次，每次间隔 1s
-    let retryCount = 0
-    const MAX_RETRIES = 2
-
     // Retain event order inside the existing message budget. Coalescing only
     // the latest callback per field would reorder interleaved phase changes or
     // lose planning events; the scheduled callback applies this batch once.
     let pendingMessageUpdates: Array<(message: Message) => Message> = []
+    const persistUpdate = (update: (message: Message) => Message) => {
+      const saved = JSON.parse(localStorage.getItem(`chat_messages_${capturedSessionId}`) || '[]') as Message[]
+      saveMessages(capturedSessionId, saved.map(m => m.id === capturedMessageId ? update(m) : m))
+    }
     const queueMessageUpdate = (update: (message: Message) => Message) => {
+      persistUpdate(update)
+
       const scheduled = schedule(capturedMessageId, 'message', () => {
         const updates = pendingMessageUpdates
         pendingMessageUpdates = []
         setMessages((prev) => prev.map((m) => m.id === capturedMessageId
           ? updates.reduce((message, apply) => apply(message), m) : m))
       })
-      // Background streams may outlive Chat; do not retain render batches then.
+      // A closing tail cannot retain render batches after unmount.
       if (scheduled) pendingMessageUpdates.push(update)
     }
 
@@ -359,16 +368,22 @@ export default function Chat() {
     }
 
     try {
-      // 始终走多智能体（意图识别路由），deepThinking 为深度思考模式
-      // messageIndex 是 assistant 消息在数组中的索引（messages 已包含 user + assistant）
-      const messageIndex = messages.length + 1
+      // v2 uses the server agent configuration; legacy callback arguments remain compatible.
       chatService.multiAgentChat(
         messageContent,
         messageIndex,
         deepThinking,
         webSearch,
         (agent, content) => {
-          if (agent === 'plan_step') {
+          if (agent === 'run_binding') {
+            queueMessageUpdate(m => ({ ...m, runId: content }))
+          } else if (agent === 'run_state' || agent === 'operation_state' || agent === 'transport_state') {
+            const state = JSON.parse(content) as DurableChatState
+            queueMessageUpdate(m => state.kind === 'run'
+              ? { ...m, runStatus: state.status, streamError: state.error }
+              : state.kind === 'operation' ? { ...m, operationStatus: state.status }
+              : { ...m, streamError: state.error })
+          } else if (agent === 'plan_step') {
             // 解析事件类型：think = 预思考，其他 = 规划执行
             let eventType = ''
             try {
@@ -467,56 +482,22 @@ export default function Chat() {
             }
           } catch { /* 忽略无法解析的事件 */ }
         },
-    // ── 问题三：流式中断恢复能力（前端重连逻辑）──────────────────────────────
-    // 设计思路：
-    //   onError 触发时说明 SSE 连接异常中断（网络抖动、代理超时等）。
-    //   此时 sessionStorage 中已有 run_id 和 last_seq（由 chat.ts 在每条事件到达时更新），
-    //   重新调用 multiAgentChat 即可携带这两个游标，后端补发缺失事件，无需重跑 Agent。
-    //   重连回调只追加内容（不重置当前消息的 streamingContent），保证已渲染内容不丢失。
-    //   最多重试 MAX_RETRIES 次，间隔随重试次数线性增长（1s、2s），
-    //   避免后端压力过大；超出上限或用户主动取消（abortCtrl.signal.aborted）则终止。
-    (err) => {
-      // 网络断线自动重连（最多 MAX_RETRIES 次），利用已持久化的 run_id + last_seq 补发
-          if (retryCount < MAX_RETRIES && loadingStreamRef.current === capturedMessageId && !abortCtrl.signal.aborted) {
-            retryCount++
-            setTimeout(() => {
-              chatService.multiAgentChat(
-                messageContent, messageIndex, deepThinking, webSearch,
-                (agent, content) => {
-                  streamingContent += agent !== 'status' && agent !== 'meta' && agent !== 'plan_step' ? content : ''
-                  queueContent()
-                },
-                () => {
-                  finish(capturedMessageId)
-                  if (loadingStreamRef.current === capturedMessageId) {
-                    setIsLoading(false)
-                    loadingStreamRef.current = null
-                  }
-                  setMessages((prev) => prev.map((m) =>
-                    m.id === capturedMessageId ? { ...m, content: streamingContent, isStreaming: false, isThinking: false, isPlanRunning: false, agentStatus: undefined } : m
-                  ))
-                },
-                undefined,
-                abortCtrl.signal,
-                sid
-              )
-            }, 1000 * retryCount)
-          } else {
-            finish(capturedMessageId)
-            // 重试耗尽或主动取消，显示错误
-            setMessages((prev) => prev.map((m) =>
-              m.id === capturedMessageId
-                ? { ...m, isStreaming: false, isThinking: false, isPlanRunning: false, agentStatus: undefined, content: streamingContent || `请求失败：${err.message}` }
-                : m
-            ))
-            if (loadingStreamRef.current === capturedMessageId) {
-              setIsLoading(false)
-              loadingStreamRef.current = null
-            }
+        (err) => {
+          finish(capturedMessageId)
+          const failed = (m: Message): Message => ({ ...m, content: streamingContent, isStreaming: false,
+            isThinking: false, isPlanRunning: false, agentStatus: undefined,
+            streamError: m.runId ? `连接失败：${err.message}。可重试连接以继续读取原工作流。`
+              : `创建结果尚未确认：${err.message}。请核对会话后再决定是否重新发送。` })
+          persistUpdate(failed)
+          setMessages(prev => prev.map(m => m.id === capturedMessageId ? failed(m) : m))
+          if (loadingStreamRef.current === capturedMessageId) {
+            setIsLoading(false)
+            loadingStreamRef.current = null
           }
         },
         abortCtrl.signal,
-        sid
+        sid,
+        { newTurn }
       )
     } catch {
       finish(capturedMessageId)
@@ -529,12 +510,33 @@ export default function Chat() {
     }
   }
 
+  useEffect(() => {
+    let disposed = false
+    void Promise.resolve().then(() => {
+      if (disposed || !currentSessionId) return
+      const runId = sessionStorage.getItem(`chat_run_id_${currentSessionId}`)
+      if (!runId) return
+      const saved = JSON.parse(localStorage.getItem(`chat_messages_${currentSessionId}`) || '[]') as Message[]
+      let assistant = [...saved].reverse().find(m => m.role === 'assistant' && m.runId === runId)
+        ?? [...saved].reverse().find(m => m.role === 'assistant' && !m.runId)
+      if (!assistant) {
+        assistant = { id: genId(), role: 'assistant', content: '', timestamp: new Date(), runId }
+        saved.push(assistant)
+        saveMessages(currentSessionId, saved)
+        setMessages(saved)
+      }
+      startAssistantStream(currentSessionId, assistant, '', saved.indexOf(assistant), false)
+    })
+    return () => { disposed = true }
+    // Session selection owns this tail; message renders must not reconnect it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSessionId])
+
   // ── 文件上传成功回调 ──────────────────────────────────────────────────────
   const handleFileUploadSuccess = () => {
-    setMessages((prev) => [
-      ...prev,
-      { id: genId(), role: 'assistant', content: '文件已上传到知识库', timestamp: new Date() },
-    ])
+    const updated: Message[] = [...messages, { id: genId(), role: 'assistant', content: '文件已上传到知识库', timestamp: new Date() }]
+    saveMessages(currentSessionId, updated)
+    setMessages(updated)
   }
 
   // ── 消息反馈 ──────────────────────────────────────────────────────────────
@@ -644,6 +646,8 @@ export default function Chat() {
                   <MessageBubble
                     key={m.id}
                     message={m}
+                    onRetry={m.runId && m.runId === sessionStorage.getItem(`chat_run_id_${currentSessionId}`)
+                      ? () => startAssistantStream(currentSessionId, m, '', i, false) : undefined}
                     messageIndex={i}
                     vote={votes[i]}
                     onVote={submitFeedback}
@@ -692,6 +696,7 @@ interface MessageBubbleProps {
   message: Message
   messageIndex: number
   vote?: 1 | -1
+  onRetry?: () => void
   onVote: (messageIndex: number, vote: 1 | -1, reasons?: string[]) => void
   isEditing: boolean
   editingContent: string
@@ -701,7 +706,7 @@ interface MessageBubbleProps {
   onEditingContentChange: (content: string) => void
 }
 
-function MessageBubble({ message, messageIndex, vote, onVote, isEditing, editingContent, onStartEdit, onCancelEdit, onSaveEdit, onEditingContentChange }: MessageBubbleProps) {
+function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing, editingContent, onStartEdit, onCancelEdit, onSaveEdit, onEditingContentChange }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const [showReasonPicker, setShowReasonPicker] = useState(false)
   const [selectedReasons, setSelectedReasons] = useState<string[]>([])
@@ -843,6 +848,17 @@ function MessageBubble({ message, messageIndex, vote, onVote, isEditing, editing
       </div>
 
       <div className="min-w-0 flex-1 space-y-2">
+        {message.runStatus && (
+          <div data-testid="run-status" className="text-xs text-slate-600">
+            工作流：{({ pending: '等待执行', running: '执行中', waiting_approval: '等待审批', retryable_failed: '失败，等待恢复',
+              parked: '已搁置', reconciling: '正在核对执行结果', succeeded: '已成功完成', failed: '执行失败', canceled: '已取消' } as Record<string, string>)[message.runStatus] ?? '状态未确认'}
+          </div>
+        )}
+        {message.operationStatus && <div data-testid="operation-status" className="text-xs text-slate-500">操作事件：{message.operationStatus}</div>}
+        {message.streamError && <div role="alert" className="text-sm text-amber-800 break-words">{message.streamError}</div>}
+        {!message.isStreaming && onRetry && message.runStatus !== 'succeeded' && (
+          <button type="button" onClick={onRetry} className="text-sm text-indigo-700 underline">重试连接</button>
+        )}
         {/* Agent 状态 */}
         {message.isStreaming && message.agentStatus && (
           <div className="inline-flex items-center gap-1.5 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1 text-xs text-[#2563EB]">
@@ -887,7 +903,7 @@ function MessageBubble({ message, messageIndex, vote, onVote, isEditing, editing
                 variant="chat"
                 streaming={!!message.isStreaming}
                 complete={!message.isStreaming}
-                className="text-[#1F2937]"
+                className="min-w-0 max-w-none text-[#1F2937]"
               />
               {message.isStreaming && <span className="inline-block h-4 w-1.5 motion-safe:animate-pulse bg-[#3B82F6] ml-0.5 rounded-sm align-text-bottom" />}
             </div>

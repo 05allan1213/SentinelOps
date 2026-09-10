@@ -12,26 +12,27 @@ async function installDelayedStream(page: Page) {
     localStorage.setItem('token', 'chat-markdown-fixture-token')
     const realFetch = window.fetch.bind(window)
     window.fetch = async (input, init) => {
-      if (String(input) !== '/api/chat/v1/chat') return realFetch(input, init)
+      if (!String(input).startsWith('/api/chat/v2/runs/')) return realFetch(input, init)
       const encoder = new TextEncoder()
+      let seq = 0
       const stream = new ReadableStream<Uint8Array>({ start(controller) {
         // Exercise the real Chat caller and existing service/reader with delayed
         // bytes. This is a browser fixture, not provider/runtime evidence.
         window.chatFixtureChunk = (text) => new Promise((resolve) => {
           setTimeout(() => {
-            controller.enqueue(encoder.encode(`event: assistant\n${text.split('\n').map((line) => `data: ${line}\n`).join('')}\n`))
+            controller.enqueue(encoder.encode(`id: ${++seq}\nevent: agent.plan\ndata: ${JSON.stringify({ summary: JSON.stringify({ response: text }) })}\n\n`))
             resolve()
           }, 40)
         })
         window.chatFixtureDone = () => {
-          controller.enqueue(encoder.encode('event: done\ndata: complete\n\n'))
+          controller.enqueue(encoder.encode(`id: ${++seq}\nevent: run.completed\ndata: ${JSON.stringify({ data: { to_status: 'succeeded' } })}\n\n`))
           controller.close()
         }
       } })
       return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } })
     }
   })
-  await page.route('**/api/**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data: {} }) }))
+  await page.route('**/api/**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data: route.request().url().endsWith('/chat/v2/runs') ? { run_id: 'markdown-run', session_id: route.request().postDataJSON().session_id, status: 'pending' } : {} }) }))
 }
 
 for (const width of [1280, 1440]) {
