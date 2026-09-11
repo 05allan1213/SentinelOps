@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { useRef, useState } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
 import { runtimeService } from '@/services/runtime'
 import { cn } from '@/utils'
@@ -46,22 +47,7 @@ export default function RecoveryDialog({ run, action, open, onClose, onAccepted 
   const reasonRef = useRef<HTMLTextAreaElement>(null)
   const meta = ACTION_META[action]
 
-  useEffect(() => {
-    if (!open) return
-    const timer = window.setTimeout(() => reasonRef.current?.focus(), 0)
-    return () => window.clearTimeout(timer)
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape' && !pending) onClose() }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, pending, onClose])
-
-  if (!open) return null
-
-  const generationValid = generation.trim() !== '' && Number.isFinite(Number(generation)) && Number(generation) >= 0
+  const generationValid = generation.trim() !== '' && Number.isSafeInteger(Number(generation)) && Number(generation) >= 0
   const compatibilityValid = action !== 'restore' || compatibility.trim() !== ''
   const canSubmit = reason.trim() !== '' && generationValid && compatibilityValid && !pending
 
@@ -86,23 +72,22 @@ export default function RecoveryDialog({ run, action, open, onClose, onAccepted 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { if (!pending) onClose() }}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={meta.title}
+    <Dialog open={open} onOpenChange={value => { if (!value && !pending) onClose() }}>
+      <DialogContent
         data-testid="runtime-recovery-dialog"
         data-action={action}
-        className="w-full max-w-lg mx-4 rounded-2xl bg-white p-6 shadow-xl"
-        onClick={event => event.stopPropagation()}
+        className="max-w-lg"
+        onOpenAutoFocus={event => { event.preventDefault(); reasonRef.current?.focus() }}
+        onEscapeKeyDown={event => { if (pending) event.preventDefault() }}
+        onPointerDownOutside={event => { if (pending) event.preventDefault() }}
       >
         <div className="flex items-start gap-3">
           <div className={cn('mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full', action === 'cancel' || action === 'restore' ? 'bg-red-50' : 'bg-amber-50')}>
             <AlertTriangle className={cn('h-5 w-5', action === 'cancel' || action === 'restore' ? 'text-red-500' : 'text-amber-500')} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold text-gray-900">{meta.title}</h3>
-            <p className="mt-1 text-sm text-gray-600">{meta.description}</p>
+            <DialogTitle className="text-base font-semibold text-gray-900">{meta.title}</DialogTitle>
+            <DialogDescription className="mt-1 text-sm text-gray-600">{meta.description}</DialogDescription>
           </div>
           <button type="button" aria-label="关闭" onClick={onClose} disabled={pending} className="p-1 text-gray-400 hover:text-gray-600 transition-colors duration-150">
             <X className="h-4 w-4" />
@@ -115,6 +100,8 @@ export default function RecoveryDialog({ run, action, open, onClose, onAccepted 
             <textarea
               ref={reasonRef}
               aria-label="恢复理由"
+              required
+              disabled={pending}
               value={reason}
               onChange={event => setReason(event.target.value)}
               rows={3}
@@ -126,6 +113,8 @@ export default function RecoveryDialog({ run, action, open, onClose, onAccepted 
             <span className="text-xs font-medium text-gray-700">期望 Generation（必填）</span>
             <input
               aria-label="期望 Generation"
+              required
+              disabled={pending}
               value={generation}
               onChange={event => setGeneration(event.target.value)}
               inputMode="numeric"
@@ -137,13 +126,15 @@ export default function RecoveryDialog({ run, action, open, onClose, onAccepted 
               <span className="text-xs font-medium text-gray-700">期望兼容性哈希（Restore 必填）</span>
               <input
                 aria-label="期望兼容性哈希"
+                required
+                disabled={pending}
                 value={compatibility}
                 onChange={event => setCompatibility(event.target.value)}
                 className="mt-1 h-9 w-full rounded-lg border border-gray-200 px-3 font-mono text-xs text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </label>
           )}
-          {error && <p data-testid="runtime-recovery-error" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+          {error && <p role="alert" data-testid="runtime-recovery-error" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
         </div>
 
         <div className="mt-5 flex items-center justify-end gap-2">
@@ -167,7 +158,7 @@ export default function RecoveryDialog({ run, action, open, onClose, onAccepted 
             {pending ? '提交中…' : meta.confirm}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

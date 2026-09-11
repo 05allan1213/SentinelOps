@@ -1,3 +1,5 @@
+import { useId } from 'react'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { AlertTriangle, X } from 'lucide-react'
 import { cn } from '@/utils'
 
@@ -30,16 +32,13 @@ export default function ConfirmDialog({
   reasonLabel = '理由',
   reasonPlaceholder = '请输入理由',
 }: ConfirmDialogProps) {
-  if (!open) return null
+  const reasonId = useId()
 
   const canConfirm = !reasonRequired || reason.trim().length > 0
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open={open} onOpenChange={value => { if (!value) onClose() }}>
+      <DialogContent className="max-w-sm">
         <div className="flex items-start gap-3 mb-5">
           {danger && (
             <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -47,15 +46,16 @@ export default function ConfirmDialog({
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-            <p className="text-sm text-gray-500 mt-1 leading-relaxed">{description}</p>
+            <DialogTitle className="text-base font-semibold text-gray-900">{title}</DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 mt-1 leading-relaxed">{description}</DialogDescription>
             {onReasonChange && (
               <div className="mt-4">
-                <label htmlFor="confirm-dialog-reason" className="block text-xs font-medium text-gray-600 mb-1">
+                <label htmlFor={reasonId} className="block text-xs font-medium text-gray-600 mb-1">
                   {reasonLabel}{reasonRequired ? '（必填）' : ''}
                 </label>
                 <textarea
-                  id="confirm-dialog-reason"
+                  id={reasonId}
+                  required={reasonRequired}
                   value={reason}
                   onChange={event => onReasonChange(event.target.value)}
                   placeholder={reasonPlaceholder}
@@ -65,7 +65,7 @@ export default function ConfirmDialog({
               </div>
             )}
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0 -mt-0.5">
+          <button type="button" aria-label="关闭" onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0 -mt-0.5">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -81,7 +81,7 @@ export default function ConfirmDialog({
             {confirmLabel}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
