@@ -274,3 +274,12 @@ Re-check verification after the fix (product HEAD `186d624`):
 - Desktop Playwright `tests/ui --workers=1`: **56/57 PASS**; the only failure remains the pre-existing `approval-ui.spec.ts:112` baseline case. Runtime-specific suites: 27/27 PASS.
 - Backend Runtime contract with DSN: PASS (`api/runtime/v1`, `internal/service/runtime`, `internal/controller/runtime`).
 - Scope unchanged: `git diff --stat main..HEAD -- api internal migrations manifest main.go go.mod go.sum` empty; `git diff --check` clean.
+
+### Phase E review repairs (2026-09-11)
+
+The independent review `output/e-phase-independent-review-2026-09-11.md` raised 6 Runtime findings (effect terminal events closing the Run tail, recovered/parked Run tails, failed queries rendered as empty, `datetime-local` filter format, single-page detail collections, and a second Recovery operation never refreshing). All 6 were repaired on the E branch; the mapping and evidence are recorded in `docs/implementation/phase-e-review-fixes-2026-09-11.md`. Repair commit: `03ccdad` (`fix(web-runtime): repair phase E review findings`); this documentation commit is the fast-forward point of `main`.
+
+- Re-run on the same tree before committing: `npm run test:unit` PASS 13 files / 279 tests; `npm run build` PASS (existing >500 kB chunk warning); Runtime Playwright `tests/ui/runtime-` 31/31 PASS at 1280/1440.
+- The extended Chat reconnect case failed once with a 5s SSE recovery timeout during the repair session and passed 6/6 on isolated re-runs; the root cause was not confirmed, so it stays recorded as an unreproduced flake.
+- Scope unchanged: no `api/`, `internal/`, `migrations/`, `manifest/`, `main.go`, `go.mod` or `go.sum` change; frontend-only. Real Worker/provider E2E, hosted CI, application images, rollout/rollback, P43 and all of F remain `NOT RUN`.
+- `main` is now fast-forwarded to the E branch locally; `origin/main` has not been pushed.
