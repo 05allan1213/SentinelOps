@@ -786,7 +786,7 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
           {isEditing ? (
             // 编辑模式：在原先气泡内，横条样式，取消/发送在右下角
             <div
-              className="rounded-3xl rounded-br-lg px-5 py-2.5 flex flex-col gap-2 w-full min-w-[670px]"
+              className="rounded-3xl rounded-br-lg px-5 py-2.5 flex flex-col gap-2 w-full min-w-0"
               style={{
                 background: 'linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)',
                 boxShadow: '0 2px 12px rgba(59,130,246,0.25)',

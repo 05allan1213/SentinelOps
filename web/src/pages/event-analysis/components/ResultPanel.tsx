@@ -365,7 +365,7 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
   void cacheVersion
 
   return (
-    <div className="relative h-full flex flex-col bg-white dark:bg-[#080C13]/95">
+    <div className="relative min-w-0 h-full flex flex-col bg-white dark:bg-[#080C13]/95">
       <div className="px-4 py-3 border-b border-gray-200 dark:border-[#30363D]/60 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-[#F43F5E]" />
@@ -373,7 +373,7 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
         </div>
         <span className="text-xs text-gray-500 dark:text-[#8B949E] font-mono">{data.events.length} items</span>
       </div>
-      <div className="flex-1 overflow-auto p-3 space-y-1 scrollbar-thin">
+      <div className="min-w-0 flex-1 overflow-auto p-3 space-y-1 scrollbar-thin">
         {data.events.map((event) => (
           <CompactCard
             key={event.id}

@@ -362,19 +362,19 @@ export default function EventAnalysis() {
           </div>
         </div>
       ) : (
-        <div className="flex">
-          <div className="w-[960px] shrink-0 flex flex-col border-r border-gray-200">
-            <div className="h-[260px] shrink-0 border-b border-gray-100">
+        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start">
+          <div className="min-w-0 flex flex-col border-r border-gray-200">
+            <div className="h-[360px] min-w-0 shrink-0 border-b border-gray-100">
               <AgentFlowGraph logs={agentLogs} isProcessing={isProcessing} />
             </div>
             <div className="p-3">
               <ThinkingConsole logs={agentLogs} isProcessing={isProcessing} />
             </div>
           </div>
-          <div className="flex-1">
+          <div className="min-w-0 h-[600px] overflow-y-auto">
             <ResultPanel data={riskData} isProcessing={isProcessing} onSolutionUpdate={handleSolutionUpdate} />
           </div>
-          <MitigationConsole selected={riskData ? 'proposal' : null} logs={agentLogs} />
+          <div className="col-span-2 min-w-0 overflow-x-auto [&>div]:w-full"><MitigationConsole selected={riskData ? 'proposal' : null} logs={agentLogs} /></div>
         </div>
       )}
 
