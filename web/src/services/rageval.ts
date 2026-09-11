@@ -19,6 +19,49 @@ export interface DashboardMetrics {
   trends: TrendPoint[]
 }
 
+const metricKeys = ['success_rate', 'avg_latency_ms', 'p95_latency_ms', 'total_runs', 'avg_retrieved_docs', 'avg_top_score'] as const
+type MetricKey = typeof metricKeys[number]
+export type SafeDashboardMetrics = Record<MetricKey, number | null> & {
+  success_rate_status?: DashboardMetrics['success_rate_status']
+  latency_status?: DashboardMetrics['latency_status']
+}
+export interface DashboardMetricsState {
+  metrics: SafeDashboardMetrics | null
+  trends: TrendPoint[] | null
+  availability: 'available' | 'partial' | 'unavailable'
+  data_quality: 'complete' | 'partial' | 'unknown'
+  reason_code?: string
+  not_run?: string
+}
+const numeric = (value: unknown): number | null => {
+  if (typeof value !== 'number' && !(typeof value === 'string' && value.trim() !== '')) return null
+  const number = Number(value)
+  return Number.isFinite(number) && number >= 0 ? number : null
+}
+export function normalizeDashboardPayload(value: unknown): DashboardMetricsState {
+  const absent: DashboardMetricsState = { metrics: null, trends: null, availability: 'unavailable', data_quality: 'unknown', reason_code: 'invalid_dashboard_payload', not_run: 'No valid dashboard metrics received' }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return absent
+  const input = value as Record<string, unknown>
+  const metrics = { success_rate: numeric(input.success_rate), avg_latency_ms: numeric(input.avg_latency_ms), p95_latency_ms: numeric(input.p95_latency_ms), total_runs: numeric(input.total_runs), avg_retrieved_docs: numeric(input.avg_retrieved_docs), avg_top_score: numeric(input.avg_top_score) } as SafeDashboardMetrics
+  if (metricKeys.every(key => metrics[key] === null)) return absent
+  for (const key of ['success_rate_status', 'latency_status'] as const) {
+    if (input[key] === 'good' || input[key] === 'warning' || input[key] === 'bad') metrics[key] = input[key]
+  }
+  let trends: TrendPoint[] | null = null
+  if (Array.isArray(input.trends)) {
+    const rows = input.trends.map(row => {
+      if (!row || typeof row !== 'object' || typeof row.timestamp !== 'string') return null
+      const rate = numeric(row.success_rate), latency = numeric(row.avg_latency_ms)
+      return rate === null || rate > 1 || latency === null ? null : { timestamp: row.timestamp, success_rate: rate, avg_latency_ms: latency }
+    })
+    if (rows.every(row => row !== null)) trends = rows as TrendPoint[]
+  }
+  if (metrics.success_rate !== null && metrics.success_rate > 1) metrics.success_rate = null
+  if (metrics.avg_top_score !== null && metrics.avg_top_score > 1) metrics.avg_top_score = null
+  const complete = metricKeys.every(key => metrics[key] !== null) && trends !== null
+  return { metrics, trends, availability: complete ? 'available' : 'partial', data_quality: complete ? 'complete' : 'partial', reason_code: complete ? undefined : 'incomplete_dashboard_payload' }
+}
+
 export interface TraceItem {
   trace_id: string
   trace_name: string
@@ -87,13 +130,9 @@ export interface FeedbackStats {
 interface ApiWrap<T> { data: T }
 
 export const ragevalService = {
-  async getDashboard(window = '24h'): Promise<DashboardMetrics> {
-    const res = await api.get<ApiWrap<DashboardMetrics>>('/rageval/v1/dashboard', { params: { window } })
-    return res.data.data ?? {
-      success_rate: 0, avg_latency_ms: 0, p95_latency_ms: 0, total_runs: 0,
-      avg_retrieved_docs: 0, avg_top_score: 0,
-      success_rate_status: 'good', latency_status: 'good', trends: [],
-    }
+  async getDashboard(window = '24h'): Promise<DashboardMetricsState> {
+    const res = await api.get<ApiWrap<unknown>>('/rageval/v1/dashboard', { params: { window } })
+    return normalizeDashboardPayload(res.data.data)
   },
 
   async listTraces(params?: {

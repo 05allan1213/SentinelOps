@@ -16,16 +16,12 @@ function captureRuntimeErrors(page: Page) {
 async function installAuthenticatedFixture(page: Page, dark = false) {
   await page.addInitScript(({ enableDark }) => {
     localStorage.setItem('token', 'smoke-test-token')
-    if (enableDark) {
-      document.addEventListener('DOMContentLoaded', () => {
-        document.documentElement.classList.add('dark')
-      })
-    }
+    localStorage.setItem('app-storage', JSON.stringify({ state: { theme: enableDark ? 'dark' : 'light' }, version: 1 }))
   }, { enableDark: dark })
   await page.route('**/api/**', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, message: 'OK', data: {} }),
+      body: JSON.stringify({ code: 0, message: 'OK', data: { total: 1, events: [] } }),
     })
   })
 }

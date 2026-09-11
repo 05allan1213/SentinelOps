@@ -10,7 +10,7 @@ import ReactECharts from 'echarts-for-react'
 import StatCard from '@/components/common/StatCard'
 import Pagination from '@/components/common/Pagination'
 import ConfirmDialog from '@/components/common/ConfirmDialog'
-import { ragevalService, type DashboardMetrics, type TraceItem, type FeedbackStats, type TraceDetail } from '@/services/rageval'
+import { ragevalService, type DashboardMetricsState, type TrendPoint, type TraceItem, type FeedbackStats, type TraceDetail } from '@/services/rageval'
 import { cn } from '@/utils'
 import toast from 'react-hot-toast'
 import TraceDetailModal from './components/TraceDetailModal'
@@ -18,13 +18,15 @@ import CustomSelect, { type SelectOption } from '@/components/common/CustomSelec
 
 type Window = '24h' | '7d' | '30d'
 
-function fmtMs(ms: number) {
+function fmtMs(ms: number | null) {
+  if (ms === null) return '—'
   if (ms <= 0) return '—'
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-function fmtPct(v: number) {
+function fmtPct(v: number | null) {
+  if (v === null) return '—'
   return `${(v * 100).toFixed(1)}%`
 }
 
@@ -43,7 +45,7 @@ function statusTone(status?: string): 'emerald' | 'amber' | 'red' | 'gray' {
 
 // ── ECharts 趋势配置 ──────────────────────────────────────────────────────────
 
-function buildChartOption(metrics: DashboardMetrics) {
+function buildChartOption(metrics: { trends: TrendPoint[] }) {
   const labels = metrics.trends.map(t => t.timestamp)
   const latencyValues = metrics.trends.map(t => t.avg_latency_ms)
   const maxLatency = Math.max(...latencyValues, 1)
@@ -158,7 +160,9 @@ export default function RagEvalDashboard() {
   const location = useLocation()
   const [window_, setWindow] = useState<Window>('24h')
   const [loading, setLoading] = useState(false)
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
+  const [dashboard, setDashboard] = useState<DashboardMetricsState | null>(null)
+  const metrics = dashboard?.metrics
+  const [dashboardError, setDashboardError] = useState<string | null>(null)
   const [traces, setTraces] = useState<TraceItem[]>([])
   const [tracesTotal, setTracesTotal] = useState(0)
   const [tracesPage, setTracesPage] = useState(1)
@@ -176,21 +180,20 @@ export default function RagEvalDashboard() {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const [m, tRes, f] = await Promise.all([
+      const [m, tRes, f] = await Promise.allSettled([
         ragevalService.getDashboard(window_),
-        ragevalService.listTraces({
-          page: tracesPage,
-          pageSize: tracesPageSize,
-          status: filterStatus,
-        }),
+        ragevalService.listTraces({ page: tracesPage, pageSize: tracesPageSize, status: filterStatus }),
         ragevalService.getFeedbackStats(),
       ])
-      setMetrics(m)
-      setTraces(tRes.list)
-      setTracesTotal(tRes.total)
-      setFeedbackStats(f)
-    } catch {
-      // 静默失败，避免后端未启动时弹窗
+      if (m.status === 'fulfilled' && m.value.metrics) {
+        setDashboard(m.value)
+        setDashboardError(null)
+      } else {
+        setDashboardError(m.status === 'rejected' ? (m.reason instanceof Error ? m.reason.message : 'dashboard_request_failed') : m.value.reason_code ?? 'invalid_dashboard_payload')
+      }
+      if (tRes.status === 'fulfilled') { setTraces(tRes.value.list); setTracesTotal(tRes.value.total) }
+      if (f.status === 'fulfilled') setFeedbackStats(f.value)
+
     } finally {
       setLoading(false)
     }
@@ -233,8 +236,8 @@ export default function RagEvalDashboard() {
   }, [traces, refresh])
 
   const chartOption = useMemo(
-    () => (metrics ? buildChartOption(metrics) : null),
-    [metrics],
+    () => (dashboard?.trends ? buildChartOption({ trends: dashboard.trends }) : null),
+    [dashboard],
   )
 
   const openDetail = async (traceId: string) => {
@@ -301,6 +304,13 @@ export default function RagEvalDashboard() {
   return (
     <div className="flex flex-col gap-5">
 
+      {(dashboardError || dashboard?.data_quality === 'partial') && (
+        <div role="status" data-testid="rag-dashboard-state" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          {dashboardError ? '指标不可用' : '指标部分可用'}：{dashboardError ?? dashboard?.reason_code}
+          {dashboardError && metrics && '；保留上次有效数据'}
+          <button type="button" className="ml-3 underline" onClick={() => void refresh()}>重试</button>
+        </div>
+      )}
       {/* ── 页面标题栏 ── */}
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
@@ -343,7 +353,7 @@ export default function RagEvalDashboard() {
               value={metrics ? fmtPct(metrics.success_rate) : '—'}
               Icon={CheckCircle2}
               tone={statusTone(metrics?.success_rate_status)}
-              sub={`共 ${metrics?.total_runs ?? 0} 次请求`}
+              sub={`共 ${metrics?.total_runs ?? '—'} 次请求`}
             />
             <StatCard
               label="平均延迟"
@@ -396,7 +406,7 @@ export default function RagEvalDashboard() {
                 <span className="text-xs text-slate-500">平均召回数</span>
               </div>
               <span className="text-2xl font-bold text-slate-800 tabular-nums">
-                {metrics ? metrics.avg_retrieved_docs.toFixed(1) : '—'}
+                {metrics ? metrics.avg_retrieved_docs?.toFixed(1) ?? '—' : '—'}
               </span>
               <span className="text-[11px] text-slate-400">每次检索平均召回文档数</span>
             </div>
