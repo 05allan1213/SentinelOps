@@ -1,3 +1,6 @@
+import RuntimeQueryError from './RuntimeQueryError'
+import RuntimeResourcePagination from './RuntimeResourcePagination'
+import { useState } from 'react'
 import { useRuntimeAttempts } from '@/hooks/useRuntimeQueries'
 import { cn } from '@/utils'
 import RuntimeQualityState from './RuntimeQualityState'
@@ -40,7 +43,8 @@ function AttemptRow({ attempt }: { attempt: AttemptDTO }) {
 }
 
 export default function AttemptsPanel({ runId }: Props) {
-  const query = useRuntimeAttempts(runId, { page: 1, page_size: 20 })
+  const [page, setPage] = useState(1)
+  const query = useRuntimeAttempts(runId, { page, page_size: 20 })
   const data = query.data
   const items = data?.items ?? []
 
@@ -50,7 +54,8 @@ export default function AttemptsPanel({ runId }: Props) {
         <h3 className="text-sm font-medium text-gray-900">Attempts（服务端投影）</h3>
         <RuntimeQualityState availability={data?.availability} dataQuality={data?.data_quality} reasonCode={data?.reason_code} notRun={data?.not_run} />
       </div>
-      {query.isLoading && !data ? (
+      <RuntimeQueryError query={query} />
+      {query.isError && !data ? null : query.isLoading && !data ? (
         <p data-testid="runtime-attempts-loading" className="mt-3 text-sm text-gray-500">加载中…</p>
       ) : items.length === 0 ? (
         <p data-testid="runtime-attempts-empty" className="mt-3 text-sm text-gray-500">
@@ -61,6 +66,7 @@ export default function AttemptsPanel({ runId }: Props) {
           {items.map(attempt => <AttemptRow key={attempt.attempt_id} attempt={attempt} />)}
         </ul>
       )}
+      <RuntimeResourcePagination label="Attempts" page={page} meta={data?.page} loading={query.isFetching} onChange={setPage} />
     </section>
   )
 }

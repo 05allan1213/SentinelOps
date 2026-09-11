@@ -1,3 +1,6 @@
+import RuntimeQueryError from './RuntimeQueryError'
+import RuntimeResourcePagination from './RuntimeResourcePagination'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ExternalLink, Route } from 'lucide-react'
 import { useRuntimeTraces } from '@/hooks/useRuntimeQueries'
@@ -51,7 +54,8 @@ function TraceRow({ trace }: { trace: TraceAggregateDTO }) {
 }
 
 export default function TracePanel({ runId }: Props) {
-  const query = useRuntimeTraces(runId, { page: 1, page_size: 50 })
+  const [page, setPage] = useState(1)
+  const query = useRuntimeTraces(runId, { page, page_size: 50 })
   const data = query.data
   const items = data?.items ?? []
 
@@ -61,7 +65,8 @@ export default function TracePanel({ runId }: Props) {
         <h3 className="text-sm font-medium text-gray-900">Run → Attempt → Trace</h3>
         <RuntimeQualityState availability={data?.availability} dataQuality={data?.data_quality} reasonCode={data?.reason_code} notRun={data?.not_run} />
       </div>
-      {query.isLoading && !data ? (
+      <RuntimeQueryError query={query} />
+      {query.isError && !data ? null : query.isLoading && !data ? (
         <p data-testid="runtime-trace-loading" className="mt-3 text-sm text-gray-500">加载中…</p>
       ) : items.length === 0 ? (
         <p data-testid="runtime-trace-empty" className="mt-3 text-sm text-gray-500">
@@ -73,6 +78,7 @@ export default function TracePanel({ runId }: Props) {
         </ul>
       )}
       <p className="mt-3 text-[11px] text-gray-400">不完整 Trace 仅作为诊断证据，不作为发布/验收结论；原始节点沿用既有 Trace 页面权限。</p>
+      <RuntimeResourcePagination label="Trace" page={page} meta={data?.page} loading={query.isFetching} onChange={setPage} />
     </section>
   )
 }

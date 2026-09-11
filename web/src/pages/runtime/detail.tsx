@@ -1,3 +1,5 @@
+import RuntimeQueryError from './components/RuntimeQueryError'
+import RuntimeResourcePagination from './components/RuntimeResourcePagination'
 import { Component, useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, RefreshCw, RotateCcw, ShieldAlert, Wifi, WifiOff } from 'lucide-react'
@@ -60,7 +62,8 @@ function RuntimeRunDetailPage({ runId }: { runId: string }) {
   const tab: RuntimeDetailTab = isRuntimeDetailTab(tabParam) ? tabParam : 'overview'
 
   const runQuery = useRuntimeRun(runId)
-  const timelineQuery = useRuntimeTimeline(runId, { page: 1, page_size: 50 })
+  const [timelinePage, setTimelinePage] = useState(1)
+  const timelineQuery = useRuntimeTimeline(runId, { page: timelinePage, page_size: 50 })
   const run = runQuery.data?.item
   const status = run?.summary?.status ?? ''
   const tail = useRuntimeEventTail({ runId, enabled: Boolean(runId) && status !== '' && !TERMINAL.has(status) })
@@ -123,6 +126,13 @@ function RuntimeRunDetailPage({ runId }: { runId: string }) {
         </button>
       </header>
 
+      {tail.lastEventAt && <p className="text-xs text-gray-500">事件最后更新：{tail.lastEventAt}</p>}
+      {tail.error && (
+        <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          事件流连接失败：{tail.error.message}。Run 状态以服务端查询为准。
+          <button type="button" onClick={tail.retry} className="ml-3 underline">重连事件流</button>
+        </div>
+      )}
       {runQuery.isError && (
         <div data-testid="runtime-detail-error" className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
           <p className="flex items-center gap-2 text-sm text-red-700"><AlertTriangle className="w-4 h-4" />Run 详情加载失败。</p>
@@ -158,11 +168,13 @@ function RuntimeRunDetailPage({ runId }: { runId: string }) {
 
       {tab === 'timeline' && (
         <PanelBoundary>
-          {timelineQuery.isLoading && !timelineQuery.data ? (
+          <RuntimeQueryError query={timelineQuery} />
+          {timelineQuery.isError && !timelineQuery.data ? null : timelineQuery.isLoading && !timelineQuery.data ? (
             <div data-testid="runtime-timeline-loading-panel" className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">加载中…</div>
           ) : (
-            <RunTimeline data={timelineQuery.data ?? { items: [], availability: 'available', data_quality: 'complete' }} loading={timelineQuery.isFetching} />
+            <RunTimeline data={timelineQuery.data ?? { items: [], availability: 'unavailable', data_quality: 'unknown' }} loading={timelineQuery.isFetching} />
           )}
+          <RuntimeResourcePagination label="Timeline" page={timelinePage} meta={timelineQuery.data?.page} loading={timelineQuery.isFetching} onChange={setTimelinePage} />
         </PanelBoundary>
       )}
 

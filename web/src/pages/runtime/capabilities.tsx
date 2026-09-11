@@ -5,7 +5,7 @@ import CapabilityTable from './components/CapabilityTable'
 
 export default function RuntimeCapabilitiesPage() {
   const query = useRuntimeCapabilities({ page: 1, page_size: 100 })
-  const data = query.data ?? { items: [], availability: 'available' as const, data_quality: 'complete' as const }
+  const data = query.data ?? { items: [], availability: 'unavailable' as const, data_quality: 'unknown' as const }
 
   return (
     <div className="flex flex-col gap-4 pb-8 min-w-0 max-w-[1440px]">

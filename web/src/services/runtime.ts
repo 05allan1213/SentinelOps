@@ -39,6 +39,21 @@ export interface RuntimeIncludeOptions {
   signal?: AbortSignal
 }
 
+/** datetime-local uses the browser timezone; the API requires an explicit RFC3339 offset. */
+export function runtimeFilterTimestamp(value: string): string {
+  if (!value || /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) return value
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toISOString()
+}
+
+export function runtimeLocalTimestamp(value: string): string {
+  if (!value || !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) return value
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 /** Deterministic parameter normalization: empty filters are dropped, explicit false/0 values are kept. */
 export function normalizeRuntimeParams(params: object = {}): RuntimeQueryParams {
   const source = params as Record<string, unknown>
@@ -54,7 +69,7 @@ export function normalizeRuntimeParams(params: object = {}): RuntimeQueryParams 
         return
       }
       if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        normalized[key] = value
+        normalized[key] = (key === 'from' || key === 'to') && typeof value === 'string' ? runtimeFilterTimestamp(value) : value
       }
     })
   return normalized

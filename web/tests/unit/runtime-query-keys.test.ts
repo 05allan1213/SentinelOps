@@ -1,5 +1,11 @@
+import EffectsPanel from '@/pages/runtime/components/EffectsPanel'
+import AttemptsPanel from '@/pages/runtime/components/AttemptsPanel'
+import CheckpointPanel from '@/pages/runtime/components/CheckpointPanel'
+import EvidenceInspector from '@/pages/runtime/components/EvidenceInspector'
+import TracePanel from '@/pages/runtime/components/TracePanel'
+import OperationProgress from '@/pages/runtime/components/OperationProgress'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, waitFor } from '@testing-library/react'
+import { render, screen, renderHook, waitFor } from '@testing-library/react'
 import { createElement, type ReactNode } from 'react'
 import api from '@/services/api'
 import { runtimeQueryKeys, useRuntimeRuns, useRuntimeRun, useRuntimeCapabilities } from '@/hooks/useRuntimeQueries'
@@ -140,4 +146,38 @@ describe('runtime query hooks', () => {
     expect(result.current.fetchStatus).toBe('idle')
     expect(api.get).not.toHaveBeenCalled()
   })
+})
+
+it.each([
+  [EffectsPanel, '暂无 Effect 记录'], [AttemptsPanel, '暂无 Attempt 记录'],
+  [CheckpointPanel, '暂无 Checkpoint 记录'], [EvidenceInspector, '暂无 Evidence 记录'],
+  [TracePanel, '暂无 Trace 记录'],
+])('shows query failure instead of an empty resource list: %s', async (Panel, emptyText) => {
+  vi.mocked(api.get).mockRejectedValue(new Error('HTTP 500'))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(createElement(Panel, { runId: 'run-1' }), { wrapper: wrapper(client) })
+  expect(await screen.findByRole('alert')).toHaveTextContent('查询失败')
+  expect(screen.queryByText(emptyText)).toBeNull()
+  expect(screen.getByRole('button', { name: '重试' })).toBeEnabled()
+})
+
+it('invalidates related resources after each consecutive terminal operation', async () => {
+  vi.mocked(api.get).mockImplementation(async url => envelope({ item: {
+    operation_id: String(url).split('/').pop(), run_id: 'run-1', terminal: true, status: 'failed', action: 'resume',
+  } }))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const terminal = vi.fn()
+  const invalidate = vi.spyOn(client, 'invalidateQueries')
+  const view = render(createElement(OperationProgress, { operationId: 'op-1', onTerminal: terminal }), { wrapper: wrapper(client) })
+  await waitFor(() => expect(terminal).toHaveBeenCalledTimes(1))
+  invalidate.mockClear()
+  view.rerender(createElement(OperationProgress, { operationId: 'op-2', onTerminal: terminal }))
+  await waitFor(() => expect(terminal).toHaveBeenCalledTimes(2))
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['runtime', 'attempts', 'run-1'] })
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['runtime', 'effects', 'run-1'] })
+})
+
+it('shares the same Runs cache entry for equivalent local and RFC3339 filters', () => {
+  const local = '2026-09-11T10:30'
+  expect(runtimeQueryKeys.runs({ from: local })).toEqual(runtimeQueryKeys.runs({ from: new Date(local).toISOString() }))
 })

@@ -1,9 +1,15 @@
+import { runtimeService } from '@/services/runtime'
+import { runDetailRes } from '../ui/fixtures/runtime-detail'
+import type { GetRunRes } from '@/types/runtime'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { createElement, type ReactNode } from 'react'
 import { runtimeQueryKeys } from '@/hooks/useRuntimeQueries'
 import { useRuntimeEventTail } from '@/hooks/useRuntimeEventTail'
 import type { RuntimeEventDTO, TimelineRes } from '@/types/runtime'
+
+let serverStatus = 'running'
+const serverRun = () => runDetailRes({ summary: { status: serverStatus } }) as unknown as GetRunRes
 
 const page = { page: 1, page_size: 50, total: 0, has_next: false }
 
@@ -54,14 +60,16 @@ function wrapper(client: QueryClient) {
 }
 
 function seedTimeline(client: QueryClient) {
-  const key = runtimeQueryKeys.timeline('run-1', { page: 1, page_size: 50 })
-  client.setQueryData<TimelineRes>(key, { items: [], page, availability: 'available', data_quality: 'complete' })
+  const key = runtimeQueryKeys.events('run-1', 0)
+  client.setQueryData<RuntimeEventDTO[]>(key, [])
   return key
 }
 
-const itemsOf = (client: QueryClient, key: readonly unknown[]) => client.getQueryData<TimelineRes>(key)?.items ?? []
+const itemsOf = (client: QueryClient, key: readonly unknown[]) => client.getQueryData<RuntimeEventDTO[]>(key) ?? []
 
 beforeEach(() => {
+  serverStatus = 'running'
+  vi.spyOn(runtimeService, 'getRun').mockImplementation(async () => serverRun())
   localStorage.setItem('token', 'runtime-tail-token')
 })
 
@@ -85,7 +93,7 @@ it('merges accepted events into the timeline cache in seq order', async () => {
   await waitFor(() => expect(itemsOf(client, key).map(item => item.seq)).toEqual([1, 2, 3]))
   expect(result.current.afterSeq).toBe(3)
   expect(result.current.lastEventAt).toBe('2026-09-10T00:00:03.000Z')
-  expect(invalidate).toHaveBeenCalledWith(expect.objectContaining({ queryKey: runtimeQueryKeys.run('run-1') }))
+  expect(invalidate).toHaveBeenCalledWith(expect.objectContaining({ queryKey: runtimeQueryKeys.run('run-1') }), expect.anything())
 })
 
 it('deduplicates repeated frames and ignores out-of-order sequences', async () => {
@@ -103,22 +111,17 @@ it('deduplicates repeated frames and ignores out-of-order sequences', async () =
   expect(result.current.afterSeq).toBe(3)
 })
 
-it('does not duplicate an event already present in the fetched timeline', async () => {
+it('refreshes filtered timeline pages without inserting out-of-filter frames', async () => {
   const control = installStream()
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const key = runtimeQueryKeys.timeline('run-1', { page: 1, page_size: 50 })
-  client.setQueryData<TimelineRes>(key, {
-    items: [{ seq: 1, run_id: 'run-1', event_type: 'run.started', attempt: 1, generation: 1, trace_id: '', summary: 'event-1', created_at: '2026-09-10T00:00:01.000Z', availability: 'available', data_quality: 'complete' }],
-    page,
-    availability: 'available',
-    data_quality: 'complete',
-  })
-
-  renderHook(() => useRuntimeEventTail({ runId: 'run-1', enabled: true }), { wrapper: wrapper(client) })
+  const key = runtimeQueryKeys.timeline('run-1', { page: 2, page_size: 50, event_types: ['effect.failed'] })
+  const data: TimelineRes = { items: [], page, availability: 'available', data_quality: 'complete' }
+  client.setQueryData(key, data)
+  renderHook(() => useRuntimeEventTail({ runId: 'run-1' }), { wrapper: wrapper(client) })
   await waitFor(() => expect(control.urls.length).toBe(1))
   act(() => control.emit(frame(2, 'agent.step')))
-
-  await waitFor(() => expect(itemsOf(client, key).map(item => item.seq)).toEqual([1, 2]))
+  await waitFor(() => expect(client.getQueryState(key)?.isInvalidated).toBe(true))
+  expect(client.getQueryData(key)).toEqual(data)
 })
 
 it('refetches the run once when the tab becomes visible again', async () => {
@@ -136,7 +139,7 @@ it('refetches the run once when the tab becomes visible again', async () => {
 
   visibility.mockReturnValue('visible')
   act(() => { document.dispatchEvent(new Event('visibilitychange')) })
-  expect(invalidate).toHaveBeenCalledWith(expect.objectContaining({ queryKey: runtimeQueryKeys.run('run-1') }))
+  expect(invalidate).toHaveBeenCalledWith(expect.objectContaining({ queryKey: runtimeQueryKeys.run('run-1') }), expect.anything())
 })
 
 it('closes the reader on terminal server facts and never infers success from transport close', async () => {
@@ -147,6 +150,7 @@ it('closes the reader on terminal server facts and never infers success from tra
   const { result } = renderHook(() => useRuntimeEventTail({ runId: 'run-1', enabled: true }), { wrapper: wrapper(client) })
   await waitFor(() => expect(control.urls.length).toBe(1))
 
+  serverStatus = 'succeeded'
   act(() => control.emit(frame(1, 'run.completed', { operation_id: 'op-1' })))
 
   await waitFor(() => expect(result.current.connected).toBe(false))
@@ -154,6 +158,7 @@ it('closes the reader on terminal server facts and never infers success from tra
   expect(itemsOf(client, key)[0].event_type).toBe('run.completed')
 
   // A transport close without a terminal event must never flip any success fact.
+  serverStatus = 'running'
   const control2 = installStream()
   const client2 = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const key2 = seedTimeline(client2)
@@ -210,7 +215,7 @@ it('invalidates the correlated operation without creating a run', async () => {
   await waitFor(() => expect(control.urls.length).toBe(1))
   act(() => control.emit(frame(1, 'operation.accepted', { operation_id: 'op-9' })))
 
-  await waitFor(() => expect(invalidate).toHaveBeenCalledWith(expect.objectContaining({ queryKey: runtimeQueryKeys.operation('op-9') })))
+  await waitFor(() => expect(invalidate).toHaveBeenCalledWith(expect.objectContaining({ queryKey: runtimeQueryKeys.operation('op-9') }), expect.anything()))
   const requested = vi.mocked(fetch).mock.calls.map(call => `${call[0]}`)
   expect(requested.every(url => url.includes('/events'))).toBe(true)
 })
@@ -229,7 +234,40 @@ it('does not open a reader when disabled and stops after a terminal fact', async
   rerender({ enabled: true })
   await waitFor(() => expect(control.urls.length).toBe(1))
 
+  serverStatus = 'parked'
   act(() => control.emit(frame(1, 'run.parked')))
   await waitFor(() => expect(result.current.connected).toBe(false))
   expect(result.current.afterSeq).toBe(1)
+})
+
+it('keeps reading after effect success and a historical parked event for a running Run', async () => {
+  const control = installStream()
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const { result } = renderHook(() => useRuntimeEventTail({ runId: 'run-1' }), { wrapper: wrapper(client) })
+  await waitFor(() => expect(runtimeService.getRun).toHaveBeenCalled())
+  act(() => control.emit(frame(1, 'effect.succeeded', { attributes: { status: 'succeeded' } })))
+  await waitFor(() => expect(result.current.afterSeq).toBe(1))
+  expect(result.current.connected).toBe(true)
+  act(() => control.emit(frame(2, 'run.parked')))
+  await waitFor(() => expect(result.current.afterSeq).toBe(2))
+  await waitFor(() => expect(client.getQueryState(runtimeQueryKeys.run('run-1'))?.fetchStatus).toBe('idle'))
+  expect(result.current.connected).toBe(true)
+  act(() => control.emit(frame(3, 'agent.plan')))
+  await waitFor(() => expect(result.current.afterSeq).toBe(3))
+})
+
+it('restarts the same Run from its cursor after confirmed parked then restored state', async () => {
+  const control = installStream()
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const { result } = renderHook(() => useRuntimeEventTail({ runId: 'run-1' }), { wrapper: wrapper(client) })
+  await waitFor(() => expect(control.urls.length).toBe(1))
+  serverStatus = 'parked'
+  act(() => control.emit(frame(1, 'run.parked')))
+  await waitFor(() => expect(result.current.connected).toBe(false))
+  serverStatus = 'running'
+  await act(async () => { await client.invalidateQueries({ queryKey: runtimeQueryKeys.run('run-1') }) })
+  await waitFor(() => expect(control.urls.length).toBe(2))
+  expect(control.urls[1]).toContain('after_seq=1')
+  act(() => control.emit(frame(2, 'agent.plan')))
+  await waitFor(() => expect(result.current.afterSeq).toBe(2))
 })

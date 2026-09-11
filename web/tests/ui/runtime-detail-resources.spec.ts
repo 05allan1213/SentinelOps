@@ -224,3 +224,48 @@ test('panel-level unavailable and partial states stay distinct', async ({ page }
   await expect(page.getByTestId('runtime-trace-row')).toHaveCount(1)
   await expect(page.getByTestId('runtime-trace-panel').getByTestId('runtime-quality-availability').first()).toHaveAttribute('data-availability', 'partial')
 })
+
+for (const width of [1280, 1440]) {
+  test(`all detail collections expose later pages at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await installAuth(page, 'admin')
+    await installBaseRoutes(page)
+    await page.route(detailPath, route => route.fulfill({ contentType: 'application/json', body: envelope(runDetailRes({ summary: { status: 'succeeded' } })) }))
+    const sizes: Record<string, number> = { timeline: 50, attempts: 20, checkpoints: 20, effects: 50, evidence: 20, traces: 50 }
+    const build = (resource: string, n: number): Record<string, unknown> => {
+      switch (resource) {
+        case 'effects': return effect({ id: `effect-${n}`, effect_step: `step-${n}` })
+        case 'evidence': return evidence({ evidence_id: `ev-${n}` })
+        case 'traces': return trace({ trace_id: `trace-${n}` })
+        case 'attempts': return { attempt_id: `attempt-${n}`, attempt: n, mode: 'fresh', ...meta() }
+        case 'checkpoints': return { checkpoint_id: `checkpoint-${n}`, state: 'valid', ...meta() }
+        default: return { seq: n, run_id: 'run-1', event_type: 'agent.plan', summary: `plan-${n}`, ...meta() }
+      }
+    }
+    await page.route('**/api/runtime/v1/runs/run-1/*', route => {
+      const url = new URL(route.request().url())
+      const resource = url.pathname.split('/').pop() ?? ''
+      const size = sizes[resource]
+      if (!size) return route.fallback()
+      const currentPage = Number(url.searchParams.get('page'))
+      const items = currentPage === 1 ? Array.from({ length: size }, (_, i) => build(resource, i + 1)) : [build(resource, size + 1)]
+      return route.fulfill({ contentType: 'application/json', body: envelope({ items, page: { page: currentPage, page_size: size, total: size + 1, has_next: currentPage === 1 }, ...meta() }) })
+    })
+    const cases = [
+      ['timeline', 'Timeline', 'runtime-timeline-row'], ['attempts', 'Attempts', 'runtime-attempt-row'],
+      ['attempts', 'Checkpoint', 'runtime-checkpoint-row'], ['effects', 'Effects', 'runtime-effect-row'],
+      ['evidence', 'Evidence', 'runtime-evidence-row'], ['trace', 'Trace', 'runtime-trace-row'],
+    ]
+    for (const [tab, label, row] of cases) {
+      await page.goto(`/runtime/runs/run-1?tab=${tab}`)
+      const navigation = page.getByRole('navigation', { name: `${label} 分页` })
+      await navigation.getByRole('button', { name: '下一页' }).click()
+      await expect(page.getByTestId(row)).toHaveCount(1)
+      await expect(navigation).toContainText('第 2 页')
+      await expect(navigation.getByRole('button', { name: '下一页' })).toBeDisabled()
+      await navigation.getByRole('button', { name: '上一页' }).click()
+      await expect(navigation).toContainText('第 1 页')
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+    }
+  })
+}

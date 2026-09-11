@@ -7,6 +7,7 @@ export interface UseSSECursorOptions {
   initialAfterSeq?: number
   maxRetries?: number
   enabled?: boolean
+  stopOnRunTerminal?: boolean
   signal?: AbortSignal
   onChunk: SSEChunkHandler
   onDone?: () => void
@@ -15,10 +16,10 @@ export interface UseSSECursorOptions {
 }
 
 /** Transport state only. Event bodies stay with the consumer; done is not Run success. */
-export function useSSECursor({ url, runId, initialAfterSeq = 0, maxRetries = 5, enabled = true, signal, onChunk, onDone, onError, onRetry }: UseSSECursorOptions) {
+export function useSSECursor({ url, runId, initialAfterSeq = 0, maxRetries = 5, enabled = true, stopOnRunTerminal = true, signal, onChunk, onDone, onError, onRetry }: UseSSECursorOptions) {
   const [cursor] = useState(() => new SSECursor())
   const [revision, setRevision] = useState(0)
-  const source = useMemo(() => ({ url, runId, initialAfterSeq, maxRetries, enabled, signal, revision }), [url, runId, initialAfterSeq, maxRetries, enabled, signal, revision])
+  const source = useMemo(() => ({ url, runId, initialAfterSeq, maxRetries, enabled, stopOnRunTerminal, signal, revision }), [url, runId, initialAfterSeq, maxRetries, enabled, stopOnRunTerminal, signal, revision])
   const [state, setState] = useState<{ source: typeof source | null; error: SSEError | null; done: boolean }>({ source: null, error: null, done: false })
   const chunk = useEffectEvent(onChunk)
   const complete = useEffectEvent(() => onDone?.())
@@ -26,11 +27,11 @@ export function useSSECursor({ url, runId, initialAfterSeq = 0, maxRetries = 5, 
   const reconnect = useEffectEvent((attempt: number, delay: number) => onRetry?.(attempt, delay))
 
   useEffect(() => {
-    const { url, runId, initialAfterSeq, maxRetries, enabled, signal } = source
+    const { url, runId, initialAfterSeq, maxRetries, enabled, stopOnRunTerminal, signal } = source
     if (!enabled) return
     let active = true
     const control = streamFetch(url, {
-      method: 'GET', runId, cursor, signal, initialAfterSeq, maxRetries,
+      method: 'GET', runId, cursor, signal, initialAfterSeq, maxRetries, stopOnRunTerminal,
       paused: document.visibilityState === 'hidden',
       onRetry: (attempt, delay) => { if (active) reconnect(attempt, delay) },
     }, (type, content, id) => { if (active) chunk(type, content, id) }, () => {

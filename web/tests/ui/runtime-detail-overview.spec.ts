@@ -206,3 +206,27 @@ test('run identity, tail and operation state do not leak between runs on client-
   // The previous Run's facts are not reused as placeholder data.
   await expect(page.getByTestId('runtime-run-overview')).not.toContainText('worker-1')
 })
+
+test('timeline distinguishes failed requests from empty data and retains prior rows on refresh failure', async ({ page }) => {
+  await installAuth(page)
+  await installSubresources(page)
+  await page.route(detailPath, route => route.fulfill({ contentType: 'application/json', body: envelope(runDetailRes({ summary: { status: 'succeeded' } })) }))
+  let failed = true
+  await page.route(timelinePath, route => route.fulfill({
+    status: failed ? 500 : 200,
+    contentType: 'application/json',
+    body: failed ? JSON.stringify({ message: 'timeline temporarily unavailable' }) : envelope(timelineRes([runtimeEvent(1, 'agent.plan')])),
+  }))
+  await page.goto('/runtime/runs/run-1?tab=timeline')
+  const error = page.getByRole('alert').filter({ hasText: '查询失败' })
+  await expect(error).toBeVisible({ timeout: 15000 })
+  await expect(page.getByText('暂无事件', { exact: true })).toHaveCount(0)
+  failed = false
+  await error.getByRole('button', { name: '重试', exact: true }).click()
+  await expect(page.getByTestId('runtime-timeline-row')).toHaveCount(1)
+  await expect(error).toHaveCount(0)
+  failed = true
+  await page.getByRole('button', { name: '刷新', exact: true }).click()
+  await expect(error).toContainText('保留上次加载的数据', { timeout: 15000 })
+  await expect(page.getByTestId('runtime-timeline-row')).toHaveCount(1)
+})

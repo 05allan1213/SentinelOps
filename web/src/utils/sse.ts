@@ -42,6 +42,8 @@ export interface StreamFetchOptions {
   onRetry?: (attempt: number, delayMs: number) => void
   cursor?: SSECursor
   paused?: boolean
+  /** Runtime views confirm terminal state through the Run query, including during history replay. */
+  stopOnRunTerminal?: boolean
 }
 export type SSEChunkHandler = (type: string, content: string, id?: string) => void
 export interface SSEStreamControl {
@@ -55,7 +57,7 @@ export interface SSEStreamControl {
 
 const delays = [250, 500, 1000, 2000, 4000]
 const aborted = () => new SSEError('aborted', 'Stream aborted')
-const optionsKeys = ['method', 'body', 'signal', 'runId', 'initialAfterSeq', 'maxRetries', 'onRetry', 'cursor', 'paused']
+const optionsKeys = ['method', 'body', 'signal', 'runId', 'initialAfterSeq', 'maxRetries', 'onRetry', 'cursor', 'paused', 'stopOnRunTerminal']
 function isOptions(value: unknown): value is StreamFetchOptions {
   return !!value && typeof value === 'object' && optionsKeys.some(key => key in value)
 }
@@ -145,6 +147,7 @@ export function streamFetch(
       // Commit only after successful delivery, including consumers that then abort.
       cursor.accept(runId, Number(frameId))
       const envelope = payload as { data?: { retryable?: unknown } }
+      if (options.stopOnRunTerminal === false) return false
       return frameEvent === 'run.completed' || frameEvent === 'run.parked' ||
         (frameEvent === 'run.failed' && envelope.data?.retryable !== true)
     }

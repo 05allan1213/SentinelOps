@@ -1,3 +1,4 @@
+import RuntimeQueryError from './RuntimeQueryError'
 import { useState } from 'react'
 import { History, UserRound } from 'lucide-react'
 import { useRuntimeContext } from '@/hooks/useRuntimeQueries'
@@ -20,7 +21,7 @@ export default function ContextPanel({ runId }: Props) {
   const [includeHistory, setIncludeHistory] = useState(false)
   const metadata = useRuntimeContext(runId)
   const withHistory = useRuntimeContext(runId, 'history', { enabled: includeHistory })
-  const data = (includeHistory ? withHistory.data?.item : metadata.data?.item)
+  const data = metadata.data?.item
 
   return (
     <section data-testid="runtime-context-panel" className="rounded-xl border border-gray-200 bg-white p-4">
@@ -32,7 +33,8 @@ export default function ContextPanel({ runId }: Props) {
         <RuntimeQualityState availability={metadata.data?.availability} dataQuality={metadata.data?.data_quality} reasonCode={metadata.data?.reason_code} notRun={metadata.data?.not_run} />
       </div>
 
-      {metadata.isLoading && !data ? (
+      <RuntimeQueryError query={metadata} />
+      {metadata.isError && !data ? null : metadata.isLoading && !data ? (
         <p data-testid="runtime-context-loading" className="mt-3 text-sm text-gray-500">加载中…</p>
       ) : !data ? (
         <p data-testid="runtime-context-empty" className="mt-3 text-sm text-gray-500">Context 当前不可用</p>

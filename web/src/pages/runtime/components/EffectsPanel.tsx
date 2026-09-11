@@ -1,3 +1,5 @@
+import RuntimeQueryError from './RuntimeQueryError'
+import RuntimeResourcePagination from './RuntimeResourcePagination'
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, GitBranch } from 'lucide-react'
@@ -145,7 +147,8 @@ function EffectRow({ effect, runId }: { effect: EffectDTO; runId: string }) {
 }
 
 export default function EffectsPanel({ runId }: Props) {
-  const query = useRuntimeEffects(runId, { page: 1, page_size: 50 })
+  const [page, setPage] = useState(1)
+  const query = useRuntimeEffects(runId, { page, page_size: 50 })
   const data = query.data
   const items = data?.items ?? []
   const primary = items.filter(effect => effect.effect_role === 'primary')
@@ -157,7 +160,8 @@ export default function EffectsPanel({ runId }: Props) {
         <h3 className="text-sm font-medium text-gray-900">Effect Ledger（Primary / Derived）</h3>
         <RuntimeQualityState availability={data?.availability} dataQuality={data?.data_quality} reasonCode={data?.reason_code} notRun={data?.not_run} />
       </div>
-      {query.isLoading && !data ? (
+      <RuntimeQueryError query={query} />
+      {query.isError && !data ? null : query.isLoading && !data ? (
         <p data-testid="runtime-effects-loading" className="mt-3 text-sm text-gray-500">加载中…</p>
       ) : items.length === 0 ? (
         <p data-testid="runtime-effects-empty" className="mt-3 text-sm text-gray-500">
@@ -179,6 +183,7 @@ export default function EffectsPanel({ runId }: Props) {
           </div>
         </div>
       )}
+      <RuntimeResourcePagination label="Effects" page={page} meta={data?.page} loading={query.isFetching} onChange={setPage} />
     </section>
   )
 }

@@ -4,6 +4,7 @@ export interface RuntimeSSEFixture {
   urls: string[]
   cancels: number
   runFetches: number
+  status: string
   emit: (seq: number, type: string, extra?: Record<string, unknown>) => void
   close: () => void
 }
@@ -16,6 +17,7 @@ export const fixture: RuntimeSSEFixture = {
   urls: [],
   cancels: 0,
   runFetches: 0,
+  status: 'running',
   emit: () => {},
   close: () => {},
 }

@@ -30,15 +30,16 @@ export default function OperationProgress({ operationId, onTerminal }: Props) {
   const queryClient = useQueryClient()
   const query = useRuntimeOperationPolling(operationId)
   const operation = query.data?.item
-  const notified = useRef(false)
+  const notified = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!operation?.terminal || !operation.run_id || notified.current) return
-    notified.current = true
+    if (!operation?.terminal || !operation.run_id || notified.current === operation.operation_id) return
+    notified.current = operation.operation_id
     void queryClient.invalidateQueries({ queryKey: ['runtime', 'run', operation.run_id] })
     void queryClient.invalidateQueries({ queryKey: ['runtime', 'attempts', operation.run_id] })
     void queryClient.invalidateQueries({ queryKey: ['runtime', 'timeline', operation.run_id] })
     void queryClient.invalidateQueries({ queryKey: ['runtime', 'effects', operation.run_id] })
+    void queryClient.invalidateQueries({ queryKey: ['runtime', 'checkpoints', operation.run_id] })
     onTerminal?.(operation)
   }, [onTerminal, operation, queryClient])
 
@@ -63,9 +64,8 @@ export default function OperationProgress({ operationId, onTerminal }: Props) {
             <span data-testid="runtime-operation-status" data-status={operation.status} data-terminal={String(operation.terminal)} className={cn('rounded border px-1.5 py-0.5', meta?.className)}>
               {meta?.label}
             </span>
-            {operation.terminal ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Clock className="w-3.5 h-3.5 text-blue-500" />}
+            {operation.status === 'succeeded' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : operation.terminal ? <XCircle className="w-3.5 h-3.5 text-gray-500" /> : <Clock className="w-3.5 h-3.5 text-blue-500" />}
             {operation.idempotent_replay && <span data-testid="runtime-operation-replay" className="rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-violet-700">幂等复用</span>}
-            {operation.status === 'failed' || operation.status === 'rejected' ? <XCircle className="w-3.5 h-3.5 text-red-500" /> : null}
           </div>
           <dl className="mt-3 grid grid-cols-2 gap-2 text-xs lg:grid-cols-4">
             <div><dt className="text-gray-500">Action</dt><dd className="text-gray-800">{operation.action}</dd></div>

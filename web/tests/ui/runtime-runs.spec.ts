@@ -139,3 +139,22 @@ test('row selection navigates to the frozen detail route without claiming succes
   await page.getByTestId('runtime-run-row').click()
   await expect.poll(() => new URL(page.url()).pathname).toBe('/runtime/runs/run-open')
 })
+
+test('local time filters send zoned RFC3339 values accepted by the API contract', async ({ page }) => {
+  await installAuth(page)
+  const fromValues: string[] = []
+  await page.route('**/api/runtime/v1/runs**', route => {
+    const from = new URL(route.request().url()).searchParams.get('from')
+    if (from) fromValues.push(from)
+    const valid = !from || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(from)
+    return route.fulfill({ status: valid ? 200 : 400, contentType: 'application/json', body: valid ? listRes([runRow()]) : JSON.stringify({ message: 'from must be RFC3339' }) })
+  })
+  await page.goto('/runtime/runs')
+  await page.getByLabel('开始时间').fill('2026-09-11T10:30')
+  await expect.poll(() => fromValues.length).toBeGreaterThan(0)
+  const expected = await page.evaluate(() => new Date('2026-09-11T10:30').toISOString())
+  expect(fromValues.at(-1)).toBe(expected)
+  await expect(page.getByTestId('runtime-runs-error')).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByLabel('开始时间')).toHaveValue('2026-09-11T10:30')
+})

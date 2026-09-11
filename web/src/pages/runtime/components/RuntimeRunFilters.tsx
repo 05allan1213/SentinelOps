@@ -1,3 +1,4 @@
+import { runtimeLocalTimestamp } from '@/services/runtime'
 import { Search, RotateCcw } from 'lucide-react'
 import CustomSelect from '@/components/common/CustomSelect'
 import { cn } from '@/utils'
@@ -94,14 +95,14 @@ export default function RuntimeRunFilters({ filters, onChange, onReset, disabled
         aria-label="开始时间"
         type="datetime-local"
         className={cn(inputClass, 'w-[190px]')}
-        value={filters.from}
+        value={runtimeLocalTimestamp(filters.from)}
         onChange={event => onChange({ from: event.target.value })}
       />
       <input
         aria-label="结束时间"
         type="datetime-local"
         className={cn(inputClass, 'w-[190px]')}
-        value={filters.to}
+        value={runtimeLocalTimestamp(filters.to)}
         onChange={event => onChange({ to: event.target.value })}
       />
       <CustomSelect

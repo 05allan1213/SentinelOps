@@ -6,6 +6,7 @@ declare global {
       urls: string[]
       cancels: number
       runFetches: number
+      status: string
       emit: (seq: number, type: string, extra?: Record<string, unknown>) => void
       close: () => void
     }
@@ -51,7 +52,7 @@ for (const width of [1280, 1440]) {
     expect(await page.evaluate(() => window.runtimeSSEFixture.urls.length)).toBe(1)
 
     // Terminal server fact closes the reader; transport close alone is never success.
-    await page.evaluate(() => window.runtimeSSEFixture.emit(4, 'run.completed', { operation_id: 'op-1' }))
+    await page.evaluate(() => { window.runtimeSSEFixture.status = 'succeeded'; window.runtimeSSEFixture.emit(4, 'run.completed', { operation_id: 'op-1' }) })
     await expect(page.getByTestId('connected')).toHaveText('false')
     await expect(page.getByTestId('timeline-row')).toHaveCount(4)
     await page.waitForTimeout(400)

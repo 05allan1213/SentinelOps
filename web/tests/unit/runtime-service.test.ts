@@ -1,5 +1,5 @@
 import api, { ApiRequestError } from '@/services/api'
-import { runtimeService } from '@/services/runtime'
+import { runtimeService, runtimeLocalTimestamp } from '@/services/runtime'
 
 vi.mock('@/services/api', async () => {
   const actual = await vi.importActual<typeof import('@/services/api')>('@/services/api')
@@ -154,4 +154,14 @@ describe('runtimeService response fidelity', () => {
 
     expect(vi.mocked(api.get).mock.calls[0][1]?.signal).toBe(controller.signal)
   })
+})
+
+it('serializes local date filters as RFC3339 and round-trips zoned URL values', async () => {
+  vi.mocked(api.get).mockResolvedValue(ok({ items: [], page }))
+  const local = '2026-09-11T10:30'
+  await runtimeService.listRuns({ from: local, to: '2026-09-12T00:00:00+08:00' })
+  expect(vi.mocked(api.get).mock.calls[0][1]?.params).toEqual({
+    from: new Date(local).toISOString(), to: '2026-09-12T00:00:00+08:00',
+  })
+  expect(runtimeLocalTimestamp(new Date(local).toISOString())).toBe(local + ':00')
 })

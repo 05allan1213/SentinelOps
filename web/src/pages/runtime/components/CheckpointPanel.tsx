@@ -1,3 +1,6 @@
+import RuntimeQueryError from './RuntimeQueryError'
+import RuntimeResourcePagination from './RuntimeResourcePagination'
+import { useState } from 'react'
 import { useRuntimeCheckpoints } from '@/hooks/useRuntimeQueries'
 import { cn } from '@/utils'
 import RuntimeQualityState from './RuntimeQualityState'
@@ -48,7 +51,8 @@ function CheckpointRow({ checkpoint }: { checkpoint: CheckpointDTO }) {
 }
 
 export default function CheckpointPanel({ runId }: Props) {
-  const query = useRuntimeCheckpoints(runId, { page: 1, page_size: 20 })
+  const [page, setPage] = useState(1)
+  const query = useRuntimeCheckpoints(runId, { page, page_size: 20 })
   const data = query.data
   const items = data?.items ?? []
 
@@ -58,7 +62,8 @@ export default function CheckpointPanel({ runId }: Props) {
         <h3 className="text-sm font-medium text-gray-900">Checkpoint 元数据</h3>
         <RuntimeQualityState availability={data?.availability} dataQuality={data?.data_quality} reasonCode={data?.reason_code} notRun={data?.not_run} />
       </div>
-      {query.isLoading && !data ? (
+      <RuntimeQueryError query={query} />
+      {query.isError && !data ? null : query.isLoading && !data ? (
         <p data-testid="runtime-checkpoints-loading" className="mt-3 text-sm text-gray-500">加载中…</p>
       ) : items.length === 0 ? (
         <p data-testid="runtime-checkpoints-empty" className="mt-3 text-sm text-gray-500">
@@ -69,6 +74,7 @@ export default function CheckpointPanel({ runId }: Props) {
           {items.map(checkpoint => <CheckpointRow key={checkpoint.checkpoint_id} checkpoint={checkpoint} />)}
         </ul>
       )}
+      <RuntimeResourcePagination label="Checkpoint" page={page} meta={data?.page} loading={query.isFetching} onChange={setPage} />
     </section>
   )
 }

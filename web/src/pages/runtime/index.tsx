@@ -152,7 +152,7 @@ export default function RuntimeRunsPage() {
           <p className="mt-1 text-xs text-gray-500">{reason ? `reason_code: ${reason}` : '服务端未提供可用数据'}</p>
         </div>
       ) : (
-        <RuntimeRunsTable data={data ?? { items: [], availability: 'available', data_quality: 'complete' }} onSelectRun={runId => navigate(`/runtime/runs/${runId}`)} loading={query.isLoading || (query.isFetching && !data)} />
+        <RuntimeRunsTable data={data ?? { items: [], availability: 'unavailable', data_quality: 'unknown' }} onSelectRun={runId => navigate(`/runtime/runs/${runId}`)} loading={query.isLoading || (query.isFetching && !data)} />
       )}
 
       <div className="flex items-center justify-between gap-4">

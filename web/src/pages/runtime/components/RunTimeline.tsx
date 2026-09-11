@@ -1,3 +1,4 @@
+import RuntimeQualityState from './RuntimeQualityState'
 import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer'
@@ -67,12 +68,13 @@ export default function RunTimeline({ data, loading }: Props) {
   const items = data.items ?? []
   return (
     <div data-testid="runtime-timeline" className="min-w-0">
+      <RuntimeQualityState availability={data.availability} dataQuality={data.data_quality} reasonCode={data.reason_code} notRun={data.not_run} />
       <div className="flex items-center justify-between gap-3 text-xs text-gray-500">
         <span>共 {data.page?.total ?? items.length} 个 canonical Event；分组/折叠只影响展示，不删除事件</span>
         {loading && <span data-testid="runtime-timeline-loading">加载中…</span>}
       </div>
       {items.length === 0 ? (
-        <p className="mt-3 rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">暂无事件</p>
+        <p className="mt-3 rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">{data.availability === 'unavailable' ? 'Timeline 当前不可用' : '暂无事件'}</p>
       ) : (
         <ul className={cn('mt-3 flex flex-col gap-1.5', loading && 'opacity-80')}>
           {items.map(event => <EventRow key={`${event.run_id}-${event.seq}`} event={event} />)}

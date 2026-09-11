@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSSECursor } from './useSSECursor'
-import { runtimeQueryKeys } from './useRuntimeQueries'
-import type { RuntimeEventDTO, RuntimeStatus, TimelineRes } from '@/types/runtime'
+import { runtimeQueryKeys, useRuntimeRun } from './useRuntimeQueries'
+import type { RuntimeEventDTO, RuntimeStatus } from '@/types/runtime'
 import type { SSEError } from '@/utils/sse'
 
 const TERMINAL_STATUSES: readonly RuntimeStatus[] = ['succeeded', 'failed', 'canceled', 'parked']
-const TERMINAL_EVENT_TYPES = new Set(['run.completed', 'run.parked', 'run.canceled'])
 
 export interface UseRuntimeEventTailOptions {
   runId: string
@@ -22,17 +21,7 @@ export interface RuntimeEventTailState {
   retry: () => void
 }
 
-/** Canonical terminal fact carried by an event, never inferred from the transport closing. */
-export function runtimeEventStatus(event: RuntimeEventDTO): string {
-  return event.attributes?.to_status ?? event.attributes?.status ?? ''
-}
-
-export function runtimeEventIsTerminal(event: RuntimeEventDTO): boolean {
-  if (TERMINAL_STATUSES.includes(runtimeEventStatus(event) as RuntimeStatus)) return true
-  return TERMINAL_EVENT_TYPES.has(event.event_type)
-}
-
-/** Merge one accepted event into a timeline page without duplicating or reordering rows. */
+/** Merge one accepted event into the stream cache without duplicating or reordering rows. */
 export function mergeRuntimeEvent(items: RuntimeEventDTO[] | undefined, event: RuntimeEventDTO): RuntimeEventDTO[] {
   const existing = items ?? []
   if (existing.some(item => item.seq === event.seq)) return existing
@@ -57,50 +46,52 @@ function parseRuntimeEvent(content: string, id: string | undefined, runId: strin
 /**
  * Single Runtime Run SSE reader. Consumes GET /runtime/v1/runs/{run_id}/events through the shared
  * D-06 transport (finite retry, monotonic cursor, visibility pause, abort), maps accepted events into
- * the Timeline cache, invalidates only the server-owned queries whose facts changed and never creates a Run.
+ * the stream cache, invalidates only the server-owned queries whose facts changed and never creates a Run.
  */
 export function useRuntimeEventTail({ runId, enabled = true, onError }: UseRuntimeEventTailOptions): RuntimeEventTailState {
   const queryClient = useQueryClient()
   const [afterSeq, setAfterSeq] = useState(0)
   const [lastEventAt, setLastEventAt] = useState<string | null>(null)
-  const [terminalSeen, setTerminalSeen] = useState(false)
-  const terminalRef = useRef(false)
+  // Subscribe to the same server-owned query as the detail page. Historical events
+  // only refresh this fact; they cannot latch a terminal state for a recovered Run.
+  const runQuery = useRuntimeRun(runId, { enabled: enabled && Boolean(runId) })
+  const isTerminal = TERMINAL_STATUSES.includes(runQuery.data?.item?.summary?.status as RuntimeStatus)
 
   const invalidate = useCallback((queryKey: readonly unknown[]) => {
-    void queryClient.invalidateQueries({ queryKey })
+    void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: true })
   }, [queryClient])
 
   const onChunk = useCallback((_type: string, content: string, id?: string) => {
     const event = parseRuntimeEvent(content, id, runId)
     if (!event) return
 
-    // Merge into every cached timeline page for this Run; each page keeps its own filters.
-    queryClient.getQueryCache()
-      .findAll({ queryKey: ['runtime', 'timeline', runId] })
-      .forEach(query => {
-        queryClient.setQueryData<TimelineRes>(query.queryKey, previous => (
-          previous ? { ...previous, items: mergeRuntimeEvent(previous.items, event) } : previous
-        ))
-      })
+    // Keep accepted frames in a separate stream cache. Paginated/filter-specific
+    // timelines must be refreshed from the server, never appended indiscriminately.
+    queryClient.setQueryData<RuntimeEventDTO[]>(runtimeQueryKeys.events(runId, 0), previous => mergeRuntimeEvent(previous, event))
+    invalidate(['runtime', 'timeline', runId])
 
     setAfterSeq(previous => Math.max(previous, event.seq))
     setLastEventAt(event.created_at ?? null)
 
     const family = event.event_type.split('.')[0]
-    if (family === 'run') invalidate(runtimeQueryKeys.run(runId))
+    if (family === 'run') {
+      invalidate(runtimeQueryKeys.run(runId))
+      invalidate(['runtime', 'attempts', runId])
+      invalidate(['runtime', 'checkpoints', runId])
+    }
     if (family === 'agent') {
       invalidate(runtimeQueryKeys.run(runId))
       invalidate(['runtime', 'attempts', runId])
     }
-    if (family === 'approval') invalidate(['runtime', 'approvals', runId])
-    if (family === 'effect') invalidate(['runtime', 'effects', runId])
+    if (family === 'approval' || family === 'effect') {
+      invalidate(runtimeQueryKeys.run(runId))
+      invalidate(['runtime', family === 'approval' ? 'approvals' : 'effects', runId])
+    }
+    if (family === 'checkpoint') invalidate(['runtime', 'checkpoints', runId])
+    if (family === 'evidence') invalidate(['runtime', 'evidence', runId])
+    if (family === 'trace') invalidate(['runtime', 'traces', runId])
     if (family === 'budget') invalidate(runtimeQueryKeys.run(runId))
     if (event.operation_id) invalidate(runtimeQueryKeys.operation(event.operation_id))
-
-    if (runtimeEventIsTerminal(event)) {
-      terminalRef.current = true
-      setTerminalSeen(true)
-    }
   }, [invalidate, queryClient, runId])
 
   const handleError = useCallback((error: SSEError) => {
@@ -111,7 +102,8 @@ export function useRuntimeEventTail({ runId, enabled = true, onError }: UseRunti
     url: `/api/runtime/v1/runs/${runId}/events`,
     runId,
     initialAfterSeq: 0,
-    enabled: enabled && Boolean(runId) && !terminalSeen,
+    stopOnRunTerminal: false,
+    enabled: enabled && Boolean(runId) && !isTerminal,
     onChunk,
     onError: handleError,
   })
@@ -120,7 +112,7 @@ export function useRuntimeEventTail({ runId, enabled = true, onError }: UseRunti
   useEffect(() => {
     if (!enabled || !runId) return
     const change = () => {
-      if (document.visibilityState !== 'visible' || terminalRef.current) return
+      if (document.visibilityState !== 'visible') return
       invalidate(runtimeQueryKeys.run(runId))
     }
     document.addEventListener('visibilitychange', change)
@@ -128,7 +120,7 @@ export function useRuntimeEventTail({ runId, enabled = true, onError }: UseRunti
   }, [enabled, invalidate, runId])
 
   return {
-    connected: enabled && Boolean(runId) && !terminalSeen && !error && !done,
+    connected: enabled && Boolean(runId) && !isTerminal && !error && !done,
     afterSeq,
     lastEventAt,
     error: error ?? null,
