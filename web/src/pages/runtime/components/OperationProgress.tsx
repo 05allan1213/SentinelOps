@@ -53,10 +53,14 @@ export default function OperationProgress({ operationId, onTerminal }: Props) {
           <span className="inline-flex items-center gap-1 text-xs text-gray-500"><RefreshCw className="w-3 h-3 animate-spin" />轮询中（仅非终态）</span>
         )}
       </div>
+      {query.isError && (
+        <div role="status" data-testid="runtime-operation-error" className="mt-3 flex flex-wrap items-center gap-2 text-sm text-red-700">
+          <span>Operation 状态查询失败。{operation ? '保留上次状态，等待服务端确认。' : ''}</span>
+          <button type="button" onClick={() => void query.refetch()} className="rounded border border-red-200 px-2 py-1 underline">重试</button>
+        </div>
+      )}
       {query.isLoading && !operation ? (
         <p className="mt-3 text-sm text-gray-500">加载中…</p>
-      ) : query.isError && !operation ? (
-        <p data-testid="runtime-operation-error" className="mt-3 text-sm text-red-700">Operation 状态查询失败，可重试。</p>
       ) : operation ? (
         <>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
@@ -73,7 +77,7 @@ export default function OperationProgress({ operationId, onTerminal }: Props) {
             <div><dt className="text-gray-500">开始 / 结束</dt><dd className="tabular-nums text-gray-800">{formatTime(operation.started_at)} / {formatTime(operation.finished_at)}</dd></div>
             <div><dt className="text-gray-500">Correlation Seq</dt><dd className="tabular-nums text-gray-800">{operation.correlation_seq ?? '—'}</dd></div>
             <div className="col-span-2"><dt className="text-gray-500">Reason</dt><dd className="text-gray-800 break-words">{operation.reason || '—'}</dd></div>
-            <div><dt className="text-gray-500">Error Code</dt><dd className="font-mono text-gray-800">{operation.error_code || '—'}</dd></div>
+            <div><dt className="text-gray-500">Error Code</dt><dd className="font-mono text-gray-800 [overflow-wrap:anywhere]">{operation.error_code || '—'}</dd></div>
           </dl>
         </>
       ) : (

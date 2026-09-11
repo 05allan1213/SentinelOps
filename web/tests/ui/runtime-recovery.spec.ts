@@ -209,3 +209,21 @@ test('operation reconnects from session storage after reload and shows a termina
   await expect(page.locator('[data-testid="runtime-status-badge"][data-status="retryable_failed"]').first()).toHaveAttribute('data-tone', 'warning')
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280)
 })
+
+test('operation query error exposes retry and retains last server state', async ({ page }) => {
+  await installAuth(page, 'admin')
+  await installBaseRoutes(page)
+  await page.addInitScript(() => sessionStorage.setItem('runtime_operation_run-1', 'op-1'))
+  let failing = true
+  await page.route(operationPath, route => failing
+    ? route.fulfill({ status: 503, json: { message: 'temporary query failure' } })
+    : route.fulfill({ contentType: 'application/json', body: envelope({ item: operation({ status: 'running' }), ...meta() }) }))
+  await page.goto('/runtime/runs/run-1?tab=attempts')
+  await expect(page.getByTestId('runtime-operation-error')).toBeVisible()
+  failing = false
+  await page.getByTestId('runtime-operation-error').getByRole('button', { name: '重试' }).click()
+  await expect(page.getByTestId('runtime-operation-status')).toHaveAttribute('data-status', 'running')
+  failing = true
+  await expect(page.getByTestId('runtime-operation-error')).toContainText('保留上次状态', { timeout: 15000 })
+  await expect(page.getByTestId('runtime-operation-status')).toHaveAttribute('data-status', 'running')
+})

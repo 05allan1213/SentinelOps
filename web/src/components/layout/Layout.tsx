@@ -16,7 +16,7 @@ export default function Layout() {
         className="flex flex-col h-full transition-[margin] duration-300"
         style={{ marginLeft: sidebarCollapsed ? '72px' : `${sidebarWidth}px` }}
       >
-        <main className="flex-1 min-h-0 relative overflow-y-auto p-8">
+        <main data-surface={location.pathname.startsWith('/runtime/') ? 'runtime' : location.pathname === '/chat' ? 'chat' : undefined} className="flex-1 min-w-0 min-h-0 relative overflow-y-auto p-8">
           <RouteContent key={location.pathname}><Outlet /></RouteContent>
         </main>
       </div>

@@ -40,7 +40,7 @@ export default function RuntimeQualityState({ availability, dataQuality, reasonC
         </span>
       )}
       {reasonCode && (
-        <span data-testid="runtime-quality-reason" className="inline-flex items-center h-6 px-2 rounded-md border border-gray-200 bg-white font-mono text-gray-600">
+        <span data-testid="runtime-quality-reason" className="inline-flex min-w-0 max-w-full items-center min-h-6 px-2 py-0.5 rounded-md border border-gray-200 bg-white font-mono text-gray-600 [overflow-wrap:anywhere]">
           reason: {reasonCode}
         </span>
       )}

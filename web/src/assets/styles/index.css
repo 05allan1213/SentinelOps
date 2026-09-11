@@ -1090,3 +1090,23 @@
 }
 .think-markdown th { @apply bg-[#E0F2FE] font-semibold text-[#0369A1]; }
 .think-markdown hr { @apply border-none border-t border-[#BAE6FD] my-3; }
+
+/* Runtime Operate: local contrast and focus; retain the existing Sidebar/theme. */
+main[data-surface="runtime"] {
+  --color-gray-500: #667085;
+  --color-gray-400: #687585;
+}
+main[data-surface="runtime"] :focus-visible,
+[data-testid="runtime-recovery-dialog"] :focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  main[data-surface="runtime"] *,
+  main[data-surface="chat"] *,
+  [data-testid="runtime-recovery-dialog"] * {
+    animation: none !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
