@@ -329,6 +329,9 @@ export default function EventAnalysis() {
         </div>
       </div>
 
+      <p data-testid="analysis-source-label" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+        legacy / demo · 旧版 Event Analysis：阶段进度含计时模拟，结果来自旧 pipeline；不代表 Durable Runtime 的执行状态。
+      </p>
       {/* 数据统计横条 */}
       <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 shrink-0">
         <StatsBar data={riskData} isProcessing={isProcessing} />

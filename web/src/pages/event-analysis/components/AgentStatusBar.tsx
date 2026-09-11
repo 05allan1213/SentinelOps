@@ -73,7 +73,7 @@ export default function AgentStatusBar({ logs, isProcessing }: Props) {
   const statuses = STEPS.map(s => getStatus(s.agentKey, logs))
 
   return (
-    <div className="flex items-center justify-center gap-0 px-8 py-3 bg-white border-b border-gray-100">
+    <div aria-label="legacy / demo 模拟阶段进度" className="flex items-center justify-center gap-0 px-8 py-3 bg-white border-b border-gray-100">
       {STEPS.map((step, i) => {
         const status = statuses[i]
         const prevDone = i === 0 || statuses[i - 1] === 'success'
