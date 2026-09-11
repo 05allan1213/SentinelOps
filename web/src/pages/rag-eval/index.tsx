@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   RefreshCw, CheckCircle2, XCircle, Clock,
   TrendingUp, ExternalLink,
@@ -157,7 +157,6 @@ function buildChartOption(metrics: { trends: TrendPoint[] }) {
 
 export default function RagEvalDashboard() {
   const navigate = useNavigate()
-  const location = useLocation()
   const [window_, setWindow] = useState<Window>('24h')
   const [loading, setLoading] = useState(false)
   const [dashboard, setDashboard] = useState<DashboardMetricsState | null>(null)
@@ -177,7 +176,10 @@ export default function RagEvalDashboard() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  const refreshVersion = useRef({ version: 0 })
   const refresh = useCallback(async () => {
+    if (document.visibilityState === 'hidden') return
+    const version = ++refreshVersion.current.version
     setLoading(true)
     try {
       const [m, tRes, f] = await Promise.allSettled([
@@ -185,6 +187,7 @@ export default function RagEvalDashboard() {
         ragevalService.listTraces({ page: tracesPage, pageSize: tracesPageSize, status: filterStatus }),
         ragevalService.getFeedbackStats(),
       ])
+      if (version !== refreshVersion.current.version) return
       if (m.status === 'fulfilled' && m.value.metrics) {
         setDashboard(m.value)
         setDashboardError(null)
@@ -195,19 +198,17 @@ export default function RagEvalDashboard() {
       if (f.status === 'fulfilled') setFeedbackStats(f.value)
 
     } finally {
-      setLoading(false)
+      if (version === refreshVersion.current.version) setLoading(false)
     }
   }, [window_, tracesPage, tracesPageSize, filterStatus])
 
-  useEffect(() => { refresh() }, [refresh])
-
-  // 路由变化监听：切换到此页面时自动刷新（仅当路径是 /rag-eval 时）
   useEffect(() => {
-    if (location.pathname === '/rag-eval') {
-      const timer = setTimeout(() => refresh(), 100)
-      return () => clearTimeout(timer)
-    }
-  }, [location.pathname, refresh])
+    const lifetime = refreshVersion.current
+    let active = true
+    // Coalesce StrictMode's setup/cleanup pass before issuing the initial requests.
+    queueMicrotask(() => { if (active) void refresh() })
+    return () => { active = false; lifetime.version++ }
+  }, [refresh])
 
   // 页面可见性监听：切换回页面时自动刷新
   useEffect(() => {

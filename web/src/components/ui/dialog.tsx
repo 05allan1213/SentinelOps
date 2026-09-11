@@ -2,9 +2,9 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useRef, type ComponentProps } from 'react'
 import { cn } from '@/utils'
 
-export const Dialog = DialogPrimitive.Root
-export const DialogTitle = DialogPrimitive.Title
-export const DialogDescription = DialogPrimitive.Description
+export function Dialog(props: ComponentProps<typeof DialogPrimitive.Root>) { return <DialogPrimitive.Root {...props} /> }
+export function DialogTitle(props: ComponentProps<typeof DialogPrimitive.Title>) { return <DialogPrimitive.Title {...props} /> }
+export function DialogDescription(props: ComponentProps<typeof DialogPrimitive.Description>) { return <DialogPrimitive.Description {...props} /> }
 
 // One primitive for both public ConfirmDialog and Runtime Recovery.
 // Callers may be conditionally mounted without a Radix Trigger; retain their opener.

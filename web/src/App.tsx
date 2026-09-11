@@ -1,26 +1,26 @@
-import { useLayoutEffect } from 'react'
+import { lazy, useLayoutEffect } from 'react'
 import { useAppStore } from './stores/app'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
-import Dashboard from './pages/dashboard'
-import Subscriptions from './pages/subscriptions'
-import Events from './pages/events'
-import EventAnalysis from './pages/event-analysis'
-import Reports from './pages/reports'
-import Chat from './pages/chat'
-import Settings from './pages/settings'
-import TermMapping from './pages/term-mapping'
-import Traces from './pages/traces'
-import TraceDetail from './pages/traces/detail'
-import Knowledge from './pages/knowledge'
-import RagEval from './pages/rag-eval'
-import Ingest from './pages/ingest'
-import Ops from './pages/ops'
-import RuntimeRuns from './pages/runtime'
-import RuntimeRunDetail from './pages/runtime/detail'
-import RuntimeCapabilities from './pages/runtime/capabilities'
-import RuntimeSafety from './pages/runtime/safety'
-import RuntimeWorkerHealth from './pages/runtime/worker-health'
+const Dashboard = lazy(() => import('./pages/dashboard'))
+const Subscriptions = lazy(() => import('./pages/subscriptions'))
+const Events = lazy(() => import('./pages/events'))
+const EventAnalysis = lazy(() => import('./pages/event-analysis'))
+const Reports = lazy(() => import('./pages/reports'))
+const Chat = lazy(() => import('./pages/chat'))
+const Settings = lazy(() => import('./pages/settings'))
+const TermMapping = lazy(() => import('./pages/term-mapping'))
+const Traces = lazy(() => import('./pages/traces'))
+const TraceDetail = lazy(() => import('./pages/traces/detail'))
+const Knowledge = lazy(() => import('./pages/knowledge'))
+const RagEval = lazy(() => import('./pages/rag-eval'))
+const Ingest = lazy(() => import('./pages/ingest'))
+const Ops = lazy(() => import('./pages/ops'))
+const RuntimeRuns = lazy(() => import('./pages/runtime'))
+const RuntimeRunDetail = lazy(() => import('./pages/runtime/detail'))
+const RuntimeCapabilities = lazy(() => import('./pages/runtime/capabilities'))
+const RuntimeSafety = lazy(() => import('./pages/runtime/safety'))
+const RuntimeWorkerHealth = lazy(() => import('./pages/runtime/worker-health'))
 import Login from './pages/login'
 import { useAuthStore } from './stores/authStore'
 
