@@ -219,11 +219,11 @@ export default function Sidebar() {
               {!sidebarCollapsed && (
                 <button
                   onClick={() => toggleGroup(group.title)}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg mb-1 transition-all hover:bg-white/5 group"
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg mb-1 transition-colors hover:bg-white/5 group"
                 >
                   <div className="flex items-center gap-2.5">
                     <div
-                      className="relative w-2 h-2 flex-shrink-0 transition-all duration-300"
+                      className="relative w-2 h-2 flex-shrink-0 transition-colors duration-300"
                       style={{
                         opacity: groupHasActive ? 1 : 0.5,
                       }}
@@ -278,7 +278,7 @@ export default function Sidebar() {
                         to={item.path}
                         title={sidebarCollapsed ? item.label : undefined}
                         className={cn(
-                          'relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150',
+                          'relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150',
                           sidebarCollapsed && 'justify-center px-0',
                           active
                             ? 'text-white'
@@ -342,8 +342,8 @@ export default function Sidebar() {
           </p>
         )}
         <button
-          onClick={toggleSidebar}
-          className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs transition-all hover:bg-white/[0.08]"
+          aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'} onClick={toggleSidebar}
+          className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs transition-colors hover:bg-white/[0.08]"
           style={{
             border: '1px solid rgba(255,255,255,0.09)',
             color: 'rgba(255,255,255,0.45)',
@@ -368,7 +368,7 @@ export default function Sidebar() {
           onMouseDown={handleMouseDown}
         >
           <div
-            className="absolute right-0 top-0 h-full w-px transition-all duration-150 group-hover:w-[2px]"
+            className="absolute right-0 top-0 h-full w-px transition-colors duration-150 group-hover:w-[2px]"
             style={{ background: 'rgba(255,255,255,0.06)' }}
           />
         </div>

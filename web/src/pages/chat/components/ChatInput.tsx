@@ -54,7 +54,7 @@ export default function ChatInput({
     <div className="relative">
       <div
         className={cn(
-          'relative rounded-2xl border bg-white transition-all duration-200',
+          'relative rounded-2xl border bg-white transition-colors duration-200',
           isFocused
             ? deepThinking
               ? 'border-[#A78BFA] shadow-[0_0_0_3px_rgba(167,139,250,0.25)]'
@@ -97,7 +97,7 @@ export default function ChatInput({
                 type="button"
                 onClick={() => onDeepThinkingChange(!deepThinking)}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 active:scale-95',
+                  'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-200 active:scale-95',
                   deepThinking
                     ? 'bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white shadow-[0_2px_10px_rgba(99,102,241,0.40)]'
                     : 'bg-[#F3F4F6] text-[#9CA3AF] hover:bg-[#E9EAEC] hover:text-[#6B7280]',
@@ -118,7 +118,7 @@ export default function ChatInput({
                 type="button"
                 onClick={() => onWebSearchChange(!webSearch)}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 active:scale-95',
+                  'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-200 active:scale-95',
                   webSearch
                     ? 'bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white shadow-[0_2px_10px_rgba(99,102,241,0.40)]'
                     : 'bg-[#F3F4F6] text-[#9CA3AF] hover:bg-[#E9EAEC] hover:text-[#6B7280]',
@@ -140,8 +140,8 @@ export default function ChatInput({
             <div className="relative group/upload">
               <button
                 type="button"
-                onClick={() => setUploadModalOpen(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#6B7280] transition-all duration-150 hover:bg-[#E5E7EB] hover:text-[#374151]"
+                aria-label="上传文件到知识库" onClick={() => setUploadModalOpen(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#6B7280] transition-colors duration-150 hover:bg-[#E5E7EB] hover:text-[#374151]"
               >
                 <Paperclip className="h-4 w-4" />
               </button>
@@ -155,10 +155,10 @@ export default function ChatInput({
             <div className="relative group/send">
               <button
                 type="button"
-                onClick={() => onSend()}
+                aria-label="发送消息" onClick={() => onSend()}
                 disabled={!hasContent || isLoading}
                 className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150',
+                  'flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-150',
                   isLoading
                     ? 'bg-[#6366F1]/70 text-white cursor-not-allowed'
                     : hasContent

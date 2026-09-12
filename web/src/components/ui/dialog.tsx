@@ -15,7 +15,7 @@ export function DialogContent({ className, children, onOpenAutoFocus, onCloseAut
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
       <DialogPrimitive.Content
         {...props}
-        className={cn('fixed left-1/2 top-1/2 z-50 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-xl', className)}
+        className={cn('fixed left-1/2 top-1/2 z-50 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-2xl bg-white p-6 shadow-xl', className)}
         onOpenAutoFocus={event => {
           opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
           onOpenAutoFocus?.(event)

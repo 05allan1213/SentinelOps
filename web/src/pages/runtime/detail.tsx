@@ -1,7 +1,7 @@
 import RuntimeQueryError from './components/RuntimeQueryError'
 import RuntimeResourcePagination from './components/RuntimeResourcePagination'
 import { Component, useCallback, useMemo, useState, type ReactNode } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, RefreshCw, RotateCcw, ShieldAlert, Wifi, WifiOff } from 'lucide-react'
 import { useRuntimeRun, useRuntimeTimeline } from '@/hooks/useRuntimeQueries'
 import { useRuntimeEventTail } from '@/hooks/useRuntimeEventTail'
@@ -52,7 +52,6 @@ const PLACEHOLDER_LABEL: Record<Exclude<RuntimeDetailTab, 'overview' | 'timeline
 
 function RuntimeRunDetailPage({ runId }: { runId: string }) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
   const role = useAuthStore(state => state.role)
   const [recoveryAction, setRecoveryAction] = useState<RecoveryAction | null>(null)
   const [operationOverride, setOperationOverride] = useState('')
@@ -94,14 +93,13 @@ function RuntimeRunDetailPage({ runId }: { runId: string }) {
     <div className="flex flex-col gap-4 pb-8 min-w-0 max-w-[1440px]">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <button
-            type="button"
-            onClick={() => navigate('/runtime/runs')}
+          <Link
+            to="/runtime/runs"
             className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition-colors duration-150"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             返回 Runs
-          </button>
+          </Link>
           <h1 className="mt-1 text-xl font-semibold text-gray-900 tracking-tight break-all">Run {runId || '—'}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <RuntimeStatusBadge status={run?.summary?.status} phase={run?.summary?.current_phase} />
@@ -150,6 +148,7 @@ function RuntimeRunDetailPage({ runId }: { runId: string }) {
         <RunDetailTabs active={tab} onChange={onTabChange} />
       </PanelBoundary>
 
+      <section id="runtime-tab-panel" role="tabpanel" aria-labelledby={`runtime-tab-${tab}`} tabIndex={0} className="min-w-0">
       {tab === 'overview' && (
         <PanelBoundary>
           {runQuery.isLoading && !run ? (
@@ -257,6 +256,7 @@ function RuntimeRunDetailPage({ runId }: { runId: string }) {
           )}
         </PanelBoundary>
       )}
+      </section>
     </div>
   )
 }

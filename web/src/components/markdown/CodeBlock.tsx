@@ -1,5 +1,5 @@
 import { Check, Copy } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { cn } from '@/utils'
 
@@ -14,15 +14,21 @@ export interface CodeBlockProps {
 
 export default function CodeBlock({ code, language, streaming = false, children }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(timer.current), [])
   const normalizedLanguage = normalizeLanguage(language)
   const skipReason = highlightSkipReason(code, language, streaming)
 
   const copyCode = async () => {
     try {
       await navigator.clipboard.writeText(code)
+      setCopyError(false)
       setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => setCopied(false), 1500)
     } catch {
+      setCopyError(true)
       setCopied(false)
     }
   }
@@ -48,10 +54,11 @@ export default function CodeBlock({ code, language, streaming = false, children 
           )}
         >
           {copied ? <Check aria-hidden="true" className="h-3.5 w-3.5" /> : <Copy aria-hidden="true" className="h-3.5 w-3.5" />}
-          <span>{copied ? '已复制' : '复制'}</span>
+          <span aria-live="polite">{copied ? '已复制' : '复制'}</span>
         </button>
       </div>
-      <pre className="max-w-full overflow-x-auto p-4 text-sm leading-6">
+      {copyError && <p role="status" className="px-3 py-1 text-xs text-amber-200">复制失败，请选择代码手动复制。</p>}
+      <pre tabIndex={0} role="region" aria-label="代码内容" className="max-w-full overflow-x-auto p-4 text-sm leading-6">
         <code className="font-mono">{skipReason === undefined ? (children ?? code) : code}</code>
       </pre>
     </div>

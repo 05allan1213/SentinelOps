@@ -180,3 +180,11 @@ describe('MarkdownRenderer', () => {
     error.mockRestore()
   })
 })
+
+test('clipboard denial is visible and keyboard code region remains usable', async () => {
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } })
+  render(<MarkdownRenderer content={'```go\nfmt.Println("retained")\n```'} />)
+  fireEvent.click(screen.getByRole('button', { name: '复制代码' }))
+  expect(await screen.findByRole('status')).toHaveTextContent('复制失败')
+  expect(screen.getByRole('region', { name: '代码内容' })).toHaveAttribute('tabindex', '0')
+})

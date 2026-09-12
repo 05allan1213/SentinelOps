@@ -1,6 +1,8 @@
 import { runtimeLocalTimestamp } from '@/services/runtime'
 import { Search, RotateCcw } from 'lucide-react'
-import CustomSelect from '@/components/common/CustomSelect'
+function RuntimeFilterSelect({ value, onChange, options, placeholder, className }: { value: string; onChange: (value: string) => void; options: { value: string | number; label: string }[]; placeholder: string; className?: string }) {
+  return <select aria-label={placeholder} name={placeholder} value={value} onChange={event => onChange(event.target.value)} className={cn('h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700', className)}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+}
 import { cn } from '@/utils'
 import type { RuntimeStatus } from '@/types/runtime'
 
@@ -62,7 +64,7 @@ export default function RuntimeRunFilters({ filters, onChange, onReset, disabled
     >
       <div className="flex items-center gap-2">
         <Search className="w-4 h-4 text-gray-400" />
-        <CustomSelect
+        <RuntimeFilterSelect
           value={filters.status}
           onChange={value => onChange({ status: value as RuntimeStatus | '' })}
           options={STATUS_OPTIONS}
@@ -71,48 +73,48 @@ export default function RuntimeRunFilters({ filters, onChange, onReset, disabled
         />
       </div>
       <input
-        aria-label="Session ID"
+        name="Session ID" autoComplete="off" aria-label="Session ID"
         className={cn(inputClass, 'w-[190px]')}
         placeholder="Session ID"
         value={filters.session_id}
         onChange={event => onChange({ session_id: event.target.value })}
       />
       <input
-        aria-label="Agent"
+        name="Agent" autoComplete="off" aria-label="Agent"
         className={cn(inputClass, 'w-[150px]')}
         placeholder="Agent"
         value={filters.agent}
         onChange={event => onChange({ agent: event.target.value })}
       />
       <input
-        aria-label="Scope"
+        name="Scope" autoComplete="off" aria-label="Scope"
         className={cn(inputClass, 'w-[130px]')}
         placeholder="Scope"
         value={filters.scope}
         onChange={event => onChange({ scope: event.target.value })}
       />
       <input
-        aria-label="开始时间"
+        name="开始时间" autoComplete="off" aria-label="开始时间"
         type="datetime-local"
         className={cn(inputClass, 'w-[190px]')}
         value={runtimeLocalTimestamp(filters.from)}
         onChange={event => onChange({ from: event.target.value })}
       />
       <input
-        aria-label="结束时间"
+        name="结束时间" autoComplete="off" aria-label="结束时间"
         type="datetime-local"
         className={cn(inputClass, 'w-[190px]')}
         value={runtimeLocalTimestamp(filters.to)}
         onChange={event => onChange({ to: event.target.value })}
       />
-      <CustomSelect
+      <RuntimeFilterSelect
         value={filters.sort}
         onChange={value => onChange({ sort: value })}
         options={SORT_OPTIONS}
         placeholder="排序"
         className="w-[130px]"
       />
-      <CustomSelect
+      <RuntimeFilterSelect
         value={filters.direction}
         onChange={value => onChange({ direction: value })}
         options={DIRECTION_OPTIONS}

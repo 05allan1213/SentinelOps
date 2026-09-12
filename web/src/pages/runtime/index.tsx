@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { Activity, AlertTriangle, Inbox, RefreshCw, ServerCrash } from 'lucide-react'
 import Pagination from '@/components/common/Pagination'
 import StatCard from '@/components/common/StatCard'
@@ -47,7 +47,6 @@ function toQueryParams(searchParams: URLSearchParams): ListRunsParams {
 
 export default function RuntimeRunsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
   const params = useMemo(() => toQueryParams(searchParams), [searchParams])
   const query = useRuntimeRuns(params)
   const filters = useMemo(() => parseFilters(searchParams), [searchParams])
@@ -152,7 +151,7 @@ export default function RuntimeRunsPage() {
           <p className="mt-1 text-xs text-gray-500">{reason ? `reason_code: ${reason}` : '服务端未提供可用数据'}</p>
         </div>
       ) : (
-        <RuntimeRunsTable data={data ?? { items: [], availability: 'unavailable', data_quality: 'unknown' }} onSelectRun={runId => navigate(`/runtime/runs/${runId}`)} loading={query.isLoading || (query.isFetching && !data)} />
+        <RuntimeRunsTable data={data ?? { items: [], availability: 'unavailable', data_quality: 'unknown' }} loading={query.isLoading || (query.isFetching && !data)} />
       )}
 
       <div className="flex items-center justify-between gap-4">

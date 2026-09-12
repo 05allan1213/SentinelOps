@@ -16,6 +16,18 @@ export default function RunDetailTabs({ active, onChange }: Props) {
             key={tab.id}
             role="tab"
             type="button"
+            id={`runtime-tab-${tab.id}`}
+            aria-controls="runtime-tab-panel"
+            tabIndex={selected ? 0 : -1}
+            onKeyDown={event => {
+              const index = RUNTIME_DETAIL_TABS.findIndex(item => item.id === tab.id)
+              const next = event.key === 'Home' ? 0 : event.key === 'End' ? RUNTIME_DETAIL_TABS.length - 1 : event.key === 'ArrowRight' ? (index + 1) % RUNTIME_DETAIL_TABS.length : event.key === 'ArrowLeft' ? (index - 1 + RUNTIME_DETAIL_TABS.length) % RUNTIME_DETAIL_TABS.length : -1
+              if (next < 0) return
+              event.preventDefault()
+              const target = RUNTIME_DETAIL_TABS[next].id
+              onChange(target)
+              document.getElementById(`runtime-tab-${target}`)?.focus()
+            }}
             aria-selected={selected}
             data-testid="runtime-detail-tab"
             data-tab={tab.id}

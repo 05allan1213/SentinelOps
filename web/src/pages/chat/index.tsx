@@ -806,7 +806,7 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
                 <button
                   type="button"
                   onClick={onCancelEdit}
-                  className="px-4 py-2 text-xs font-medium text-white/95 hover:text-white border border-white/30 hover:border-white/50 hover:bg-white/15 rounded-full transition-all duration-200 active:scale-[0.98]"
+                  className="px-4 py-2 text-xs font-medium text-white/95 hover:text-white border border-white/30 hover:border-white/50 hover:bg-white/15 rounded-full transition-colors duration-200 active:scale-[0.98]"
                 >
                   取消
                 </button>
@@ -814,7 +814,7 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
                   type="button"
                   onClick={() => onSaveEdit(messageIndex)}
                   disabled={!editingContent.trim()}
-                  className="px-4 py-2 text-xs font-medium text-indigo-600 bg-white hover:bg-indigo-50 shadow-sm hover:shadow rounded-full transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:hover:bg-white disabled:hover:shadow-sm disabled:cursor-not-allowed disabled:active:scale-100"
+                  className="px-4 py-2 text-xs font-medium text-indigo-600 bg-white hover:bg-indigo-50 shadow-sm hover:shadow rounded-full transition-colors duration-200 active:scale-[0.98] disabled:opacity-40 disabled:hover:bg-white disabled:hover:shadow-sm disabled:cursor-not-allowed disabled:active:scale-100"
                 >
                   发送
                 </button>
@@ -836,7 +836,7 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
                 <div className="relative group/copy">
                   <button
                     type="button"
-                    onClick={handleCopy}
+                    aria-label={copied ? '已复制消息' : '复制消息'} onClick={handleCopy}
                     className="p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                   >
                     {copied ? (
@@ -853,7 +853,7 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
                 <div className="relative group/edit">
                   <button
                     type="button"
-                    onClick={() => onStartEdit(messageIndex, message.content)}
+                    aria-label="编辑消息" onClick={() => onStartEdit(messageIndex, message.content)}
                     className={cn(
                       'p-1.5 rounded-full text-gray-500 transition-colors',
                       'hover:bg-indigo-50 hover:text-indigo-600',
@@ -952,7 +952,7 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
               <div className="flex items-center gap-1">
                 <div className="relative group/like">
                   <button
-                    onClick={() => onVote(messageIndex, 1)}
+                    aria-label="有帮助" onClick={() => onVote(messageIndex, 1)}
                     className={cn(
                       'p-1.5 rounded-full hover:bg-emerald-50 transition-colors',
                       vote === 1 ? 'text-emerald-600' : 'text-gray-500 hover:text-emerald-500',
@@ -966,7 +966,7 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
                   </div>
                 </div>
                 <div className="relative" ref={reasonPickerRef}>
-                  <button
+                  <button aria-label="没帮助"
                     onClick={() => {
                       if (vote === -1) { onVote(messageIndex, -1); setShowReasonPicker(false); setSelectedReasons([]) }
                       else { onVote(messageIndex, -1); setShowReasonPicker(true) }

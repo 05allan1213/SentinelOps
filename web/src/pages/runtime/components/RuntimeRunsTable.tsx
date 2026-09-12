@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Bot } from 'lucide-react'
 import { cn } from '@/utils'
 import RuntimeStatusBadge from './RuntimeStatusBadge'
@@ -6,7 +7,6 @@ import type { ListRunsRes, RunSummaryDTO } from '@/types/runtime'
 
 interface Props {
   data: ListRunsRes
-  onSelectRun: (runId: string) => void
   loading: boolean
 }
 
@@ -42,7 +42,7 @@ const budgetSummary = (run: RunSummaryDTO) => {
   return { text: `M${model} / T${tool}`, title: '模型调用 / 工具调用' }
 }
 
-export default function RuntimeRunsTable({ data, onSelectRun, loading }: Props) {
+export default function RuntimeRunsTable({ data, loading }: Props) {
   const items = data.items ?? []
 
   return (
@@ -84,14 +84,11 @@ export default function RuntimeRunsTable({ data, onSelectRun, loading }: Props) 
                 key={run.run_id}
                 data-testid="runtime-run-row"
                 data-run-id={run.run_id}
-                tabIndex={0}
-                onClick={() => onSelectRun(run.run_id)}
-                onKeyDown={event => { if (event.key === 'Enter') onSelectRun(run.run_id) }}
                 className="border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-indigo-50/40 focus:outline-none focus:bg-indigo-50/40 transition-colors duration-150"
               >
                 <td className="px-3 py-2.5 font-mono text-xs text-gray-900">
                   <span className="inline-flex items-center gap-2 min-w-0">
-                    <span className="truncate max-w-[190px]" title={run.run_id}>{run.run_id}</span>
+                    <Link to={`/runtime/runs/${encodeURIComponent(run.run_id)}`} className="block truncate max-w-[190px] text-indigo-700 underline underline-offset-2" title={run.run_id}>{run.run_id}</Link>
                     {legacy && (
                       <span data-testid="runtime-legacy-chip" className="shrink-0 rounded border border-gray-300 bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600">
                         仅历史记录

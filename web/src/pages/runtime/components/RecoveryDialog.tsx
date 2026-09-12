@@ -99,7 +99,7 @@ export default function RecoveryDialog({ run, action, open, onClose, onAccepted 
             <span className="text-xs font-medium text-gray-700">理由（必填）</span>
             <textarea
               ref={reasonRef}
-              aria-label="恢复理由"
+              name="reason" autoComplete="off" aria-label="恢复理由"
               required
               disabled={pending}
               value={reason}
@@ -112,7 +112,7 @@ export default function RecoveryDialog({ run, action, open, onClose, onAccepted 
           <label className="block">
             <span className="text-xs font-medium text-gray-700">期望 Generation（必填）</span>
             <input
-              aria-label="期望 Generation"
+              name="expected_generation" autoComplete="off" spellCheck={false} aria-label="期望 Generation"
               required
               disabled={pending}
               value={generation}
@@ -125,7 +125,7 @@ export default function RecoveryDialog({ run, action, open, onClose, onAccepted 
             <label className="block">
               <span className="text-xs font-medium text-gray-700">期望兼容性哈希（Restore 必填）</span>
               <input
-                aria-label="期望兼容性哈希"
+                name="expected_compatibility_hash" autoComplete="off" spellCheck={false} aria-label="期望兼容性哈希"
                 required
                 disabled={pending}
                 value={compatibility}

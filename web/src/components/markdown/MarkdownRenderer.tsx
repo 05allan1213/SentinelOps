@@ -115,7 +115,7 @@ const components: Components = {
     </CodeBlock>
   },
   code: ({ node, children }) => <code className={node?.data?.markdownCode !== undefined ? undefined : 'rounded bg-gray-100 px-1 py-0.5 font-mono text-[0.9em] [overflow-wrap:anywhere] dark:bg-gray-800'}>{children}</code>,
-  table: ({ children }) => <div className="my-3 min-w-0 max-w-full overflow-x-auto" data-testid="markdown-table-scroll"><table className="w-full border-collapse text-left text-sm">{children}</table></div>,
+  table: ({ children }) => <div tabIndex={0} role="region" aria-label="Markdown 表格" className="my-3 min-w-0 max-w-full overflow-x-auto" data-testid="markdown-table-scroll"><table className="w-full border-collapse text-left text-sm">{children}</table></div>,
   thead: ({ children }) => <thead className="bg-gray-50 dark:bg-gray-800">{children}</thead>,
   tbody: ({ children }) => <tbody>{children}</tbody>,
   tr: ({ children }) => <tr className="border-b border-gray-200 dark:border-gray-700">{children}</tr>,

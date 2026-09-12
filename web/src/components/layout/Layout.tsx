@@ -11,12 +11,13 @@ export default function Layout() {
 
   return (
     <div className="h-screen overflow-hidden bg-[#F3F4F6]">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:text-indigo-800">跳到主要内容</a>
       <Sidebar />
       <div
         className="flex flex-col h-full transition-[margin] duration-300"
         style={{ marginLeft: sidebarCollapsed ? '72px' : `${sidebarWidth}px` }}
       >
-        <main data-surface={location.pathname.startsWith('/runtime/') ? 'runtime' : location.pathname === '/chat' ? 'chat' : undefined} className="flex-1 min-w-0 min-h-0 relative overflow-y-auto p-8">
+        <main id="main-content" tabIndex={-1} data-surface={location.pathname.startsWith('/runtime/') ? 'runtime' : location.pathname === '/chat' ? 'chat' : undefined} className="flex-1 min-w-0 min-h-0 relative overflow-y-auto p-8">
           <RouteContent key={location.pathname}><Outlet /></RouteContent>
         </main>
       </div>

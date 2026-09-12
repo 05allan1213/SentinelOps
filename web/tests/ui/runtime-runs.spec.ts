@@ -78,8 +78,7 @@ for (const width of [1280, 1440]) {
     await expect(page.getByTestId('runtime-legacy-chip')).toHaveCount(1)
 
     // URL filter synchronisation: status select then a session filter.
-    await page.getByRole('button', { name: '全部状态' }).click()
-    await page.getByRole('button', { name: '已搁置' }).click()
+    await page.getByRole('combobox', { name: '状态', exact: true }).selectOption('parked')
     await expect.poll(() => new URL(page.url()).searchParams.get('status')).toBe('parked')
     await expect.poll(() => requests.some(url => url.includes('status=parked'))).toBe(true)
 
@@ -136,7 +135,7 @@ test('row selection navigates to the frozen detail route without claiming succes
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.goto('/runtime/runs')
   await expect(page.locator('[data-testid="runtime-status-badge"][data-status="reconciling"]')).toHaveAttribute('data-tone', 'attention')
-  await page.getByTestId('runtime-run-row').click()
+  await page.getByTestId('runtime-run-row').getByRole('link').click()
   await expect.poll(() => new URL(page.url()).pathname).toBe('/runtime/runs/run-open')
 })
 
