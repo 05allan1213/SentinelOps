@@ -1,5 +1,0 @@
-WARNING: sonic/ast only supports (go1.17~1.26 and amd64 CPU) or (go1.20~1.26 and arm64 CPU), but your environment is not suitable and will fallback to encoding/json
-2026-09-11T19:42:37.433+08:00 [INFO] [Rule] 已加载 100 条术语规则
-2026-09-11T19:42:37.649+08:00 [INFO] [Rerank] client initialized | model=qwen3-rerank | baseURL=https://dashscope.aliyuncs.com/compatible-api/v1
-2026-09-11T19:42:37.665+08:00 [INFO] [knowledge] Worker Pool 已启动，workers=3，队列容量=1000
-2026/09/11 19:42:37 [scheduler] 启动完成：已注册 0 个订阅

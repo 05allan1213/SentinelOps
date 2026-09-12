@@ -1,5 +1,0 @@
-?   	SentinelOps/api/runtime	[no test files]
-ok  	SentinelOps/api/runtime/v1	0.110s
-ok  	SentinelOps/internal/service/runtime	1.818s
-ok  	SentinelOps/internal/controller/runtime	0.115s
-ok  	SentinelOps/internal/dao/mysql	62.052s
