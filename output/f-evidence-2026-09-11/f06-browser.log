@@ -1,0 +1,882 @@
+npm notice run sentinelops-web@1.0.0 npx
+npm notice run 'playwright' test tests/ui/chat-reconnect.spec.ts tests/ui/runtime-sse.spec.ts tests/ui/rag-eval-resilience.spec.ts tests/smoke/current-ui.spec.ts --workers=1
+
+Running 26 tests using 1 worker
+
+(node:62716) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/26] [chromium] › tests/smoke/current-ui.spec.ts:29:1 › 未认证访问受保护路由时保留登录语义
+  1) [chromium] › tests/smoke/current-ui.spec.ts:29:1 › 未认证访问受保护路由时保留登录语义 ──────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/dashboard
+    Call log:
+      - navigating to "http://127.0.0.1:5173/dashboard", waiting until "load"
+
+
+      30 |   const runtimeErrors = captureRuntimeErrors(page)
+      31 |
+    > 32 |   await page.goto('/dashboard')
+         |              ^
+      33 |
+      34 |   await expect(page).toHaveURL(/\/login$/)
+      35 |   await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
+        at /home/monody/project/SentinelOps/web/tests/smoke/current-ui.spec.ts:32:14
+
+    Error Context: test-results/smoke-current-ui-未认证访问受保护路由时保留登录语义-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-current-ui-未认证访问受保护路由时保留登录语义-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-current-ui-未认证访问受保护路由时保留登录语义-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:62851) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[2/26] [chromium] › tests/smoke/current-ui.spec.ts:40:1 › 关键路由可达且主布局保持渲染
+  2) [chromium] › tests/smoke/current-ui.spec.ts:40:1 › 关键路由可达且主布局保持渲染 ─────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/dashboard
+    Call log:
+      - navigating to "http://127.0.0.1:5173/dashboard", waiting until "load"
+
+
+      43 |
+      44 |   for (const route of protectedRoutes) {
+    > 45 |     await page.goto(route)
+         |                ^
+      46 |     await expect(page).toHaveURL(new RegExp(`${route.replace('/', '\\/')}$`))
+      47 |     await expect(page.getByText('Security Console', { exact: true })).toBeVisible()
+      48 |     await expect(page.locator('main')).toBeVisible()
+        at /home/monody/project/SentinelOps/web/tests/smoke/current-ui.spec.ts:45:16
+
+    Error Context: test-results/smoke-current-ui-关键路由可达且主布局保持渲染-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-current-ui-关键路由可达且主布局保持渲染-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-current-ui-关键路由可达且主布局保持渲染-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:62950) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[3/26] [chromium] › tests/smoke/current-ui.spec.ts:56:1 › dark class 继续驱动暗色 variant
+  3) [chromium] › tests/smoke/current-ui.spec.ts:56:1 › dark class 继续驱动暗色 variant ──────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/events/analysis
+    Call log:
+      - navigating to "http://127.0.0.1:5173/events/analysis", waiting until "load"
+
+
+      58 |   await installAuthenticatedFixture(page, true)
+      59 |
+    > 60 |   await page.goto('/events/analysis')
+         |              ^
+      61 |
+      62 |   await expect(page.locator('html')).toHaveClass(/dark/)
+      63 |   const thinkingHeader = page.getByText('思考链路', { exact: true }).locator('..')
+        at /home/monody/project/SentinelOps/web/tests/smoke/current-ui.spec.ts:60:14
+
+    Error Context: test-results/smoke-current-ui-dark-class-继续驱动暗色-variant-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-current-ui-dark-class-继续驱动暗色-variant-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-current-ui-dark-class-继续驱动暗色-variant-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:63054) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[4/26] [chromium] › tests/ui/chat-reconnect.spec.ts:52:3 › dedupe, disconnect, reload and deliberate next turn at 1280px
+  4) [chromium] › tests/ui/chat-reconnect.spec.ts:52:3 › dedupe, disconnect, reload and deliberate next turn at 1280px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:54:21
+
+    Error Context: test-results/ui-chat-reconnect-dedupe-d-20c3b-iberate-next-turn-at-1280px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-dedupe-d-20c3b-iberate-next-turn-at-1280px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-dedupe-d-20c3b-iberate-next-turn-at-1280px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:63246) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[5/26] [chromium] › tests/ui/chat-reconnect.spec.ts:97:3 › preserves body and actionable error; retry only tails and cleanup at 1280px
+  5) [chromium] › tests/ui/chat-reconnect.spec.ts:97:3 › preserves body and actionable error; retry only tails and cleanup at 1280px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:99:21
+
+    Error Context: test-results/ui-chat-reconnect-preserve-13891-tails-and-cleanup-at-1280px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-preserve-13891-tails-and-cleanup-at-1280px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-preserve-13891-tails-and-cleanup-at-1280px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:63346) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[6/26] [chromium] › tests/ui/chat-reconnect.spec.ts:126:3 › server recovery states and DONE-only reload stay truthful at 1280px
+  6) [chromium] › tests/ui/chat-reconnect.spec.ts:126:3 › server recovery states and DONE-only reload stay truthful at 1280px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:128:21
+
+    Error Context: test-results/ui-chat-reconnect-server-r-6c647-oad-stay-truthful-at-1280px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-server-r-6c647-oad-stay-truthful-at-1280px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-server-r-6c647-oad-stay-truthful-at-1280px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:63449) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[7/26] [chromium] › tests/ui/chat-reconnect.spec.ts:150:3 › accepted create after session switch retains its own identity at 1280px
+  7) [chromium] › tests/ui/chat-reconnect.spec.ts:150:3 › accepted create after session switch retains its own identity at 1280px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:152:5
+
+    Error Context: test-results/ui-chat-reconnect-accepted-83466--its-own-identity-at-1280px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-accepted-83466--its-own-identity-at-1280px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-accepted-83466--its-own-identity-at-1280px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:63874) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[8/26] [chromium] › tests/ui/chat-reconnect.spec.ts:180:3 › switch back before create returns joins one request at 1280px
+  8) [chromium] › tests/ui/chat-reconnect.spec.ts:180:3 › switch back before create returns joins one request at 1280px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:182:5
+
+    Error Context: test-results/ui-chat-reconnect-switch-b-64374-joins-one-request-at-1280px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-switch-b-64374-joins-one-request-at-1280px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-switch-b-64374-joins-one-request-at-1280px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:64005) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[9/26] [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged first turn stays uncertain through switch and reload at 1280px
+  9) [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged first turn stays uncertain through switch and reload at 1280px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:209:7
+
+    Error Context: test-results/ui-chat-reconnect-unacknow-080e3-switch-and-reload-at-1280px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-unacknow-080e3-switch-and-reload-at-1280px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-unacknow-080e3-switch-and-reload-at-1280px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:64133) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[10/26] [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged next turn stays uncertain through switch and reload at 1280px
+  10) [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged next turn stays uncertain through switch and reload at 1280px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:209:7
+
+    Error Context: test-results/ui-chat-reconnect-unacknow-599dd-switch-and-reload-at-1280px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-unacknow-599dd-switch-and-reload-at-1280px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-unacknow-599dd-switch-and-reload-at-1280px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:64222) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[11/26] [chromium] › tests/ui/chat-reconnect.spec.ts:237:3 › legacy pending snapshot stays uncertain after restore at 1280px
+  11) [chromium] › tests/ui/chat-reconnect.spec.ts:237:3 › legacy pending snapshot stays uncertain after restore at 1280px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:239:21
+
+    Error Context: test-results/ui-chat-reconnect-legacy-p-69c25-ain-after-restore-at-1280px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-legacy-p-69c25-ain-after-restore-at-1280px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-legacy-p-69c25-ain-after-restore-at-1280px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:64341) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[12/26] [chromium] › tests/ui/chat-reconnect.spec.ts:258:3 › upload preserves the accepted snapshot before the render frame at 1280px
+  12) [chromium] › tests/ui/chat-reconnect.spec.ts:258:3 › upload preserves the accepted snapshot before the render frame at 1280px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:260:5
+
+    Error Context: test-results/ui-chat-reconnect-upload-p-cde04--the-render-frame-at-1280px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-upload-p-cde04--the-render-frame-at-1280px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-upload-p-cde04--the-render-frame-at-1280px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:64449) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[13/26] [chromium] › tests/ui/chat-reconnect.spec.ts:52:3 › dedupe, disconnect, reload and deliberate next turn at 1440px
+  13) [chromium] › tests/ui/chat-reconnect.spec.ts:52:3 › dedupe, disconnect, reload and deliberate next turn at 1440px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:54:21
+
+    Error Context: test-results/ui-chat-reconnect-dedupe-d-9d35b-iberate-next-turn-at-1440px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-dedupe-d-9d35b-iberate-next-turn-at-1440px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-dedupe-d-9d35b-iberate-next-turn-at-1440px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:64545) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[14/26] [chromium] › tests/ui/chat-reconnect.spec.ts:97:3 › preserves body and actionable error; retry only tails and cleanup at 1440px
+  14) [chromium] › tests/ui/chat-reconnect.spec.ts:97:3 › preserves body and actionable error; retry only tails and cleanup at 1440px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:99:21
+
+    Error Context: test-results/ui-chat-reconnect-preserve-956d4-tails-and-cleanup-at-1440px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-preserve-956d4-tails-and-cleanup-at-1440px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-preserve-956d4-tails-and-cleanup-at-1440px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:64645) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[15/26] [chromium] › tests/ui/chat-reconnect.spec.ts:126:3 › server recovery states and DONE-only reload stay truthful at 1440px
+  15) [chromium] › tests/ui/chat-reconnect.spec.ts:126:3 › server recovery states and DONE-only reload stay truthful at 1440px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:128:21
+
+    Error Context: test-results/ui-chat-reconnect-server-r-11609-oad-stay-truthful-at-1440px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-server-r-11609-oad-stay-truthful-at-1440px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-server-r-11609-oad-stay-truthful-at-1440px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:64760) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[16/26] [chromium] › tests/ui/chat-reconnect.spec.ts:150:3 › accepted create after session switch retains its own identity at 1440px
+  16) [chromium] › tests/ui/chat-reconnect.spec.ts:150:3 › accepted create after session switch retains its own identity at 1440px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:152:5
+
+    Error Context: test-results/ui-chat-reconnect-accepted-d849a--its-own-identity-at-1440px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-accepted-d849a--its-own-identity-at-1440px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-accepted-d849a--its-own-identity-at-1440px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:64893) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[17/26] [chromium] › tests/ui/chat-reconnect.spec.ts:180:3 › switch back before create returns joins one request at 1440px
+  17) [chromium] › tests/ui/chat-reconnect.spec.ts:180:3 › switch back before create returns joins one request at 1440px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:182:5
+
+    Error Context: test-results/ui-chat-reconnect-switch-b-21913-joins-one-request-at-1440px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-switch-b-21913-joins-one-request-at-1440px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-switch-b-21913-joins-one-request-at-1440px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:65108) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[18/26] [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged first turn stays uncertain through switch and reload at 1440px
+  18) [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged first turn stays uncertain through switch and reload at 1440px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:209:7
+
+    Error Context: test-results/ui-chat-reconnect-unacknow-5c4a4-switch-and-reload-at-1440px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-unacknow-5c4a4-switch-and-reload-at-1440px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-unacknow-5c4a4-switch-and-reload-at-1440px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:65208) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[19/26] [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged next turn stays uncertain through switch and reload at 1440px
+  19) [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged next turn stays uncertain through switch and reload at 1440px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:209:7
+
+    Error Context: test-results/ui-chat-reconnect-unacknow-c31dc-switch-and-reload-at-1440px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-unacknow-c31dc-switch-and-reload-at-1440px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-unacknow-c31dc-switch-and-reload-at-1440px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:65302) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[20/26] [chromium] › tests/ui/chat-reconnect.spec.ts:237:3 › legacy pending snapshot stays uncertain after restore at 1440px
+  20) [chromium] › tests/ui/chat-reconnect.spec.ts:237:3 › legacy pending snapshot stays uncertain after restore at 1440px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:239:21
+
+    Error Context: test-results/ui-chat-reconnect-legacy-p-6c514-ain-after-restore-at-1440px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-legacy-p-6c514-ain-after-restore-at-1440px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-legacy-p-6c514-ain-after-restore-at-1440px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:65408) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[21/26] [chromium] › tests/ui/chat-reconnect.spec.ts:258:3 › upload preserves the accepted snapshot before the render frame at 1440px
+  21) [chromium] › tests/ui/chat-reconnect.spec.ts:258:3 › upload preserves the accepted snapshot before the render frame at 1440px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/chat
+    Call log:
+      - navigating to "http://127.0.0.1:5173/chat", waiting until "load"
+
+
+      42 |     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'OK', data }) })
+      43 |   })
+    > 44 |   await page.goto('/chat')
+         |              ^
+      45 |   return creates
+      46 | }
+      47 | async function send(page: Page, query = 'Inspect a controlled workflow') {
+        at setup (/home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:44:14)
+        at /home/monody/project/SentinelOps/web/tests/ui/chat-reconnect.spec.ts:260:5
+
+    Error Context: test-results/ui-chat-reconnect-upload-p-c74f2--the-render-frame-at-1440px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-chat-reconnect-upload-p-c74f2--the-render-frame-at-1440px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-chat-reconnect-upload-p-c74f2--the-render-frame-at-1440px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:65495) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[22/26] [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles null
+  22) [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles null ───────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/rag-eval
+    Call log:
+      - navigating to "http://127.0.0.1:5173/rag-eval", waiting until "load"
+
+
+      10 |     await page.route('**/api/**', route => route.fulfill({ json: { data: { list: [], recent: [], total: 0 } } }))
+      11 |     await page.route('**/api/rageval/v1/dashboard**', route => route.fulfill({ status: value === '404' ? 404 : 200, json: { data: value } }))
+    > 12 |     await page.goto('/rag-eval')
+         |                ^
+      13 |     await expect(page.getByTestId('rag-dashboard-state')).toContainText('不可用')
+      14 |     await expect(page.locator('html')).not.toHaveClass(/dark/)
+      15 |     expect(errors).toEqual([])
+        at /home/monody/project/SentinelOps/web/tests/ui/rag-eval-resilience.spec.ts:12:16
+
+    Error Context: test-results/ui-rag-eval-resilience-RAG-dashboard-handles-null-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-rag-eval-resilience-RAG-dashboard-handles-null-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-rag-eval-resilience-RAG-dashboard-handles-null-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:65592) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[23/26] [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles {}
+  23) [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles {} ─────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/rag-eval
+    Call log:
+      - navigating to "http://127.0.0.1:5173/rag-eval", waiting until "load"
+
+
+      10 |     await page.route('**/api/**', route => route.fulfill({ json: { data: { list: [], recent: [], total: 0 } } }))
+      11 |     await page.route('**/api/rageval/v1/dashboard**', route => route.fulfill({ status: value === '404' ? 404 : 200, json: { data: value } }))
+    > 12 |     await page.goto('/rag-eval')
+         |                ^
+      13 |     await expect(page.getByTestId('rag-dashboard-state')).toContainText('不可用')
+      14 |     await expect(page.locator('html')).not.toHaveClass(/dark/)
+      15 |     expect(errors).toEqual([])
+        at /home/monody/project/SentinelOps/web/tests/ui/rag-eval-resilience.spec.ts:12:16
+
+    Error Context: test-results/ui-rag-eval-resilience-RAG-dashboard-handles--chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-rag-eval-resilience-RAG-dashboard-handles--chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-rag-eval-resilience-RAG-dashboard-handles--chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:65725) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[24/26] [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles "404"
+  24) [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles "404" ──────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/rag-eval
+    Call log:
+      - navigating to "http://127.0.0.1:5173/rag-eval", waiting until "load"
+
+
+      10 |     await page.route('**/api/**', route => route.fulfill({ json: { data: { list: [], recent: [], total: 0 } } }))
+      11 |     await page.route('**/api/rageval/v1/dashboard**', route => route.fulfill({ status: value === '404' ? 404 : 200, json: { data: value } }))
+    > 12 |     await page.goto('/rag-eval')
+         |                ^
+      13 |     await expect(page.getByTestId('rag-dashboard-state')).toContainText('不可用')
+      14 |     await expect(page.locator('html')).not.toHaveClass(/dark/)
+      15 |     expect(errors).toEqual([])
+        at /home/monody/project/SentinelOps/web/tests/ui/rag-eval-resilience.spec.ts:12:16
+
+    Error Context: test-results/ui-rag-eval-resilience-RAG-dashboard-handles-404--chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-rag-eval-resilience-RAG-dashboard-handles-404--chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-rag-eval-resilience-RAG-dashboard-handles-404--chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:65858) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[25/26] [chromium] › tests/ui/runtime-sse.spec.ts:17:3 › single reader, dedupe, terminal close and visibility at 1280px
+  25) [chromium] › tests/ui/runtime-sse.spec.ts:17:3 › single reader, dedupe, terminal close and visibility at 1280px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/tests/ui/fixtures/runtime-sse.html
+    Call log:
+      - navigating to "http://127.0.0.1:5173/tests/ui/fixtures/runtime-sse.html", waiting until "load"
+
+
+      20 |     page.on('pageerror', error => errors.push(error.message))
+      21 |
+    > 22 |     await page.goto('/tests/ui/fixtures/runtime-sse.html')
+         |                ^
+      23 |     await expect(page.getByTestId('connected')).toHaveText('true')
+      24 |     await expect.poll(() => page.evaluate(() => window.runtimeSSEFixture.urls.length)).toBe(1)
+      25 |     expect(await page.evaluate(() => window.runtimeSSEFixture.urls[0])).toBe('/api/runtime/v1/runs/run-1/events?after_seq=0')
+        at /home/monody/project/SentinelOps/web/tests/ui/runtime-sse.spec.ts:22:16
+
+    Error Context: test-results/ui-runtime-sse-single-read-759a3-se-and-visibility-at-1280px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-runtime-sse-single-read-759a3-se-and-visibility-at-1280px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-runtime-sse-single-read-759a3-se-and-visibility-at-1280px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:65967) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[26/26] [chromium] › tests/ui/runtime-sse.spec.ts:17:3 › single reader, dedupe, terminal close and visibility at 1440px
+  26) [chromium] › tests/ui/runtime-sse.spec.ts:17:3 › single reader, dedupe, terminal close and visibility at 1440px
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/tests/ui/fixtures/runtime-sse.html
+    Call log:
+      - navigating to "http://127.0.0.1:5173/tests/ui/fixtures/runtime-sse.html", waiting until "load"
+
+
+      20 |     page.on('pageerror', error => errors.push(error.message))
+      21 |
+    > 22 |     await page.goto('/tests/ui/fixtures/runtime-sse.html')
+         |                ^
+      23 |     await expect(page.getByTestId('connected')).toHaveText('true')
+      24 |     await expect.poll(() => page.evaluate(() => window.runtimeSSEFixture.urls.length)).toBe(1)
+      25 |     expect(await page.evaluate(() => window.runtimeSSEFixture.urls[0])).toBe('/api/runtime/v1/runs/run-1/events?after_seq=0')
+        at /home/monody/project/SentinelOps/web/tests/ui/runtime-sse.spec.ts:22:16
+
+    Error Context: test-results/ui-runtime-sse-single-read-2b741-se-and-visibility-at-1440px-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-runtime-sse-single-read-2b741-se-and-visibility-at-1440px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-runtime-sse-single-read-2b741-se-and-visibility-at-1440px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  26 failed
+    [chromium] › tests/smoke/current-ui.spec.ts:29:1 › 未认证访问受保护路由时保留登录语义 ───────────────────────────
+    [chromium] › tests/smoke/current-ui.spec.ts:40:1 › 关键路由可达且主布局保持渲染 ──────────────────────────────
+    [chromium] › tests/smoke/current-ui.spec.ts:56:1 › dark class 继续驱动暗色 variant ───────────────────
+    [chromium] › tests/ui/chat-reconnect.spec.ts:52:3 › dedupe, disconnect, reload and deliberate next turn at 1280px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:97:3 › preserves body and actionable error; retry only tails and cleanup at 1280px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:126:3 › server recovery states and DONE-only reload stay truthful at 1280px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:150:3 › accepted create after session switch retains its own identity at 1280px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:180:3 › switch back before create returns joins one request at 1280px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged first turn stays uncertain through switch and reload at 1280px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged next turn stays uncertain through switch and reload at 1280px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:237:3 › legacy pending snapshot stays uncertain after restore at 1280px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:258:3 › upload preserves the accepted snapshot before the render frame at 1280px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:52:3 › dedupe, disconnect, reload and deliberate next turn at 1440px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:97:3 › preserves body and actionable error; retry only tails and cleanup at 1440px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:126:3 › server recovery states and DONE-only reload stay truthful at 1440px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:150:3 › accepted create after session switch retains its own identity at 1440px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:180:3 › switch back before create returns joins one request at 1440px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged first turn stays uncertain through switch and reload at 1440px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged next turn stays uncertain through switch and reload at 1440px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:237:3 › legacy pending snapshot stays uncertain after restore at 1440px
+    [chromium] › tests/ui/chat-reconnect.spec.ts:258:3 › upload preserves the accepted snapshot before the render frame at 1440px
+    [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles null ─────────────
+    [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles {} ───────────────
+    [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles "404" ────────────
+    [chromium] › tests/ui/runtime-sse.spec.ts:17:3 › single reader, dedupe, terminal close and visibility at 1280px
+    [chromium] › tests/ui/runtime-sse.spec.ts:17:3 › single reader, dedupe, terminal close and visibility at 1440px

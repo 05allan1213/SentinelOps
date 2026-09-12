@@ -1,0 +1,10 @@
+npm notice run sentinelops-web@1.0.0 test:unit
+npm notice run vitest run
+
+ RUN  v4.1.11 /home/monody/project/SentinelOps/web
+
+
+ Test Files  16 passed (16)
+      Tests  289 passed (289)
+   Start at  12:08:33
+   Duration  4.17s (transform 3.83s, setup 3.40s, import 8.95s, tests 4.97s, environment 26.23s)

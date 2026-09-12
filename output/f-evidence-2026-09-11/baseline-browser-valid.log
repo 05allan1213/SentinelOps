@@ -1,0 +1,201 @@
+npm notice run sentinelops-web@1.0.0 npx
+npm notice run 'playwright' test tests/ui/layout-regressions.spec.ts tests/ui/legacy-demo-labels.spec.ts tests/ui/rag-eval-resilience.spec.ts --workers=1
+
+Running 6 tests using 1 worker
+
+(node:40720) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/6] [chromium] › tests/ui/layout-regressions.spec.ts:3:3 › analysis columns stay local at 1280
+  1) [chromium] › tests/ui/layout-regressions.spec.ts:3:3 › analysis columns stay local at 1280 ────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+       7 |     await page.goto('/events/analysis')
+       8 |     await expect(page.getByText('思考链路', { exact: true })).toBeVisible()
+    >  9 |     expect(await page.locator('main').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+         |                                                                                         ^
+      10 |     expect(await page.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth)).toBe(true)
+      11 |   })
+      12 | }
+        at /home/monody/project/SentinelOps/web/tests/ui/layout-regressions.spec.ts:9:89
+
+    Error Context: test-results/ui-layout-regressions-analysis-columns-stay-local-at-1280-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-layout-regressions-analysis-columns-stay-local-at-1280-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-layout-regressions-analysis-columns-stay-local-at-1280-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:40978) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[2/6] [chromium] › tests/ui/layout-regressions.spec.ts:3:3 › analysis columns stay local at 1440
+[3/6] [chromium] › tests/ui/legacy-demo-labels.spec.ts:2:1 › analysis source is explicitly legacy/demo
+  2) [chromium] › tests/ui/legacy-demo-labels.spec.ts:2:1 › analysis source is explicitly legacy/demo
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('analysis-source-label')
+    Expected substring: "legacy / demo"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for getByTestId('analysis-source-label')
+
+
+      4 |   await page.route('**/api/**', route => route.fulfill({ json: { data: { total: 1, events: [] } } }))
+      5 |   await page.goto('/events/analysis')
+    > 6 |   await expect(page.getByTestId('analysis-source-label')).toContainText('legacy / demo')
+        |                                                           ^
+      7 |   await expect(page.getByTestId('analysis-source-label')).toContainText('模拟')
+      8 |   await expect(page.getByTestId('runtime-recovery-button')).toHaveCount(0)
+      9 |   await expect(page.locator('a[href="/logs"]')).toHaveCount(0)
+        at /home/monody/project/SentinelOps/web/tests/ui/legacy-demo-labels.spec.ts:6:59
+
+    Error Context: test-results/ui-legacy-demo-labels-anal-337f7-e-is-explicitly-legacy-demo-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-legacy-demo-labels-anal-337f7-e-is-explicitly-legacy-demo-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-legacy-demo-labels-anal-337f7-e-is-explicitly-legacy-demo-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:41200) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[4/6] [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles null
+  3) [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles null ────────────
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('rag-dashboard-state')
+    Expected substring: "不可用"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for getByTestId('rag-dashboard-state')
+
+
+      11 |     await page.route('**/api/rageval/v1/dashboard**', route => route.fulfill({ status: value === '404' ? 404 : 200, json: { data: value } }))
+      12 |     await page.goto('/rag-eval')
+    > 13 |     await expect(page.getByTestId('rag-dashboard-state')).toContainText('不可用')
+         |                                                           ^
+      14 |     await expect(page.locator('html')).not.toHaveClass(/dark/)
+      15 |     expect(errors).toEqual([])
+      16 |   })
+        at /home/monody/project/SentinelOps/web/tests/ui/rag-eval-resilience.spec.ts:13:59
+
+    Error Context: test-results/ui-rag-eval-resilience-RAG-dashboard-handles-null-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-rag-eval-resilience-RAG-dashboard-handles-null-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-rag-eval-resilience-RAG-dashboard-handles-null-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:41568) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[5/6] [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles {}
+  4) [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles {} ──────────────
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('rag-dashboard-state')
+    Expected substring: "不可用"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for getByTestId('rag-dashboard-state')
+
+
+      11 |     await page.route('**/api/rageval/v1/dashboard**', route => route.fulfill({ status: value === '404' ? 404 : 200, json: { data: value } }))
+      12 |     await page.goto('/rag-eval')
+    > 13 |     await expect(page.getByTestId('rag-dashboard-state')).toContainText('不可用')
+         |                                                           ^
+      14 |     await expect(page.locator('html')).not.toHaveClass(/dark/)
+      15 |     expect(errors).toEqual([])
+      16 |   })
+        at /home/monody/project/SentinelOps/web/tests/ui/rag-eval-resilience.spec.ts:13:59
+
+    Error Context: test-results/ui-rag-eval-resilience-RAG-dashboard-handles--chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-rag-eval-resilience-RAG-dashboard-handles--chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-rag-eval-resilience-RAG-dashboard-handles--chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:41848) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[6/6] [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles "404"
+  5) [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles "404" ───────────
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('rag-dashboard-state')
+    Expected substring: "不可用"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for getByTestId('rag-dashboard-state')
+
+
+      11 |     await page.route('**/api/rageval/v1/dashboard**', route => route.fulfill({ status: value === '404' ? 404 : 200, json: { data: value } }))
+      12 |     await page.goto('/rag-eval')
+    > 13 |     await expect(page.getByTestId('rag-dashboard-state')).toContainText('不可用')
+         |                                                           ^
+      14 |     await expect(page.locator('html')).not.toHaveClass(/dark/)
+      15 |     expect(errors).toEqual([])
+      16 |   })
+        at /home/monody/project/SentinelOps/web/tests/ui/rag-eval-resilience.spec.ts:13:59
+
+    Error Context: test-results/ui-rag-eval-resilience-RAG-dashboard-handles-404--chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ui-rag-eval-resilience-RAG-dashboard-handles-404--chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ui-rag-eval-resilience-RAG-dashboard-handles-404--chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  5 failed
+    [chromium] › tests/ui/layout-regressions.spec.ts:3:3 › analysis columns stay local at 1280 ─────
+    [chromium] › tests/ui/legacy-demo-labels.spec.ts:2:1 › analysis source is explicitly legacy/demo
+    [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles null ─────────────
+    [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles {} ───────────────
+    [chromium] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles "404" ────────────
+  1 passed (31.4s)

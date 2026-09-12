@@ -1,0 +1,1022 @@
+WARNING: sonic/ast only supports (go1.17~1.26 and amd64 CPU) or (go1.20~1.26 and arm64 CPU), but your environment is not suitable and will fallback to encoding/json
+
+2026/09/12 12:08:07 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.864ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '5868c7863f1312ce74ccc28d3c10e2fe6b1027dded88cfe6c92c0cf3fbb6c934' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:08 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.818ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'c63ec61702ea13d938d96f7e063ff0e92220cc1cdf0771fa4acc9416ad0d9d91' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:10 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.884ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '6fe9f6bf78ff0ad2e5e9834131ce806650dbc8cdfb9a665afa10f12c87df0e58' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:10 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:669 Error 1644 (45000): reject phase22 publish event
+[1.817ms] [rows:0] INSERT INTO `workflow_events` (`run_id`,`seq`,`event_type`,`payload`,`payload_version`,`trace_id`,`operation_id`,`command_action`,`idempotency_key_digest`,`request_fingerprint`,`actor_id`,`reason_redacted`,`correlation_seq`,`created_at`) VALUES ('run-phase22-publish-rollback-agent-interrupted',4,'agent.interrupted','{"data":{"approval_id":"6fe9f6bf78ff0ad2e5e9834131ce806650dbc8cdfb9a665afa10f12c87df0e58","interrupt_id":"interrupt-phase22-rollback"},"reference":"6fe9f6bf78ff0ad2e5e9834131ce806650dbc8cdfb9a665afa10f12c87df0e58","schema":"sentinelops/workflow-event/v1"}',1,'',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'2026-09-12 12:08:10.526')
+
+2026/09/12 12:08:12 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.942ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'a29c0847c0a76fb2bf4b05800b961e82c09121cd66f91448a2e1b4e73497eaf2' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:12 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:669 Error 1644 (45000): reject phase22 publish event
+[0.663ms] [rows:0] INSERT INTO `workflow_events` (`run_id`,`seq`,`event_type`,`payload`,`payload_version`,`trace_id`,`operation_id`,`command_action`,`idempotency_key_digest`,`request_fingerprint`,`actor_id`,`reason_redacted`,`correlation_seq`,`created_at`) VALUES ('run-phase22-publish-rollback-approval-requested',5,'approval.requested','{"data":{"approval_id":"a29c0847c0a76fb2bf4b05800b961e82c09121cd66f91448a2e1b4e73497eaf2","checkpoint_id":"sentinelops/run/run-phase22-publish-rollback-approval-requested","checkpoint_lease_generation":1,"checkpoint_payload_sha256":"c084b0698bd90cf90b2ced9badde546d44f2099976109cacb4ad65a230d28e0d","proposal_hash":"0000000000000000000000000000000000000000000000000000000000000037"},"reference":"a29c0847c0a76fb2bf4b05800b961e82c09121cd66f91448a2e1b4e73497eaf2","schema":"sentinelops/workflow-event/v1"}',1,'',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'2026-09-12 12:08:12.221')
+
+2026/09/12 12:08:13 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.784ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '0d64993893c04ac52a421266a30fb3286b322cd473dbc679e5f2856f8096058d' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:15 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.393ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '627a6aef09e232b522c7014959b0bb425c9410ee77b18abd42f1bb0c3356a30a' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:17 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.807ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '49b271ab358d06eb37659d3ba7ee887b501c2da3b549bf4557c5e275063c8333' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:17 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.315ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-resume-authorization' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:18 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.778ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '6bf13f66f64f9d837e61916d4fdb750529effa2c082967f8a09b9c6a8e9ffdc4' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:20 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.806ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '9224b72b4e6c83c1096305f4128015c9b225e16aec4f4a817ed7b20e14655e10' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:20 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.188ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-terminal-resume-rejected' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:22 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.908ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'e095363f5233a2e5521c90da3236e91c3129a36ed5fb0d67c1bf73720546e326' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+--- FAIL: TestResumeAuthorizationTerminalDecisionsDoNotReopenApproval (3.43s)
+    --- FAIL: TestResumeAuthorizationTerminalDecisionsDoNotReopenApproval/expired (1.68s)
+        approval_lifecycle_test.go:294: APPROVAL_NOT_EXPIRED
+
+2026/09/12 12:08:23 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.956ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '97609fef01c25891f5c1fd2b12fe2f1c82187d199108ea572f66b1d7f4ada614' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:23 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.310ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-closed-gate' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:24 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.864ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '50201d6c616a0af9058e6094f6c00286c4f40a09a6c536ada0e316421a55add7' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:26 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.800ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'cecf766ab32ce2f9e5a5d0f473c79f6b5ade846aed85caf4660b60295c164263' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:26 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.381ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-overwrite-parks' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:08:28 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.039ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '97a5fc4b887630a7706e84b3affe5f590fd8a46853abec9b74c6902e456e85e5' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+--- FAIL: TestTwoPhaseApprovalExpiryScanUsesDecisionPrimitiveAndTerminalInvalidatesPreparing (1.77s)
+    approval_lifecycle_test.go:434: expire due Approvals count=0 err=<nil>
+
+2026/09/12 12:08:30 /home/monody/project/SentinelOps/internal/ai/workflow/approval_test.go:30 Error 1062 (23000): Duplicate entry 'run-phase21-unique-111111111111111111111111111111111111111111111' for key 'agent_approvals.uidx_agent_approvals_run_proposal'
+[2.836ms] [rows:0] INSERT INTO `agent_approvals` (`id`,`run_id`,`tool_call_id_observed`,`tool_name`,`tool_revision`,`tool_schema_hash`,`risk_level`,`proposal_json_redacted`,`proposal_hash`,`policy_hash`,`runtime_compatibility_hash`,`requested_by`,`decided_by`,`status`,`version`,`decision_reason`,`interrupt_id`,`interrupt_address`,`checkpoint_id`,`checkpoint_payload_sha256`,`checkpoint_lease_generation`,`preparing_at`,`published_at`,`expires_at`,`created_at`,`decided_at`) VALUES ('different-id','run-phase21-unique',NULL,'block_ip','v1','2222222222222222222222222222222222222222222222222222222222222222','L2','{"ip":"192.0.2.1"}','1111111111111111111111111111111111111111111111111111111111111111','3333333333333333333333333333333333333333333333333333333333333333','4444444444444444444444444444444444444444444444444444444444444444','requester',NULL,'preparing',1,NULL,NULL,NULL,NULL,NULL,NULL,'2026-09-12 04:08:30.086',NULL,'2026-09-12 13:08:30.086','2026-09-12 04:08:30.086',NULL)
+--- FAIL: TestApprovalDecisionExpiredReturnsStableConflict (3.73s)
+    approval_test.go:127: approve expired proposal error=<nil>, want ErrApprovalExpired
+
+2026/09/12 12:08:38 /home/monody/project/SentinelOps/internal/ai/workflow/approvals.go:86 record not found
+[0.831ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '5c78c2ef4e6291a648b929b624a3dd742a7f234efa41a0cbde9e817ff7cc2917' AND status = 'pending' ORDER BY `agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:08:38 /home/monody/project/SentinelOps/internal/ai/workflow/approvals.go:113 record not found
+[0.743ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '5c78c2ef4e6291a648b929b624a3dd742a7f234efa41a0cbde9e817ff7cc2917' AND status <> 'preparing' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:10:05 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:669 Error 1644 (45000): reject approval event
+[1.188ms] [rows:0] INSERT INTO `workflow_events` (`run_id`,`seq`,`event_type`,`payload`,`payload_version`,`trace_id`,`operation_id`,`command_action`,`idempotency_key_digest`,`request_fingerprint`,`actor_id`,`reason_redacted`,`correlation_seq`,`created_at`) VALUES ('run-phase21-atomic',4,'approval.decided','{"data":{"approval_id":"6d9933a7f1dcf56eeae57797c8562523fb4c9e1e5edf7c419c9bb89a916c008e","decision":"approved"},"reference":"6d9933a7f1dcf56eeae57797c8562523fb4c9e1e5edf7c419c9bb89a916c008e","schema":"sentinelops/workflow-event/v1"}',1,'',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'2026-09-12 12:10:05.034')
+
+2026/09/12 12:10:17 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.268ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-c02-attempt' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:10:24 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.350ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c02-attempt-stale' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:10:24 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.705ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c02-attempt-stale' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:10:30 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.362ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-c02-attempt-fingerprint' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:10:43 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.436ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c02-attempt-trace-idempotent' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:10:50 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[2.311ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-c02-attempt-reliability' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:10:51 /home/monody/project/SentinelOps/internal/ai/workflow/claim.go:73 record not found
+[2.040ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND attempt < max_attempts AND (NOT EXISTS (
+				SELECT 1 FROM workflow_events op_accepted
+				WHERE op_accepted.run_id = workflow_runs.id
+				  AND op_accepted.event_type = 'operation.accepted'
+				  AND op_accepted.operation_id IS NOT NULL
+				  AND NOT EXISTS (
+					SELECT 1 FROM workflow_events op_terminal
+					WHERE op_terminal.run_id = op_accepted.run_id
+					  AND op_terminal.operation_id = op_accepted.operation_id
+					  AND op_terminal.event_type IN ('operation.succeeded', 'operation.failed', 'operation.canceled', 'operation.rejected')
+				  )
+			)) AND ((
+				(status = 'pending' AND available_at <= CURRENT_TIMESTAMP(3) AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
+				OR
+				(status = 'retryable_failed' AND available_at <= CURRENT_TIMESTAMP(3) AND lease_owner IS NULL)
+				OR
+				(status = 'running' AND (lease_owner IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
+			)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED
+--- FAIL: TestAttemptProjectionRetryAndFailoverRemainSameRun (7.71s)
+    attempts_test.go:170: reclaim: (*workflow.ClaimedRun)(nil) false <nil>
+
+2026/09/12 12:10:57 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.450ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-c02-rebuild' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:03 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.396ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase14-c02-reliability-facts' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:09 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.582ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase14-c02-reliability-idempotent' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:15 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.480ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c02-reaper-rollback' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:15 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:328 Error 1644 (45000): reject c02 attempt reaper
+[0.736ms] [rows:0] UPDATE `workflow_attempts` SET `current_phase`='failed',`failure_code`='lease_expired',`failure_message_redacted`='worker lease expired before Attempt completion',`finished_at`=CURRENT_TIMESTAMP(3),`status`='failed',`trace_quality`='unknown',`updated_at`=CURRENT_TIMESTAMP(3),`usage_quality`='unknown' WHERE id = '13b27382-e61c-48c0-bda1-61cd91d64991' AND lease_generation = 1 AND finished_at IS NULL
+
+2026/09/12 12:11:21 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[2.298ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c02-reaper-stale' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:27 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.315ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase14-hard-stop' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:33 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.340ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase14-crash' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+--- FAIL: TestBudgetCrashReservationPreservedAcrossLeaseHandoff (5.78s)
+    budget_test.go:95: pending reservation bypassed attempt deadline: <nil>
+
+2026/09/12 12:11:38 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.340ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase14-deadline' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+--- FAIL: TestBaseBudgetDeadlineDurationAndReservationIdentity (5.65s)
+    budget_test.go:138: deadline error = <nil>
+
+2026/09/12 12:11:48 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.372ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase14-tamper' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:49 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.289ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c06-success' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:49 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.657ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-success' AND event_type = 'operation.accepted' AND idempotency_key_digest = '202498193dbddd5764ff00302cbba27ec75bfef8ec863d69c972c5294f02f53d' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:11:49 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.734ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-c06-success' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:11:49 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.798ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-c06-success' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:11:49 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.682ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c06-success' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:49 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:378 record not found
+[1.110ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-success' AND operation_id = 'op-10fd9834a5f4099948dd12b994835ebb3417ecb5197967632fbceb758016616e' AND event_type = 'operation.started' ORDER BY `workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:11:49 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:428 record not found
+[0.732ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-success' AND operation_id = 'op-10fd9834a5f4099948dd12b994835ebb3417ecb5197967632fbceb758016616e' AND event_type IN ('operation.succeeded','operation.failed','operation.canceled','operation.rejected') ORDER BY `workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:11:50 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.810ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c06-rollback' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:50 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.820ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-rollback' AND event_type = 'operation.accepted' AND idempotency_key_digest = '85f7c48823e1bab25d2ef8b4b16933e843346831dddefbca96e21f1b204f2f28' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:11:50 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.690ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-c06-rollback' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:11:50 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.681ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-c06-rollback' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:11:50 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.640ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c06-rollback' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:11:50 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:378 record not found
+[0.805ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-rollback' AND operation_id = 'op-d78c2fb6be36f7c5419aa1e24174b7d105025ab35e4cb41f97e09743cd2292ea' AND event_type = 'operation.started' ORDER BY `workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:11:50 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:428 record not found
+[0.653ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-rollback' AND operation_id = 'op-d78c2fb6be36f7c5419aa1e24174b7d105025ab35e4cb41f97e09743cd2292ea' AND event_type IN ('operation.succeeded','operation.failed','operation.canceled','operation.rejected') ORDER BY `workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:11:50 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:669 Error 1644 (45000): reject c06 operation terminal
+[0.607ms] [rows:0] INSERT INTO `workflow_events` (`run_id`,`seq`,`event_type`,`payload`,`payload_version`,`trace_id`,`operation_id`,`command_action`,`idempotency_key_digest`,`request_fingerprint`,`actor_id`,`reason_redacted`,`correlation_seq`,`created_at`) VALUES ('run-phase09-c06-rollback',6,'operation.failed','{"data":{"action":"replay","error_code":"recovery_failed","operation_id":"op-d78c2fb6be36f7c5419aa1e24174b7d105025ab35e4cb41f97e09743cd2292ea","reason_code":"terminal_write_rejected"},"schema":"sentinelops/workflow-event/v1"}',1,'','op-d78c2fb6be36f7c5419aa1e24174b7d105025ab35e4cb41f97e09743cd2292ea','replay',NULL,NULL,NULL,NULL,5,'2026-09-12 12:11:50.725')
+
+2026/09/12 12:11:54 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.801ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-c06-cancel-pending' AND event_type = 'operation.accepted' AND idempotency_key_digest = '66b8aac4a43a33d0cf2b725cbb23fab7334a1179dd6b3015bb7c0c244fbecf0c' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:11:54 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:378 record not found
+[0.614ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-c06-cancel-pending' AND operation_id = 'op-556985230df04d966a5742d5f14038782ebe139a5f38a1383a1c62bcae482e0a' AND event_type = 'operation.started' ORDER BY `workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:11:54 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:428 record not found
+[0.919ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-c06-cancel-pending' AND operation_id = 'op-556985230df04d966a5742d5f14038782ebe139a5f38a1383a1c62bcae482e0a' AND event_type IN ('operation.succeeded','operation.failed','operation.canceled','operation.rejected') ORDER BY `workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:11:59 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.665ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c06-reclaim-one-attempt' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:00 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.932ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-reclaim-one-attempt' AND event_type = 'operation.accepted' AND idempotency_key_digest = '363e284f475f6969dd2656403995f1f86fa144ceabda48565256193465dbe979' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:12:00 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.825ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-c06-reclaim-one-attempt' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:12:00 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.953ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-c06-reclaim-one-attempt' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:12:00 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.666ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c06-reclaim-one-attempt' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:00 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:378 record not found
+[0.890ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-reclaim-one-attempt' AND operation_id = 'op-881d4b3f24a978765767cfbf0965c24e9e0d82424c33ee53251e4ccef1d7b64b' AND event_type = 'operation.started' ORDER BY `workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:12:00 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.994ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-c06-reclaim-one-attempt' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:12:05 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.879ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c06-recovery-fingerprint' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:05 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.753ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-recovery-fingerprint' AND event_type = 'operation.accepted' AND idempotency_key_digest = '1e3831ccdb38b508d60420ab9812db81708779412b566fc4c74b73d44a9d0117' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:12:05 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.758ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-c06-recovery-fingerprint' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:12:05 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.693ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-c06-recovery-fingerprint' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:12:05 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.750ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c06-recovery-fingerprint' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:05 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:378 record not found
+[0.720ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-recovery-fingerprint' AND operation_id = 'op-ccff9e0558467e0badb51c0af9b7e19809d814557b8aa18eb72b14a8557aa599' AND event_type = 'operation.started' ORDER BY `workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:12:10 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.426ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-c06-recovery-fingerprint-mismatch' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:10 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.711ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-c06-recovery-fingerprint-mismatch' AND event_type = 'operation.accepted' AND idempotency_key_digest = '8f858465d113e9a6ec6c858f9edbecc9da75fef86ba471d509c21911b6812500' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:12:10 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.856ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-c06-recovery-fingerprint-mismatch' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:12:16 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.772ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-c06-restore-dependencies' AND event_type = 'operation.accepted' AND idempotency_key_digest = 'e496de023d2e16f4979742c65213d41111c47b227da3138900654648dcc69ef2' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:12:16 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.788ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-c06-restore-dependencies' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:12:16 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.859ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-c06-restore-dependencies' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:12:16 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:378 record not found
+[0.716ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-c06-restore-dependencies' AND operation_id = 'op-09e28ecaf8a05b76e6a83b3542a9968714fcf7f875b47812a8a4c06271c24a79' AND event_type = 'operation.started' ORDER BY `workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:12:16 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.808ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-c06-restore-dependencies' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:12:21 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.864ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '0c50de84cf3143ea118efa3bdde4d592e71357a76371d6cffe2bad5c090e511b' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:21 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.350ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-identity' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:21 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.722ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '978d266debab4597806a077f14f8da613fa1cc5853c2ab6ed206e3a67e0e575d' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:28 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.878ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'a833cf242786b059140b0be605f65f91f3f93345c7509fe7ef20e176b2acbe8d' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:28 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.637ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-atomic-success' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:28 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[1.166ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '9e812f96aef96bd664d955daf53400db6b70f4338b38f8c8ae7abe00068fbef6' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:34 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.022ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '2d9bc82a58be01577dc6a0e34c3b5f6a6da12c8914e8de60961a1c4596351230' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:34 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.199ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-rollback' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:34 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.697ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = 'e583f9af8f853d0c036b5e69c1116126aafdf4780d5e7139a96677cd73edf0a5' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:40 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.991ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'e2372d4d1020cef87f9deae84c3bb5a6cc4a7f0db9d4c9a46409cb809ac1a282' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:40 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.361ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-reuse-guards' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:40 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.788ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '08b49e6ec66486bafc3cab0d6eaa1980f684e8409bc1d68cd8c55a304aa728a4' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:46 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.867ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '967c63be1901f8ed40bcda1326ebb44a9a49d7747bb60fa679fa2b929c63838c' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:46 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.488ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase42-shadow' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:53 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.815ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '657cdc9a049f49ec32f4e1c2d4771f1f8c7ed38c82ae490137a686cf1b643bc0' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:53 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.453ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-embeddedsecret' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:59 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.861ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'bcc86790b1c310361dfa7b4ce35ca8f780bd0d31e436eb70a2c7e559e255f8bd' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:12:59 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.396ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-unredacted' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:06 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[2.328ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase10-empty' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:06 /home/monody/project/SentinelOps/internal/ai/workflow/eino_checkpoint_store.go:92 record not found
+[0.961ms] [rows:0] SELECT `checkpoint_blob` FROM `workflow_checkpoints` WHERE (eino_checkpoint_id = 'sentinelops/run/run-phase09-phase10-empty' AND checkpoint_blob IS NOT NULL) AND `workflow_checkpoints`.`deleted_at` IS NULL ORDER BY `workflow_checkpoints`.`id` LIMIT 1
+
+2026/09/12 12:13:11 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.857ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase10-roundtrip' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:18 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.568ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase10-stale' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:18 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.257ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase10-stale' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:25 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.320ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase10-isolation' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:25 /home/monody/project/SentinelOps/internal/ai/workflow/eino_checkpoint_store.go:92 record not found
+[0.877ms] [rows:0] SELECT `checkpoint_blob` FROM `workflow_checkpoints` WHERE (eino_checkpoint_id = 'sentinelops/run/other-run' AND checkpoint_blob IS NOT NULL) AND `workflow_checkpoints`.`deleted_at` IS NULL ORDER BY `workflow_checkpoints`.`id` LIMIT 1
+
+2026/09/12 12:13:32 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.779ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase10-delete' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:32 /home/monody/project/SentinelOps/internal/ai/workflow/eino_checkpoint_store.go:92 record not found
+[0.546ms] [rows:0] SELECT `checkpoint_blob` FROM `workflow_checkpoints` WHERE (eino_checkpoint_id = 'sentinelops/run/run-phase09-phase10-delete' AND checkpoint_blob IS NOT NULL) AND `workflow_checkpoints`.`deleted_at` IS NULL ORDER BY `workflow_checkpoints`.`id` LIMIT 1
+
+2026/09/12 12:13:38 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.397ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase10-cross-process' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:44 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.905ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '754dbc5a9968413b89768b9a5a3007dc10e022033380285a80736838bf19d294' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:44 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.390ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase24-derived' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:44 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.808ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = 'e695f379ab1d99d27080c46c7d189acf3c3e66970502407202ded5210a67c8f7' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:51 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[3.153ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'fd6455719c7b40f94fb3fb6974d592f6b355219792d64b106355eb8a5efc6e8e' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:51 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.425ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase24-secret' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:57 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.765ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '1305589cbdfd57badb8c971994006e143b24d2e6b7f112502216d60da7da70ca' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:57 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.457ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase24-reuse' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:13:57 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.811ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = 'a30d2c746902eee4f5c56faa9094c3e3ffd47efa1fdec20756d60c97fa04c654' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:04 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.814ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'fa1adaee7207303b081bb6d53f690027d7a6794f2690c0c103131cb51cfcbc34' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:04 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.390ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase24-transactional-derived' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:04 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.819ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = 'fe2a7e6022abc305a5c05785b5b948ef31077ffeb91054a02b3d4ec1d9464eef' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:10 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.852ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'a1f9923bf83130090e48b59cc05b160ebf357d45506f2c33ccb7232159956143' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:10 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.467ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase24-deadline' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:10 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[1.286ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '9851177163166a6f1ca3e2040731598e6a39c1cf43e57a5d204d0af62ce3da63' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:16 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.801ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '48b166acab9b1b70285141afc03155c6667aeac73bc52d35911bf3d7c11aed1c' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:16 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.616ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase24-unknown' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:16 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[1.028ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '904a47f134742ee88bac7038487ef73b55d8f31ed4b17fa6641dc665cb069316' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:23 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.871ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'c2c687af4f1c051041a004738370334192c4ea8f6bd611d2ac397d313037010f' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:23 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.322ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase24-success-window' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:23 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[1.157ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '0b0bf7118c15b250c99406420ebdca62c2fa0c6ebe9610becf8ee0b85b75063d' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:29 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.094ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'd166ef0ae38cc344fd894c75b4836d978e727896ec8a4beabffb84c032cd5ca9' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:29 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.503ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase24-partial' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:29 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.796ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = 'd4b12edd338bac57cf2bc325907404a92f987e4b81b7f81fba40aa55e08b84e6' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:35 /home/monody/project/SentinelOps/internal/ai/workflow/claim.go:73 record not found
+[1.145ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND attempt < max_attempts AND (NOT EXISTS (
+				SELECT 1 FROM workflow_events op_accepted
+				WHERE op_accepted.run_id = workflow_runs.id
+				  AND op_accepted.event_type = 'operation.accepted'
+				  AND op_accepted.operation_id IS NOT NULL
+				  AND NOT EXISTS (
+					SELECT 1 FROM workflow_events op_terminal
+					WHERE op_terminal.run_id = op_accepted.run_id
+					  AND op_terminal.operation_id = op_accepted.operation_id
+					  AND op_terminal.event_type IN ('operation.succeeded', 'operation.failed', 'operation.canceled', 'operation.rejected')
+				  )
+			)) AND ((
+				(status = 'pending' AND available_at <= CURRENT_TIMESTAMP(3) AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
+				OR
+				(status = 'retryable_failed' AND available_at <= CURRENT_TIMESTAMP(3) AND lease_owner IS NULL)
+				OR
+				(status = 'running' AND (lease_owner IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
+			)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:14:35 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.384ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-claim' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:41 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:669 Error 1644 (45000): reject run.claimed
+[0.929ms] [rows:0] INSERT INTO `workflow_events` (`run_id`,`seq`,`event_type`,`payload`,`payload_version`,`trace_id`,`operation_id`,`command_action`,`idempotency_key_digest`,`request_fingerprint`,`actor_id`,`reason_redacted`,`correlation_seq`,`created_at`) VALUES ('run-phase09-claim-atomic',2,'run.claimed','{"data":{"attempt":1,"lease_generation":1,"owner":"worker-atomic","runtime_compatibility_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","runtime_version":"sentinelops-test-v1"},"schema":"sentinelops/workflow-event/v1"}',1,'',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'2026-09-12 12:14:41.948')
+
+2026/09/12 12:14:47 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.560ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-heartbeat' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:53 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.943ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-generation' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:14:53 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.827ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-generation' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:15:00 /home/monody/project/SentinelOps/internal/ai/workflow/claim.go:73 record not found
+[2.227ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND attempt < max_attempts AND (NOT EXISTS (
+				SELECT 1 FROM workflow_events op_accepted
+				WHERE op_accepted.run_id = workflow_runs.id
+				  AND op_accepted.event_type = 'operation.accepted'
+				  AND op_accepted.operation_id IS NOT NULL
+				  AND NOT EXISTS (
+					SELECT 1 FROM workflow_events op_terminal
+					WHERE op_terminal.run_id = op_accepted.run_id
+					  AND op_terminal.operation_id = op_accepted.operation_id
+					  AND op_terminal.event_type IN ('operation.succeeded', 'operation.failed', 'operation.canceled', 'operation.rejected')
+				  )
+			)) AND ((
+				(status = 'pending' AND available_at <= CURRENT_TIMESTAMP(3) AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
+				OR
+				(status = 'retryable_failed' AND available_at <= CURRENT_TIMESTAMP(3) AND lease_owner IS NULL)
+				OR
+				(status = 'running' AND (lease_owner IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
+			)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED
+--- FAIL: TestClaimPredicateExcludesIncompleteAndUnavailableRuns (5.90s)
+    lease_test.go:169: claim = (*workflow.ClaimedRun)(nil) ok=false, want eligible
+
+2026/09/12 12:15:02 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.350ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-reap' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:15:02 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.761ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-reap' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:15:03 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.887ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-stale' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:15:03 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.733ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-stale' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:15:15 /home/monody/project/SentinelOps/internal/ai/workflow/legacy.go:174 Error 1644 (45000): reject cutover audit
+[0.701ms] [rows:0] INSERT INTO `workflow_events` (`run_id`,`seq`,`event_type`,`payload`,`payload_version`,`trace_id`,`operation_id`,`command_action`,`idempotency_key_digest`,`request_fingerprint`,`actor_id`,`reason_redacted`,`correlation_seq`,`created_at`) VALUES ('legacy-rollback',2,'run.failed','{"action":"legacy_cutover_terminalize","from_status":"running","park_reason":"legacy_cutover_not_resumable","schema":"fo/legacy-cutover/v1","to_status":"failed"}',1,'',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'2026-09-12 12:15:15.924')
+
+2026/09/12 12:15:22 /home/monody/project/SentinelOps/internal/ai/workflow/legacy_test.go:202 record not found
+[0.879ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'durable-only' ORDER BY `workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:15:28 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.593ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-operation-accept-replay' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:15:28 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.842ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-operation-accept-replay' AND event_type = 'operation.accepted' AND idempotency_key_digest = '31d4ee1b35f7843ba3dccd12c33a896c01cee29a2229b47b4cf43d8da2e234c5' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:15:28 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.913ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-operation-accept-replay' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:15:34 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.388ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-operation-accept-idempotency' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:15:34 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.806ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-operation-accept-idempotency' AND event_type = 'operation.accepted' AND idempotency_key_digest = '0368e54645078daae1e95117daab2daf60561651ee155868e920767f6226a2c8' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:15:34 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.845ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-operation-accept-idempotency' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:15:40 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.628ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-operation-accept-active' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:15:40 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.987ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-operation-accept-active' AND event_type = 'operation.accepted' AND idempotency_key_digest = '55102c56e38b3b6998b0d5d38e8399280e7d25474f7534e2695427c5e5b167c3' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:15:40 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.709ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-operation-accept-active' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:15:40 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.699ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-operation-accept-active' AND event_type = 'operation.accepted' AND idempotency_key_digest = 'c872a5c4dcbe03f486fcee4966b052b7521b7da369d2749e4bcab943c4189d47' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:15:46 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.956ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-operation-legality-replay' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:15:46 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[1.041ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-operation-legality-replay' AND event_type = 'operation.accepted' AND idempotency_key_digest = 'ff4a69a56867de1d86ddb824e830c49214e408c89b8401fa5eea4bbb42c3b7db' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:15:52 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.750ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-operation-legality-resume' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:15:52 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.790ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-operation-legality-resume' AND event_type = 'operation.accepted' AND idempotency_key_digest = '6d6b87ac486d275b12ec9bf8661d07c0ba5749e7f147a11a2505a1e224c78886' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:15:52 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.796ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-operation-legality-resume' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:15:59 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.830ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-operation-legality-cancel' AND event_type = 'operation.accepted' AND idempotency_key_digest = '0c5d95ab9890af8e80b8f5240c49aad2c25f37ec7db70756ae0a77ae77ec77e2' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:15:59 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.964ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-operation-legality-cancel-terminal' AND event_type = 'operation.accepted' AND idempotency_key_digest = '27689645406461de79943e764e7cd6f08ab3ebc2835c3e1ceee6c91b4492285c' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:15:59 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.722ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-operation-legality-cancel-terminal' AND event_type = 'operation.accepted' AND idempotency_key_digest = '27689645406461de79943e764e7cd6f08ab3ebc2835c3e1ceee6c91b4492285c' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:15:59 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.811ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-operation-legality-cancel-terminal' AND event_type = 'operation.accepted' AND idempotency_key_digest = 'f9b83de774e43f636ffbfffe92333c1436f7c95e46d5994cf02b85570bc4a26a' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:16:05 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.577ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-operation-legality-cancel-stale' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:16:05 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[1.106ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-operation-legality-cancel-stale' AND event_type = 'operation.accepted' AND idempotency_key_digest = 'a6a8f4baa3ffd5e771f00c0a364e7d9a416cef84f578b7da8afa2bbe8ceb405c' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:16:12 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.792ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-operation-legality-unknown-status' AND event_type = 'operation.accepted' AND idempotency_key_digest = '26eea39b0b592955bbc06316034f58cfcc89003cc15e29eb7583d0fbd9e50889' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:16:12 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.740ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-operation-legality-unknown-status' AND event_type = 'operation.accepted' AND idempotency_key_digest = '60f3f80248f5437329de9b665d8971de6a938b2130fbca1a76a2e127fca498e7' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:16:12 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[1.157ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-operation-legality-unknown-status' AND event_type = 'operation.accepted' AND idempotency_key_digest = 'd7c77180974d85bbd9cb757a5a55f27933eacefdba3b67a8acd54294cfc2d0af' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:16:17 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[1.057ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-operation-legality-restore' AND event_type = 'operation.accepted' AND idempotency_key_digest = '1d7fc891d2f2e5a7a4cee8c370042eb903a76556fd0fb02bcf8b6dd24bcd0bea' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:16:17 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.890ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-operation-legality-restore' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:16:24 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.643ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-operation-accept-serial' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:16:24 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.894ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-operation-accept-serial' AND event_type = 'operation.accepted' AND idempotency_key_digest = '074bd45ba817b05dedf67192c2eb81c1d820e75a77926168108e97b36b5b35d4' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:16:24 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1414 record not found
+[0.666ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase09-operation-accept-serial' AND status IN ('preparing','pending','approved') ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1
+
+2026/09/12 12:16:24 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:1296 record not found
+[0.831ms] [rows:0] SELECT * FROM `workflow_events` WHERE run_id = 'run-phase09-operation-accept-serial' AND event_type = 'operation.accepted' AND idempotency_key_digest = '6d04b0aede0626e45666c384e5a05af42c7042863499e6f6b888548b950f83c9' ORDER BY seq ASC,`workflow_events`.`id` LIMIT 1
+
+2026/09/12 12:16:44 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.301ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'a4830ef51ae30fa8585aad5764bdb41126cdd93682dacfbdff383dabc50c46bc' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:16:44 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.358ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-expired' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:16:44 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.817ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '7ffc1d706602bca0b3a8fc11db7f15cd6ea048765d0150af443d0f918062988d' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+--- FAIL: TestUnknownEffectExpiredRunningExternalBecomesParked (6.96s)
+    reconciliation_test.go:44: reap external effect lease count=0 err=<nil>
+
+2026/09/12 12:16:50 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.001ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'c54128f10b5a59c7a1e2d523a92d10d28d71604f96f1cb8f424a3896fbc641f8' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:16:50 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.668ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-c02-expired-effect-rollback' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:16:50 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.900ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '08c734558efdc237710e19ca110b7efad2f3f9c67dad1f22f975d1fff6a97f88' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+--- FAIL: TestExpiredExternalEffectAttemptFailureRollsBackRunAndEffect (6.57s)
+    reconciliation_test.go:92: expired Effect reconciliation succeeded despite Attempt failure
+
+2026/09/12 12:16:56 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.987ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'f79d69940ea9789e2ff08f412d0c3d6073ce9b2b4bfd66b2d8cba7151e076e12' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:16:56 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.600ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-claim' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:16:56 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[1.045ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = 'b5dac2349ca05c54d7c123319f92045cce1f6472262415851ba585f50e2520d1' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:02 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.072ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'cec86c44a10346515256280addbd35f424560b80a8e718063149744f838f9b12' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:02 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.689ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-claim-nr' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:02 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.941ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = 'd74078b0e206f6cd4af0e3ba60e9d6243dae0f6788ece701005f42d55b0cd0fc' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:02 /home/monody/project/SentinelOps/internal/ai/workflow/reconciliation.go:251 record not found
+[1.916ms] [rows:0] SELECT `workflow_runs`.`id`,`workflow_runs`.`workflow_key`,`workflow_runs`.`user_id`,`workflow_runs`.`session_id`,`workflow_runs`.`parent_run_id`,`workflow_runs`.`active_session_key`,`workflow_runs`.`status`,`workflow_runs`.`available_at`,`workflow_runs`.`priority`,`workflow_runs`.`runtime_mode`,`workflow_runs`.`attempt`,`workflow_runs`.`max_attempts`,`workflow_runs`.`lease_owner`,`workflow_runs`.`lease_until`,`workflow_runs`.`lease_generation`,`workflow_runs`.`heartbeat_at`,`workflow_runs`.`immutable_input_json`,`workflow_runs`.`query_text`,`workflow_runs`.`context_snapshot_json`,`workflow_runs`.`session_revision`,`workflow_runs`.`runtime_version`,`workflow_runs`.`runtime_compatibility_hash`,`workflow_runs`.`agent_revision`,`workflow_runs`.`model_snapshot`,`workflow_runs`.`tool_snapshot`,`workflow_runs`.`mcp_catalog_hash`,`workflow_runs`.`skill_snapshot`,`workflow_runs`.`prompt_hash`,`workflow_runs`.`policy_hash`,`workflow_runs`.`config_hash`,`workflow_runs`.`feature_snapshot`,`workflow_runs`.`budget_limits_json`,`workflow_runs`.`budget_usage_json`,`workflow_runs`.`budget_reservations_json`,`workflow_runs`.`usage_quality`,`workflow_runs`.`trace_quality`,`workflow_runs`.`last_event_seq`,`workflow_runs`.`cancel_requested_at`,`workflow_runs`.`park_reason`,`workflow_runs`.`input_payload`,`workflow_runs`.`output_payload`,`workflow_runs`.`error_message`,`workflow_runs`.`started_at`,`workflow_runs`.`finished_at`,`workflow_runs`.`duration_ms`,`workflow_runs`.`created_at`,`workflow_runs`.`updated_at`,`workflow_runs`.`deleted_at` FROM `workflow_runs` JOIN agent_effects ON agent_effects.run_id = workflow_runs.id WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND (workflow_runs.status = 'parked' AND workflow_runs.park_reason = 'effect_unknown' AND agent_effects.status = 'unknown' AND agent_effects.effect_type <> 'transactional_db' AND agent_effects.lease_generation = workflow_runs.lease_generation) AND (agent_effects.next_reconcile_at IS NULL OR agent_effects.next_reconcile_at <= CURRENT_TIMESTAMP(3)) AND agent_effects.effect_type IN ('reconcilable','provider_idempotent') AND `workflow_runs`.`deleted_at` IS NULL ORDER BY workflow_runs.available_at ASC, workflow_runs.id ASC, agent_effects.id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:17:09 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.981ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '7857ee28d60f75c75fcdc7f3ea0b9b5b616c6bd27bf55439a4af4cdf720eb2bf' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:09 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.596ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase42-reconcile-version' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:09 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.857ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '4c585843e47aa42d1bd0af205b1a1dc3906c6bc5af68e6c11c36366e0f5c0ade' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:09 /home/monody/project/SentinelOps/internal/ai/workflow/reconciliation.go:251 record not found
+[1.516ms] [rows:0] SELECT `workflow_runs`.`id`,`workflow_runs`.`workflow_key`,`workflow_runs`.`user_id`,`workflow_runs`.`session_id`,`workflow_runs`.`parent_run_id`,`workflow_runs`.`active_session_key`,`workflow_runs`.`status`,`workflow_runs`.`available_at`,`workflow_runs`.`priority`,`workflow_runs`.`runtime_mode`,`workflow_runs`.`attempt`,`workflow_runs`.`max_attempts`,`workflow_runs`.`lease_owner`,`workflow_runs`.`lease_until`,`workflow_runs`.`lease_generation`,`workflow_runs`.`heartbeat_at`,`workflow_runs`.`immutable_input_json`,`workflow_runs`.`query_text`,`workflow_runs`.`context_snapshot_json`,`workflow_runs`.`session_revision`,`workflow_runs`.`runtime_version`,`workflow_runs`.`runtime_compatibility_hash`,`workflow_runs`.`agent_revision`,`workflow_runs`.`model_snapshot`,`workflow_runs`.`tool_snapshot`,`workflow_runs`.`mcp_catalog_hash`,`workflow_runs`.`skill_snapshot`,`workflow_runs`.`prompt_hash`,`workflow_runs`.`policy_hash`,`workflow_runs`.`config_hash`,`workflow_runs`.`feature_snapshot`,`workflow_runs`.`budget_limits_json`,`workflow_runs`.`budget_usage_json`,`workflow_runs`.`budget_reservations_json`,`workflow_runs`.`usage_quality`,`workflow_runs`.`trace_quality`,`workflow_runs`.`last_event_seq`,`workflow_runs`.`cancel_requested_at`,`workflow_runs`.`park_reason`,`workflow_runs`.`input_payload`,`workflow_runs`.`output_payload`,`workflow_runs`.`error_message`,`workflow_runs`.`started_at`,`workflow_runs`.`finished_at`,`workflow_runs`.`duration_ms`,`workflow_runs`.`created_at`,`workflow_runs`.`updated_at`,`workflow_runs`.`deleted_at` FROM `workflow_runs` JOIN agent_effects ON agent_effects.run_id = workflow_runs.id WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND (workflow_runs.status = 'parked' AND workflow_runs.park_reason = 'effect_unknown' AND agent_effects.status = 'unknown' AND agent_effects.effect_type <> 'transactional_db' AND agent_effects.lease_generation = workflow_runs.lease_generation) AND (agent_effects.next_reconcile_at IS NULL OR agent_effects.next_reconcile_at <= CURRENT_TIMESTAMP(3)) AND workflow_runs.runtime_version = 'sentinelops-test-v1' AND agent_effects.effect_type IN ('reconcilable','provider_idempotent') AND `workflow_runs`.`deleted_at` IS NULL ORDER BY workflow_runs.available_at ASC, workflow_runs.id ASC, agent_effects.id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:17:16 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.230ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '35688f8623ddcee99005c31e5aa02ee00e898e3700f93fbcdbfbd403dd6acbb6' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:16 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[2.265ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-executed' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:16 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[1.003ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '6b65fd7328aa29a9b96c8b01a60ef220d61293991be81a820e96abcd3d122063' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:21 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.342ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'c39339b94089580cfe7b3088de2829582a756292887c130ef920fcd67f7c4900' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:22 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.990ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-notexecuted' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:22 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[1.170ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = 'c8c61fc47450136f4c6e0e1fe7072fc6ad878477ea9d62c6d6e67336d31b580f' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:28 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.780ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '3423618a4fa4fcfbda0e97a7d8922d6c2a2a29f99b7620a8cd998f7896bafa09' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:28 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.273ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-stillunknown' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:28 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[1.013ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = 'a5e2fffc8845c05df01ab3ff9b417aa42cc502af745de6ecc74551785d4aaf89' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+--- FAIL: TestReconciliationResolutionsUseEffectCASAndRunTransitions (19.32s)
+    --- FAIL: TestReconciliationResolutionsUseEffectCASAndRunTransitions/still-unknown (6.32s)
+        reconciliation_test.go:253: still-unknown resolution did not set future backoff: mysql.AgentEffect{ID:"a5e2fffc8845c05df01ab3ff9b417aa42cc502af745de6ecc74551785d4aaf89", RunID:"run-phase22-phase25-stillunknown", ToolCallIDObserved:(*string)(0x5e8ac01cbf0), IdempotencyKey:"a5e2fffc8845c05df01ab3ff9b417aa42cc502af745de6ecc74551785d4aaf89", EffectRole:"primary", EffectStep:"primary", ParentEffectID:(*string)(nil), ProposalHash:"000000000000000000000000000000000000000000000000000000000000003f", ToolName:"block_ip", ToolRevision:"v1", ToolSchemaHash:"be34ad3658d92b5bcd16d692d7183de57cec6f14305554a8e0add0aa1a370573", TargetHash:"4444444444444444444444444444444444444444444444444444444444444444", RequestRedacted:(*string)(0x5e8ac01cc80), ResponseRedacted:(*string)(nil), EffectType:"reconcilable", Status:"unknown", Version:0x5, ExternalReference:(*string)(nil), LeaseGeneration:0x3, Attempt:0x1, ReconciliationAttempts:0x1, NextReconcileAt:time.Date(2026, time.September, 12, 4, 18, 28, 609000000, time.Local), Resolution:(*string)(0x5e8ac01ccb0), ResolutionEvidenceRedacted:(*string)(0x5e8ac01ccc0), ResolvedBy:(*string)(0x5e8ac01ccd0), ResolvedAt:time.Date(2026, time.September, 12, 4, 17, 28, 609000000, time.Local), StartedAt:time.Date(2026, time.September, 12, 4, 17, 28, 557000000, time.Local), FinishedAt:time.Date(2026, time.September, 12, 4, 17, 28, 574000000, time.Local), LastError:(*string)(nil), CreatedAt:time.Date(2026, time.September, 12, 12, 17, 28, 543000000, time.Local), UpdatedAt:time.Date(2026, time.September, 12, 12, 17, 28, 609000000, time.Local)}
+
+2026/09/12 12:17:34 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.836ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '82fb051f11b739474be33581df3895dbc416c8c64c33712cf0cb07d48ed4b510' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:34 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.343ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-stale-generation' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:34 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.773ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '1b95d8fc9b117cb212d1c326e417e6db70dd9d02f06aa88b1dcdc49f1fea7e10' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:34 /home/monody/project/SentinelOps/internal/ai/workflow/reconciliation.go:251 record not found
+[2.266ms] [rows:0] SELECT `workflow_runs`.`id`,`workflow_runs`.`workflow_key`,`workflow_runs`.`user_id`,`workflow_runs`.`session_id`,`workflow_runs`.`parent_run_id`,`workflow_runs`.`active_session_key`,`workflow_runs`.`status`,`workflow_runs`.`available_at`,`workflow_runs`.`priority`,`workflow_runs`.`runtime_mode`,`workflow_runs`.`attempt`,`workflow_runs`.`max_attempts`,`workflow_runs`.`lease_owner`,`workflow_runs`.`lease_until`,`workflow_runs`.`lease_generation`,`workflow_runs`.`heartbeat_at`,`workflow_runs`.`immutable_input_json`,`workflow_runs`.`query_text`,`workflow_runs`.`context_snapshot_json`,`workflow_runs`.`session_revision`,`workflow_runs`.`runtime_version`,`workflow_runs`.`runtime_compatibility_hash`,`workflow_runs`.`agent_revision`,`workflow_runs`.`model_snapshot`,`workflow_runs`.`tool_snapshot`,`workflow_runs`.`mcp_catalog_hash`,`workflow_runs`.`skill_snapshot`,`workflow_runs`.`prompt_hash`,`workflow_runs`.`policy_hash`,`workflow_runs`.`config_hash`,`workflow_runs`.`feature_snapshot`,`workflow_runs`.`budget_limits_json`,`workflow_runs`.`budget_usage_json`,`workflow_runs`.`budget_reservations_json`,`workflow_runs`.`usage_quality`,`workflow_runs`.`trace_quality`,`workflow_runs`.`last_event_seq`,`workflow_runs`.`cancel_requested_at`,`workflow_runs`.`park_reason`,`workflow_runs`.`input_payload`,`workflow_runs`.`output_payload`,`workflow_runs`.`error_message`,`workflow_runs`.`started_at`,`workflow_runs`.`finished_at`,`workflow_runs`.`duration_ms`,`workflow_runs`.`created_at`,`workflow_runs`.`updated_at`,`workflow_runs`.`deleted_at` FROM `workflow_runs` JOIN agent_effects ON agent_effects.run_id = workflow_runs.id WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND (workflow_runs.status = 'parked' AND workflow_runs.park_reason = 'effect_unknown' AND agent_effects.status = 'unknown' AND agent_effects.effect_type <> 'transactional_db' AND agent_effects.lease_generation = workflow_runs.lease_generation) AND (agent_effects.next_reconcile_at IS NULL OR agent_effects.next_reconcile_at <= CURRENT_TIMESTAMP(3)) AND agent_effects.effect_type IN ('reconcilable','provider_idempotent') AND `workflow_runs`.`deleted_at` IS NULL ORDER BY workflow_runs.available_at ASC, workflow_runs.id ASC, agent_effects.id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:17:41 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.864ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'fcd65187ccb151875ef245548f9445bab075663c491c410f5871a4993ecd0292' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:41 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.559ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-derived-primary' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:41 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.782ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '3e17ee62c8a679b7a4975c5501ec4498a5a8b7922361de444992859f09e01153' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:47 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.069ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '6afe4ba184daccad6d57721ecf6fc730173528410a5fde31b93448f2e0af2c94' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:47 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.582ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-admin' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:47 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.971ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '7b2d27a22548078d904df0ee7372ba71585db871cad23e3744d9e5e7af268be4' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:17:52 /home/monody/project/SentinelOps/internal/ai/workflow/reconciliation.go:251 record not found
+[1.713ms] [rows:0] SELECT `workflow_runs`.`id`,`workflow_runs`.`workflow_key`,`workflow_runs`.`user_id`,`workflow_runs`.`session_id`,`workflow_runs`.`parent_run_id`,`workflow_runs`.`active_session_key`,`workflow_runs`.`status`,`workflow_runs`.`available_at`,`workflow_runs`.`priority`,`workflow_runs`.`runtime_mode`,`workflow_runs`.`attempt`,`workflow_runs`.`max_attempts`,`workflow_runs`.`lease_owner`,`workflow_runs`.`lease_until`,`workflow_runs`.`lease_generation`,`workflow_runs`.`heartbeat_at`,`workflow_runs`.`immutable_input_json`,`workflow_runs`.`query_text`,`workflow_runs`.`context_snapshot_json`,`workflow_runs`.`session_revision`,`workflow_runs`.`runtime_version`,`workflow_runs`.`runtime_compatibility_hash`,`workflow_runs`.`agent_revision`,`workflow_runs`.`model_snapshot`,`workflow_runs`.`tool_snapshot`,`workflow_runs`.`mcp_catalog_hash`,`workflow_runs`.`skill_snapshot`,`workflow_runs`.`prompt_hash`,`workflow_runs`.`policy_hash`,`workflow_runs`.`config_hash`,`workflow_runs`.`feature_snapshot`,`workflow_runs`.`budget_limits_json`,`workflow_runs`.`budget_usage_json`,`workflow_runs`.`budget_reservations_json`,`workflow_runs`.`usage_quality`,`workflow_runs`.`trace_quality`,`workflow_runs`.`last_event_seq`,`workflow_runs`.`cancel_requested_at`,`workflow_runs`.`park_reason`,`workflow_runs`.`input_payload`,`workflow_runs`.`output_payload`,`workflow_runs`.`error_message`,`workflow_runs`.`started_at`,`workflow_runs`.`finished_at`,`workflow_runs`.`duration_ms`,`workflow_runs`.`created_at`,`workflow_runs`.`updated_at`,`workflow_runs`.`deleted_at` FROM `workflow_runs` JOIN agent_effects ON agent_effects.run_id = workflow_runs.id WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND (workflow_runs.status = 'parked' AND workflow_runs.park_reason = 'effect_unknown' AND agent_effects.status = 'unknown' AND agent_effects.effect_type <> 'transactional_db' AND agent_effects.lease_generation = workflow_runs.lease_generation) AND (agent_effects.next_reconcile_at IS NULL OR agent_effects.next_reconcile_at <= CURRENT_TIMESTAMP(3)) AND agent_effects.effect_type IN ('reconcilable','provider_idempotent') AND `workflow_runs`.`deleted_at` IS NULL ORDER BY workflow_runs.available_at ASC, workflow_runs.id ASC, agent_effects.id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:17:57 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.360ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase12-facts' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:18:03 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[2.053ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase12-events' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:18:08 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.625ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase12-restore' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:18:14 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.624ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase09-phase12-handoff' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:18:20 /home/monody/project/SentinelOps/internal/ai/workflow/retention.go:83 record not found
+[1.113ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (id = 'system:retention' AND available_at <= CURRENT_TIMESTAMP(3) AND ((status = 'pending' AND lease_owner IS NULL) OR (status = 'running' AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP(3))))) AND `workflow_runs`.`deleted_at` IS NULL LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:18:20 /home/monody/project/SentinelOps/internal/ai/workflow/retention.go:83 record not found
+[0.900ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (id = 'system:retention' AND available_at <= CURRENT_TIMESTAMP(3) AND ((status = 'pending' AND lease_owner IS NULL) OR (status = 'running' AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP(3))))) AND `workflow_runs`.`deleted_at` IS NULL LIMIT 1 FOR UPDATE SKIP LOCKED
+--- FAIL: TestCleanupLeaseGenerationFenceAllowsOneWorker (6.28s)
+    retention_test.go:44: claimed workers=0, want 1
+
+2026/09/12 12:18:38 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:214 Error 1062 (23000): Duplicate entry 'session-conflict' for key 'workflow_runs.uidx_workflow_runs_active_session'
+[0.939ms] [rows:0] INSERT INTO `workflow_runs` (`id`,`workflow_key`,`user_id`,`session_id`,`parent_run_id`,`active_session_key`,`status`,`priority`,`runtime_mode`,`attempt`,`max_attempts`,`lease_owner`,`lease_until`,`lease_generation`,`heartbeat_at`,`immutable_input_json`,`query_text`,`context_snapshot_json`,`session_revision`,`runtime_version`,`runtime_compatibility_hash`,`agent_revision`,`model_snapshot`,`tool_snapshot`,`mcp_catalog_hash`,`skill_snapshot`,`prompt_hash`,`policy_hash`,`config_hash`,`feature_snapshot`,`budget_limits_json`,`budget_usage_json`,`budget_reservations_json`,`usage_quality`,`trace_quality`,`last_event_seq`,`cancel_requested_at`,`park_reason`,`input_payload`,`output_payload`,`error_message`,`started_at`,`finished_at`,`duration_ms`,`created_at`,`updated_at`,`deleted_at`) VALUES ('run-second','phase08-test','user-conflict','session-conflict','','session-conflict','pending',0,'durable_v1',0,3,NULL,NULL,0,NULL,'{"query":"current task only"}','current task only','{"schema":"sentinelops/runtime-context/v1","identity":{"user_id":"user-conflict","role":"viewer","scope":{"UserID":"user-conflict","All":false}},"history":{"schema":"fo/session-state/v1","history":[],"summary":"","revision":0,"provenance":{"history":"empty_no_durable_mysql_history","preference":"none"}},"budget_limits":{},"deadline_at":"2026-09-12T05:18:38.479926557Z"}',0,'sentinelops-test-v1','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','agent-test-v1','[]','[]','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','[]','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc','dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd','eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','{}','{}','{}','{}','unknown','unknown',1,NULL,NULL,'','','','2026-09-12 12:18:38.48',NULL,0,'2026-09-12 12:18:38.485','2026-09-12 12:18:38.485',NULL)
+
+2026/09/12 12:18:44 /home/monody/project/SentinelOps/internal/ai/workflow/store.go:194 record not found
+[0.902ms] [rows:0] SELECT `id`,`user_id`,`session_id`,`status`,`runtime_mode`,`last_event_seq`,`started_at`,`finished_at` FROM `workflow_runs` WHERE (id = 'legacy-resume-read-only' AND runtime_mode = 'durable_v1') AND `workflow_runs`.`deleted_at` IS NULL ORDER BY `workflow_runs`.`id` LIMIT 1
+
+2026/09/12 12:18:50 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:214 Error 1062 (23000): Duplicate entry 'session-concurrent' for key 'workflow_runs.uidx_workflow_runs_active_session'
+[1.166ms] [rows:0] INSERT INTO `workflow_runs` (`id`,`workflow_key`,`user_id`,`session_id`,`parent_run_id`,`active_session_key`,`status`,`priority`,`runtime_mode`,`attempt`,`max_attempts`,`lease_owner`,`lease_until`,`lease_generation`,`heartbeat_at`,`immutable_input_json`,`query_text`,`context_snapshot_json`,`session_revision`,`runtime_version`,`runtime_compatibility_hash`,`agent_revision`,`model_snapshot`,`tool_snapshot`,`mcp_catalog_hash`,`skill_snapshot`,`prompt_hash`,`policy_hash`,`config_hash`,`feature_snapshot`,`budget_limits_json`,`budget_usage_json`,`budget_reservations_json`,`usage_quality`,`trace_quality`,`last_event_seq`,`cancel_requested_at`,`park_reason`,`input_payload`,`output_payload`,`error_message`,`started_at`,`finished_at`,`duration_ms`,`created_at`,`updated_at`,`deleted_at`) VALUES ('run-concurrent-0','phase08-test','user-concurrent','session-concurrent','','session-concurrent','pending',0,'durable_v1',0,3,NULL,NULL,0,NULL,'{"query":"current task only"}','current task only','{"schema":"sentinelops/runtime-context/v1","identity":{"user_id":"user-concurrent","role":"viewer","scope":{"UserID":"user-concurrent","All":false}},"history":{"schema":"fo/session-state/v1","history":[],"summary":"","revision":0,"provenance":{"history":"empty_no_durable_mysql_history","preference":"none"}},"budget_limits":{},"deadline_at":"2026-09-12T05:18:50.768616876Z"}',0,'sentinelops-test-v1','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','agent-test-v1','[]','[]','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','[]','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc','dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd','eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','{}','{}','{}','{}','unknown','unknown',1,NULL,NULL,'','','','2026-09-12 12:18:50.768',NULL,0,'2026-09-12 12:18:50.787','2026-09-12 12:18:50.787',NULL)
+
+2026/09/12 12:18:56 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:669 Error 1644 (45000): reject run.created
+[1.503ms] [rows:0] INSERT INTO `workflow_events` (`run_id`,`seq`,`event_type`,`payload`,`payload_version`,`trace_id`,`operation_id`,`command_action`,`idempotency_key_digest`,`request_fingerprint`,`actor_id`,`reason_redacted`,`correlation_seq`,`created_at`) VALUES ('run-bootstrap',1,'run.created','{"data":{"source":"phase08-test"},"schema":"sentinelops/workflow-event/v1"}',1,'',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'2026-09-12 12:18:56.856')
+
+2026/09/12 12:19:03 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:669 Error 1644 (45000): reject transition event
+[1.668ms] [rows:0] INSERT INTO `workflow_events` (`run_id`,`seq`,`event_type`,`payload`,`payload_version`,`trace_id`,`operation_id`,`command_action`,`idempotency_key_digest`,`request_fingerprint`,`actor_id`,`reason_redacted`,`correlation_seq`,`created_at`) VALUES ('run-transition',2,'run.claimed','{"data":{"source":"test"},"schema":"sentinelops/workflow-event/v1"}',1,'',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'2026-09-12 12:19:03.834')
+
+2026/09/12 12:20:40 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:700 Error 1644 (45000): reject completion revision
+[0.671ms] [rows:0] INSERT INTO `session_state_revisions` (`session_id`,`revision`,`state_json`,`created_at`,`deleted_at`) VALUES ('session-complete_rollback',1,'{"schema":"fo/session-state/v1"}','2026-09-12 12:20:40.783',NULL)
+FAIL
+FAIL	SentinelOps/internal/ai/workflow	843.291s
+WARNING: sonic/ast only supports (go1.17~1.26 and amd64 CPU) or (go1.20~1.26 and arm64 CPU), but your environment is not suitable and will fallback to encoding/json
+
+2026/09/12 12:21:53 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[1.000ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:21:53 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.333ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase20-focused' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:21:53 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:322 record not found
+[0.689ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase20-focused' ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:21:59 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[1.051ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:21:59 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.205ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase20-retry' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:21:59 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[1.620ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:21:59 /home/monody/project/SentinelOps/internal/ai/workflow/claim.go:73 record not found
+[1.230ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND attempt < max_attempts AND (NOT EXISTS (
+				SELECT 1 FROM workflow_events op_accepted
+				WHERE op_accepted.run_id = workflow_runs.id
+				  AND op_accepted.event_type = 'operation.accepted'
+				  AND op_accepted.operation_id IS NOT NULL
+				  AND NOT EXISTS (
+					SELECT 1 FROM workflow_events op_terminal
+					WHERE op_terminal.run_id = op_accepted.run_id
+					  AND op_terminal.operation_id = op_accepted.operation_id
+					  AND op_terminal.event_type IN ('operation.succeeded', 'operation.failed', 'operation.canceled', 'operation.rejected')
+				  )
+			)) AND ((
+				(status = 'pending' AND available_at <= CURRENT_TIMESTAMP(3) AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
+				OR
+				(status = 'retryable_failed' AND available_at <= CURRENT_TIMESTAMP(3) AND lease_owner IS NULL)
+				OR
+				(status = 'running' AND (lease_owner IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
+			)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:21:59 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[0.988ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:21:59 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.611ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase20-retry' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:03 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[0.966ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:22:03 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.560ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase20-drain' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:03 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:322 record not found
+[0.779ms] [rows:0] SELECT * FROM `agent_approvals` WHERE run_id = 'run-phase20-drain' ORDER BY created_at DESC, id DESC,`agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:09 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.188ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase20-parked' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:09 /home/monody/project/SentinelOps/internal/ai/workflow/run.go:214 Error 1062 (23000): Duplicate entry 'session-phase20-parked' for key 'workflow_runs.uidx_workflow_runs_active_session'
+[0.722ms] [rows:0] INSERT INTO `workflow_runs` (`id`,`workflow_key`,`user_id`,`session_id`,`parent_run_id`,`active_session_key`,`status`,`priority`,`runtime_mode`,`attempt`,`max_attempts`,`lease_owner`,`lease_until`,`lease_generation`,`heartbeat_at`,`immutable_input_json`,`query_text`,`context_snapshot_json`,`session_revision`,`runtime_version`,`runtime_compatibility_hash`,`agent_revision`,`model_snapshot`,`tool_snapshot`,`mcp_catalog_hash`,`skill_snapshot`,`prompt_hash`,`policy_hash`,`config_hash`,`feature_snapshot`,`budget_limits_json`,`budget_usage_json`,`budget_reservations_json`,`usage_quality`,`trace_quality`,`last_event_seq`,`cancel_requested_at`,`park_reason`,`input_payload`,`output_payload`,`error_message`,`started_at`,`finished_at`,`duration_ms`,`created_at`,`updated_at`,`deleted_at`) VALUES ('run-phase20-conflict','chat.intent','user-phase20-parked','session-phase20-parked','','session-phase20-parked','pending',0,'durable_v1',0,3,NULL,NULL,0,NULL,'{"agent":"event_analysis_agent","query":"park"}','park','{"schema":"sentinelops/runtime-context/v1","identity":{"user_id":"user-phase20-parked","role":"operator","scope":{"UserID":"user-phase20-parked","All":false}},"history":{"schema":"fo/session-state/v1","history":[],"summary":"","revision":0,"provenance":{"history":"empty_no_durable_mysql_history","preference":"none"}},"budget_limits":{},"deadline_at":"2026-09-12T04:23:09.234550166Z"}',0,'{"app":"app-rev-1","eino":"v0.9.15","go":"go1.27.0"}','0eb3509b97913c6e47a4c4e5d3c80f151c4305cd95bd07542312f35bf4408960','agent-rev-1','[{"candidate_order":0,"catalog_ref":"provider_a/chat","driver":"openai_compatible_chat","kind":"chat","model_id":"vendor-chat","pricing":{"currency":"CNY","input":1,"output":2,"revision":"pricing-1","unit":"per_million_tokens"},"profile":"default","provider":"provider_a","route_options":{"enable_thinking":false}},{"candidate_order":0,"catalog_ref":"provider_a/embed","driver":"openai_compatible_embedding","kind":"embedding","model_id":"vendor-embed","pricing":{"currency":"CNY","input":0.5,"revision":"pricing-1","unit":"per_million_tokens"},"profile":"default","provider":"provider_a","route_options":{}}]','[{"name":"query_events","revision":"tool-rev-1","schema_hash":"ba53bf86b539ee9e7cccf3ef37f870303570da3f83e15856dc693ef3af69f57b"},{"name":"search_similar_events","revision":"tool-rev-1","schema_hash":"a573fc5fa62f0efbdaebecfdc8bb8c05653a1857fa188c25b9a3778f7e5d5465"}]','cbb80c3635e53e0968c365e025f0e7199b39c619f86379a8b3e9a28a8729637f','[{"content_hash":"73545c1aad08b159490e3e2b2c2305bc6ed3f56a4a9ae1a0099f8e8a4245ed3f","name":"incident-analysis"}]','7ed65932e8020d4d9f9f6a3685dd16ea62b9bd0477726edcf734750de827e343','a9abbb22710fbf816a5a12587ad6a2bb37941a6a207e36a4d6390beb8531116f','44b25fd6993edeb3b8ded5d90a7ed24479b70103fe0653e3cf5facadbfb1d1df','{"agent_runtime.accept_new_runs":true,"agent_runtime.admin_query_database_debug":false,"agent_runtime.enabled":true,"agent_runtime.l1_writes":false,"agent_runtime.l2_writes":false,"agent_runtime.shadow_mode":false,"langfuse.enabled":false,"mcp.enabled":false,"skill.enabled":false}','{}','{}','{}','unknown','unknown',1,NULL,NULL,'','','','2026-09-12 12:22:09.283',NULL,0,'2026-09-12 12:22:09.287','2026-09-12 12:22:09.287',NULL)
+
+2026/09/12 12:22:15 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.402ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase24-external-resume' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:15 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.981ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'c87bedcdcfd6117eaa568f3799f6d8cee60449ad868562b1658fb60c77004163' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:15 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.398ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase24-external-resume' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:15 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.880ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '4403bd60ae7e42846a2ba8ebd1661c7a94421def60079b97bd1ab849ebd3f640' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+--- FAIL: TestExternalEffectApprovedResumeUsesLedgerDeadlineAndIdempotency (6.13s)
+    external_effect_test.go:130: [NodeRunError] failed to invoke tool[name:webhook_out id:phase24-webhook-call]: [LocalFunc] failed to invoke tool, toolName=webhook_out, err=webhook_out: provider result unknown
+        ------------------------
+        node path: [node_1, ToolNode]
+
+2026/09/12 12:22:21 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.436ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'b-current-phase42' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:21 /home/monody/project/SentinelOps/internal/ai/workflow/claim.go:73 record not found
+[1.086ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND attempt < max_attempts AND (NOT EXISTS (
+				SELECT 1 FROM workflow_events op_accepted
+				WHERE op_accepted.run_id = workflow_runs.id
+				  AND op_accepted.event_type = 'operation.accepted'
+				  AND op_accepted.operation_id IS NOT NULL
+				  AND NOT EXISTS (
+					SELECT 1 FROM workflow_events op_terminal
+					WHERE op_terminal.run_id = op_accepted.run_id
+					  AND op_terminal.operation_id = op_accepted.operation_id
+					  AND op_terminal.event_type IN ('operation.succeeded', 'operation.failed', 'operation.canceled', 'operation.rejected')
+				  )
+			)) AND ((
+				(status = 'pending' AND available_at <= CURRENT_TIMESTAMP(3) AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
+				OR
+				(status = 'retryable_failed' AND available_at <= CURRENT_TIMESTAMP(3) AND lease_owner IS NULL)
+				OR
+				(status = 'running' AND (lease_owner IS NULL OR lease_until <= CURRENT_TIMESTAMP(3)))
+			)) AND runtime_version = '{"app":"unknown","eino":"v0","go":"go0"}' AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:22:26 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.451ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'existing-phase42' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:32 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.344ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-phase42-runtime-disabled' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:32 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[0.923ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:22:36 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.355ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-stateful-interrupt' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:36 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.962ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '8ece1f3f5144123849d74921e6ea56238c0a8542df13a900324b24de2f7517dc' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:42 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.500ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-no-reopen-rejected' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:42 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.814ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '10be4fecf1a4327edee5d50b38a77db0ca4809692caa3bdd133e8534c8dfe68c' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:47 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.461ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-no-reopen-expired' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:47 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.908ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '72f723d28d9ff218add5837625e4509defcc2bd2addffa4021423b6efde37616' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:52 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.334ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-runner-publish' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:52 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.904ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '957570ac7deb47e40bde932f51152ecc00b41dea29eb79339043ce78517970f4' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:58 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.404ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-checkpoint-set-failure' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:22:58 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.817ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'b6ccd88a6f69a86925715050ff1d6ed4d7fa53a7f55278328d8733ac2bc2b5a3' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:04 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.414ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-worker-expiry' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:04 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.831ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '26bed325011f1589c67a774123f0bb21ef0f8df33a4258043d814c119d23d48e' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:04 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[0.926ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+--- FAIL: TestTwoPhaseApprovalWorkerLoopExpiresDueApproval (5.99s)
+    hitl_test.go:298: expiry-only Worker RunOnce worked=false err=<nil>
+
+2026/09/12 12:23:10 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.530ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-forged-resume-rejected' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:10 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.790ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '45352829024ac3590dc9a8085026213e64be3a12bcb5c3148607668c59f23e3a' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:10 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.573ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-forged-resume-rejected' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:16 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.303ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-forged-resume-expired' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:16 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.826ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '37dadbb25a817e56fbf75a6b5f5331aeeee2ceecd36242be3d5a9121724bc875' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+--- FAIL: TestResumeAuthorizationIgnoresForgedDecisionAndDoesNotReinterruptTerminal (12.62s)
+    --- FAIL: TestResumeAuthorizationIgnoresForgedDecisionAndDoesNotReinterruptTerminal/expired (6.27s)
+        hitl_test.go:372: APPROVAL_NOT_EXPIRED
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.629ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase26-create_report' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.907ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '453da0f24d940c883a9babbeb1dbf526f3f960b9088b45c01010272258d5e970' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.840ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase26-save_intelligence' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.710ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'eb48b0fcd47f5b689e049db61e3d0f54d3e5896c9aa6b9aa4f437e68b5267782' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.706ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase26-update_event_status' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.729ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '68b20d64bcc45493c840547cf70f2491ac9b9362796fbd884da93fcf7dddd89e' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.677ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase26-block_ip' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.732ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '426211f5b15669e4d74e185d40d5a99e8c05797a5a78100918be7022c0657432' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.705ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase26-notify_dingtalk' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.827ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'fef6608d793bbe960f8afc3cab4e1047b44b29dc24db400915bbc5486e71f64a' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.667ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase26-notify_wecom' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:22 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.684ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '8f902ad4e095d393971db53793540d052347bf9b0f9448dc333fa3d75c919d01' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:23 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.700ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase26-notify_email' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:23 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.691ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '44ba82baf99153e558828d9a8cddf66fd8c32fd7cab293dbeafe2985ad17c418' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:23 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.705ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase26-webhook_out' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:23 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[1.817ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = 'affe822d8c10ccaf613b45426679ffe90ad608ced0aa9c0e39083f8ea5782c20' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:29 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.242ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase26-nested-agent-tool' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:29 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.768ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '3d5fe37c4e14a20d378931a38501f6d152fa89ada86690b9f3afe3bf2c2991bc' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:29 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.636ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase26-nested-agent-tool' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:29 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.781ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = 'bbfc68ac5ef14f67eed42d8222b0309a0b558d79b69b395500f9bd6577f07c05' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:35 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.404ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-applied' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:35 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[1.020ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:23:40 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.400ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-not_applied' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:40 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[1.401ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:23:46 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.375ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-query_error' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:47 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[0.993ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+--- FAIL: TestReconciliationWorkerAutomaticallyResolvesTargetState (18.60s)
+    --- FAIL: TestReconciliationWorkerAutomaticallyResolvesTargetState/query_error (6.09s)
+        reconciliation_test.go:70: query error did not persist bounded backoff: mysql.AgentEffect{ID:"fb60806ad617bd193e68bb361c748282771855c02bfacf95e8f98feceb9a1031", RunID:"run-phase22-phase25-query_error", ToolCallIDObserved:(*string)(nil), IdempotencyKey:"fb60806ad617bd193e68bb361c748282771855c02bfacf95e8f98feceb9a1031", EffectRole:"primary", EffectStep:"primary", ParentEffectID:(*string)(nil), ProposalHash:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ToolName:"block_ip", ToolRevision:"v1", ToolSchemaHash:"be34ad3658d92b5bcd16d692d7183de57cec6f14305554a8e0add0aa1a370573", TargetHash:"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", RequestRedacted:(*string)(0x13bd1ae362e0), ResponseRedacted:(*string)(nil), EffectType:"reconcilable", Status:"unknown", Version:0x4, ExternalReference:(*string)(nil), LeaseGeneration:0x2, Attempt:0x1, ReconciliationAttempts:0x1, NextReconcileAt:time.Date(2026, time.September, 12, 4, 24, 47, 7000000, time.Local), Resolution:(*string)(0x13bd1ae36350), ResolutionEvidenceRedacted:(*string)(0x13bd1ae36360), ResolvedBy:(*string)(0x13bd1ae36390), ResolvedAt:time.Date(2026, time.September, 12, 4, 23, 47, 7000000, time.Local), StartedAt:time.Date(2026, time.September, 12, 12, 23, 46, 956000000, time.Local), FinishedAt:time.Date(2026, time.September, 12, 12, 23, 46, 956000000, time.Local), LastError:(*string)(nil), CreatedAt:time.Date(2026, time.September, 12, 12, 23, 46, 956000000, time.Local), UpdatedAt:time.Date(2026, time.September, 12, 12, 23, 47, 7000000, time.Local)}
+
+2026/09/12 12:23:53 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.275ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase25-nonreconcilable' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:23:53 /home/monody/project/SentinelOps/internal/ai/workflow/reconciliation.go:251 record not found
+[1.022ms] [rows:0] SELECT `workflow_runs`.`id`,`workflow_runs`.`workflow_key`,`workflow_runs`.`user_id`,`workflow_runs`.`session_id`,`workflow_runs`.`parent_run_id`,`workflow_runs`.`active_session_key`,`workflow_runs`.`status`,`workflow_runs`.`available_at`,`workflow_runs`.`priority`,`workflow_runs`.`runtime_mode`,`workflow_runs`.`attempt`,`workflow_runs`.`max_attempts`,`workflow_runs`.`lease_owner`,`workflow_runs`.`lease_until`,`workflow_runs`.`lease_generation`,`workflow_runs`.`heartbeat_at`,`workflow_runs`.`immutable_input_json`,`workflow_runs`.`query_text`,`workflow_runs`.`context_snapshot_json`,`workflow_runs`.`session_revision`,`workflow_runs`.`runtime_version`,`workflow_runs`.`runtime_compatibility_hash`,`workflow_runs`.`agent_revision`,`workflow_runs`.`model_snapshot`,`workflow_runs`.`tool_snapshot`,`workflow_runs`.`mcp_catalog_hash`,`workflow_runs`.`skill_snapshot`,`workflow_runs`.`prompt_hash`,`workflow_runs`.`policy_hash`,`workflow_runs`.`config_hash`,`workflow_runs`.`feature_snapshot`,`workflow_runs`.`budget_limits_json`,`workflow_runs`.`budget_usage_json`,`workflow_runs`.`budget_reservations_json`,`workflow_runs`.`usage_quality`,`workflow_runs`.`trace_quality`,`workflow_runs`.`last_event_seq`,`workflow_runs`.`cancel_requested_at`,`workflow_runs`.`park_reason`,`workflow_runs`.`input_payload`,`workflow_runs`.`output_payload`,`workflow_runs`.`error_message`,`workflow_runs`.`started_at`,`workflow_runs`.`finished_at`,`workflow_runs`.`duration_ms`,`workflow_runs`.`created_at`,`workflow_runs`.`updated_at`,`workflow_runs`.`deleted_at` FROM `workflow_runs` JOIN agent_effects ON agent_effects.run_id = workflow_runs.id WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND (workflow_runs.status = 'parked' AND workflow_runs.park_reason = 'effect_unknown' AND agent_effects.status = 'unknown' AND agent_effects.effect_type <> 'transactional_db' AND agent_effects.lease_generation = workflow_runs.lease_generation) AND (agent_effects.next_reconcile_at IS NULL OR agent_effects.next_reconcile_at <= CURRENT_TIMESTAMP(3)) AND agent_effects.effect_type IN ('reconcilable','provider_idempotent') AND `workflow_runs`.`deleted_at` IS NULL ORDER BY workflow_runs.available_at ASC, workflow_runs.id ASC, agent_effects.id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:23:53 /home/monody/project/SentinelOps/internal/ai/workflow/operations.go:137 record not found
+[0.945ms] [rows:0] SELECT * FROM `workflow_runs` WHERE (runtime_mode = 'durable_v1' AND immutable_input_json IS NOT NULL AND runtime_version IS NOT NULL AND TRIM(runtime_version) <> '' AND runtime_compatibility_hash IS NOT NULL AND TRIM(runtime_compatibility_hash) <> '') AND runtime_mode = 'durable_v1' AND status NOT IN ('succeeded','success','failed','canceled') AND (EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = 'operation.accepted' AND e.operation_id IS NOT NULL)) AND `workflow_runs`.`deleted_at` IS NULL ORDER BY priority DESC, available_at ASC, id ASC,`workflow_runs`.`id` LIMIT 1 FOR UPDATE SKIP LOCKED
+
+2026/09/12 12:23:59 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[2.324ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase12-decode' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:24:05 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[1.271ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase23-approved-resume' AND attempt = 1 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:24:05 /home/monody/project/SentinelOps/internal/ai/workflow/approval_lifecycle.go:114 record not found
+[0.955ms] [rows:0] SELECT * FROM `agent_approvals` WHERE id = '3b0517de73ccf901e36bfa3a69b84ddf34e24424af73638ad752a863c42f4b92' ORDER BY `agent_approvals`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:24:05 /home/monody/project/SentinelOps/internal/ai/workflow/attempts.go:105 record not found
+[0.670ms] [rows:0] SELECT * FROM `workflow_attempts` WHERE run_id = 'run-phase22-phase23-approved-resume' AND attempt = 2 ORDER BY `workflow_attempts`.`id` LIMIT 1 FOR UPDATE
+
+2026/09/12 12:24:05 /home/monody/project/SentinelOps/internal/ai/workflow/effects.go:298 record not found
+[0.886ms] [rows:0] SELECT * FROM `agent_effects` WHERE id = '5b3443266c747d703931f2adbff3a4bca36892b81575b779d1f9ab2709a0d99b' ORDER BY `agent_effects`.`id` LIMIT 1 FOR UPDATE
+FAIL
+FAIL	SentinelOps/internal/ai/runtime	148.327s
+FAIL

@@ -1,0 +1,244 @@
+[
+  {
+    "viewport": 1280,
+    "route": "/runtime/runs/8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7?tab=overview",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1280,
+    "route": "/runtime/runs/8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7?tab=timeline",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1280,
+    "route": "/runtime/runs/8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7?tab=attempts",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1280,
+    "route": "/runtime/runs/8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7?tab=effects",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1280,
+    "route": "/runtime/runs/8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7?tab=evidence",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1280,
+    "route": "/runtime/runs/8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7?tab=context",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1280,
+    "route": "/runtime/runs/8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7?tab=trace",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1280,
+    "route": "/runtime/runs",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1280,
+    "route": "/runtime/capabilities",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1280,
+    "route": "/runtime/safety",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1280,
+    "route": "/runtime/worker-health",
+    "dimensions": {
+      "page": 1280,
+      "viewport": 1280,
+      "main": 992,
+      "mainWidth": 992
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/runs/0eeddcf4-4331-44aa-8032-1dc2ab97404a?tab=overview",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/runs/0eeddcf4-4331-44aa-8032-1dc2ab97404a?tab=timeline",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/runs/0eeddcf4-4331-44aa-8032-1dc2ab97404a?tab=attempts",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/runs/0eeddcf4-4331-44aa-8032-1dc2ab97404a?tab=effects",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/runs/0eeddcf4-4331-44aa-8032-1dc2ab97404a?tab=evidence",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/runs/0eeddcf4-4331-44aa-8032-1dc2ab97404a?tab=context",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/runs/0eeddcf4-4331-44aa-8032-1dc2ab97404a?tab=trace",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/runs",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/capabilities",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/safety",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  },
+  {
+    "viewport": 1440,
+    "route": "/runtime/worker-health",
+    "dimensions": {
+      "page": 1440,
+      "viewport": 1440,
+      "main": 1152,
+      "mainWidth": 1152
+    },
+    "console_errors": []
+  }
+]

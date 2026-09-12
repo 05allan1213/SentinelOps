@@ -1,0 +1,10 @@
+npm notice run sentinelops-web@1.0.0 test:unit
+npm notice run vitest run --run tests/unit/rag-eval-normalizer.test.ts
+
+ RUN  v4.1.11 /home/monody/project/SentinelOps/web
+
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  14:21:59
+   Duration  595ms (transform 34ms, setup 55ms, import 97ms, tests 3ms, environment 362ms)

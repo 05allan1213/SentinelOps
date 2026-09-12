@@ -1,0 +1,30 @@
+npm notice run sentinelops-web@1.0.0 npx
+npm notice run 'playwright' test tests/ui/runtime-guidelines.spec.ts tests/ui/runtime-runs.spec.ts tests/ui/markdown.spec.ts tests/ui/recovery-dialog-a11y.spec.ts --workers=1
+[WebServer] npm notice run sentinelops-web@1.0.0 dev
+
+[WebServer] npm notice run vite --host 127.0.0.1
+
+[WebServer] (node:94295) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 13 tests using 1 worker
+
+(node:94374) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/13] [chromium] › tests/ui/markdown.spec.ts:5:5 › shared Markdown renderer desktop fixture › bounds tables/code, highlights and copies source at 1280
+[2/13] [chromium] › tests/ui/markdown.spec.ts:5:5 › shared Markdown renderer desktop fixture › bounds tables/code, highlights and copies source at 1440
+[3/13] [chromium] › tests/ui/markdown.spec.ts:44:3 › shared Markdown renderer desktop fixture › preserves fence context and EOF in the real clipboard
+[4/13] [chromium] › tests/ui/markdown.spec.ts:62:3 › shared Markdown renderer desktop fixture › streaming guards and unsupported languages stay raw in the browser
+[5/13] [chromium] › tests/ui/recovery-dialog-a11y.spec.ts:4:3 › Recovery focus and dismissal at 1280
+[6/13] [chromium] › tests/ui/recovery-dialog-a11y.spec.ts:4:3 › Recovery focus and dismissal at 1440
+[7/13] [chromium] › tests/ui/runtime-guidelines.spec.ts:3:1 › Runtime skip link, semantic tab keyboard and form names
+[8/13] [chromium] › tests/ui/runtime-runs.spec.ts:47:3 › runs navigation, url filters, canonical badges and legacy labelling at 1280px
+[9/13] [chromium] › tests/ui/runtime-runs.spec.ts:91:3 › distinct empty, partial, unavailable and failed states at 1280px
+[10/13] [chromium] › tests/ui/runtime-runs.spec.ts:47:3 › runs navigation, url filters, canonical badges and legacy labelling at 1440px
+[11/13] [chromium] › tests/ui/runtime-runs.spec.ts:91:3 › distinct empty, partial, unavailable and failed states at 1440px
+[12/13] [chromium] › tests/ui/runtime-runs.spec.ts:129:1 › row selection navigates to the frozen detail route without claiming success
+[13/13] [chromium] › tests/ui/runtime-runs.spec.ts:142:1 › local time filters send zoned RFC3339 values accepted by the API contract
+  13 passed (26.0s)

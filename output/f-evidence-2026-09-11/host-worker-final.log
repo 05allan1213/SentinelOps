@@ -1,0 +1,329 @@
+WARNING: sonic/ast only supports (go1.17~1.26 and amd64 CPU) or (go1.20~1.26 and arm64 CPU), but your environment is not suitable and will fallback to encoding/json
+2026-09-12T12:09:17.927+08:00 [INFO] [Rule] 已加载 100 条术语规则
+2026-09-12T12:09:18.145+08:00 [INFO] [Rerank] client initialized | model=qwen3-rerank | baseURL=https://dashscope.aliyuncs.com/compatible-api/v1
+2026-09-12T12:09:18.150+08:00 [INFO] [knowledge] Worker Pool 已启动，workers=3，队列容量=1000
+2026/09/12 12:09:18 [scheduler] 启动完成：已注册 0 个订阅
+2026-09-12T12:10:28.933+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type=Sequential | name=plan_execute_replan
+2026-09-12T12:10:28.934+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type= | name=planner
+2026-09-12T12:10:28.935+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:10:28.935+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:10:29.438+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:10:29.465+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=
+2026-09-12T12:13:18.622+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type=Sequential | name=plan_execute_replan
+2026-09-12T12:13:18.622+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type= | name=planner
+2026-09-12T12:13:18.622+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:13:18.622+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:13:19.261+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:13:19.290+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:13:19.290+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=
+2026-09-12T12:13:19.290+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:13:19.291+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=planner
+2026-09-12T12:13:19.291+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type=Loop | name=execute_replan
+2026-09-12T12:13:19.291+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type=ChatModel | name=executor
+2026-09-12T12:13:19.292+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:13:19.292+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:13:19.292+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=Init
+2026-09-12T12:13:19.836+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:13:19.875+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:13:19.875+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:13:19.946+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type= | name=event_analysis_agent
+2026-09-12T12:13:19.946+08:00 [DEBU] [Rule] 术语归一化完成 | 原始="查询最近的安全事件列表，并总结主要类型、数量及趋势" | 归一化="查询最近7天的安全事件列表，并总结主要类型、数量及趋势"
+2026-09-12T12:13:20.802+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:13:20.802+08:00 [DEBU] [RewriteAndSplit] 完成 | 原始="查询最近7天的安全事件列表，并总结主要类型、数量及趋势" | 改写="最近7天的安全事件列表，并总结主要类型、数量及趋势" | 子问题数=4
+2026-09-12T12:13:21.035+08:00 [INFO] [Retriever] 缓存未命中，执行检索 | query="最近7天安全事件的趋势分析" | partition="" | hybrid=true
+2026-09-12T12:13:21.035+08:00 [DEBU] [HybridSearcher] 开始混合检索 | query=最近7天安全事件的趋势分析 | topK=5 | partition=
+2026-09-12T12:13:21.035+08:00 [DEBU] [HybridSearcher] BM25编码完成
+2026-09-12T12:13:21.042+08:00 [INFO] [Retriever] 召回 0 块，保留 0 块（混合检索，finalTopK=3）
+2026-09-12T12:13:21.044+08:00 [DEBU] [SemanticCache] 写入 id=d1f9974f-4f87-4a59-9fda-527bc68ec980
+2026-09-12T12:13:21.095+08:00 [INFO] [Retriever] 缓存命中 0 文档 | query="最近7天安全事件的数量统计" | sim=0.9323
+2026-09-12T12:13:21.158+08:00 [INFO] [Retriever] 缓存命中 0 文档 | query="最近7天的安全事件列表" | sim=0.8716
+2026-09-12T12:13:21.390+08:00 [INFO] [Retriever] 缓存命中 0 文档 | query="最近7天安全事件的主要类型" | sim=0.8833
+2026-09-12T12:13:21.410+08:00 [DEBU] [MultiRetrieve] 并行检索完成 | 查询数=4 | 原始文档数=0 | 去重后=0
+2026-09-12T12:13:21.410+08:00 [DEBU] [RetrievalNode] 检索完成 | 子查询数=4 | 文档数=0
+2026-09-12T12:13:21.410+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:13:21.410+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:13:21.411+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=Init
+2026-09-12T12:13:22.108+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:13:22.132+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:13:22.133+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:13:22.160+08:00 [INFO] [Tool] query_events | filters=[from=2026-09-12] | limit=50
+
+2026/09/12 12:13:22 /home/monody/project/SentinelOps/internal/ai/tools/event/query_events.go:153
+[2.914ms] [rows:0] SELECT * FROM `events` WHERE created_at >= '2026-09-12 00:00:00' AND `events`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 50
+2026-09-12T12:13:22.164+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_events
+2026-09-12T12:13:22.195+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:13:22.195+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:13:22.195+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:13:22.863+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:13:22.892+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:13:22.892+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:13:22.918+08:00 [INFO] [Tool] query_events | filters=[from=2026-09-05] | limit=50
+
+2026/09/12 12:13:22 /home/monody/project/SentinelOps/internal/ai/tools/event/query_events.go:153
+[0.966ms] [rows:0] SELECT * FROM `events` WHERE created_at >= '2026-09-05 00:00:00' AND `events`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 50
+2026-09-12T12:13:22.919+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_events
+2026-09-12T12:13:22.952+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:13:22.952+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:13:22.952+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:13:23.431+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:13:23.484+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:13:23.484+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:13:23.508+08:00 [INFO] [Tool] query_events | filters=[-] | limit=50
+
+2026/09/12 12:13:23 /home/monody/project/SentinelOps/internal/ai/tools/event/query_events.go:153
+[1.065ms] [rows:0] SELECT * FROM `events` WHERE `events`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 50
+2026-09-12T12:13:23.509+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_events
+2026-09-12T12:13:23.533+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:13:23.534+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:13:23.534+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:13:24.118+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:13:24.152+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:13:24.152+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:13:24.183+08:00 [INFO] [Tool] query_reports 开始 | type=weekly | limit=10
+2026-09-12T12:13:24.186+08:00 [INFO] [Tool] query_reports 完成 | 返回=0 条
+2026-09-12T12:13:24.186+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_reports
+2026-09-12T12:13:24.205+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:13:24.206+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:13:24.206+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:13:24.654+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:13:24.684+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:13:24.685+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:13:24.711+08:00 [INFO] [Tool] query_subscriptions 开始 | enabled=true
+2026-09-12T12:13:24.714+08:00 [INFO] [Tool] query_subscriptions 完成 | 返回=0 条
+2026-09-12T12:13:24.714+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_subscriptions
+2026-09-12T12:13:24.740+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:13:24.740+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:13:24.740+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:13:27.937+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:13:27.983+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:13:27.984+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterAgent
+2026-09-12T12:13:27.984+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Graph | type= | name=ReAct
+2026-09-12T12:13:27.984+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=EventAnalysisAgent
+2026-09-12T12:13:27.984+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=typedAgentTool[*github.com/cloudwego/eino/schema.Message] | name=event_analysis_agent
+2026-09-12T12:13:28.051+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:13:28.051+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:13:28.051+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:13:28.052+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=ToolNodeToEndConverter
+2026-09-12T12:13:28.052+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterAgent
+2026-09-12T12:13:28.052+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Graph | type= | name=ReAct
+2026-09-12T12:13:28.052+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=executor
+2026-09-12T12:13:28.052+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type= | name=replanner
+2026-09-12T12:13:28.052+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:13:28.052+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:13:30.525+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:13:30.554+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:13:30.554+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=
+2026-09-12T12:13:30.555+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:13:30.555+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=replanner
+2026-09-12T12:14:41.457+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type=Sequential | name=plan_execute_replan
+2026-09-12T12:14:41.457+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type= | name=planner
+2026-09-12T12:14:41.457+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:14:41.457+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:14:42.011+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:14:42.036+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:14:42.036+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=
+2026-09-12T12:14:42.036+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:14:42.036+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=planner
+2026-09-12T12:14:42.036+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type=Loop | name=execute_replan
+2026-09-12T12:14:42.037+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type=ChatModel | name=executor
+2026-09-12T12:14:42.038+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:14:42.038+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:14:42.039+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=Init
+2026-09-12T12:14:42.629+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:14:42.656+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:14:42.657+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:14:42.705+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type= | name=event_analysis_agent
+2026-09-12T12:14:42.705+08:00 [DEBU] [Rule] 术语归一化完成 | 原始="查询最近的安全事件列表，并提供只读摘要，不包含任何通知或写操作。" | 归一化="查询最近7天的安全事件列表，并提供只读摘要，不包含任何通知或写操作。"
+2026-09-12T12:14:42.580+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:14:42.580+08:00 [DEBU] [RewriteAndSplit] 完成 | 原始="查询最近7天的安全事件列表，并提供只读摘要，不包含任何通知或写操作。" | 改写="最近7天的安全事件列表及只读摘要" | 子问题数=2
+2026-09-12T12:14:42.833+08:00 [DEBU] [SemanticCache] 未达阈值 | 最高=0.8011 | 阈值=0.85 | 条目数=1
+2026-09-12T12:14:42.833+08:00 [INFO] [Retriever] 缓存未命中，执行检索 | query="最近7天安全事件的只读摘要" | partition="" | hybrid=true
+2026-09-12T12:14:42.833+08:00 [DEBU] [HybridSearcher] 开始混合检索 | query=最近7天安全事件的只读摘要 | topK=5 | partition=
+2026-09-12T12:14:42.834+08:00 [DEBU] [HybridSearcher] BM25编码完成
+2026-09-12T12:14:42.837+08:00 [INFO] [Retriever] 召回 0 块，保留 0 块（混合检索，finalTopK=3）
+2026-09-12T12:14:42.842+08:00 [DEBU] [SemanticCache] 写入 id=6ec7b9e4-8d02-4fbb-b618-23ab28f5be1d
+2026-09-12T12:14:42.846+08:00 [INFO] [Retriever] 缓存命中 0 文档 | query="最近7天的安全事件列表" | sim=0.8717
+2026-09-12T12:14:42.897+08:00 [DEBU] [MultiRetrieve] 并行检索完成 | 查询数=2 | 原始文档数=0 | 去重后=0
+2026-09-12T12:14:42.897+08:00 [DEBU] [RetrievalNode] 检索完成 | 子查询数=2 | 文档数=0
+2026-09-12T12:14:42.897+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:14:42.897+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:14:42.898+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=Init
+2026-09-12T12:14:43.299+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:14:43.330+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:14:43.330+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:14:43.364+08:00 [DEBU] [Tool] get_current_time | timestamp=2026-09-12 12:14:43
+2026-09-12T12:14:43.364+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=get_current_time
+2026-09-12T12:14:43.404+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:14:43.404+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:14:43.405+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:14:44.396+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:14:44.431+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:14:44.431+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:14:44.455+08:00 [INFO] [Tool] query_events | filters=[from=2026-09-12] | limit=50
+
+2026/09/12 12:14:44 /home/monody/project/SentinelOps/internal/ai/tools/event/query_events.go:153
+[1.097ms] [rows:0] SELECT * FROM `events` WHERE created_at >= '2026-09-12 00:00:00' AND `events`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 50
+2026-09-12T12:14:44.456+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_events
+2026-09-12T12:14:44.476+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:14:44.476+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:14:44.476+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:14:45.025+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:14:45.047+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:14:45.047+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:14:45.070+08:00 [INFO] [Tool] query_events | filters=[from=2026-09-05] | limit=50
+
+2026/09/12 12:14:45 /home/monody/project/SentinelOps/internal/ai/tools/event/query_events.go:153
+[1.176ms] [rows:0] SELECT * FROM `events` WHERE created_at >= '2026-09-05 00:00:00' AND `events`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 50
+2026-09-12T12:14:45.071+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_events
+2026-09-12T12:14:45.100+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:14:45.100+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:14:45.100+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:14:45.516+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:14:45.566+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:14:45.566+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:14:45.604+08:00 [INFO] [Tool] query_events | filters=[-] | limit=50
+
+2026/09/12 12:14:45 /home/monody/project/SentinelOps/internal/ai/tools/event/query_events.go:153
+[1.088ms] [rows:0] SELECT * FROM `events` WHERE `events`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 50
+2026-09-12T12:14:45.606+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_events
+2026-09-12T12:14:45.629+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:14:45.629+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:14:45.629+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:14:47.921+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:14:47.946+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:14:47.946+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterAgent
+2026-09-12T12:14:47.946+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Graph | type= | name=ReAct
+2026-09-12T12:14:47.946+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=EventAnalysisAgent
+2026-09-12T12:14:47.946+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=typedAgentTool[*github.com/cloudwego/eino/schema.Message] | name=event_analysis_agent
+2026-09-12T12:14:47.967+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:14:47.968+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:14:47.968+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:14:47.968+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=ToolNodeToEndConverter
+2026-09-12T12:14:47.969+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterAgent
+2026-09-12T12:14:47.969+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Graph | type= | name=ReAct
+2026-09-12T12:14:47.969+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=executor
+2026-09-12T12:14:47.970+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type= | name=replanner
+2026-09-12T12:14:47.971+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:14:47.971+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:14:49.509+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:14:49.543+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:14:49.543+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=
+2026-09-12T12:14:49.543+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:14:49.544+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=replanner
+2026-09-12T12:15:01.210+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type=Sequential | name=plan_execute_replan
+2026-09-12T12:15:01.210+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type= | name=planner
+2026-09-12T12:15:01.210+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:15:01.210+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:15:01.693+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:01.712+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:15:01.712+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=
+2026-09-12T12:15:01.712+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:15:01.712+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=planner
+2026-09-12T12:15:01.712+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type=Loop | name=execute_replan
+2026-09-12T12:15:01.712+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type=ChatModel | name=executor
+2026-09-12T12:15:01.713+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:15:01.713+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:15:01.713+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=Init
+2026-09-12T12:15:02.195+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:02.204+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:15:02.205+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:15:02.222+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type= | name=event_analysis_agent
+2026-09-12T12:15:02.222+08:00 [DEBU] [Rule] 术语归一化完成 | 原始="查询最近的安全事件列表，并生成只读摘要报告" | 归一化="查询最近7天的安全事件列表，并生成只读摘要报告"
+2026-09-12T12:15:02.888+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:02.888+08:00 [DEBU] [RewriteAndSplit] 完成 | 原始="查询最近7天的安全事件列表，并生成只读摘要报告" | 改写="最近7天的安全事件列表及只读摘要报告" | 子问题数=2
+2026-09-12T12:15:03.099+08:00 [INFO] [Retriever] 缓存命中 0 文档 | query="最近7天的安全事件列表" | sim=0.8717
+2026-09-12T12:15:03.133+08:00 [INFO] [Retriever] 缓存命中 0 文档 | query="最近7天安全事件的只读摘要报告" | sim=0.9736
+2026-09-12T12:15:03.142+08:00 [DEBU] [MultiRetrieve] 并行检索完成 | 查询数=2 | 原始文档数=0 | 去重后=0
+2026-09-12T12:15:03.142+08:00 [DEBU] [RetrievalNode] 检索完成 | 子查询数=2 | 文档数=0
+2026-09-12T12:15:03.142+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:15:03.143+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:15:03.143+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=Init
+2026-09-12T12:15:03.897+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:03.909+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:15:03.910+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:15:03.924+08:00 [INFO] [Tool] query_events | filters=[from=2026-09-11 | to=2026-09-12] | limit=50
+
+2026/09/12 12:15:03 /home/monody/project/SentinelOps/internal/ai/tools/event/query_events.go:153
+[0.842ms] [rows:0] SELECT * FROM `events` WHERE created_at >= '2026-09-11 00:00:00' AND created_at < '2026-09-13 00:00:00' AND `events`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 50
+2026-09-12T12:15:03.925+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_events
+2026-09-12T12:15:03.938+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:15:03.938+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:15:03.938+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:15:04.560+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:04.574+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:15:04.575+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:15:04.586+08:00 [INFO] [Tool] query_events | filters=[from=2026-09-05 | to=2026-09-12] | limit=50
+
+2026/09/12 12:15:04 /home/monody/project/SentinelOps/internal/ai/tools/event/query_events.go:153
+[0.812ms] [rows:0] SELECT * FROM `events` WHERE created_at >= '2026-09-05 00:00:00' AND created_at < '2026-09-13 00:00:00' AND `events`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 50
+2026-09-12T12:15:04.587+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_events
+2026-09-12T12:15:04.598+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:15:04.598+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:15:04.598+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:15:05.058+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:05.070+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:15:05.070+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:15:05.084+08:00 [INFO] [Tool] query_events | filters=[-] | limit=50
+
+2026/09/12 12:15:05 /home/monody/project/SentinelOps/internal/ai/tools/event/query_events.go:153
+[0.945ms] [rows:0] SELECT * FROM `events` WHERE `events`.`deleted_at` IS NULL ORDER BY created_at DESC LIMIT 50
+2026-09-12T12:15:05.085+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_events
+2026-09-12T12:15:05.097+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:15:05.097+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:15:05.097+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:15:05.542+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:05.558+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:15:05.558+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:15:05.570+08:00 [INFO] [Tool] query_reports 开始 | type=weekly | limit=10
+2026-09-12T12:15:05.571+08:00 [INFO] [Tool] query_reports 完成 | 返回=0 条
+2026-09-12T12:15:05.571+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_reports
+2026-09-12T12:15:05.585+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:15:05.586+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:15:05.586+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:15:06.143+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:06.163+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:15:06.163+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:15:06.188+08:00 [INFO] [Tool] query_subscriptions 开始 | enabled=true
+2026-09-12T12:15:06.189+08:00 [INFO] [Tool] query_subscriptions 完成 | 返回=0 条
+2026-09-12T12:15:06.189+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_subscriptions
+2026-09-12T12:15:06.215+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:15:06.215+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:15:06.215+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:15:06.710+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:06.762+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:15:06.762+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:15:06.792+08:00 [INFO] [Tool] query_subscriptions 开始 | enabled=false
+2026-09-12T12:15:06.793+08:00 [INFO] [Tool] query_subscriptions 完成 | 返回=0 条
+2026-09-12T12:15:06.793+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=query_subscriptions
+2026-09-12T12:15:06.820+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:15:06.820+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:15:06.820+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:15:07.205+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:07.226+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:15:07.226+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=CancelCheck
+2026-09-12T12:15:07.251+08:00 [DEBU] [Tool] get_current_time | timestamp=2026-09-12 12:15:07
+2026-09-12T12:15:07.251+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=stableInvokableTool | name=get_current_time
+2026-09-12T12:15:07.270+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:15:07.271+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:15:07.271+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:15:11.083+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:11.110+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=ChatModel
+2026-09-12T12:15:11.110+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterAgent
+2026-09-12T12:15:11.111+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Graph | type= | name=ReAct
+2026-09-12T12:15:11.111+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=EventAnalysisAgent
+2026-09-12T12:15:11.111+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Tool | type=typedAgentTool[*github.com/cloudwego/eino/schema.Message] | name=event_analysis_agent
+2026-09-12T12:15:11.137+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ToolsNode | type= | name=ToolNode
+2026-09-12T12:15:11.138+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCalls
+2026-09-12T12:15:11.138+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterToolCallsCancelCheck
+2026-09-12T12:15:11.139+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=ToolNodeToEndConverter
+2026-09-12T12:15:11.139+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=AfterAgent
+2026-09-12T12:15:11.140+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Graph | type= | name=ReAct
+2026-09-12T12:15:11.140+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=executor
+2026-09-12T12:15:11.140+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Agent | type= | name=replanner
+2026-09-12T12:15:11.140+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatTemplate | type=Default | name=
+2026-09-12T12:15:11.140+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:15:13.387+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=OpenAI | name=
+2026-09-12T12:15:13.413+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=ChatModel | type=candidateModel | name=
+2026-09-12T12:15:13.413+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:15:13.413+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Lambda | type= | name=
+2026-09-12T12:15:13.413+08:00 [DEBU] [buildNodeUpdate] 处理节点 | component=Chain | type= | name=replanner

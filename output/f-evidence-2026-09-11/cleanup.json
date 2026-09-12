@@ -1,0 +1,15 @@
+{
+  "stopped_host_roles": [
+    "api",
+    "worker",
+    "vite-5174"
+  ],
+  "stopped_dependency_containers": [
+    "sentinelops-f-mysql",
+    "sentinelops-f-redis",
+    "sentinelops-f-milvus",
+    "sentinelops-f-etcd",
+    "sentinelops-f-minio"
+  ],
+  "retained": "isolated DB volumes and ignored output/.f-host configuration/binary; original user files untouched"
+}

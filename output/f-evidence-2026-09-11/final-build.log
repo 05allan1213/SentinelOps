@@ -1,0 +1,93 @@
+npm notice run sentinelops-web@1.0.0 build
+npm notice run tsc --noEmit && tsc --project tsconfig.node.json --noEmit && vite build
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 2816 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                   1.12 kB │ gzip:   0.58 kB
+dist/assets/index-TZkFKPWW.css                  158.86 kB │ gzip:  25.21 kB
+dist/assets/check-DsS44XNL.js                     0.11 kB │ gzip:   0.12 kB
+dist/assets/chevron-up-C2B6ILqk.js                0.11 kB │ gzip:   0.12 kB
+dist/assets/chevron-right-7exmI4WV.js             0.11 kB │ gzip:   0.13 kB
+dist/assets/plus-BSimq0vi.js                      0.14 kB │ gzip:   0.13 kB
+dist/assets/arrow-left-BLkVZXgL.js                0.15 kB │ gzip:   0.15 kB
+dist/assets/clock-DROJO5XW.js                     0.15 kB │ gzip:   0.15 kB
+dist/assets/search-DqAaa9AP.js                    0.16 kB │ gzip:   0.16 kB
+dist/assets/trending-up-D_08nowe.js               0.16 kB │ gzip:   0.16 kB
+dist/assets/circle-check-BJzKm7jG.js              0.16 kB │ gzip:   0.16 kB
+dist/assets/play-IUpznqAI.js                      0.17 kB │ gzip:   0.16 kB
+dist/assets/circle-check-big-cYJEuLug.js          0.18 kB │ gzip:   0.17 kB
+dist/assets/rotate-ccw-BocVSIaN.js                0.18 kB │ gzip:   0.17 kB
+dist/assets/chart-no-axes-column-Cd4-r_Ai.js      0.19 kB │ gzip:   0.16 kB
+dist/assets/circle-x-DVCshou8.js                  0.19 kB │ gzip:   0.16 kB
+dist/assets/contextStore-DLfgfr67.js              0.20 kB │ gzip:   0.15 kB
+dist/assets/copy-BtDDDMjN.js                      0.22 kB │ gzip:   0.19 kB
+dist/assets/history-CUohQL42.js                   0.22 kB │ gzip:   0.18 kB
+dist/assets/database-Bs6I1XGD.js                  0.23 kB │ gzip:   0.19 kB
+dist/assets/circle-pause-OwrdooII.js              0.23 kB │ gzip:   0.17 kB
+dist/assets/circle-alert-BFBiZwB1.js              0.23 kB │ gzip:   0.17 kB
+dist/assets/chart-column-DtgSgUw2.js              0.23 kB │ gzip:   0.18 kB
+dist/assets/eye-BXVdluJx.js                       0.24 kB │ gzip:   0.19 kB
+dist/assets/funnel-BdPGPgrG.js                    0.24 kB │ gzip:   0.20 kB
+dist/assets/zap-CZk8Lqsq.js                       0.24 kB │ gzip:   0.19 kB
+dist/assets/triangle-alert-I7h6HdDU.js            0.25 kB │ gzip:   0.20 kB
+dist/assets/pencil-CnDGnKhA.js                    0.26 kB │ gzip:   0.21 kB
+dist/assets/book-open-Bz2S8mkf.js                 0.26 kB │ gzip:   0.19 kB
+dist/assets/inbox-CkYz3h8M.js                     0.27 kB │ gzip:   0.22 kB
+dist/assets/lightbulb-n5gITmjq.js                 0.27 kB │ gzip:   0.21 kB
+dist/assets/refresh-cw-CsUJKHcF.js                0.30 kB │ gzip:   0.21 kB
+dist/assets/bot-kzFLxlBY.js                       0.31 kB │ gzip:   0.22 kB
+dist/assets/trash-2-DhH_KFFt.js                   0.31 kB │ gzip:   0.20 kB
+dist/assets/upload-DPAE8ScE.js                    0.32 kB │ gzip:   0.23 kB
+dist/assets/layers-CI2qiuxc.js                    0.40 kB │ gzip:   0.22 kB
+dist/assets/octagon-alert-11yU2cvL.js             0.41 kB │ gzip:   0.24 kB
+dist/assets/star-Befs68kQ.js                      0.45 kB │ gzip:   0.28 kB
+dist/assets/calendar-days-CBmGUDT5.js             0.48 kB │ gzip:   0.25 kB
+dist/assets/settings-C83Ak7cO.js                  0.64 kB │ gzip:   0.35 kB
+dist/assets/trace-B6db3IhD.js                     1.66 kB │ gzip:   0.60 kB
+dist/assets/RuntimeQualityState-I_5R7SFv.js       1.77 kB │ gzip:   0.71 kB
+dist/assets/subscription-BUgAYkeJ.js              1.81 kB │ gzip:   0.78 kB
+dist/assets/RuntimeStatusBadge-DMhZQeLt.js        1.95 kB │ gzip:   0.86 kB
+dist/assets/ConfirmDialog-u3DyVJVY.js             1.97 kB │ gzip:   0.99 kB
+dist/assets/CustomSelect-CpC3Zb7Z.js              1.98 kB │ gzip:   0.97 kB
+dist/assets/ops-BIcGZAnO.js                       2.30 kB │ gzip:   0.65 kB
+dist/assets/rageval-BX5BEK7q.js                   2.78 kB │ gzip:   1.22 kB
+dist/assets/event-CjcSV8vp.js                     2.97 kB │ gzip:   1.37 kB
+dist/assets/sse-CqQYwHZH.js                       4.50 kB │ gzip:   2.18 kB
+dist/assets/settings-DH3V09I3.js                  4.56 kB │ gzip:   1.70 kB
+dist/assets/StatCard-7KWN0Rd4.js                  5.05 kB │ gzip:   1.86 kB
+dist/assets/useRuntimeQueries-BRy60vtg.js         5.62 kB │ gzip:   1.46 kB
+dist/assets/safety-DdlKHi1z.js                    5.72 kB │ gzip:   1.82 kB
+dist/assets/capabilities-CYtZldPR.js              6.73 kB │ gzip:   2.39 kB
+dist/assets/useQuery-CeQxRjBv.js                  8.10 kB │ gzip:   2.98 kB
+dist/assets/DocUploadModal-C3VLH2b1.js            9.22 kB │ gzip:   3.36 kB
+dist/assets/ActionQueue-DY09Q1SW.js              10.82 kB │ gzip:   4.05 kB
+dist/assets/worker-health-DOEvo81d.js            11.50 kB │ gzip:   3.43 kB
+dist/assets/ops-DPUvFhip.js                      12.86 kB │ gzip:   4.04 kB
+dist/assets/reports-C2Qc_irT.js                  13.29 kB │ gzip:   4.64 kB
+dist/assets/runtime-D0tNKXS9.js                  13.45 kB │ gzip:   4.59 kB
+dist/assets/term-mapping-C7UmJx_C.js             14.32 kB │ gzip:   4.57 kB
+dist/assets/ingest-h3BNTCOu.js                   17.64 kB │ gzip:   5.66 kB
+dist/assets/subscriptions-CE2tYELa.js            18.41 kB │ gzip:   6.02 kB
+dist/assets/events-BnV7eQa7.js                   18.88 kB │ gzip:   5.74 kB
+dist/assets/detail-AuTdFls1.js                   19.49 kB │ gzip:   5.58 kB
+dist/assets/rag-eval-BRyFrRq5.js                 24.55 kB │ gzip:   7.22 kB
+dist/assets/dashboard-BH1PZG-Q.js                29.53 kB │ gzip:   8.20 kB
+dist/assets/traces-DDzchJlx.js                   35.20 kB │ gzip:   9.34 kB
+dist/assets/dialog-ai3R9dFr.js                   39.70 kB │ gzip:  13.60 kB
+dist/assets/event-analysis-D6s9J7W7.js           42.98 kB │ gzip:  12.93 kB
+dist/assets/knowledge-D8jqeUSX.js                44.07 kB │ gzip:  10.25 kB
+dist/assets/chat-CuoTU-ph.js                     56.53 kB │ gzip:  16.31 kB
+dist/assets/detail-BjjUbMFn.js                   67.68 kB │ gzip:  15.54 kB
+dist/assets/api-CYYOMqOE.js                      91.58 kB │ gzip:  33.64 kB
+dist/assets/MarkdownRenderer-CRwx7lQq.js        237.40 kB │ gzip:  73.34 kB
+dist/assets/index-1OhB52Cr.js                   299.49 kB │ gzip:  94.58 kB
+dist/assets/esm-DUvCztnh.js                   1,132.78 kB │ gzip: 376.27 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 698ms

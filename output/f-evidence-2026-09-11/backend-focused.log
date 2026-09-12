@@ -1,0 +1,439 @@
+?   	SentinelOps/api/runtime	[no test files]
+ok  	SentinelOps/api/runtime/v1	0.107s
+WARNING: sonic/ast only supports (go1.17~1.26 and amd64 CPU) or (go1.20~1.26 and arm64 CPU), but your environment is not suitable and will fallback to encoding/json
+--- FAIL: TestGetContextRealRunHistoryCountIsNonZero (0.00s)
+    context_db_test.go:25: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestReleaseServiceProjectsPersistedWorkerVersions (0.00s)
+    eval_release_test.go:154: refuse non-disposable database "sentinelops_f"
+FAIL
+FAIL	SentinelOps/internal/service/runtime	0.169s
+ok  	SentinelOps/internal/controller/runtime	0.114s
+WARNING: sonic/ast only supports (go1.17~1.26 and amd64 CPU) or (go1.20~1.26 and arm64 CPU), but your environment is not suitable and will fallback to encoding/json
+--- FAIL: TestActiveSessionUniqueIndexRetainsAllNonTerminalStates (0.00s)
+    active_session_test.go:10: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestMigrationsUpFromEmptyDatabase (0.00s)
+    migrations_test.go:25: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestMigrationsUpFromCurrentSchemaSnapshot (0.00s)
+    migrations_test.go:31: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApplicationStartupDoesNotRunDDL (0.00s)
+    migrations_test.go:60: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestSchemaVersionMismatchFailsFast (0.00s)
+    migrations_test.go:97: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestLegacyApplicationModelsReadExpandSchema (0.00s)
+    migrations_test.go:107: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeSchemaContract (0.00s)
+    migrations_test.go:157: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeEventIdempotencyDigestOnlyAcceptedReservesKey (0.00s)
+    migrations_test.go:166: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestMigrationsDownOnDisposableDatabase (0.00s)
+    migrations_test.go:227: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeEvidenceSourceProjectionIsMetadataOnlyAndScoped (0.00s)
+    runtime_evidence_test.go:15: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeWorkerSnapshotQueryReturnsPersistedRows (0.00s)
+    runtime_health_test.go:22: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestListRuntimeRunsSafeAgentProjectionQuality (0.00s)
+    runtime_query_test.go:34: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestListRuntimeRunsDefaultsToDurable (0.00s)
+    runtime_query_test.go:56: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestListRuntimeRunsLegacyRequiresExplicitFilter (0.00s)
+    runtime_query_test.go:69: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestGetRuntimeRunCrossScope (0.00s)
+    runtime_query_test.go:82: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestListRuntimeRunsScopeAndFilters (0.00s)
+    runtime_query_test.go:92: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestListRuntimeRunsStablePagination (0.00s)
+    runtime_query_test.go:105: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeRunBoundaryContracts (0.00s)
+    runtime_query_test.go:123: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeRunPaginationTieBreaksByID (0.00s)
+    runtime_query_test.go:149: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeApprovalQueryReturnsAllLifecycleStatesAndScope (0.00s)
+    runtime_safety_resources_test.go:16: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeEffectQueryBuildsStablePrimaryDerivedOrderAndFilters (0.00s)
+    runtime_safety_resources_test.go:64: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeEffectLookupAndEventQueryRespectScope (0.00s)
+    runtime_safety_resources_test.go:102: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRetentionAuditIsAtomicQueryableAndRedacted (0.00s)
+    setting_retention_test.go:10: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEffectiveGateAuditIsAtomicQueryableAndRedacted (0.00s)
+    setting_runtime_gates_test.go:10: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEffectiveGateAuditFailureRollsBackWholeVector (0.00s)
+    setting_runtime_gates_test.go:55: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestPhysicalDeleteTracePayloadUsesTerminalRunAnchor (0.00s)
+    trace_dao_retention_test.go:10: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeTraceQueriesAggregateAttemptsWithScopeAndSafeProjection (0.00s)
+    trace_dao_test.go:15: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+FAIL
+FAIL	SentinelOps/internal/dao/mysql	0.110s
+WARNING: sonic/ast only supports (go1.17~1.26 and amd64 CPU) or (go1.20~1.26 and arm64 CPU), but your environment is not suitable and will fallback to encoding/json
+--- FAIL: TestTwoPhaseApprovalPublishesOnlyExactCheckpoint (0.00s)
+    approval_lifecycle_test.go:18: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCheckpointFingerprintMismatchNeverPublishes (0.00s)
+    approval_lifecycle_test.go:72: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestTwoPhaseApprovalPublicationRollsBackIfEitherEventFails (0.00s)
+    --- FAIL: TestTwoPhaseApprovalPublicationRollsBackIfEitherEventFails/agent.interrupted (0.00s)
+        approval_lifecycle_test.go:108: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestTwoPhaseApprovalPublicationRollsBackIfEitherEventFails/approval.requested (0.00s)
+        approval_lifecycle_test.go:108: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestTwoPhaseApprovalPreparingIsGenerationFencedAndNeverResetsTerminal (0.00s)
+    approval_lifecycle_test.go:160: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestTwoPhaseApprovalIncompatiblePreparingIsInvalidatedAndParked (0.00s)
+    approval_lifecycle_test.go:193: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestResumeAuthorizationRequiresExplicitExactDatabaseTruth (0.00s)
+    approval_lifecycle_test.go:218: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCheckpointFingerprintPreparingOrphanBuildsEmptyResumeTargets (0.00s)
+    approval_lifecycle_test.go:258: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestResumeAuthorizationTerminalDecisionsDoNotReopenApproval (0.00s)
+    --- FAIL: TestResumeAuthorizationTerminalDecisionsDoNotReopenApproval/rejected (0.00s)
+        approval_lifecycle_test.go:282: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestResumeAuthorizationTerminalDecisionsDoNotReopenApproval/expired (0.00s)
+        approval_lifecycle_test.go:282: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestResumeAuthorizationClosedGateParksWithoutChangingApprovedAudit (0.00s)
+    approval_lifecycle_test.go:334: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestResumeAuthorizationRejectsL2SelfApproval (0.00s)
+    approval_lifecycle_test.go:378: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCheckpointFingerprintOverwriteParksWithoutChangingApprovedAudit (0.00s)
+    approval_lifecycle_test.go:391: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestTwoPhaseApprovalExpiryScanUsesDecisionPrimitiveAndTerminalInvalidatesPreparing (0.00s)
+    approval_lifecycle_test.go:428: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalStableIdentityAndRunProposalUnique (0.00s)
+    approval_test.go:19: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalDecisionCASIsIdempotentAndWakesRun (0.00s)
+    approval_test.go:40: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalDecisionParksRunWhenAttemptsExhausted (0.00s)
+    approval_test.go:83: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalDecisionExpiredReturnsStableConflict (0.00s)
+    approval_test.go:119: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestPreparingApprovalIsInvisibleAndUndecidable (0.00s)
+    approval_test.go:149: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalListAndDetailReturnOnlyActionableOthers (0.00s)
+    approval_test.go:169: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalRoleAndSelfApprovalAreRejected (0.00s)
+    --- FAIL: TestApprovalRoleAndSelfApprovalAreRejected/viewer (0.00s)
+        approval_test.go:197: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestApprovalRoleAndSelfApprovalAreRejected/operator (0.00s)
+        approval_test.go:197: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestApprovalRoleAndSelfApprovalAreRejected/approver_self_L2 (0.00s)
+        approval_test.go:197: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestApprovalRoleAndSelfApprovalAreRejected/admin_self_L2 (0.00s)
+        approval_test.go:197: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestApprovalRoleAndSelfApprovalAreRejected/other_approver (0.00s)
+        approval_test.go:211: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestApprovalRoleAndSelfApprovalAreRejected/other_admin (0.00s)
+        approval_test.go:211: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalDecisionRejectsProposalHashMismatch (0.00s)
+    approval_test.go:224: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalDecisionRejectsUnstableIdentity (0.00s)
+    approval_test.go:240: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalTerminalStatusesAreImmutable (0.00s)
+    --- FAIL: TestApprovalTerminalStatusesAreImmutable/rejected (0.00s)
+        approval_test.go:258: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestApprovalTerminalStatusesAreImmutable/invalidated (0.00s)
+        approval_test.go:258: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalAuthDisabledIsReadOnly (0.00s)
+    approval_test.go:276: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalDecisionReasonUsesUnifiedRedactor (0.00s)
+    approval_test.go:292: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalDecisionTransactionRollsBackEveryWrite (0.00s)
+    approval_test.go:308: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestApprovalConcurrentDecisionCASHasOneEvent (0.00s)
+    approval_test.go:335: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAttemptProjectionOnClaimRecoveryCompletion (0.00s)
+    attempts_test.go:17: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAttemptProjectionRejectsStaleGeneration (0.00s)
+    attempts_test.go:59: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAttemptPersistsExecutingWorkerFingerprintOnClaim (0.00s)
+    attempts_test.go:77: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAttemptClaimRejectsMismatchedWorkerFingerprint (0.00s)
+    attempts_test.go:98: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAttemptTraceAttachIsIdempotentAndImmutable (0.00s)
+    attempts_test.go:132: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAttemptProjectionRetryAndFailoverRemainSameRun (0.00s)
+    attempts_test.go:155: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAttemptReconstructionMarksMissingFactsPartial (0.00s)
+    attempts_test.go:182: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAttemptReliabilityCountsOnlyCanonicalBudgetFacts (0.00s)
+    attempts_test.go:209: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAttemptReliabilityIdempotentAndExhaustedDoNotDoubleCount (0.00s)
+    attempts_test.go:237: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAttemptReaperCloseIsFencedAndRollsBack (0.00s)
+    attempts_test.go:256: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestExpiredAttemptHelperRejectsGenerationMismatch (0.00s)
+    attempts_test.go:280: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestBaseBudgetPreCallHardStopAndSettlement (0.00s)
+    budget_test.go:19: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestBudgetCrashReservationPreservedAcrossLeaseHandoff (0.00s)
+    budget_test.go:79: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestBaseBudgetDeadlineDurationAndReservationIdentity (0.00s)
+    budget_test.go:130: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestBaseBudgetConcurrentCAS (0.00s)
+    budget_test.go:190: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestBaseBudgetRejectsTamperedDurableTruth (0.00s)
+    budget_test.go:237: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestC06FinishRecoveryOperationCommitsTerminalCorrelation (0.00s)
+    c06_completion_test.go:41: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestC06FinishRecoveryOperationRollbackOnTerminalEventFailure (0.00s)
+    c06_completion_test.go:91: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestC06FinishRecoveryOperationNonRunningCancelWithoutAttempt (0.00s)
+    c06_completion_test.go:134: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestC06RecoveryClaimStartsOnceAndReclaimKeepsOneAttempt (0.00s)
+    c06_completion_test.go:169: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestC06RecoveryFirstClaimPersistsExecutingWorkerFingerprint (0.00s)
+    c06_completion_test.go:224: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestC06RecoveryFirstClaimRejectsMismatchedWorkerFingerprint (0.00s)
+    c06_completion_test.go:246: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestC06RestoreRevalidatesDependenciesBeforeUnlock (0.00s)
+    c06_completion_test.go:266: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEffectIdentityIgnoresToolCallID (0.00s)
+    effect_test.go:18: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestTransactionalEffectCommitsLedgerDomainEventsAndDerived (0.00s)
+    effect_test.go:66: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEffectRollbackLeavesNoPartialTruthAndNeverUnknown (0.00s)
+    effect_test.go:105: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestReuseSucceededSkipsDomainWriteAndRejectsStaleGuards (0.00s)
+    effect_test.go:132: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestShadowModeApprovedEffectCreatesNoLedgerOrMutation (0.00s)
+    effect_test.go:164: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestTransactionalEffectRejectsUnredactedRequest (0.00s)
+    --- FAIL: TestTransactionalEffectRejectsUnredactedRequest/unredacted (0.00s)
+        effect_test.go:200: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestTransactionalEffectRejectsUnredactedRequest/embeddedsecret (0.00s)
+        effect_test.go:200: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEinoCheckpointGetDistinguishesMissingAndEmpty (0.00s)
+    eino_checkpoint_store_test.go:39: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEinoCheckpointSetRoundTripsOpaqueMetadataAndIsIdempotent (0.00s)
+    eino_checkpoint_store_test.go:58: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEinoCheckpointStaleGenerationCannotOverwrite (0.00s)
+    eino_checkpoint_store_test.go:100: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEinoCheckpointRejectsCrossRunTokenAndLegacyRows (0.00s)
+    eino_checkpoint_store_test.go:125: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEinoCheckpointDeleteRequiresTerminalRun (0.00s)
+    eino_checkpoint_store_test.go:150: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCheckpointCrossProcessRegisteredState (0.00s)
+    eino_checkpoint_store_test.go:179: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestDerivedEffectRowsKeepStableParentAndIndependentKeys (0.00s)
+    external_effect_test.go:16: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestExternalEffectRejectsUnredactedSecretBeforeLedger (0.00s)
+    external_effect_test.go:47: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestExternalEffectSucceededIsReusedAfterToolReturnCrash (0.00s)
+    external_effect_test.go:61: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestDerivedEffectTransactionalPrimaryCanStartMilvusChild (0.00s)
+    external_effect_test.go:96: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEffectDeadlineIsBoundedByCurrentLease (0.00s)
+    external_effect_test.go:120: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestUnknownWindowParksRunAndKeepsSessionLockAtomically (0.00s)
+    external_effect_test.go:139: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestUnknownWindowAfterSucceededEndpointLedgerFailureParksRun (0.00s)
+    external_effect_test.go:179: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestDerivedEffectPartialSuccessCannotBecomeOverallSuccess (0.00s)
+    external_effect_test.go:220: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestClaimTwoWorkersOnlyOneOwnerGeneration (0.00s)
+    lease_test.go:18: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestClaimEventFailureRollsBackLease (0.00s)
+    lease_test.go:80: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestHeartbeatRequiresCurrentOwnerGeneration (0.00s)
+    lease_test.go:106: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestGenerationIncreasesAfterLeaseExpiry (0.00s)
+    lease_test.go:125: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestClaimPredicateExcludesIncompleteAndUnavailableRuns (0.00s)
+    lease_test.go:147: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestLeaseReapFencesExpiredOwner (0.00s)
+    lease_test.go:177: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestStaleGenerationCannotWriteTruth (0.00s)
+    lease_test.go:216: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestLegacyRuntimeContractNeverBecomesDurableEligible (0.00s)
+    legacy_test.go:16: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCutoverTerminalizesSelectedLegacyRunsWithAudit (0.00s)
+    legacy_test.go:40: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCutoverAuditFailureRollsBackTerminalization (0.00s)
+    legacy_test.go:132: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCutoverRejectsNonLegacyOrUnselectedRuns (0.00s)
+    legacy_test.go:184: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRecoverySameKeyReplaysOriginalOperation (0.00s)
+    operations_test.go:21: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRecoverySameKeyDifferentFingerprintConflicts (0.00s)
+    operations_test.go:47: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRecoveryDifferentKeyActiveConflict (0.00s)
+    operations_test.go:61: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRecoveryLegalityMatrix (0.00s)
+    --- FAIL: TestRecoveryLegalityMatrix/replay_requires_no_durable_recovery_dependency (0.00s)
+        operations_test.go:74: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestRecoveryLegalityMatrix/resume_requires_complete_checkpoint_or_explicit_approval_target (0.00s)
+        operations_test.go:83: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestRecoveryLegalityMatrix/cancel_accepts_nonterminal_and_terminal_is_event-free (0.00s)
+        operations_test.go:91: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestRecoveryLegalityMatrix/cancel_rejects_stale_expected_generation_without_Event (0.00s)
+        operations_test.go:127: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestRecoveryLegalityMatrix/unknown_status_rejects_cancel_and_replay (0.00s)
+        operations_test.go:139: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestRecoveryLegalityMatrix/restore_only_runtime_incompatible_exact_hash_with_valid_dependencies (0.00s)
+        operations_test.go:156: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRecoveryRunRowLockSerializesRequests (0.00s)
+    operations_test.go:198: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestOperationEventMetadataIsRedacted (0.00s)
+    operations_test.go:393: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestLegacyEventInsertUnaffected (0.00s)
+    operations_test.go:485: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestUnknownEffectExpiredRunningExternalBecomesParked (0.00s)
+    reconciliation_test.go:17: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestExpiredExternalEffectAttemptFailureRollsBackRunAndEffect (0.00s)
+    reconciliation_test.go:74: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestUnknownEffectOnlyReconcilableCanBeClaimed (0.00s)
+    reconciliation_test.go:112: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRollbackCompatibilityReconciliationClaimsExactRuntimeVersion (0.00s)
+    reconciliation_test.go:159: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestReconciliationResolutionsUseEffectCASAndRunTransitions (0.00s)
+    --- FAIL: TestReconciliationResolutionsUseEffectCASAndRunTransitions/executed (0.00s)
+        reconciliation_test.go:208: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestReconciliationResolutionsUseEffectCASAndRunTransitions/not-executed (0.00s)
+        reconciliation_test.go:208: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestReconciliationResolutionsUseEffectCASAndRunTransitions/still-unknown (0.00s)
+        reconciliation_test.go:208: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestReconciliationClaimRejectsStaleEffectGeneration (0.00s)
+    reconciliation_test.go:268: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestReconciliationClaimCarriesDerivedPrimaryResponse (0.00s)
+    reconciliation_test.go:290: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestAdminResolutionAcceptUnknownCancelsThroughCompletionPrimitive (0.00s)
+    reconciliation_test.go:324: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestParkReasonNonEffectNeverEntersReconciliation (0.00s)
+    reconciliation_test.go:358: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRecoverySelectorFactsComeOnlyFromDurableTruth (0.00s)
+    recovery_test.go:14: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRecoverySelectorPersistsFencedResumeReplayAndParkedEvents (0.00s)
+    recovery_test.go:58: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRecoverySelectorRuntimeRestoreRequiresExactHashAndValidDependency (0.00s)
+    recovery_test.go:126: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRecursiveCancelHandoffRequiresCurrentGenerationCheckpoint (0.00s)
+    recovery_test.go:194: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCleanupLeaseGenerationFenceAllowsOneWorker (0.00s)
+    retention_test.go:14: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestPhysicalDeleteRetentionProtectsResumeAndSeparatesPayloadFromAudit (0.00s)
+    retention_test.go:49: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCreateRunWithSessionLockIsAtomic (0.00s)
+    run_store_test.go:21: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCreateRunSameSessionReturnsConflict (0.00s)
+    run_store_test.go:55: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestGetRunForResumeRequiresOwnedDurableRunAndDoesNotWrite (0.00s)
+    run_store_test.go:76: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCreateRunSameSessionConcurrentOnlyOneSucceeds (0.00s)
+    run_store_test.go:116: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCreateRunBootstrapsRevisionZeroAtomic (0.00s)
+    run_store_test.go:153: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestTransitionRunWithEventIsAtomic (0.00s)
+    run_store_test.go:181: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEventSequenceAllocatedByDatabase (0.00s)
+    run_store_test.go:212: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestTransitionRunEventPayloadIsRedactedAndBounded (0.00s)
+    run_store_test.go:339: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCompleteRunAndCommitSessionSucceededAtomic (0.00s)
+    run_store_test.go:381: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCompleteRunFailureDoesNotCreateRevision (0.00s)
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/pending_to_failed (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/pending_to_canceled (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/running_to_failed (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/running_to_canceled (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/waiting_approval_to_failed (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/waiting_approval_to_canceled (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/retryable_failed_to_failed (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/retryable_failed_to_canceled (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/parked_to_failed (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/parked_to_canceled (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/reconciling_to_failed (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+    --- FAIL: TestCompleteRunFailureDoesNotCreateRevision/reconciling_to_canceled (0.00s)
+        run_store_test.go:425: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCompleteRunTransactionFailureRollsBackEverything (0.00s)
+    run_store_test.go:464: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestLegacyFinishRunCannotTerminateDurableRun (0.00s)
+    run_store_test.go:497: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestTransitionRunCannotCompleteDurableRun (0.00s)
+    run_store_test.go:515: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCompleteRunRejectsSuccessfulRevisionForFailure (0.00s)
+    run_store_test.go:632: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCreateRunRejectsInvalidDurableContract (0.00s)
+    run_store_test.go:645: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestTransitionRunCASRejectsStaleExpectedState (0.00s)
+    run_store_test.go:655: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCompleteRunCASRejectsStaleExpectedState (0.00s)
+    run_store_test.go:675: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCreateRunUsesLatestSessionRevisionSnapshot (0.00s)
+    run_store_test.go:687: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestEventEnvelopeIsStructuredJSON (0.00s)
+    run_store_test.go:714: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestCompleteRunFinishedTimestampIsNotBeforeStart (0.00s)
+    run_store_test.go:739: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRuntimeSnapshotPersistenceAndContextEnvelope (0.00s)
+    runtime_snapshot_test.go:14: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRevisionZeroConcurrentBootstrapUsesMySQLOnly (0.00s)
+    session_revision_test.go:16: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+--- FAIL: TestRevisionZeroAllowsEmptyDurableHistoryAndPreference (0.00s)
+    session_revision_test.go:128: refuse non-disposable database "sentinelops_f"; want "sentinelops_phase03"
+FAIL
+FAIL	SentinelOps/internal/ai/workflow	0.114s
+WARNING: sonic/ast only supports (go1.17~1.26 and amd64 CPU) or (go1.20~1.26 and arm64 CPU), but your environment is not suitable and will fallback to encoding/json
+--- FAIL: TestAPIWorkerFocusedIntegration (0.00s)
+    api_worker_sse_test.go:343: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestWorkerRetryableBackoffPersistsAndReclaims (0.00s)
+    api_worker_sse_test.go:434: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestWorkerSafePointCancelCommitsCheckpointForHandoff (0.00s)
+    api_worker_sse_test.go:506: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestSessionRunParkedKeepsExclusiveLock (0.00s)
+    api_worker_sse_test.go:588: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestExternalEffectApprovedResumeUsesLedgerDeadlineAndIdempotency (0.02s)
+    external_effect_test.go:39: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestRollbackCompatibilityWorkerClaimsExactRuntimeVersion (0.00s)
+    gates_test.go:296: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestFrozenSnapshotExistingRunStillClaimsWhenAcceptNewRunsCloses (0.00s)
+    gates_test.go:344: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestEffectiveGateRuntimeDisabledSkipsEffectReconciliationClaim (0.00s)
+    gates_test.go:387: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestStatefulInterruptCoversAllToolWrappersBeforeMutationEndpoint (0.00s)
+    hitl_test.go:27: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestStatefulInterruptTerminalDecisionDoesNotReopenSameProposal (0.00s)
+    --- FAIL: TestStatefulInterruptTerminalDecisionDoesNotReopenSameProposal/rejected (0.00s)
+        hitl_test.go:124: refuse non-disposable database "sentinelops_f"
+    --- FAIL: TestStatefulInterruptTerminalDecisionDoesNotReopenSameProposal/expired (0.00s)
+        hitl_test.go:124: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestTwoPhaseApprovalRunnerPublishesOnlyAfterCheckpointEvent (0.00s)
+    hitl_test.go:166: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestTwoPhaseApprovalCheckpointSetFailureNeverPublishesPending (0.00s)
+    hitl_test.go:211: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestTwoPhaseApprovalWorkerLoopExpiresDueApproval (0.00s)
+    hitl_test.go:250: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestResumeAuthorizationIgnoresForgedDecisionAndDoesNotReinterruptTerminal (0.00s)
+    --- FAIL: TestResumeAuthorizationIgnoresForgedDecisionAndDoesNotReinterruptTerminal/rejected (0.00s)
+        hitl_test.go:316: refuse non-disposable database "sentinelops_f"
+    --- FAIL: TestResumeAuthorizationIgnoresForgedDecisionAndDoesNotReinterruptTerminal/expired (0.00s)
+        hitl_test.go:316: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestMutationRouteEveryLeafInterruptsBeforeEndpoint (0.00s)
+    mutation_route_test.go:72: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestNestedLedgerAgentToolLeafCreatesOnePrimary (0.00s)
+    nested_agent_tool_test.go:23: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestReconciliationWorkerAutomaticallyResolvesTargetState (0.00s)
+    --- FAIL: TestReconciliationWorkerAutomaticallyResolvesTargetState/applied (0.00s)
+        reconciliation_test.go:32: refuse non-disposable database "sentinelops_f"
+    --- FAIL: TestReconciliationWorkerAutomaticallyResolvesTargetState/not_applied (0.00s)
+        reconciliation_test.go:32: refuse non-disposable database "sentinelops_f"
+    --- FAIL: TestReconciliationWorkerAutomaticallyResolvesTargetState/query_error (0.00s)
+        reconciliation_test.go:32: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestReconciliationWorkerNeverClaimsNonReconcilableEffect (0.00s)
+    reconciliation_test.go:77: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestParkedOnOpaqueCheckpointDecodeFailure (0.00s)
+    recovery_test.go:153: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestTransactionalEffectApprovedResumeCallsOriginalEndpointOnce (0.00s)
+    transactional_effect_test.go:20: refuse non-disposable database "sentinelops_f"
+--- FAIL: TestWorkerSnapshotPersistsHeartbeatWithDisposableDSN (0.00s)
+    worker_snapshot_test.go:170: refuse non-disposable database "sentinelops_f"
+FAIL
+FAIL	SentinelOps/internal/ai/runtime	0.163s
+FAIL

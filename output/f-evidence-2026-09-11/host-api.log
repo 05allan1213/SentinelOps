@@ -1,0 +1,784 @@
+WARNING: sonic/ast only supports (go1.17~1.26 and amd64 CPU) or (go1.20~1.26 and arm64 CPU), but your environment is not suitable and will fallback to encoding/json
+2026-09-11T19:40:42.514+08:00 [INFO] [knowledge] 默认知识库已创建
+2026-09-11T19:40:42.515+08:00 [INFO] [Rule] 已加载 100 条术语规则
+2026-09-11T19:42:15.050+08:00 [INFO] [Rerank] client initialized | model=qwen3-rerank | baseURL=https://dashscope.aliyuncs.com/compatible-api/v1
+2026-09-11T19:42:15.051+08:00 [INFO] [knowledge] Worker Pool 已启动，workers=3，队列容量=1000
+2026-09-11T19:42:15.082+08:00 [INFO] pid[76504]: http server started listening on [127.0.0.1:8001]
+2026-09-11T19:42:15.082+08:00 [INFO] swagger ui is serving at address: http://127.0.0.1:8001/swagger/
+2026-09-11T19:42:15.082+08:00 [INFO] openapi specification is serving at address: http://127.0.0.1:8001/api.json
+
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+|    ADDRESS     | METHOD |                        ROUTE                         |                                    HANDLER                                    |              MIDDLEWARE              |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | ALL    | /api.json                                            | github.com/gogf/gf/v2/net/ghttp.(*Server).openapiSpec                         |                                      |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/auth/v1/login                                   | SentinelOps/internal/controller/auth.(*ControllerV1).Login                    | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/auth/v1/register                                | SentinelOps/internal/controller/auth.(*ControllerV1).Register                 | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/chat/v1/chat                                    | SentinelOps/internal/controller/chat.(*ControllerV1).Chat                     | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/chat/v1/rollback                                | SentinelOps/internal/controller/chat.(*ControllerV1).Rollback                 | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/chat/v2/runs                                    | SentinelOps/internal/controller/chat.(*ControllerV2).CreateRun                | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/chat/v2/runs/{run_id}/events                    | SentinelOps/internal/controller/chat.(*ControllerV2).RunEvents                | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/event/v1/analyze/stream                         | SentinelOps/internal/controller/event.(*ControllerV1).AnalyzeSingleStream     | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/event/v1/batch_delete                           | SentinelOps/internal/controller/event.(*ControllerV1).BatchDelete             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/event/v1/batch_update_status                    | SentinelOps/internal/controller/event.(*ControllerV1).BatchUpdateStatus       | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/event/v1/create                                 | SentinelOps/internal/controller/event.(*ControllerV1).Create                  | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/event/v1/delete                                 | SentinelOps/internal/controller/event.(*ControllerV1).Delete                  | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/event/v1/list                                   | SentinelOps/internal/controller/event.(*ControllerV1).List                    | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/event/v1/pipeline/stream                        | SentinelOps/internal/controller/event.(*ControllerV1).PipelineStream          | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/event/v1/stats                                  | SentinelOps/internal/controller/event.(*ControllerV1).Stats                   | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/event/v1/trend                                  | SentinelOps/internal/controller/event.(*ControllerV1).Trend                   | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/event/v1/update_status                          | SentinelOps/internal/controller/event.(*ControllerV1).UpdateStatus            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ingest/v1/cef                                   | SentinelOps/internal/controller/ingest.(*ingestctrl.ControllerV1).CEF         | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.authDisabledWriteGuard.1  |
+|                |        |                                                      |                                                                               | middleware.IngestAPIKeyMiddleware.1  |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ingest/v1/leef                                  | SentinelOps/internal/controller/ingest.(*ingestctrl.ControllerV1).LEEF        | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.authDisabledWriteGuard.1  |
+|                |        |                                                      |                                                                               | middleware.IngestAPIKeyMiddleware.1  |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ingest/v1/push                                  | SentinelOps/internal/controller/ingest.(*ingestctrl.ControllerV1).AlertPush   | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.authDisabledWriteGuard.1  |
+|                |        |                                                      |                                                                               | middleware.IngestAPIKeyMiddleware.1  |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ingest/v1/webhook                               | SentinelOps/internal/controller/ingest.(*ingestctrl.ControllerV1).Webhook     | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.authDisabledWriteGuard.1  |
+|                |        |                                                      |                                                                               | middleware.IngestAPIKeyMiddleware.1  |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/knowledge/v1/bases/create                       | SentinelOps/internal/controller/knowledge.(*controllerV1).BaseCreate          | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/knowledge/v1/bases/delete                       | SentinelOps/internal/controller/knowledge.(*controllerV1).BaseDelete          | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/knowledge/v1/bases/detail                       | SentinelOps/internal/controller/knowledge.(*controllerV1).BaseDetail          | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/knowledge/v1/bases/list                         | SentinelOps/internal/controller/knowledge.(*controllerV1).BaseList            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/knowledge/v1/chunks/enable                      | SentinelOps/internal/controller/knowledge.(*controllerV1).ChunkEnable         | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/knowledge/v1/chunks/list                        | SentinelOps/internal/controller/knowledge.(*controllerV1).ChunkList           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/knowledge/v1/docs/batch_delete                  | SentinelOps/internal/controller/knowledge.(*controllerV1).DocBatchDelete      | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/knowledge/v1/docs/batch_rebuild                 | SentinelOps/internal/controller/knowledge.(*controllerV1).DocBatchRebuild     | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/knowledge/v1/docs/delete                        | SentinelOps/internal/controller/knowledge.(*controllerV1).DocDelete           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/knowledge/v1/docs/detail                        | SentinelOps/internal/controller/knowledge.(*controllerV1).DocDetail           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/knowledge/v1/docs/enable                        | SentinelOps/internal/controller/knowledge.(*controllerV1).DocEnable           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/knowledge/v1/docs/list                          | SentinelOps/internal/controller/knowledge.(*controllerV1).DocList             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/knowledge/v1/docs/rebuild                       | SentinelOps/internal/controller/knowledge.(*controllerV1).DocRebuild          | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/knowledge/v1/docs/upload                        | SentinelOps/internal/controller/knowledge.(*controllerV1).DocUpload           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/knowledge/v1/queue/status                       | SentinelOps/internal/controller/knowledge.(*controllerV1).QueueStatus         | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/knowledge/v1/search                             | SentinelOps/internal/controller/knowledge.(*controllerV1).Search              | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/ops/v1/approvals                                | SentinelOps/internal/controller/ops.(*ControllerV1).ListApprovals             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/ops/v1/approvals/{id}                           | SentinelOps/internal/controller/ops.(*ControllerV1).GetApproval               | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ops/v1/approvals/{id}/approve                   | SentinelOps/internal/controller/ops.(*ControllerV1).ApproveApproval           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ops/v1/approvals/{id}/reject                    | SentinelOps/internal/controller/ops.(*ControllerV1).RejectApproval            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/ops/v1/effects/unknown                          | SentinelOps/internal/controller/ops.(*ControllerV1).ListUnknownEffects        | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ops/v1/effects/{id}/accept-unknown              | SentinelOps/internal/controller/ops.(*ControllerV1).AcceptUnknownEffect       | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ops/v1/effects/{id}/resolve                     | SentinelOps/internal/controller/ops.(*ControllerV1).ResolveEffect             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/ops/v1/playbooks                                | SentinelOps/internal/controller/ops.(*ControllerV1).ListPlaybooks             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ops/v1/playbooks                                | SentinelOps/internal/controller/ops.(*ControllerV1).CreatePlaybook            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ops/v1/playbooks/trigger_for_event              | SentinelOps/internal/controller/ops.(*ControllerV1).TriggerForEvent           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | DELETE | /api/ops/v1/playbooks/{id}                           | SentinelOps/internal/controller/ops.(*ControllerV1).DeletePlaybook            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/ops/v1/playbooks/{id}                           | SentinelOps/internal/controller/ops.(*ControllerV1).GetPlaybook               | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | PUT    | /api/ops/v1/playbooks/{id}                           | SentinelOps/internal/controller/ops.(*ControllerV1).UpdatePlaybook            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ops/v1/playbooks/{id}/test                      | SentinelOps/internal/controller/ops.(*ControllerV1).TestPlaybook              | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/ops/v1/protected_assets                         | SentinelOps/internal/controller/ops.(*ControllerV1).ListProtectedAssets       | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ops/v1/protected_assets                         | SentinelOps/internal/controller/ops.(*ControllerV1).CreateProtectedAsset      | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | DELETE | /api/ops/v1/protected_assets/{id}                    | SentinelOps/internal/controller/ops.(*ControllerV1).DeleteProtectedAsset      | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | DELETE | /api/ops/v1/runs                                     | SentinelOps/internal/controller/ops.(*ControllerV1).ClearRuns                 | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/ops/v1/runs                                     | SentinelOps/internal/controller/ops.(*ControllerV1).ListRuns                  | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/ops/v1/runs/direct                              | SentinelOps/internal/controller/ops.(*ControllerV1).DirectRunForEvent         | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | DELETE | /api/ops/v1/runs/{id}                                | SentinelOps/internal/controller/ops.(*ControllerV1).DeleteRun                 | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/ops/v1/runs/{id}                                | SentinelOps/internal/controller/ops.(*ControllerV1).GetRun                    | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/ops/v1/stats                                    | SentinelOps/internal/controller/ops.(*ControllerV1).GetStats                  | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/rageval/v1/dashboard                            | SentinelOps/internal/controller/rageval.(*controllerV1).Dashboard             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/rageval/v1/feedback                             | SentinelOps/internal/controller/rageval.(*controllerV1).Feedback              | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/rageval/v1/feedback_stats                       | SentinelOps/internal/controller/rageval.(*controllerV1).FeedbackStats         | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | DELETE | /api/rageval/v1/traces                               | SentinelOps/internal/controller/rageval.(*controllerV1).DeleteTrace           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/rageval/v1/traces                               | SentinelOps/internal/controller/rageval.(*controllerV1).Traces                | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/rageval/v1/traces/detail                        | SentinelOps/internal/controller/rageval.(*controllerV1).TraceDetail           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/report/v1/create                                | SentinelOps/internal/controller/report.(*ControllerV1).Create                 | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/report/v1/delete                                | SentinelOps/internal/controller/report.(*ControllerV1).Delete                 | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/report/v1/export                                | SentinelOps/internal/controller/report.(*ControllerV1).Export                 | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/report/v1/get                                   | SentinelOps/internal/controller/report.(*ControllerV1).Get                    | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/report/v1/list                                  | SentinelOps/internal/controller/report.(*ControllerV1).List                   | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/report/v1/template/create                       | SentinelOps/internal/controller/report.(*ControllerV1).TemplateCreate         | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/report/v1/template/delete                       | SentinelOps/internal/controller/report.(*ControllerV1).TemplateDelete         | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/report/v1/template/list                         | SentinelOps/internal/controller/report.(*ControllerV1).TemplateList           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/capabilities                         | SentinelOps/internal/controller/runtime.(*ControllerV1).GetCapabilities       | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/eval                                 | SentinelOps/internal/controller/runtime.(*ControllerV1).GetEval               | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/operations/{operation_id}            | SentinelOps/internal/controller/runtime.(*ControllerV1).GetOperation          | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/release                              | SentinelOps/internal/controller/runtime.(*ControllerV1).GetRelease            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/retention                            | SentinelOps/internal/controller/runtime.(*ControllerV1).GetRetention          | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs                                 | SentinelOps/internal/controller/runtime.(*ControllerV1).ListRuns              | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}                        | SentinelOps/internal/controller/runtime.(*ControllerV1).GetRun                | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}/approvals              | SentinelOps/internal/controller/runtime.(*ControllerV1).GetApprovals          | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}/attempts               | SentinelOps/internal/controller/runtime.(*ControllerV1).GetAttempts           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}/checkpoints            | SentinelOps/internal/controller/runtime.(*ControllerV1).GetCheckpoints        | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}/context                | SentinelOps/internal/controller/runtime.(*ControllerV1).GetContext            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}/effects                | SentinelOps/internal/controller/runtime.(*ControllerV1).GetEffects            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}/events                 | SentinelOps/internal/controller/runtime.(*ControllerV1).RunEvents             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}/evidence               | SentinelOps/internal/controller/runtime.(*ControllerV1).GetEvidence           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}/evidence/{evidence_id} | SentinelOps/internal/controller/runtime.(*ControllerV1).ExpandEvidence        | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/runtime/v1/runs/{run_id}/recovery               | SentinelOps/internal/controller/runtime.(*ControllerV1).RecoverRun            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}/timeline               | SentinelOps/internal/controller/runtime.(*ControllerV1).GetTimeline           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/runs/{run_id}/traces                 | SentinelOps/internal/controller/runtime.(*ControllerV1).GetTraces             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/safety                               | SentinelOps/internal/controller/runtime.(*ControllerV1).GetSafety             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/runtime/v1/worker-health                        | SentinelOps/internal/controller/runtime.(*ControllerV1).GetWorkerHealth       | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/settings/v1/general                             | SentinelOps/internal/controller/settings.(*ControllerV1).GetGeneral           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/settings/v1/general                             | SentinelOps/internal/controller/settings.(*ControllerV1).SaveGeneral          | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/settings/v1/ingest_key                          | SentinelOps/internal/controller/settings.(*ControllerV1).GetIngestKey         | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/settings/v1/ingest_key/reset                    | SentinelOps/internal/controller/settings.(*ControllerV1).ResetIngestKey       | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/settings/v1/retention                           | SentinelOps/internal/controller/settings.(*ControllerV1).GetRetention         | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/settings/v1/retention                           | SentinelOps/internal/controller/settings.(*ControllerV1).SaveRetention        | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/settings/v1/retention/audit                     | SentinelOps/internal/controller/settings.(*ControllerV1).ListRetentionAudit   | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/settings/v1/runtime-gates                       | SentinelOps/internal/controller/settings.(*ControllerV1).GetRuntimeGates      | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/settings/v1/runtime-gates                       | SentinelOps/internal/controller/settings.(*ControllerV1).SaveRuntimeGates     | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/settings/v1/runtime-gates/audit                 | SentinelOps/internal/controller/settings.(*ControllerV1).ListRuntimeGateAudit | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/subscription/v1/create                          | SentinelOps/internal/controller/subscription.(*ControllerV1).Create           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/subscription/v1/delete                          | SentinelOps/internal/controller/subscription.(*ControllerV1).Delete           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/subscription/v1/fetch                           | SentinelOps/internal/controller/subscription.(*ControllerV1).Fetch            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/subscription/v1/fetch_stats                     | SentinelOps/internal/controller/subscription.(*ControllerV1).FetchStats       | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/subscription/v1/list                            | SentinelOps/internal/controller/subscription.(*ControllerV1).List             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/subscription/v1/logs                            | SentinelOps/internal/controller/subscription.(*ControllerV1).Logs             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/subscription/v1/pause                           | SentinelOps/internal/controller/subscription.(*ControllerV1).Pause            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/subscription/v1/resume                          | SentinelOps/internal/controller/subscription.(*ControllerV1).Resume           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/subscription/v1/update                          | SentinelOps/internal/controller/subscription.(*ControllerV1).Update           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/term_mapping/v1/create                          | SentinelOps/internal/controller/term_mapping.(*ControllerV1).Create           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/term_mapping/v1/delete                          | SentinelOps/internal/controller/term_mapping.(*ControllerV1).Delete           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/term_mapping/v1/list                            | SentinelOps/internal/controller/term_mapping.(*ControllerV1).List             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/term_mapping/v1/reload                          | SentinelOps/internal/controller/term_mapping.(*ControllerV1).Reload           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/term_mapping/v1/update                          | SentinelOps/internal/controller/term_mapping.(*ControllerV1).Update           | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | DELETE | /api/trace/v1/batch_delete                           | SentinelOps/internal/controller/trace.(*ControllerV1).BatchDelete             | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/trace/v1/cost/overview                          | SentinelOps/internal/controller/trace.(*ControllerV1).CostOverview            | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/trace/v1/cost/token_trend                       | SentinelOps/internal/controller/trace.(*ControllerV1).TokenTrend              | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/trace/v1/detail                                 | SentinelOps/internal/controller/trace.(*ControllerV1).Detail                  | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/trace/v1/export                                 | SentinelOps/internal/controller/trace.(*ControllerV1).Export                  | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/trace/v1/export_session_snapshot                | SentinelOps/internal/controller/trace.(*ControllerV1).ExportSessionSnapshot   | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/trace/v1/list                                   | SentinelOps/internal/controller/trace.(*ControllerV1).List                    | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/trace/v1/session_timeline                       | SentinelOps/internal/controller/trace.(*ControllerV1).SessionTimeline         | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | GET    | /api/trace/v1/stats                                  | SentinelOps/internal/controller/trace.(*ControllerV1).Stats                   | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | POST   | /api/upload                                          | SentinelOps/internal/controller/chat.(*ControllerV1).FileUpload               | middleware.CORSMiddleware            |
+|                |        |                                                      |                                                                               | middleware.ResponseMiddleware        |
+|                |        |                                                      |                                                                               | middleware.jwtMiddleware.1           |
+|                |        |                                                      |                                                                               | middleware.AuthorizationMiddleware.1 |
+|                |        |                                                      |                                                                               | middleware.RateLimitMiddleware       |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+| 127.0.0.1:8001 | ALL    | /swagger/*                                           | github.com/gogf/gf/v2/net/ghttp.(*Server).swaggerUI                           | HOOK_BEFORE_SERVE                    |
+-----------------|--------|------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------
+
+2026-09-11T19:45:51.472+08:00 {7370ca36aa41d4189c7dc919c2d6f5ee} 200 "POST http 127.0.0.1:8001 /api/auth/v1/login HTTP/1.1" 179753.998, 127.0.0.1, "", "Python-urllib/3.12", -1, "", ""
+Stack:
+crypto/bcrypt: hashedPassword is not the hash of the given password
+2026-09-11T19:46:23.839+08:00 {505aa2cab141d4189e7dc919f8f4e28a} 503 "POST http 127.0.0.1:8001 /api/chat/v2/runs HTTP/1.1" 1878.137, 127.0.0.1, "", "Python-urllib/3.12", -1, "", ""
+Stack:
+durable Run accept-new-runs gate is closed
+2026-09-11T19:46:34.506+08:00 {c87d7e46b441d418a17dc9198e58f0cd} 503 "POST http 127.0.0.1:8001 /api/chat/v2/runs HTTP/1.1" 1110.844, 127.0.0.1, "", "Python-urllib/3.12", -1, "", ""
+Stack:
+durable Run accept-new-runs gate is closed

@@ -1,0 +1,24 @@
+npm notice run sentinelops-web@1.0.0 npx
+npm notice run 'playwright' test tests/ui/runtime-regression.spec.ts tests/ui/runtime-visual-states.spec.ts --workers=1
+
+Running 10 tests using 1 worker
+
+(node:925454) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/10] [chromium-1280] › tests/ui/runtime-regression.spec.ts:10:3 › real persisted Runtime › v2 create, worker terminal, incremental tail and all read surfaces
+[2/10] [chromium-1280] › tests/ui/runtime-regression.spec.ts:75:3 › real persisted Runtime › admin cancel returns 202 and reaches durable operation terminal
+[3/10] [chromium-1280] › tests/ui/runtime-visual-states.spec.ts:5:3 › runtime visual states and motion at 1280
+[4/10] [chromium-1280] › tests/ui/runtime-visual-states.spec.ts:5:3 › runtime visual states and motion at 1440
+[5/10] [chromium-1280] › tests/ui/runtime-visual-states.spec.ts:41:1 › loading, empty and unavailable evidence states
+(node:930203) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[6/10] [chromium-1440] › tests/ui/runtime-regression.spec.ts:10:3 › real persisted Runtime › v2 create, worker terminal, incremental tail and all read surfaces
+[7/10] [chromium-1440] › tests/ui/runtime-regression.spec.ts:75:3 › real persisted Runtime › admin cancel returns 202 and reaches durable operation terminal
+[8/10] [chromium-1440] › tests/ui/runtime-visual-states.spec.ts:5:3 › runtime visual states and motion at 1280
+[9/10] [chromium-1440] › tests/ui/runtime-visual-states.spec.ts:5:3 › runtime visual states and motion at 1440
+[10/10] [chromium-1440] › tests/ui/runtime-visual-states.spec.ts:41:1 › loading, empty and unavailable evidence states
+  10 passed (1.7m)

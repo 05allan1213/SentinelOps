@@ -1,0 +1,1051 @@
+{
+  "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+  "session_id": "phase-f-browser-d23bd37e-d776-4a81-9df5-8827ff7a3977",
+  "status": "succeeded",
+  "last_seq": 37,
+  "detail": {
+    "item": {
+      "summary": {
+        "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+        "session_id": "phase-f-browser-d23bd37e-d776-4a81-9df5-8827ff7a3977",
+        "workflow_key": "chat.intent",
+        "runtime_mode": "durable_v1",
+        "status": "succeeded",
+        "current_phase": "completed",
+        "agent": "plan_agent",
+        "attempt": 1,
+        "worker_id": "",
+        "lease_state": "unassigned",
+        "lease_generation": 1,
+        "recovery_mode": "",
+        "park_reason": "",
+        "runtime_version": "{\"app\":\"v0.0.0-20260912041027-06fb9faa1092+dirty\",\"eino\":\"v0.9.15\",\"go\":\"go1.27.0\"}",
+        "runtime_compatibility_hash": "8691e6cad3ac29bef8b3e7595e73f9916aee56294addb7ad93a6c76a9cb5ad83",
+        "query_hash": "dc5bfb03ecac15b39aaaf96df6d1276ae59025e7ad73487cf23e4c6f77fa6166",
+        "budget": {
+          "max_model_calls": 64,
+          "max_l0_tool_calls": 32,
+          "max_duration_ms": 900000,
+          "model_calls": 7,
+          "tool_calls": 2,
+          "iterations": 0,
+          "input_tokens": 10095,
+          "output_tokens": 1850,
+          "cost_cny": 0.025434,
+          "elapsed_ms": 18630,
+          "mcp_calls": 0,
+          "rag_calls": 0,
+          "reserved_model_calls": 0,
+          "reserved_tool_calls": 0,
+          "exhausted": false,
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        "usage_quality": "unknown",
+        "trace_quality": "complete",
+        "started_at": "2026-09-12T08:42:14.737Z",
+        "finished_at": "2026-09-12T08:42:33.368Z",
+        "duration_ms": 18630,
+        "availability": "available",
+        "data_quality": "complete"
+      },
+      "overview": {
+        "status": "succeeded",
+        "current_phase": "completed",
+        "availability": "available",
+        "data_quality": "complete"
+      },
+      "current_attempt": {
+        "attempt_id": "70542fdc-03dc-428d-bb90-62355693de36",
+        "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+        "attempt": 1,
+        "mode": "replay",
+        "status": "succeeded",
+        "current_phase": "completed",
+        "worker_id": "phase-f-host-worker",
+        "lease_generation": 1,
+        "runtime_version": "{\"app\":\"v0.0.0-20260912041027-06fb9faa1092+dirty\",\"eino\":\"v0.9.15\",\"go\":\"go1.27.0\"}",
+        "run_compatibility_hash": "8691e6cad3ac29bef8b3e7595e73f9916aee56294addb7ad93a6c76a9cb5ad83",
+        "checkpoint_compatibility_hash": "",
+        "executing_worker_fingerprint": "8691e6cad3ac29bef8b3e7595e73f9916aee56294addb7ad93a6c76a9cb5ad83",
+        "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+        "retry_count": 0,
+        "failover_count": 0,
+        "usage_quality": "unknown",
+        "trace_quality": "complete",
+        "started_at": "2026-09-12T08:42:16.558Z",
+        "finished_at": "2026-09-12T08:42:33.368Z",
+        "availability": "available",
+        "data_quality": "complete"
+      },
+      "budget": {
+        "max_model_calls": 64,
+        "max_l0_tool_calls": 32,
+        "max_duration_ms": 900000,
+        "model_calls": 7,
+        "tool_calls": 2,
+        "iterations": 0,
+        "input_tokens": 10095,
+        "output_tokens": 1850,
+        "cost_cny": 0.025434,
+        "elapsed_ms": 18630,
+        "mcp_calls": 0,
+        "rag_calls": 0,
+        "reserved_model_calls": 0,
+        "reserved_tool_calls": 0,
+        "exhausted": false,
+        "availability": "available",
+        "data_quality": "complete"
+      },
+      "compatibility": {
+        "run_fingerprint": "8691e6cad3ac29bef8b3e7595e73f9916aee56294addb7ad93a6c76a9cb5ad83",
+        "checkpoint_fingerprint": "",
+        "attempt_fingerprint": "3cea55c77c239e1b5daef0749f7042a0027f8e4c2822a64d6098d7f97fc9ab5a",
+        "executing_worker_fingerprint": "8691e6cad3ac29bef8b3e7595e73f9916aee56294addb7ad93a6c76a9cb5ad83",
+        "run_match": true,
+        "checkpoint_match": false,
+        "worker_match": true,
+        "exact_restore_allowed": false,
+        "reason_code": "checkpoint_fingerprint_not_observed",
+        "availability": "partial",
+        "data_quality": "partial"
+      },
+      "context_summary": {
+        "identity": {
+          "user_id": "default-admin-20260828",
+          "username": "admin",
+          "role": "admin",
+          "scope": "all"
+        },
+        "session_revision_used": 0,
+        "session_revision_committed": 1,
+        "summary_hash": "ee6645861447453d36a86bdcff1b37e3382657cb3918f7141413016cb14249e7",
+        "history_count": 0,
+        "budget_limits_hash": "780b0e4a8bda73431fe58439a3ad309fcf9a620ddec543f123f5611f942ac872",
+        "deadline_at": "2026-09-12T08:57:14.736624844Z",
+        "runtime_version": "{\"app\":\"v0.0.0-20260912041027-06fb9faa1092+dirty\",\"eino\":\"v0.9.15\",\"go\":\"go1.27.0\"}",
+        "runtime_compatibility_hash": "8691e6cad3ac29bef8b3e7595e73f9916aee56294addb7ad93a6c76a9cb5ad83",
+        "policy_hash": "2829d40340ba038ad2105ea2ba97f0fcd471242056d244b43c4a336753305126",
+        "config_hash": "2a604c366ba8ec5088ec2de3e10c4e5d5a98aaf1f8b283708bc91788b265596c",
+        "gate_keys": null,
+        "availability": "available",
+        "data_quality": "complete"
+      },
+      "gate_summary": {
+        "static_caps": [
+          "agent_runtime.enabled",
+          "agent_runtime.accept_new_runs",
+          "agent_runtime.shadow_mode",
+          "agent_runtime.l1_writes",
+          "agent_runtime.l2_writes",
+          "agent_runtime.admin_query_database_debug",
+          "skill.enabled"
+        ],
+        "dynamic_caps": [
+          "agent_runtime.enabled",
+          "agent_runtime.accept_new_runs",
+          "agent_runtime.shadow_mode"
+        ],
+        "effective_caps": [
+          "agent_runtime.enabled",
+          "agent_runtime.accept_new_runs",
+          "agent_runtime.shadow_mode"
+        ],
+        "shadow_mode": true,
+        "l1_write_allowed": false,
+        "l2_write_allowed": false,
+        "policy_hash": "",
+        "catalog_revision": "",
+        "audit_available": false,
+        "availability": "available",
+        "data_quality": "complete"
+      },
+      "allowed_recovery_actions": null,
+      "availability": "available",
+      "data_quality": "complete"
+    },
+    "availability": "available",
+    "data_quality": "complete"
+  },
+  "resources": {
+    "attempts": {
+      "items": [
+        {
+          "attempt_id": "70542fdc-03dc-428d-bb90-62355693de36",
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "attempt": 1,
+          "mode": "replay",
+          "status": "succeeded",
+          "current_phase": "completed",
+          "worker_id": "phase-f-host-worker",
+          "lease_generation": 1,
+          "runtime_version": "{\"app\":\"v0.0.0-20260912041027-06fb9faa1092+dirty\",\"eino\":\"v0.9.15\",\"go\":\"go1.27.0\"}",
+          "run_compatibility_hash": "8691e6cad3ac29bef8b3e7595e73f9916aee56294addb7ad93a6c76a9cb5ad83",
+          "checkpoint_compatibility_hash": "",
+          "executing_worker_fingerprint": "8691e6cad3ac29bef8b3e7595e73f9916aee56294addb7ad93a6c76a9cb5ad83",
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "retry_count": 0,
+          "failover_count": 0,
+          "usage_quality": "unknown",
+          "trace_quality": "complete",
+          "started_at": "2026-09-12T08:42:16.558Z",
+          "finished_at": "2026-09-12T08:42:33.368Z",
+          "availability": "available",
+          "data_quality": "complete"
+        }
+      ],
+      "page": {
+        "page": 1,
+        "page_size": 50,
+        "total": 1,
+        "has_next": false
+      },
+      "availability": "available",
+      "data_quality": "complete"
+    },
+    "timeline": {
+      "items": [
+        {
+          "seq": 37,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "run.completed",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "created_at": "2026-09-12T08:42:33.378Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 36,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "trace.flushed",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "reference": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "attributes": {
+            "trace_quality": "complete"
+          },
+          "created_at": "2026-09-12T08:42:33.37Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 35,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "agent.plan",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "{\"response\": \"## 最近安全事件只读摘要\\n\\n基于当前时间（2026-09-12 16:42:21），查询到以下两条最新的高危安全事件：\\n\\n### 1. Apache ActiveMQ 远程代码执行漏洞 (CVE-2023-46604)\\n*   **严重程度**：Critical (风险评分 9.8)\\n*   **状态**：New\\n*   **来源**：NVD/CVE Database\\n*   **描述**：攻击者可利用构造恶意的 HTTP 请求或序列化数据，在目标系统上执行任意命令，无需身份验证。\\n\\n### 2. Spring Framework 远程代码执行漏洞 (CVE-2025-22233)\\n*   **严重程度**：Critical (风险评分 9.8)\\n*   **状态**：New\\n*   **来源**：NVD/CVE Database\\n*   **描述**：与 CVE-2023-46604 类似，涉及远程代码执行 (RCE)，攻击复杂度低，自动化利用工具可能已公开。\\n\\n---\\n\\n### 影响与风险评估\\n*   **潜在危害",
+          "reference": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "attributes": {
+            "agent_name": "replanner"
+          },
+          "created_at": "2026-09-12T08:42:33.285Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 34,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{\"cost_cny\":0.004718399999999999,\"input_tokens\":1718,\"output_tokens\":369}",
+            "kind": "model_call",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"reasoning\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"4c42bd6446aa06a161d3b8c51fae9dab940842739002f907543eef4ae9edcf6f\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "087822cafbe1df12d6faba9b06bab23aff2f086faf236a0cb3326b014dce85b0",
+            "subject": "aliyun_bailian/qwen3.6-flash",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:33.259Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 33,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{\"input_tokens\":1341}",
+            "kind": "model_call",
+            "lease_generation": "1",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"reasoning\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"4c42bd6446aa06a161d3b8c51fae9dab940842739002f907543eef4ae9edcf6f\"}",
+            "reason": "",
+            "reservation_identity": "087822cafbe1df12d6faba9b06bab23aff2f086faf236a0cb3326b014dce85b0",
+            "state": "pending",
+            "subject": "aliyun_bailian/qwen3.6-flash"
+          },
+          "created_at": "2026-09-12T08:42:31.04Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 32,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "agent.tool_result",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "**事件详情**：\n由于您未提供具体的事件 ID，我查询了当前时间附近（2026-09-12 当天）的安全事件以获取上下文。以下是最近发生的两条安全事件摘要：\n\n1. **事件 A**\n   - **标题**：Apache ActiveMQ 远程代码执行漏洞 (CVE-2023-46604)\n   - **严重程度**：Critical\n   - **风险评分 (risk_score)**：9.8\n   - **状态**：New\n   - **来源**：NVD/CVE Database\n\n2. **事件 B**\n   - **标题**：Spring Framework 远程代码执行漏洞 (CVE-2025-22233)\n   - **严重程度**：Critical\n   - **风险评分 (risk_score)**：9.8\n   - **状态**：New\n   - **来源**：NVD/CVE Database\n\n**影响分析**：\n- **攻击手法**：两个 CVE 均涉及“远程代码执行 (RCE)”。攻击者可通过构造恶意的 HTTP 请求或利用特定的序列化数据，在目标系统上执行任",
+          "attributes": {
+            "agent_name": "executor",
+            "tool_name": "event_analysis_agent"
+          },
+          "created_at": "2026-09-12T08:42:31.031Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 31,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{\"result_bytes\":2766,\"result_chars\":1334}",
+            "kind": "l0_tool_call",
+            "metadata": "{\"tool_name\":\"event_analysis_agent\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "e5336175494f3427db1b8fb730736fad0c07efb98c0b9e771194c28025394809",
+            "subject": "event_analysis_agent",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:31.019Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 30,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{\"cost_cny\":0.00732,\"input_tokens\":1816,\"output_tokens\":714}",
+            "kind": "model_call",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"default\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"2528c1b4201bb90689fcc93016b8f5698d58dfc92b18fece0e8e9c978ab4114d\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "fcb72318848c3479a11376c76af1062d6aefd6a03d5c03be84ca6e3f9c0b419a",
+            "subject": "aliyun_bailian/qwen3.6-flash",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:31.007Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 29,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{\"input_tokens\":549}",
+            "kind": "model_call",
+            "lease_generation": "1",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"default\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"2528c1b4201bb90689fcc93016b8f5698d58dfc92b18fece0e8e9c978ab4114d\"}",
+            "reason": "",
+            "reservation_identity": "fcb72318848c3479a11376c76af1062d6aefd6a03d5c03be84ca6e3f9c0b419a",
+            "state": "pending",
+            "subject": "aliyun_bailian/qwen3.6-flash"
+          },
+          "created_at": "2026-09-12T08:42:24.734Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 28,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{}",
+            "kind": "rag",
+            "metadata": "{\"phase\":\"rag\",\"tool_name\":\"documents\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "rag:18d41ad0f684d9433f6ba0a34cc7610c058f558e308b5658765be7e5fe715924",
+            "subject": "documents",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:24.724Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 27,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{}",
+            "kind": "rag",
+            "metadata": "{\"phase\":\"rag\",\"tool_name\":\"documents\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "rag:e865d05e664a943ce37ee144db7b0dc04f12e5003777346d109766eb47b78a48",
+            "subject": "documents",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:24.642Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 26,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{}",
+            "kind": "rag",
+            "metadata": "{\"phase\":\"rag\",\"tool_name\":\"documents\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "rag:4ec8c31056537ff3f763c1f65b3a20e31810ce4b57b65f35c7febe0f20d1db17",
+            "subject": "documents",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:24.457Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 25,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{\"context_chars\":40000,\"documents\":5}",
+            "kind": "rag",
+            "lease_generation": "1",
+            "metadata": "{\"phase\":\"rag\",\"tool_name\":\"documents\"}",
+            "reason": "",
+            "reservation_identity": "rag:e865d05e664a943ce37ee144db7b0dc04f12e5003777346d109766eb47b78a48",
+            "state": "pending",
+            "subject": "documents"
+          },
+          "created_at": "2026-09-12T08:42:24.184Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 24,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{\"context_chars\":40000,\"documents\":5}",
+            "kind": "rag",
+            "lease_generation": "1",
+            "metadata": "{\"phase\":\"rag\",\"tool_name\":\"documents\"}",
+            "reason": "",
+            "reservation_identity": "rag:18d41ad0f684d9433f6ba0a34cc7610c058f558e308b5658765be7e5fe715924",
+            "state": "pending",
+            "subject": "documents"
+          },
+          "created_at": "2026-09-12T08:42:24.175Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 23,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{\"context_chars\":40000,\"documents\":5}",
+            "kind": "rag",
+            "lease_generation": "1",
+            "metadata": "{\"phase\":\"rag\",\"tool_name\":\"documents\"}",
+            "reason": "",
+            "reservation_identity": "rag:4ec8c31056537ff3f763c1f65b3a20e31810ce4b57b65f35c7febe0f20d1db17",
+            "state": "pending",
+            "subject": "documents"
+          },
+          "created_at": "2026-09-12T08:42:24.167Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 22,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "agent.tool_call",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "durable L0 Tool call",
+          "attributes": {
+            "agent_name": "executor",
+            "tool_name": "event_analysis_agent"
+          },
+          "created_at": "2026-09-12T08:42:23.249Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 21,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{}",
+            "kind": "l0_tool_call",
+            "lease_generation": "1",
+            "metadata": "{\"tool_name\":\"event_analysis_agent\"}",
+            "reason": "",
+            "reservation_identity": "e5336175494f3427db1b8fb730736fad0c07efb98c0b9e771194c28025394809",
+            "state": "pending",
+            "subject": "event_analysis_agent"
+          },
+          "created_at": "2026-09-12T08:42:23.241Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 20,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{\"cost_cny\":0.0021936,\"input_tokens\":1468,\"output_tokens\":60}",
+            "kind": "model_call",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"default\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"2528c1b4201bb90689fcc93016b8f5698d58dfc92b18fece0e8e9c978ab4114d\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "e874d406e220f197db25c2ccfa2ef4eaa2021f4e6d352c642f32486efc49e824",
+            "subject": "aliyun_bailian/qwen3.6-flash",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:23.229Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 19,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{\"input_tokens\":247}",
+            "kind": "model_call",
+            "lease_generation": "1",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"default\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"2528c1b4201bb90689fcc93016b8f5698d58dfc92b18fece0e8e9c978ab4114d\"}",
+            "reason": "",
+            "reservation_identity": "e874d406e220f197db25c2ccfa2ef4eaa2021f4e6d352c642f32486efc49e824",
+            "state": "pending",
+            "subject": "aliyun_bailian/qwen3.6-flash"
+          },
+          "created_at": "2026-09-12T08:42:22.618Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 18,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "agent.plan",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "{\"steps\": \n[\"event_analysis_agent: 基于当前时间（2026-09-12 16:42:21），查询最近的安全事件，并提供只读的事件摘要和分析。\"]\n\n}",
+          "reference": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "attributes": {
+            "agent_name": "replanner"
+          },
+          "created_at": "2026-09-12T08:42:22.606Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 17,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{\"cost_cny\":0.0016296000000000001,\"input_tokens\":956,\"output_tokens\":67}",
+            "kind": "model_call",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"reasoning\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"4c42bd6446aa06a161d3b8c51fae9dab940842739002f907543eef4ae9edcf6f\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "1b5b760edd2c2b0e5c587f704a382147b42d017d75c09cda13ddece099bfeaf5",
+            "subject": "aliyun_bailian/qwen3.6-flash",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:22.595Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 16,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{\"input_tokens\":628}",
+            "kind": "model_call",
+            "lease_generation": "1",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"reasoning\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"4c42bd6446aa06a161d3b8c51fae9dab940842739002f907543eef4ae9edcf6f\"}",
+            "reason": "",
+            "reservation_identity": "1b5b760edd2c2b0e5c587f704a382147b42d017d75c09cda13ddece099bfeaf5",
+            "state": "pending",
+            "subject": "aliyun_bailian/qwen3.6-flash"
+          },
+          "created_at": "2026-09-12T08:42:21.955Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 15,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "agent.plan",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "第一步已完成。当前系统时间为 **2026-09-12 16:42:21**（Unix 时间戳：1789202541）。\n\n接下来，我将执行第二步：使用 event_analysis_agent 查询最近的安全事件并提供只读摘要。",
+          "reference": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "attributes": {
+            "agent_name": "executor"
+          },
+          "created_at": "2026-09-12T08:42:21.942Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 14,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{\"cost_cny\":0.0022848,\"input_tokens\":1514,\"output_tokens\":65}",
+            "kind": "model_call",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"default\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"2528c1b4201bb90689fcc93016b8f5698d58dfc92b18fece0e8e9c978ab4114d\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "28bd03a3007add4133def6aa5c958f5c07140a4736f3b06ac217a000d6fc1d4d",
+            "subject": "aliyun_bailian/qwen3.6-flash",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:21.931Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 13,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{\"input_tokens\":249}",
+            "kind": "model_call",
+            "lease_generation": "1",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"default\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"2528c1b4201bb90689fcc93016b8f5698d58dfc92b18fece0e8e9c978ab4114d\"}",
+            "reason": "",
+            "reservation_identity": "28bd03a3007add4133def6aa5c958f5c07140a4736f3b06ac217a000d6fc1d4d",
+            "state": "pending",
+            "subject": "aliyun_bailian/qwen3.6-flash"
+          },
+          "created_at": "2026-09-12T08:42:21.124Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 12,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "agent.tool_result",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "{\n  \"success\": true,\n  \"seconds\": 1789202541,\n  \"milliseconds\": 1789202541097,\n  \"microseconds\": 1789202541097269,\n  \"timestamp\": \"2026-09-12 16:42:21\",\n  \"message\": \"Current time retrieved successfully\"\n}",
+          "attributes": {
+            "agent_name": "executor",
+            "tool_name": "get_current_time"
+          },
+          "created_at": "2026-09-12T08:42:21.113Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 11,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{\"result_bytes\":205,\"result_chars\":205}",
+            "kind": "l0_tool_call",
+            "metadata": "{\"tool_name\":\"get_current_time\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "6be123da3f208c58cd7aae550d03b9d5b9cb8bbcb07d284058a70577ac54e533",
+            "subject": "get_current_time",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:21.104Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 10,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{}",
+            "kind": "l0_tool_call",
+            "lease_generation": "1",
+            "metadata": "{\"tool_name\":\"get_current_time\"}",
+            "reason": "",
+            "reservation_identity": "6be123da3f208c58cd7aae550d03b9d5b9cb8bbcb07d284058a70577ac54e533",
+            "state": "pending",
+            "subject": "get_current_time"
+          },
+          "created_at": "2026-09-12T08:42:21.092Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 9,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "agent.tool_call",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "durable L0 Tool call",
+          "attributes": {
+            "agent_name": "executor",
+            "tool_name": "get_current_time"
+          },
+          "created_at": "2026-09-12T08:42:21.085Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 8,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{\"cost_cny\":0.0018696,\"input_tokens\":1354,\"output_tokens\":34}",
+            "kind": "model_call",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"default\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"2528c1b4201bb90689fcc93016b8f5698d58dfc92b18fece0e8e9c978ab4114d\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "921da2794abcede41989a88318264413a1d5a45fea15ed07799520fcb9143294",
+            "subject": "aliyun_bailian/qwen3.6-flash",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:21.076Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 7,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{\"input_tokens\":171}",
+            "kind": "model_call",
+            "lease_generation": "1",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"default\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"2528c1b4201bb90689fcc93016b8f5698d58dfc92b18fece0e8e9c978ab4114d\"}",
+            "reason": "",
+            "reservation_identity": "921da2794abcede41989a88318264413a1d5a45fea15ed07799520fcb9143294",
+            "state": "pending",
+            "subject": "aliyun_bailian/qwen3.6-flash"
+          },
+          "created_at": "2026-09-12T08:42:20.48Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 6,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "agent.plan",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "{\"steps\": \n[\"get_current_time: 获取当前时间戳，以确定‘最近’安全事件的时间范围。\", \"event_analysis_agent: 查询指定时间范围内的最近安全事件，并提供只读的事件摘要和分析。\"]\n\n}",
+          "reference": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "attributes": {
+            "agent_name": "planner"
+          },
+          "created_at": "2026-09-12T08:42:20.469Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 5,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.settled",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "actual": "{\"cost_cny\":0.005418,\"input_tokens\":1269,\"output_tokens\":541}",
+            "kind": "model_call",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"reasoning\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"4c42bd6446aa06a161d3b8c51fae9dab940842739002f907543eef4ae9edcf6f\"}",
+            "outcome": "succeeded",
+            "reservation_identity": "72e38004449931635fe36c5c481c773ddeca737890f63a7956f55987dc8cdad7",
+            "subject": "aliyun_bailian/qwen3.6-flash",
+            "usage_quality": "reliable"
+          },
+          "created_at": "2026-09-12T08:42:20.458Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 4,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "budget.reserved",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "estimate": "{\"input_tokens\":1007}",
+            "kind": "model_call",
+            "lease_generation": "1",
+            "metadata": "{\"cached_input_price\":1.2,\"catalog_ref\":\"aliyun_bailian/qwen3.6-flash\",\"driver\":\"openai_compatible_chat\",\"input_price\":1.2,\"model_id\":\"qwen3.6-flash\",\"output_price\":7.2,\"pricing_currency\":\"CNY\",\"pricing_revision\":\"2026-08-28\",\"pricing_unit\":\"per_million_tokens\",\"profile\":\"reasoning\",\"provider\":\"aliyun_bailian\",\"snapshot_identity\":\"4c42bd6446aa06a161d3b8c51fae9dab940842739002f907543eef4ae9edcf6f\"}",
+            "reason": "",
+            "reservation_identity": "72e38004449931635fe36c5c481c773ddeca737890f63a7956f55987dc8cdad7",
+            "state": "pending",
+            "subject": "aliyun_bailian/qwen3.6-flash"
+          },
+          "created_at": "2026-09-12T08:42:16.617Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 3,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "run.replayed",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "lease_generation": "1",
+            "mode": "replay",
+            "runtime_version": "{\"app\":\"v0.0.0-20260912041027-06fb9faa1092+dirty\",\"eino\":\"v0.9.15\",\"go\":\"go1.27.0\"}"
+          },
+          "created_at": "2026-09-12T08:42:16.601Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 2,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "run.claimed",
+          "attempt": 1,
+          "generation": 1,
+          "trace_id": "",
+          "summary": "",
+          "attributes": {
+            "attempt": "1",
+            "lease_generation": "1",
+            "runtime_compatibility_hash": "8691e6cad3ac29bef8b3e7595e73f9916aee56294addb7ad93a6c76a9cb5ad83",
+            "runtime_version": "{\"app\":\"v0.0.0-20260912041027-06fb9faa1092+dirty\",\"eino\":\"v0.9.15\",\"go\":\"go1.27.0\"}"
+          },
+          "created_at": "2026-09-12T08:42:16.557Z",
+          "availability": "available",
+          "data_quality": "complete"
+        },
+        {
+          "seq": 1,
+          "run_id": "8cb5c7e8-ed8d-401d-b1bc-2a9c454bd7b7",
+          "event_type": "run.created",
+          "attempt": 0,
+          "generation": 0,
+          "trace_id": "",
+          "summary": "",
+          "created_at": "2026-09-12T08:42:14.745Z",
+          "availability": "available",
+          "data_quality": "complete"
+        }
+      ],
+      "page": {
+        "page": 1,
+        "page_size": 50,
+        "total": 37,
+        "has_next": false
+      },
+      "availability": "available",
+      "data_quality": "complete"
+    },
+    "checkpoints": {
+      "items": [],
+      "page": {
+        "page": 1,
+        "page_size": 50,
+        "total": 0,
+        "has_next": false
+      },
+      "availability": "available",
+      "data_quality": "unknown"
+    },
+    "approvals": {
+      "items": [],
+      "page": {
+        "page": 1,
+        "page_size": 50,
+        "total": 0,
+        "has_next": false
+      },
+      "availability": "available",
+      "data_quality": "complete"
+    },
+    "effects": {
+      "items": [],
+      "page": {
+        "page": 1,
+        "page_size": 50,
+        "total": 0,
+        "has_next": false
+      },
+      "availability": "available",
+      "data_quality": "complete"
+    },
+    "evidence": {
+      "items": null,
+      "page": {
+        "page": 1,
+        "page_size": 50,
+        "total": 0,
+        "has_next": false
+      },
+      "availability": "partial",
+      "data_quality": "partial",
+      "reason_code": "evidence_event_not_observed"
+    },
+    "context": {
+      "item": {
+        "identity": {
+          "user_id": "default-admin-20260828",
+          "username": "admin",
+          "role": "admin",
+          "scope": "all"
+        },
+        "session_revision_used": 0,
+        "session_revision_committed": 1,
+        "summary_hash": "ee6645861447453d36a86bdcff1b37e3382657cb3918f7141413016cb14249e7",
+        "history_count": 0,
+        "budget_limits_hash": "780b0e4a8bda73431fe58439a3ad309fcf9a620ddec543f123f5611f942ac872",
+        "deadline_at": "2026-09-12T08:57:14.736624844Z",
+        "runtime_version": "{\"app\":\"v0.0.0-20260912041027-06fb9faa1092+dirty\",\"eino\":\"v0.9.15\",\"go\":\"go1.27.0\"}",
+        "runtime_compatibility_hash": "8691e6cad3ac29bef8b3e7595e73f9916aee56294addb7ad93a6c76a9cb5ad83",
+        "policy_hash": "2829d40340ba038ad2105ea2ba97f0fcd471242056d244b43c4a336753305126",
+        "config_hash": "2a604c366ba8ec5088ec2de3e10c4e5d5a98aaf1f8b283708bc91788b265596c",
+        "gate_keys": null,
+        "availability": "available",
+        "data_quality": "complete"
+      },
+      "availability": "available",
+      "data_quality": "complete"
+    },
+    "traces": {
+      "items": [
+        {
+          "trace_id": "fdaad823-95ba-493d-856f-5db8b5a92862",
+          "attempt": 1,
+          "status": "success",
+          "trace_quality": "complete",
+          "duration_ms": 17631,
+          "input_tokens": 10569,
+          "output_tokens": 1943,
+          "cost_cny": 0.026648,
+          "node_count": 72,
+          "raw_available": false,
+          "availability": "partial",
+          "data_quality": "complete",
+          "reason_code": "trace_detail_unavailable"
+        }
+      ],
+      "page": {
+        "page": 1,
+        "page_size": 50,
+        "total": 1,
+        "has_next": false
+      },
+      "availability": "partial",
+      "data_quality": "complete",
+      "reason_code": "trace_detail_unavailable"
+    }
+  },
+  "page_errors": [],
+  "overflow": false
+}

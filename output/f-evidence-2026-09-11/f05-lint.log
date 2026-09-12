@@ -1,0 +1,940 @@
+npm notice run sentinelops-web@1.0.0 lint
+npm notice run tsc --noEmit --pretty false && tsc --project tsconfig.node.json --noEmit --pretty false && eslint .
+
+/home/monody/project/SentinelOps/web/src/components/ReportGenerateModal.tsx
+  40:7  warning  Error: Cannot access variable before it is declared
+
+`doSaveReport` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/home/monody/project/SentinelOps/web/src/components/ReportGenerateModal.tsx:40:7
+  38 |     if (totalCount === 0 || doneCount >= totalCount) {
+  39 |       isSavingRef.current = true
+> 40 |       doSaveReport()
+     |       ^^^^^^^^^^^^ `doSaveReport` accessed before it is declared
+  41 |     }
+  42 |   }, [reportGenerating, doneCount, totalCount])
+  43 |
+
+/home/monody/project/SentinelOps/web/src/components/ReportGenerateModal.tsx:44:3
+  42 |   }, [reportGenerating, doneCount, totalCount])
+  43 |
+> 44 |   const doSaveReport = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 45 |     if (!riskData) return
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 46 |     setReportSaving(true)
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 76 |     }
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 77 |   }
+     | ^^^^ `doSaveReport` is declared here
+  78 |
+  79 |   const handleForceGenerate = () => {
+  80 |     if (isSavingRef.current) return  react-hooks/immutability
+  42:6  warning  React Hook useEffect has a missing dependency: 'doSaveReport'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/exhaustive-deps
+
+/home/monody/project/SentinelOps/web/src/components/ui/dialog.tsx
+  5:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  6:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  7:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+/home/monody/project/SentinelOps/web/src/pages/chat/index.tsx
+   86:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/chat/index.tsx:86:7
+  84 |     if (loaded.length === 0) {
+  85 |       const s = chatService.createSession()
+> 86 |       setSessions([s])
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  87 |       setCurrentSessionId(s.id)
+  88 |     } else {
+  89 |       setSessions(loaded)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/set-state-in-effect
+   92:7   warning  Error: Cannot access variable before it is declared
+
+`loadMessages` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/home/monody/project/SentinelOps/web/src/pages/chat/index.tsx:92:7
+  90 |       const sid = chatService.getSessionId()
+  91 |       setCurrentSessionId(sid)
+> 92 |       loadMessages(sid)
+     |       ^^^^^^^^^^^^ `loadMessages` accessed before it is declared
+  93 |     }
+  94 |   }, [])
+  95 |
+
+/home/monody/project/SentinelOps/web/src/pages/chat/index.tsx:131:3
+  129 |
+  130 |   // ── 会话管理 ─────────────────────────────────────────────────────────────
+> 131 |   const loadMessages = (sid: string) => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 132 |     const raw = localStorage.getItem(`chat_messages_${sid}`)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 133 |     const saved = ((raw ? JSON.parse(raw) : []) as Message[]).map(migrateLegacyPending)
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 149 |     setVotes(votesRaw ? JSON.parse(votesRaw) : {})
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 150 |   }
+      | ^^^^ `loadMessages` is declared here
+  151 |
+  152 |   const saveMessages = (sid: string, msgs: Message[]) => {
+  153 |     localStorage.setItem(`chat_messages_${sid}`, JSON.stringify(msgs))                                                                                                                                                                                                                                                     react-hooks/immutability
+   94:6   warning  React Hook useEffect has a missing dependency: 'loadMessages'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+  119:5   warning  Error: Cannot access variable before it is declared
+
+`handleSend` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/home/monody/project/SentinelOps/web/src/pages/chat/index.tsx:119:5
+  117 |     if (!state?.query) return
+  118 |     navigate(location.pathname, { replace: true, state: null })
+> 119 |     handleSend(state.query)
+      |     ^^^^^^^^^^ `handleSend` accessed before it is declared
+  120 |   // eslint-disable-next-line react-hooks/exhaustive-deps
+  121 |   }, [location.state])
+  122 |
+
+/home/monody/project/SentinelOps/web/src/pages/chat/index.tsx:287:3
+  285 |
+  286 |   // ── 发送消息（overrideText 来自技能卡片或事件跳转；force=true 跳过 isLoading 检查，用于编辑回溯） ──────────────────────────
+> 287 |   const handleSend = async (overrideText?: string, force?: boolean, previousMessages?: Message[]) => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 288 |     const history = previousMessages ?? messages
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 289 |     const rawContent = overrideText !== undefined ? overrideText : input
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 339 |     startAssistantStream(sid, assistantMessage, messageContent, history.length + 1, true)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 340 |   }
+      | ^^^^ `handleSend` is declared here
+  341 |
+  342 |   const startAssistantStream = (sid: string, assistantMessage: Message, messageContent: string, messageIndex: number, newTurn: boolean) => {
+  343 |     setIsLoading(true)  react-hooks/immutability
+  306:11  warning  Error: Cannot access variable before it is declared
+
+`genId` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/home/monody/project/SentinelOps/web/src/pages/chat/index.tsx:306:11
+  304 |
+  305 |     const userMessage: Message = {
+> 306 |       id: genId(),
+      |           ^^^^^ `genId` accessed before it is declared
+  307 |       role: 'user',
+  308 |       content: rawContent.trim(),
+  309 |       timestamp: new Date(),
+
+/home/monody/project/SentinelOps/web/src/pages/chat/index.tsx:612:3
+  610 |   }
+  611 |
+> 612 |   const genId = () => Math.random().toString(36).substring(2, 15)
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `genId` is declared here
+  613 |
+  614 |   // ── 渲染 ─────────────────────────────────────────────────────────────────
+  615 |   return (                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               react-hooks/immutability
+
+/home/monody/project/SentinelOps/web/src/pages/cost-monitor/index.tsx
+  359:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/cost-monitor/index.tsx:359:5
+  357 |
+  358 |   useEffect(() => {
+> 359 |     loadData(range)
+      |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  360 |     loadTrend(range)
+  361 |   }, [range, loadData, loadTrend])
+  362 |  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/dashboard/index.tsx
+  259:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/dashboard/index.tsx:259:5
+  257 |   useEffect(() => {
+  258 |     const days = timeWindow === '30d' ? 30 : 7
+> 259 |     setFlowLoading(true)
+      |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  260 |     eventService
+  261 |       .getTrend(days)
+  262 |       .then(items => {  react-hooks/set-state-in-effect
+  787:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/dashboard/index.tsx:787:5
+  785 |
+  786 |   useEffect(() => {
+> 787 |     fetchStats()
+      |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  788 |   }, [])
+  789 |
+  790 |   const handleRefresh = () => {                                                                                  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/AgentFlowGraph.tsx
+   91:45  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/AgentFlowGraph.tsx:91:45
+  89 |
+  90 |   useEffect(() => {
+> 91 |     if (!isProcessing && logs.length === 0) setElapsed(0)
+     |                                             ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  92 |   }, [isProcessing, logs.length])
+  93 |
+  94 |   useEffect(() => {  react-hooks/set-state-in-effect
+  211:6   warning  React Hook useEffect has a missing dependency: 'getStatus'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         react-hooks/exhaustive-deps
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/EventPickerModal.tsx
+  30:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/EventPickerModal.tsx:30:7
+  28 |   useEffect(() => {
+  29 |     if (visible) {
+> 30 |       setSelected(new Set(selectedIds))
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  31 |       loadEvents()
+  32 |     }
+  33 |   }, [visible])                                                                                                                                                                                                                                               react-hooks/set-state-in-effect
+  31:7  warning  Error: Cannot access variable before it is declared
+
+`loadEvents` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/EventPickerModal.tsx:31:7
+  29 |     if (visible) {
+  30 |       setSelected(new Set(selectedIds))
+> 31 |       loadEvents()
+     |       ^^^^^^^^^^ `loadEvents` accessed before it is declared
+  32 |     }
+  33 |   }, [visible])
+  34 |
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/EventPickerModal.tsx:35:3
+  33 |   }, [visible])
+  34 |
+> 35 |   const loadEvents = async (kw?: string) => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 36 |     setLoading(true)
+     | ^^^^^^^^^^^^^^^^^^^^
+> 37 |     try {
+     | ^^^^^^^^^^^^^^^^^^^^
+> 38 |       const res = await eventService.list({ page: 1, size: 50, keyword: kw })
+     | ^^^^^^^^^^^^^^^^^^^^
+> 39 |       setEvents(res.list)
+     | ^^^^^^^^^^^^^^^^^^^^
+> 40 |     } catch { /* 忽略事件列表加载失败 */ }
+     | ^^^^^^^^^^^^^^^^^^^^
+> 41 |     setLoading(false)
+     | ^^^^^^^^^^^^^^^^^^^^
+> 42 |   }
+     | ^^^^ `loadEvents` is declared here
+  43 |
+  44 |   const toggle = (id: string) => {
+  45 |     setSelected(prev => {  react-hooks/immutability
+  33:6  warning  React Hook useEffect has a missing dependency: 'selectedIds'. Either include it or remove the dependency array. If 'setSelected' needs the current value of 'selectedIds', you can also switch to useReducer instead of useState and read 'selectedIds' in the reducer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            react-hooks/exhaustive-deps
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/ReportModal.tsx
+  47:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/ResultPanel.tsx
+  219:3   warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/ResultPanel.tsx:219:3
+  217 |   // 用 ref 存储以避免 useCallback 的循环依赖（finally 中调用自身）
+  218 |   const launchFetchRef = useRef<(event: EventData) => void>(() => {})
+> 219 |   launchFetchRef.current = (event: EventData) => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  220 |     const { event_id } = event
+  221 |     activeStreams.current.add(event_id)
+  222 |     activeCount.current++                                                                                                                                                                                                       react-hooks/refs
+  317:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/ResultPanel.tsx:317:5
+  315 |       }
+  316 |     }
+> 317 |     setCacheVersion(v => v + 1)
+      |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  318 |   }, [data])
+  319 |
+  320 |   // 分析结果到来后，自动预加载所有事件的解决方案（受并发限制，超出部分入队）  react-hooks/set-state-in-effect
+  362:44  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/ResultPanel.tsx:362:44
+  360 |
+  361 |   // cacheVersion 变化时重新读取，确保 EventDetail 拿到最新内容
+> 362 |   const selectedSolution = selectedEvent ? solutionCache.current.get(selectedEvent.event_id) : undefined
+      |                                            ^^^^^^^^^^^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  363 |   const isSelectedStreaming = selectedEvent ? activeStreams.current.has(selectedEvent.event_id) : false
+  364 |   // 标注 cacheVersion 依赖（防止 linter 警告，实际读取在上方 Map.get 中）
+  365 |   void cacheVersion                                                                react-hooks/refs
+  362:44  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/ResultPanel.tsx:362:44
+  360 |
+  361 |   // cacheVersion 变化时重新读取，确保 EventDetail 拿到最新内容
+> 362 |   const selectedSolution = selectedEvent ? solutionCache.current.get(selectedEvent.event_id) : undefined
+      |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  363 |   const isSelectedStreaming = selectedEvent ? activeStreams.current.has(selectedEvent.event_id) : false
+  364 |   // 标注 cacheVersion 依赖（防止 linter 警告，实际读取在上方 Map.get 中）
+  365 |   void cacheVersion                                                            react-hooks/refs
+  363:47  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/ResultPanel.tsx:363:47
+  361 |   // cacheVersion 变化时重新读取，确保 EventDetail 拿到最新内容
+  362 |   const selectedSolution = selectedEvent ? solutionCache.current.get(selectedEvent.event_id) : undefined
+> 363 |   const isSelectedStreaming = selectedEvent ? activeStreams.current.has(selectedEvent.event_id) : false
+      |                                               ^^^^^^^^^^^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  364 |   // 标注 cacheVersion 依赖（防止 linter 警告，实际读取在上方 Map.get 中）
+  365 |   void cacheVersion
+  366 |                                                             react-hooks/refs
+  363:47  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/ResultPanel.tsx:363:47
+  361 |   // cacheVersion 变化时重新读取，确保 EventDetail 拿到最新内容
+  362 |   const selectedSolution = selectedEvent ? solutionCache.current.get(selectedEvent.event_id) : undefined
+> 363 |   const isSelectedStreaming = selectedEvent ? activeStreams.current.has(selectedEvent.event_id) : false
+      |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  364 |   // 标注 cacheVersion 依赖（防止 linter 警告，实际读取在上方 Map.get 中）
+  365 |   void cacheVersion
+  366 |                                                         react-hooks/refs
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/StatsBar.tsx
+  20:24  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/StatsBar.tsx:20:24
+  18 |
+  19 |   useEffect(() => {
+> 20 |     if (value === 0) { setDisplay(0); return }
+     |                        ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  21 |     const duration = 800
+  22 |     const start = performance.now()
+  23 |     const from = 0  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/ThinkingConsole.tsx
+  65:36  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/components/ThinkingConsole.tsx:65:36
+  63 |   // 分析进行中自动展开
+  64 |   useEffect(() => {
+> 65 |     if (isProcessing && collapsed) setCollapsed(false)
+     |                                    ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  66 |   }, [isProcessing])
+  67 |
+  68 |   // 新日志出现时自动滚到底部  react-hooks/set-state-in-effect
+  66:6   warning  React Hook useEffect has a missing dependency: 'collapsed'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react-hooks/exhaustive-deps
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/index.tsx
+  51:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/event-analysis/index.tsx:51:7
+  49 |   useEffect(() => {
+  50 |     if (location.state?.mode === 'specific' && Array.isArray(location.state?.preSelectedIds) && location.state.preSelectedIds.length > 0) {
+> 51 |       setAnalysisMode('specific')
+     |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  52 |       setSelectedEventIds(location.state.preSelectedIds)
+  53 |     }
+  54 |   }, [])  react-hooks/set-state-in-effect
+  54:6  warning  React Hook useEffect has missing dependencies: 'location.state?.mode' and 'location.state.preSelectedIds'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        react-hooks/exhaustive-deps
+
+/home/monody/project/SentinelOps/web/src/pages/events/components/EventDetailModal.tsx
+  35:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/events/components/EventDetailModal.tsx:35:5
+  33 |
+  34 |   useEffect(() => {
+> 35 |     setCurrentStatus(event?.status || 'new')
+     |     ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  36 |   }, [event?.id, event?.status])
+  37 |
+  38 |   if (!event) return null  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/events/index.tsx
+  109:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/events/index.tsx:109:21
+  107 |   }
+  108 |
+> 109 |   useEffect(() => { fetchEvents() }, [page, pageSize, severityFilter, sortField, sortDir])
+      |                     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  110 |
+  111 |   const handleSearch = () => { setPage(1); fetchEvents() }
+  112 |  react-hooks/set-state-in-effect
+  109:38  warning  React Hook useEffect has a missing dependency: 'fetchEvents'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+
+/home/monody/project/SentinelOps/web/src/pages/ingest/index.tsx
+  76:5  warning  Error: Cannot access variable before it is declared
+
+`loadHistory` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/home/monody/project/SentinelOps/web/src/pages/ingest/index.tsx:76:5
+  74 |     settingsService.getIngestKey().then(k => { setApiKey(k); cacheIngestKey(k) }).catch(() => {})
+  75 |     // 加载接入历史
+> 76 |     loadHistory()
+     |     ^^^^^^^^^^^ `loadHistory` accessed before it is declared
+  77 |   }, [])
+  78 |
+  79 |   const loadHistory = async () => {
+
+/home/monody/project/SentinelOps/web/src/pages/ingest/index.tsx:79:3
+  77 |   }, [])
+  78 |
+> 79 |   const loadHistory = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 80 |     setHistLoading(true)
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 81 |     try {
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 90 |     }
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 91 |   }
+     | ^^^^ `loadHistory` is declared here
+  92 |
+  93 |   const handleResetKey = async () => {
+  94 |     if (!resetConfirm) { setResetConfirm(true); return }  react-hooks/immutability
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/chunks.tsx
+  190:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/chunks.tsx:190:21
+  188 |   }, [baseId, docId, page, pageSize, keyword])
+  189 |
+> 190 |   useEffect(() => { fetchData() }, [fetchData])
+      |                     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  191 |
+  192 |   const totalPages = Math.ceil(total / pageSize)
+  193 |   const avgChars = chunks.length > 0  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/components/DocList.tsx
+  81:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/components/DocList.tsx:81:21
+  79 |   }, [baseID, page])
+  80 |
+> 81 |   useEffect(() => { fetchDocs() }, [fetchDocs])
+     |                     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  82 |
+  83 |   // 有 indexing/pending 的文档时每 3s 轮询
+  84 |   useEffect(() => {  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/docs.tsx
+  129:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/docs.tsx:129:21
+  127 |   }, [baseId, page, pageSize, search, statusFilter, fileTypeFilter])
+  128 |
+> 129 |   useEffect(() => { fetchDocs() }, [fetchDocs])
+      |                     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  130 |
+  131 |   // 有进行中的索引时，每 3 秒自动轮询
+  132 |   useEffect(() => {  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/index.tsx
+  269:34  warning  Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setBases`, but the source dependencies were []. Inferred dependency not present in source.
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/index.tsx:269:34
+  267 |   // ── 数据加载 ────────────────────────────────────────────────────────────────
+  268 |
+> 269 |   const fetchBases = useCallback(async () => {
+      |                                  ^^^^^^^^^^^^^
+> 270 |     try {
+      | ^^^^^^^^^
+> 271 |       setBasesLoading(true)
+      | ^^^^^^^^^
+> 272 |       setBases(await knowledgeService.listBases())
+      | ^^^^^^^^^
+> 273 |     } catch {
+      | ^^^^^^^^^
+> 274 |       // 静默处理，后端无数据时不显示错误
+      | ^^^^^^^^^
+> 275 |     }
+      | ^^^^^^^^^
+> 276 |     finally { setBasesLoading(false) }
+      | ^^^^^^^^^
+> 277 |   }, [])
+      | ^^^^ Could not preserve existing manual memoization
+  278 |
+  279 |   const fetchDocs = useCallback(async () => {
+  280 |     if (!baseIdFromUrl) return  react-hooks/preserve-manual-memoization
+  279:33  warning  Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. This value was memoized in source but not in compilation output.
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/index.tsx:279:33
+  277 |   }, [])
+  278 |
+> 279 |   const fetchDocs = useCallback(async () => {
+      |                                 ^^^^^^^^^^^^^
+> 280 |     if (!baseIdFromUrl) return
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 281 |     try {
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 296 |     finally { setDocsLoading(false) }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 297 |   }, [baseIdFromUrl, docPage, docPageSize, docSearch, statusFilter, fileTypeFilter])
+      | ^^^^ Could not preserve existing memoization
+  298 |
+  299 |   const fetchChunks = useCallback(async () => {
+  300 |     if (!docIdFromUrl) return                                                                                                                                                                                                                                                                                                                                                    react-hooks/preserve-manual-memoization
+  297:7   warning  Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. This dependency may be mutated later, which could cause the value to change unexpectedly.
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/index.tsx:297:7
+  295 |     } catch { toast.error('获取文档列表失败') }
+  296 |     finally { setDocsLoading(false) }
+> 297 |   }, [baseIdFromUrl, docPage, docPageSize, docSearch, statusFilter, fileTypeFilter])
+      |       ^^^^^^^^^^^^^ This dependency may be modified later
+  298 |
+  299 |   const fetchChunks = useCallback(async () => {
+  300 |     if (!docIdFromUrl) return                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/preserve-manual-memoization
+  299:35  warning  Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. This value was memoized in source but not in compilation output.
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/index.tsx:299:35
+  297 |   }, [baseIdFromUrl, docPage, docPageSize, docSearch, statusFilter, fileTypeFilter])
+  298 |
+> 299 |   const fetchChunks = useCallback(async () => {
+      |                                   ^^^^^^^^^^^^^
+> 300 |     if (!docIdFromUrl) return
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 301 |     try {
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 313 |     finally { setChunksLoading(false) }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 314 |   }, [baseIdFromUrl, docIdFromUrl, chunkPage, chunkPageSize, chunkKeyword])
+      | ^^^^ Could not preserve existing memoization
+  315 |
+  316 |   useEffect(() => { fetchBases() }, [fetchBases])
+  317 |                                                                                                                                                                                                                                                                                                           react-hooks/preserve-manual-memoization
+  314:7   warning  Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. This dependency may be mutated later, which could cause the value to change unexpectedly.
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/index.tsx:314:7
+  312 |     } catch { toast.error('获取分块列表失败') }
+  313 |     finally { setChunksLoading(false) }
+> 314 |   }, [baseIdFromUrl, docIdFromUrl, chunkPage, chunkPageSize, chunkKeyword])
+      |       ^^^^^^^^^^^^^ This dependency may be modified later
+  315 |
+  316 |   useEffect(() => { fetchBases() }, [fetchBases])
+  317 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react-hooks/preserve-manual-memoization
+  316:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/index.tsx:316:21
+  314 |   }, [baseIdFromUrl, docIdFromUrl, chunkPage, chunkPageSize, chunkKeyword])
+  315 |
+> 316 |   useEffect(() => { fetchBases() }, [fetchBases])
+      |                     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  317 |
+  318 |   useEffect(() => {
+  319 |     const poll = async () => {                                                                                                                                                                                                react-hooks/set-state-in-effect
+  328:48  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/index.tsx:328:48
+  326 |
+  327 |   useEffect(() => {
+> 328 |     if (activeTab === 'docs' && baseIdFromUrl) fetchDocs()
+      |                                                ^^^^^^^^^ Avoid calling setState() directly within an effect
+  329 |   }, [activeTab, baseIdFromUrl, fetchDocs])
+  330 |
+  331 |   useEffect(() => {                                                                                                                                                                                                        react-hooks/set-state-in-effect
+  332:49  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/knowledge/index.tsx:332:49
+  330 |
+  331 |   useEffect(() => {
+> 332 |     if (activeTab === 'chunks' && docIdFromUrl) fetchChunks()
+      |                                                 ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  333 |   }, [activeTab, docIdFromUrl, fetchChunks])
+  334 |
+  335 |   // 文档索引中时自动轮询                                                                                                                                                                                                     react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/logs/index.tsx
+  89:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/logs/index.tsx:89:5
+  87 |
+  88 |   useEffect(() => {
+> 89 |     fetchSubscriptions()
+     |     ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  90 |   }, [])
+  91 |
+  92 |   useEffect(() => {                                    react-hooks/set-state-in-effect
+  94:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/logs/index.tsx:94:7
+  92 |   useEffect(() => {
+  93 |     if (selectedSubscriptionId) {
+> 94 |       fetchLogs()
+     |       ^^^^^^^^^ Avoid calling setState() directly within an effect
+  95 |     }
+  96 |   }, [selectedSubscriptionId, page])
+  97 |  react-hooks/set-state-in-effect
+  96:6  warning  React Hook useEffect has a missing dependency: 'fetchLogs'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+
+/home/monody/project/SentinelOps/web/src/pages/ops/RunsPanel.tsx
+  41:34  warning  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+/home/monody/project/SentinelOps/web/src/pages/ops/RunsPanel.tsx:41:34
+  39 |   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  40 |   const [details, setDetails] = useState<Record<string, OpsRun>>({})
+> 41 |   const [now, setNow] = useState(Date.now())
+     |                                  ^^^^^^^^^^ Cannot call impure function
+  42 |
+  43 |   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  44 |   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)                                                                                                                                                                                                                             react-hooks/purity
+  56:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/ops/RunsPanel.tsx:56:21
+  54 |     opsService.getRun(id).then(r => setDetails(p => ({ ...p, [id]: r }))).catch(() => {})
+  55 |
+> 56 |   useEffect(() => { load() }, [])
+     |                     ^^^^ Avoid calling setState() directly within an effect
+  57 |
+  58 |   // 有活跃任务时自动轮询 + 实时计时
+  59 |   useEffect(() => {  react-hooks/set-state-in-effect
+  84:6   warning  React Hook useEffect has a missing dependency: 'runs'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        react-hooks/exhaustive-deps
+  84:7   warning  React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       react-hooks/exhaustive-deps
+
+/home/monody/project/SentinelOps/web/src/pages/rag-eval/index.tsx
+  202:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/rag-eval/index.tsx:202:21
+  200 |   }, [window_, tracesPage, tracesPageSize, filterStatus])
+  201 |
+> 202 |   useEffect(() => { refresh() }, [refresh])
+      |                     ^^^^^^^ Avoid calling setState() directly within an effect
+  203 |
+  204 |   // 路由变化监听：切换到此页面时自动刷新（仅当路径是 /rag-eval 时）
+  205 |   useEffect(() => {  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/reports/components/GenerateReportModal.tsx
+  25:7  warning  The value assigned to 'start' is not used in subsequent statements  no-useless-assignment
+  32:7  warning  Unexpected lexical declaration in case block                        no-case-declarations
+  36:7  warning  Unexpected lexical declaration in case block                        no-case-declarations
+  40:7  warning  Unexpected lexical declaration in case block                        no-case-declarations
+
+/home/monody/project/SentinelOps/web/src/pages/reports/index.tsx
+   65:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/reports/index.tsx:65:21
+  63 |   }
+  64 |
+> 65 |   useEffect(() => { fetchReports() }, [page, pageSize, typeFilter])
+     |                     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  66 |
+  67 |   // 有生成中的报告时每 5s 自动刷新
+  68 |   useEffect(() => {                                    react-hooks/set-state-in-effect
+   65:39  warning  React Hook useEffect has a missing dependency: 'fetchReports'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+   73:6   warning  React Hook useEffect has a missing dependency: 'fetchReports'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+  137:27  warning  Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. This value was memoized in source but not in compilation output.
+
+/home/monody/project/SentinelOps/web/src/pages/reports/index.tsx:137:27
+  135 |   }
+  136 |
+> 137 |   const filteredReports = useMemo(
+      |                           ^^^^^^^^
+> 138 |     () => reports.filter(r => r.title.toLowerCase().includes(searchQuery.toLowerCase())),
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 139 |     [reports, searchQuery]
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 140 |   )
+      | ^^^^ Could not preserve existing memoization
+  141 |
+  142 |   const pageAllSelected = filteredReports.length > 0 && filteredReports.every(r => selected.has(r.id))
+  143 |   const pagePartialSelected = !pageAllSelected && filteredReports.some(r => selected.has(r.id))  react-hooks/preserve-manual-memoization
+
+/home/monody/project/SentinelOps/web/src/pages/settings/index.tsx
+  25:6  warning  React Hook useEffect has a missing dependency: 'setSettings'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/monody/project/SentinelOps/web/src/pages/subscriptions/index.tsx
+  81:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/subscriptions/index.tsx:81:21
+  79 |   }
+  80 |
+> 81 |   useEffect(() => { fetchSubscriptions() }, [])
+     |                     ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  82 |
+  83 |   const handleToggle = async (sub: Subscription) => {
+  84 |     try {  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/term-mapping/index.tsx
+  198:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/term-mapping/index.tsx:198:21
+  196 |   }
+  197 |
+> 198 |   useEffect(() => { fetchItems() }, [])
+      |                     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  199 |
+  200 |   // 过滤结果
+  201 |   const filtered = useMemo(() => {                                    react-hooks/set-state-in-effect
+  216:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/term-mapping/index.tsx:216:21
+  214 |
+  215 |   // 过滤条件变化时重置到第 1 页
+> 216 |   useEffect(() => { setPage(1) }, [searchQuery, filterEnabled])
+      |                     ^^^^^^^ Avoid calling setState() directly within an effect
+  217 |
+  218 |   // 当前页数据
+  219 |   const pagedItems = useMemo(  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/traces/detail.tsx
+  383:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/traces/detail.tsx:383:5
+  381 |   useEffect(() => {
+  382 |     if (!traceId) return
+> 383 |     setLoading(true)
+      |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  384 |     traceService.detail(traceId)
+  385 |       .then(d => setData(d))
+  386 |       .catch(e => setError(String(e)))  react-hooks/set-state-in-effect
+
+/home/monody/project/SentinelOps/web/src/pages/traces/index.tsx
+  571:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/traces/index.tsx:571:21
+  569 |   }
+  570 |
+> 571 |   useEffect(() => { loadStats() }, [loadStats])
+      |                     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  572 |   useEffect(() => { loadRuns() }, [loadRuns])
+  573 |
+  574 |   // 成本概览：仅在概览 Tab 激活时加载                                                              react-hooks/set-state-in-effect
+  572:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/traces/index.tsx:572:21
+  570 |
+  571 |   useEffect(() => { loadStats() }, [loadStats])
+> 572 |   useEffect(() => { loadRuns() }, [loadRuns])
+      |                     ^^^^^^^^ Avoid calling setState() directly within an effect
+  573 |
+  574 |   // 成本概览：仅在概览 Tab 激活时加载
+  575 |   useEffect(() => {                                               react-hooks/set-state-in-effect
+  577:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/traces/index.tsx:577:7
+  575 |   useEffect(() => {
+  576 |     if (activeTab === 'overview') {
+> 577 |       loadCostOverview(costRange)
+      |       ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  578 |       loadTokenTrend(costRange)
+  579 |     }
+  580 |   }, [activeTab, costRange, loadCostOverview, loadTokenTrend])  react-hooks/set-state-in-effect
+  600:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monody/project/SentinelOps/web/src/pages/traces/index.tsx:600:7
+  598 |   useEffect(() => {
+  599 |     if (activeTab === 'session' && sessionFilter) {
+> 600 |       setSessionInput(sessionFilter)
+      |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  601 |       loadSessionTimeline(sessionFilter)
+  602 |     }
+  603 |   }, [activeTab, sessionFilter])     react-hooks/set-state-in-effect
+  932:41  warning  Empty block statement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      no-empty
+
+✖ 71 problems (0 errors, 71 warnings)

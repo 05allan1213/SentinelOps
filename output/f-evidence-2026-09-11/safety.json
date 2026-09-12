@@ -1,0 +1,26 @@
+{
+  "message": "OK",
+  "data": {
+    "item": {
+      "static_caps": [
+        "agent_runtime.accept_new_runs",
+        "agent_runtime.admin_query_database_debug",
+        "agent_runtime.enabled",
+        "agent_runtime.l1_writes",
+        "agent_runtime.l2_writes",
+        "agent_runtime.shadow_mode",
+        "skill.enabled"
+      ],
+      "dynamic_caps": [],
+      "current_effective": [],
+      "shadow_mode": false,
+      "policy_hash": "cce420ede7a3ee994da190098e74d07a26217cf4629d03c7baca532d6922c79e",
+      "catalog_revision": "v1",
+      "gate_audit_available": true,
+      "availability": "available",
+      "data_quality": "complete"
+    },
+    "availability": "available",
+    "data_quality": "complete"
+  }
+}

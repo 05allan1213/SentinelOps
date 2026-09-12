@@ -1,0 +1,7 @@
+?   	SentinelOps/api/runtime	[no test files]
+ok  	SentinelOps/api/runtime/v1	0.164s
+ok  	SentinelOps/internal/service/runtime	1.806s
+ok  	SentinelOps/internal/controller/runtime	0.207s
+ok  	SentinelOps/internal/dao/mysql	60.260s
+ok  	SentinelOps/internal/ai/workflow	932.791s
+ok  	SentinelOps/internal/ai/runtime	142.428s

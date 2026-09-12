@@ -1,0 +1,168 @@
+npm notice run sentinelops-web@1.0.0 npx
+npm notice run 'playwright' test --workers=1
+
+Running 154 tests using 1 worker
+
+(node:68188) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/154] [chromium-1280] › tests/smoke/current-ui.spec.ts:29:1 › 未认证访问受保护路由时保留登录语义
+[2/154] [chromium-1280] › tests/smoke/current-ui.spec.ts:40:1 › 关键路由可达且主布局保持渲染
+[3/154] [chromium-1280] › tests/smoke/current-ui.spec.ts:56:1 › dark class 继续驱动暗色 variant
+[4/154] [chromium-1280] › tests/ui/approval-ui.spec.ts:56:1 › pending approval exposes redacted facts, hides preparing, and requires a reason
+[5/154] [chromium-1280] › tests/ui/approval-ui.spec.ts:71:1 › viewer has no decision entry and parked run is not shown as success
+[6/154] [chromium-1280] › tests/ui/approval-ui.spec.ts:81:1 › admin unknown resolution submits a decision only
+[7/154] [chromium-1280] › tests/ui/approval-ui.spec.ts:97:1 › 409 already-decided is stable and double click sends one decision
+[8/154] [chromium-1280] › tests/ui/approval-ui.spec.ts:112:1 › preview surfaces never claim an effect was applied
+[9/154] [chromium-1280] › tests/ui/approval-ui.spec.ts:120:1 › failed polling does not render an all-clear success state
+[10/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:52:3 › dedupe, disconnect, reload and deliberate next turn at 1280px
+[11/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:97:3 › preserves body and actionable error; retry only tails and cleanup at 1280px
+[12/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:126:3 › server recovery states and DONE-only reload stay truthful at 1280px
+[13/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:150:3 › accepted create after session switch retains its own identity at 1280px
+[14/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:180:3 › switch back before create returns joins one request at 1280px
+[15/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged first turn stays uncertain through switch and reload at 1280px
+[16/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged next turn stays uncertain through switch and reload at 1280px
+[17/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:237:3 › legacy pending snapshot stays uncertain after restore at 1280px
+[18/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:258:3 › upload preserves the accepted snapshot before the render frame at 1280px
+[19/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:52:3 › dedupe, disconnect, reload and deliberate next turn at 1440px
+[20/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:97:3 › preserves body and actionable error; retry only tails and cleanup at 1440px
+[21/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:126:3 › server recovery states and DONE-only reload stay truthful at 1440px
+[22/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:150:3 › accepted create after session switch retains its own identity at 1440px
+[23/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:180:3 › switch back before create returns joins one request at 1440px
+[24/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged first turn stays uncertain through switch and reload at 1440px
+[25/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged next turn stays uncertain through switch and reload at 1440px
+[26/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:237:3 › legacy pending snapshot stays uncertain after restore at 1440px
+[27/154] [chromium-1280] › tests/ui/chat-reconnect.spec.ts:258:3 › upload preserves the accepted snapshot before the render frame at 1440px
+[28/154] [chromium-1280] › tests/ui/chat-streaming-markdown.spec.ts:39:3 › actual Chat delayed fence remains stable at 1280px
+[29/154] [chromium-1280] › tests/ui/chat-streaming-markdown.spec.ts:39:3 › actual Chat delayed fence remains stable at 1440px
+[30/154] [chromium-1280] › tests/ui/layout-regressions.spec.ts:3:3 › analysis columns stay local at 1280
+[31/154] [chromium-1280] › tests/ui/layout-regressions.spec.ts:3:3 › analysis columns stay local at 1440
+[32/154] [chromium-1280] › tests/ui/legacy-demo-labels.spec.ts:2:1 › analysis source is explicitly legacy/demo
+[33/154] [chromium-1280] › tests/ui/markdown.spec.ts:5:5 › shared Markdown renderer desktop fixture › bounds tables/code, highlights and copies source at 1280
+[34/154] [chromium-1280] › tests/ui/markdown.spec.ts:5:5 › shared Markdown renderer desktop fixture › bounds tables/code, highlights and copies source at 1440
+[35/154] [chromium-1280] › tests/ui/markdown.spec.ts:44:3 › shared Markdown renderer desktop fixture › preserves fence context and EOF in the real clipboard
+[36/154] [chromium-1280] › tests/ui/markdown.spec.ts:62:3 › shared Markdown renderer desktop fixture › streaming guards and unsupported languages stay raw in the browser
+[37/154] [chromium-1280] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles null
+[38/154] [chromium-1280] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles {}
+[39/154] [chromium-1280] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles "404"
+[40/154] [chromium-1280] › tests/ui/rag-eval-resilience.spec.ts:19:1 › late RAG window response cannot replace current metrics; failed refresh retains them
+[41/154] [chromium-1280] › tests/ui/recovery-dialog-a11y.spec.ts:4:3 › Recovery focus and dismissal at 1280
+[42/154] [chromium-1280] › tests/ui/recovery-dialog-a11y.spec.ts:4:3 › Recovery focus and dismissal at 1440
+[43/154] [chromium-1280] › tests/ui/runtime-capabilities.spec.ts:91:3 › agent runtime navigation and capabilities table at 1280px
+[44/154] [chromium-1280] › tests/ui/runtime-capabilities.spec.ts:91:3 › agent runtime navigation and capabilities table at 1440px
+[45/154] [chromium-1280] › tests/ui/runtime-capabilities.spec.ts:142:1 › capabilities unavailable state is explicit
+[46/154] [chromium-1280] › tests/ui/runtime-detail-overview.spec.ts:31:3 › run detail overview, tabs and full timeline at 1280px
+[47/154] [chromium-1280] › tests/ui/runtime-detail-overview.spec.ts:88:3 › run detail partial, unavailable and failed states at 1280px
+[48/154] [chromium-1280] › tests/ui/runtime-detail-overview.spec.ts:31:3 › run detail overview, tabs and full timeline at 1440px
+[49/154] [chromium-1280] › tests/ui/runtime-detail-overview.spec.ts:88:3 › run detail partial, unavailable and failed states at 1440px
+[50/154] [chromium-1280] › tests/ui/runtime-detail-overview.spec.ts:126:1 › tail starts only for a non-terminal run and never claims success
+[51/154] [chromium-1280] › tests/ui/runtime-detail-overview.spec.ts:164:1 › run identity, tail and operation state do not leak between runs on client-side navigation
+[52/154] [chromium-1280] › tests/ui/runtime-detail-overview.spec.ts:210:1 › timeline distinguishes failed requests from empty data and retains prior rows on refresh failure
+[53/154] [chromium-1280] › tests/ui/runtime-detail-resources.spec.ts:135:3 › effects, evidence, context and trace tabs at 1280px
+[54/154] [chromium-1280] › tests/ui/runtime-detail-resources.spec.ts:135:3 › effects, evidence, context and trace tabs at 1440px
+[55/154] [chromium-1280] › tests/ui/runtime-detail-resources.spec.ts:188:1 › non-admin sees no controlled reconciliation and unavailable raw trace is labelled
+[56/154] [chromium-1280] › tests/ui/runtime-detail-resources.spec.ts:211:1 › panel-level unavailable and partial states stay distinct
+[57/154] [chromium-1280] › tests/ui/runtime-detail-resources.spec.ts:229:3 › all detail collections expose later pages at 1280px
+[58/154] [chromium-1280] › tests/ui/runtime-detail-resources.spec.ts:229:3 › all detail collections expose later pages at 1440px
+[59/154] [chromium-1280] › tests/ui/runtime-guidelines.spec.ts:3:1 › Runtime skip link, semantic tab keyboard and form names
+[60/154] [chromium-1280] › tests/ui/runtime-recovery.spec.ts:96:3 › attempts, checkpoints and admin recovery operation at 1280px
+[61/154] [chromium-1280] › tests/ui/runtime-recovery.spec.ts:156:3 › operator never receives an enabled recovery control at 1280px
+[62/154] [chromium-1280] › tests/ui/runtime-recovery.spec.ts:170:3 › admin sees idempotent replay and a conflict is never shown as success at 1280px
+[63/154] [chromium-1280] › tests/ui/runtime-recovery.spec.ts:96:3 › attempts, checkpoints and admin recovery operation at 1440px
+[64/154] [chromium-1280] › tests/ui/runtime-recovery.spec.ts:156:3 › operator never receives an enabled recovery control at 1440px
+[65/154] [chromium-1280] › tests/ui/runtime-recovery.spec.ts:170:3 › admin sees idempotent replay and a conflict is never shown as success at 1440px
+[66/154] [chromium-1280] › tests/ui/runtime-recovery.spec.ts:192:1 › operation reconnects from session storage after reload and shows a terminal failure
+[67/154] [chromium-1280] › tests/ui/runtime-recovery.spec.ts:213:1 › operation query error exposes retry and retains last server state
+[68/154] [chromium-1280] › tests/ui/runtime-runs.spec.ts:47:3 › runs navigation, url filters, canonical badges and legacy labelling at 1280px
+[69/154] [chromium-1280] › tests/ui/runtime-runs.spec.ts:91:3 › distinct empty, partial, unavailable and failed states at 1280px
+[70/154] [chromium-1280] › tests/ui/runtime-runs.spec.ts:47:3 › runs navigation, url filters, canonical badges and legacy labelling at 1440px
+[71/154] [chromium-1280] › tests/ui/runtime-runs.spec.ts:91:3 › distinct empty, partial, unavailable and failed states at 1440px
+[72/154] [chromium-1280] › tests/ui/runtime-runs.spec.ts:129:1 › row selection navigates to the frozen detail route without claiming success
+[73/154] [chromium-1280] › tests/ui/runtime-runs.spec.ts:142:1 › local time filters send zoned RFC3339 values accepted by the API contract
+[74/154] [chromium-1280] › tests/ui/runtime-sse.spec.ts:17:3 › single reader, dedupe, terminal close and visibility at 1280px
+[75/154] [chromium-1280] › tests/ui/runtime-sse.spec.ts:17:3 › single reader, dedupe, terminal close and visibility at 1440px
+[76/154] [chromium-1280] › tests/ui/runtime-visual-states.spec.ts:5:3 › runtime visual states and motion at 1280
+[77/154] [chromium-1280] › tests/ui/runtime-visual-states.spec.ts:5:3 › runtime visual states and motion at 1440
+(node:79664) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[78/154] [chromium-1440] › tests/smoke/current-ui.spec.ts:29:1 › 未认证访问受保护路由时保留登录语义
+[79/154] [chromium-1440] › tests/smoke/current-ui.spec.ts:40:1 › 关键路由可达且主布局保持渲染
+[80/154] [chromium-1440] › tests/smoke/current-ui.spec.ts:56:1 › dark class 继续驱动暗色 variant
+[81/154] [chromium-1440] › tests/ui/approval-ui.spec.ts:56:1 › pending approval exposes redacted facts, hides preparing, and requires a reason
+[82/154] [chromium-1440] › tests/ui/approval-ui.spec.ts:71:1 › viewer has no decision entry and parked run is not shown as success
+[83/154] [chromium-1440] › tests/ui/approval-ui.spec.ts:81:1 › admin unknown resolution submits a decision only
+[84/154] [chromium-1440] › tests/ui/approval-ui.spec.ts:97:1 › 409 already-decided is stable and double click sends one decision
+[85/154] [chromium-1440] › tests/ui/approval-ui.spec.ts:112:1 › preview surfaces never claim an effect was applied
+[86/154] [chromium-1440] › tests/ui/approval-ui.spec.ts:120:1 › failed polling does not render an all-clear success state
+[87/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:52:3 › dedupe, disconnect, reload and deliberate next turn at 1280px
+[88/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:97:3 › preserves body and actionable error; retry only tails and cleanup at 1280px
+[89/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:126:3 › server recovery states and DONE-only reload stay truthful at 1280px
+[90/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:150:3 › accepted create after session switch retains its own identity at 1280px
+[91/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:180:3 › switch back before create returns joins one request at 1280px
+[92/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged first turn stays uncertain through switch and reload at 1280px
+[93/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged next turn stays uncertain through switch and reload at 1280px
+[94/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:237:3 › legacy pending snapshot stays uncertain after restore at 1280px
+[95/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:258:3 › upload preserves the accepted snapshot before the render frame at 1280px
+[96/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:52:3 › dedupe, disconnect, reload and deliberate next turn at 1440px
+[97/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:97:3 › preserves body and actionable error; retry only tails and cleanup at 1440px
+[98/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:126:3 › server recovery states and DONE-only reload stay truthful at 1440px
+[99/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:150:3 › accepted create after session switch retains its own identity at 1440px
+[100/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:180:3 › switch back before create returns joins one request at 1440px
+[101/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged first turn stays uncertain through switch and reload at 1440px
+[102/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:207:5 › unacknowledged next turn stays uncertain through switch and reload at 1440px
+[103/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:237:3 › legacy pending snapshot stays uncertain after restore at 1440px
+[104/154] [chromium-1440] › tests/ui/chat-reconnect.spec.ts:258:3 › upload preserves the accepted snapshot before the render frame at 1440px
+[105/154] [chromium-1440] › tests/ui/chat-streaming-markdown.spec.ts:39:3 › actual Chat delayed fence remains stable at 1280px
+[106/154] [chromium-1440] › tests/ui/chat-streaming-markdown.spec.ts:39:3 › actual Chat delayed fence remains stable at 1440px
+[107/154] [chromium-1440] › tests/ui/layout-regressions.spec.ts:3:3 › analysis columns stay local at 1280
+[108/154] [chromium-1440] › tests/ui/layout-regressions.spec.ts:3:3 › analysis columns stay local at 1440
+[109/154] [chromium-1440] › tests/ui/legacy-demo-labels.spec.ts:2:1 › analysis source is explicitly legacy/demo
+[110/154] [chromium-1440] › tests/ui/markdown.spec.ts:5:5 › shared Markdown renderer desktop fixture › bounds tables/code, highlights and copies source at 1280
+[111/154] [chromium-1440] › tests/ui/markdown.spec.ts:5:5 › shared Markdown renderer desktop fixture › bounds tables/code, highlights and copies source at 1440
+[112/154] [chromium-1440] › tests/ui/markdown.spec.ts:44:3 › shared Markdown renderer desktop fixture › preserves fence context and EOF in the real clipboard
+[113/154] [chromium-1440] › tests/ui/markdown.spec.ts:62:3 › shared Markdown renderer desktop fixture › streaming guards and unsupported languages stay raw in the browser
+[114/154] [chromium-1440] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles null
+[115/154] [chromium-1440] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles {}
+[116/154] [chromium-1440] › tests/ui/rag-eval-resilience.spec.ts:3:3 › RAG dashboard handles "404"
+[117/154] [chromium-1440] › tests/ui/rag-eval-resilience.spec.ts:19:1 › late RAG window response cannot replace current metrics; failed refresh retains them
+[118/154] [chromium-1440] › tests/ui/recovery-dialog-a11y.spec.ts:4:3 › Recovery focus and dismissal at 1280
+[119/154] [chromium-1440] › tests/ui/recovery-dialog-a11y.spec.ts:4:3 › Recovery focus and dismissal at 1440
+[120/154] [chromium-1440] › tests/ui/runtime-capabilities.spec.ts:91:3 › agent runtime navigation and capabilities table at 1280px
+[121/154] [chromium-1440] › tests/ui/runtime-capabilities.spec.ts:91:3 › agent runtime navigation and capabilities table at 1440px
+[122/154] [chromium-1440] › tests/ui/runtime-capabilities.spec.ts:142:1 › capabilities unavailable state is explicit
+[123/154] [chromium-1440] › tests/ui/runtime-detail-overview.spec.ts:31:3 › run detail overview, tabs and full timeline at 1280px
+[124/154] [chromium-1440] › tests/ui/runtime-detail-overview.spec.ts:88:3 › run detail partial, unavailable and failed states at 1280px
+[125/154] [chromium-1440] › tests/ui/runtime-detail-overview.spec.ts:31:3 › run detail overview, tabs and full timeline at 1440px
+[126/154] [chromium-1440] › tests/ui/runtime-detail-overview.spec.ts:88:3 › run detail partial, unavailable and failed states at 1440px
+[127/154] [chromium-1440] › tests/ui/runtime-detail-overview.spec.ts:126:1 › tail starts only for a non-terminal run and never claims success
+[128/154] [chromium-1440] › tests/ui/runtime-detail-overview.spec.ts:164:1 › run identity, tail and operation state do not leak between runs on client-side navigation
+[129/154] [chromium-1440] › tests/ui/runtime-detail-overview.spec.ts:210:1 › timeline distinguishes failed requests from empty data and retains prior rows on refresh failure
+[130/154] [chromium-1440] › tests/ui/runtime-detail-resources.spec.ts:135:3 › effects, evidence, context and trace tabs at 1280px
+[131/154] [chromium-1440] › tests/ui/runtime-detail-resources.spec.ts:135:3 › effects, evidence, context and trace tabs at 1440px
+[132/154] [chromium-1440] › tests/ui/runtime-detail-resources.spec.ts:188:1 › non-admin sees no controlled reconciliation and unavailable raw trace is labelled
+[133/154] [chromium-1440] › tests/ui/runtime-detail-resources.spec.ts:211:1 › panel-level unavailable and partial states stay distinct
+[134/154] [chromium-1440] › tests/ui/runtime-detail-resources.spec.ts:229:3 › all detail collections expose later pages at 1280px
+[135/154] [chromium-1440] › tests/ui/runtime-detail-resources.spec.ts:229:3 › all detail collections expose later pages at 1440px
+[136/154] [chromium-1440] › tests/ui/runtime-guidelines.spec.ts:3:1 › Runtime skip link, semantic tab keyboard and form names
+[137/154] [chromium-1440] › tests/ui/runtime-recovery.spec.ts:96:3 › attempts, checkpoints and admin recovery operation at 1280px
+[138/154] [chromium-1440] › tests/ui/runtime-recovery.spec.ts:156:3 › operator never receives an enabled recovery control at 1280px
+[139/154] [chromium-1440] › tests/ui/runtime-recovery.spec.ts:170:3 › admin sees idempotent replay and a conflict is never shown as success at 1280px
+[140/154] [chromium-1440] › tests/ui/runtime-recovery.spec.ts:96:3 › attempts, checkpoints and admin recovery operation at 1440px
+[141/154] [chromium-1440] › tests/ui/runtime-recovery.spec.ts:156:3 › operator never receives an enabled recovery control at 1440px
+[142/154] [chromium-1440] › tests/ui/runtime-recovery.spec.ts:170:3 › admin sees idempotent replay and a conflict is never shown as success at 1440px
+[143/154] [chromium-1440] › tests/ui/runtime-recovery.spec.ts:192:1 › operation reconnects from session storage after reload and shows a terminal failure
+[144/154] [chromium-1440] › tests/ui/runtime-recovery.spec.ts:213:1 › operation query error exposes retry and retains last server state
+[145/154] [chromium-1440] › tests/ui/runtime-runs.spec.ts:47:3 › runs navigation, url filters, canonical badges and legacy labelling at 1280px
+[146/154] [chromium-1440] › tests/ui/runtime-runs.spec.ts:91:3 › distinct empty, partial, unavailable and failed states at 1280px
+[147/154] [chromium-1440] › tests/ui/runtime-runs.spec.ts:47:3 › runs navigation, url filters, canonical badges and legacy labelling at 1440px
+[148/154] [chromium-1440] › tests/ui/runtime-runs.spec.ts:91:3 › distinct empty, partial, unavailable and failed states at 1440px
+[149/154] [chromium-1440] › tests/ui/runtime-runs.spec.ts:129:1 › row selection navigates to the frozen detail route without claiming success
+[150/154] [chromium-1440] › tests/ui/runtime-runs.spec.ts:142:1 › local time filters send zoned RFC3339 values accepted by the API contract
+[151/154] [chromium-1440] › tests/ui/runtime-sse.spec.ts:17:3 › single reader, dedupe, terminal close and visibility at 1280px
+[152/154] [chromium-1440] › tests/ui/runtime-sse.spec.ts:17:3 › single reader, dedupe, terminal close and visibility at 1440px
+[153/154] [chromium-1440] › tests/ui/runtime-visual-states.spec.ts:5:3 › runtime visual states and motion at 1280
+[154/154] [chromium-1440] › tests/ui/runtime-visual-states.spec.ts:5:3 › runtime visual states and motion at 1440
+  154 passed (6.2m)
