@@ -37,3 +37,27 @@ for (const width of [1280, 1440]) {
     expect(errors).toEqual([])
   })
 }
+
+test('loading, empty and unavailable evidence states', async ({ page }, testInfo) => {
+  await page.addInitScript(() => localStorage.setItem('token', 'fixture'))
+  await page.route('**/api/**', route => route.fulfill({ json: { data: {} } }))
+  let release: (() => void) | undefined
+  let state = 'loading'
+  await page.route('**/api/runtime/v1/runs/run-1/events**', route => route.fulfill({ contentType: 'text/event-stream', body: 'data: [DONE]\n\n' }))
+  await page.route('**/api/runtime/v1/runs/run-1', async route => {
+    if (state === 'loading') await new Promise<void>(resolve => { release = resolve })
+    await route.fulfill({ json: { data: { item: null, availability: state === 'unavailable' ? 'unavailable' : 'available', data_quality: 'unknown', reason_code: state === 'unavailable' ? 'not_observed' : undefined } } })
+  })
+  const dir = `../output/playwright/runtime-${testInfo.project.use.viewport!.width}/final`
+  await mkdir(dir, { recursive: true })
+  await page.goto('/runtime/runs/run-1')
+  await expect(page.getByTestId('runtime-detail-loading')).toBeVisible()
+  await page.screenshot({ path: `${dir}/loading.png`, fullPage: true })
+  state = 'empty'; release!()
+  await expect(page.getByTestId('runtime-detail-empty')).toBeVisible()
+  await page.screenshot({ path: `${dir}/empty.png`, fullPage: true })
+  state = 'unavailable'
+  await page.getByRole('button', { name: '刷新', exact: true }).click()
+  await expect(page.getByTestId('runtime-detail-unavailable')).toBeVisible()
+  await page.screenshot({ path: `${dir}/unavailable.png`, fullPage: true })
+})

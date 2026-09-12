@@ -555,6 +555,7 @@ func (c *ControllerV1) requireService(ctx context.Context) error {
 
 func setStatus(ctx context.Context, status int) {
 	if request := g.RequestFromCtx(ctx); request != nil {
-		request.Response.WriteStatus(status)
+		// Set only the status; ResponseMiddleware owns the single JSON body.
+		request.Response.WriteHeader(status)
 	}
 }

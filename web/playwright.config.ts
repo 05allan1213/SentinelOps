@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests',
+  testMatch: '**/*.spec.ts',
   timeout: 120_000,
   fullyParallel: false,
   reporter: 'line',
@@ -18,8 +19,12 @@ export default defineConfig({
   }),
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'chromium-1280',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 1000 } },
+    },
+    {
+      name: 'chromium-1440',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 1000 } },
     },
   ],
 })

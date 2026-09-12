@@ -11,7 +11,7 @@
     "build": "tsc --noEmit && tsc --project tsconfig.node.json --noEmit && vite build",
     "lint": "tsc --noEmit --pretty false && tsc --project tsconfig.node.json --noEmit --pretty false && eslint .",
     "preview": "vite preview",
-    "test:smoke": "playwright test tests/smoke/current-ui.spec.ts --project=chromium",
+    "test:smoke": "playwright test tests/smoke/current-ui.spec.ts",
     "test:unit": "vitest run"
   },
   "dependencies": {

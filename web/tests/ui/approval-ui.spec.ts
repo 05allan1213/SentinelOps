@@ -111,6 +111,7 @@ test('409 already-decided is stable and double click sends one decision', async 
 
 test('preview surfaces never claim an effect was applied', async ({ page }) => {
   await installFixture(page)
+  await page.route('**/api/event/v1/list**', route => route.fulfill({ json: { data: { total: 1, events: [] } } }))
   await page.goto('/events/analysis')
   await expect(page.getByText('Proposal Preview', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('规则已应用', { exact: true })).toHaveCount(0)
