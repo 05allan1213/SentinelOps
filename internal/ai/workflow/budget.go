@@ -551,6 +551,36 @@ func budgetFloatEqual(left, right float64) bool {
 	return math.Abs(left-right) <= 1e-12*math.Max(1, math.Max(math.Abs(left), math.Abs(right)))
 }
 
+// baseBudgetUsageQuality 从 Run 的持久化预算事实推导用量质量：没有任何已结算
+// 用量 -> unknown；存在 usage_quality 未知的结算 -> partial；全部结算都有可信
+// 用量 -> complete。Run/Attempt 终态复用该结论，避免 usage_quality 永远是初值。
+func baseBudgetUsageQuality(run *mysql.WorkflowRun) string {
+	if run == nil {
+		return "unknown"
+	}
+	_, usage, reservations, err := decodeBaseBudgetState(run)
+	if err != nil {
+		return "unknown"
+	}
+	settled := 0
+	for _, reservation := range reservations.Items {
+		if reservation.State != BaseBudgetReservationSettled {
+			continue
+		}
+		settled++
+		if reservation.UsageQuality == "" || reservation.UsageQuality == "unknown" {
+			return "partial"
+		}
+	}
+	if settled == 0 {
+		return "unknown"
+	}
+	if usage.UsageUnknown {
+		return "partial"
+	}
+	return "complete"
+}
+
 func encodeBaseBudgetState(usage BaseBudgetUsage, reservations BaseBudgetReservations) (string, string, error) {
 	usage.Schema = BaseBudgetSchema
 	reservations.Schema = BaseBudgetSchema

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"math"
+	"strings"
 	"time"
 
 	v1 "SentinelOps/api/runtime/v1"
@@ -358,6 +359,24 @@ func AllowedRecoveryActions(status string, compatibility v1.RuntimeCompatibility
 	}
 }
 
+// buildRuntimeAnswer 从持久化 output_payload 提取权威答案原文。
+// 事件流只保存截断 summary，Run 详情必须返回完整 answer；
+// payload 缺失或不可解析时返回 nil，读模型保持 partial 语义。
+func buildRuntimeAnswer(outputPayload string) *v1.RuntimeAnswerDTO {
+	if strings.TrimSpace(outputPayload) == "" {
+		return nil
+	}
+	var root struct {
+		Answer          string `json:"answer"`
+		Grounding       string `json:"grounding"`
+		GroundingReason string `json:"grounding_reason"`
+	}
+	if err := json.Unmarshal([]byte(outputPayload), &root); err != nil || strings.TrimSpace(root.Answer) == "" {
+		return nil
+	}
+	return &v1.RuntimeAnswerDTO{Content: root.Answer, Grounding: root.Grounding, GroundingReason: root.GroundingReason}
+}
+
 func (s *RuntimeService) GetRun(ctx context.Context, runID string) (v1.RunDetailDTO, error) {
 	if s == nil || s.Store == nil {
 		return v1.RunDetailDTO{}, ErrRuntimeNotFound
@@ -435,7 +454,7 @@ func (s *RuntimeService) GetRun(ctx context.Context, runID string) (v1.RunDetail
 		currentAttempt = &v1.AttemptDTO{AttemptID: attempt.ID, RunID: attempt.RunID, Attempt: int(attempt.Attempt), Mode: value(attempt.Mode), Status: status, CurrentPhase: sum.CurrentPhase, WorkerID: value(attempt.WorkerID), LeaseGeneration: valueU64(attempt.LeaseGeneration), RuntimeVersion: value(attempt.RuntimeVersion), RunCompatibilityHash: value(attempt.RunCompatibilityHash), CheckpointCompatibilityHash: value(attempt.CheckpointCompatibilityHash), ExecutingWorkerFingerprint: value(attempt.ExecutingWorkerFingerprint), TraceID: value(attempt.TraceID), OperationID: value(attempt.OperationID), RetryCount: int(valueU(attempt.RetryCount)), FailoverCount: int(valueU(attempt.FailoverCount)), FailureCode: value(attempt.FailureCode), FailureMessage: value(attempt.FailureMessageRedacted), UsageQuality: v1.DataQuality(value(attempt.UsageQuality)), TraceQuality: v1.DataQuality(value(attempt.TraceQuality)), StartedAt: attempt.StartedAt, FinishedAt: attempt.FinishedAt, ResourceMeta: v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}}
 	}
 	ctxSummary := v1.RuntimeContextSummaryDTO{Identity: c.Identity, SessionRevisionUsed: c.SessionRevisionUsed, SessionRevisionCommitted: c.SessionRevisionCommitted, SummaryHash: c.SummaryHash, HistoryCount: c.HistoryCount, BudgetLimitsHash: c.BudgetLimitsHash, DeadlineAt: c.DeadlineAt, RuntimeVersion: value(run.RuntimeVersion), RuntimeCompatibilityHash: value(run.RuntimeCompatibilityHash), PolicyHash: value(run.PolicyHash), ConfigHash: value(run.ConfigHash), ResourceMeta: c.ResourceMeta}
-	return v1.RunDetailDTO{Summary: sum, Overview: v1.RunOverviewDTO{Status: sum.Status, CurrentPhase: sum.CurrentPhase, ResourceMeta: sum.ResourceMeta}, CurrentAttempt: currentAttempt, Budget: sum.Budget, Compatibility: comp, ContextSummary: ctxSummary, GateSummary: gate, AllowedRecoveryActions: AllowedRecoveryActions(string(sum.Status), comp), ResourceMeta: sum.ResourceMeta}, nil
+	return v1.RunDetailDTO{Summary: sum, Overview: v1.RunOverviewDTO{Status: sum.Status, CurrentPhase: sum.CurrentPhase, ResourceMeta: sum.ResourceMeta}, CurrentAttempt: currentAttempt, Budget: sum.Budget, Compatibility: comp, ContextSummary: ctxSummary, GateSummary: gate, AllowedRecoveryActions: AllowedRecoveryActions(string(sum.Status), comp), Answer: buildRuntimeAnswer(run.OutputPayload), ResourceMeta: sum.ResourceMeta}, nil
 }
 
 // GetContext returns the owned Run Context projection.  includeHistory is the

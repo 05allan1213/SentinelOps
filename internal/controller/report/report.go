@@ -114,16 +114,21 @@ func (c *ControllerV1) Export(ctx context.Context, req *v1.ExportReq) (*v1.Expor
 		return nil, err
 	}
 	format := strings.ToLower(req.Format)
-	contentType, ext := "application/json", "json"
 	var body []byte
+	var contentType, ext string
 	switch format {
 	case "markdown", "md":
 		contentType, ext, body = "text/markdown; charset=utf-8", "md", []byte(r.Content)
 	case "html":
 		contentType, ext, body = "text/html; charset=utf-8", "html", []byte("<html><body><pre>"+template.HTMLEscapeString(r.Content)+"</pre></body></html>")
-	default:
+	case "", "json":
+		contentType, ext = "application/json", "json"
 		payload := map[string]any{"id": r.ID, "title": r.Title, "type": r.Type, "content": r.Content, "created_at": r.CreatedAt}
 		body, _ = json.MarshalIndent(payload, "", "  ")
+	default:
+		// 未知格式不再静默回落到 JSON：调用方会拿到与 Content-Type 不符的
+		// 文件（例如 format=pdf 实际下载 .json）。
+		return nil, gerror.NewCode(gcode.CodeValidationFailed, "不支持的导出格式 "+req.Format+"，支持：markdown/md、html、json")
 	}
 	request := g.RequestFromCtx(ctx)
 	if request != nil {

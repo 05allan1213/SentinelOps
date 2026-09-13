@@ -3,6 +3,8 @@ package ingest
 import (
 	"fmt"
 	"strings"
+
+	"SentinelOps/utility/stringutil"
 )
 
 // ParseCEF 解析 ArcSight CEF 格式告警。
@@ -106,8 +108,24 @@ func ParseLEEF(line string, sourceName string) (*NormalizedAlert, error) {
 		return nil, fmt.Errorf("LEEF EventID 为空")
 	}
 
+	// 解析属性（tab 或空格分隔的 key=value）
+	attrs := map[string]string{}
+	if len(parts) == 6 {
+		attrs = parseLEEFAttrs(parts[5])
+	}
+
+	// QRadar 的 EventID 只是事件编号（如 "200"），标题优先使用 name/msg 属性，
+	// 缺失时才回退 EventID；标题列上限 256，超长按 rune 边界截断。
+	title := strings.TrimSpace(attrs["name"])
+	if title == "" {
+		title = strings.TrimSpace(attrs["msg"])
+	}
+	if title == "" {
+		title = eventID
+	}
+
 	alert := &NormalizedAlert{
-		Title:        eventID,
+		Title:        stringutil.TruncateRunes(title, 256),
 		Source:       fmt.Sprintf("%s/%s", vendor, product),
 		IngestSource: "leef",
 		RawPayload:   line,
@@ -117,9 +135,7 @@ func ParseLEEF(line string, sourceName string) (*NormalizedAlert, error) {
 		alert.Source = sourceName
 	}
 
-	// 解析属性（tab 分隔的 key=value）
-	if len(parts) == 6 {
-		attrs := parseLEEFAttrs(parts[5])
+	if len(attrs) > 0 {
 		alert.Content = attrs["msg"]
 		alert.Severity = normalizeSeverity(attrs["sev"])
 		if v := attrs["src"]; v != "" {
@@ -145,9 +161,17 @@ func parseLEEFAttrs(s string) map[string]string {
 	if !strings.Contains(s, "\t") {
 		sep = " "
 	}
+	lastKey := ""
 	for _, pair := range strings.Split(s, sep) {
 		if idx := strings.Index(pair, "="); idx > 0 {
-			result[pair[:idx]] = pair[idx+1:]
+			lastKey = pair[:idx]
+			result[lastKey] = pair[idx+1:]
+			continue
+		}
+		// 空格分隔的 LEEF 属性值可能自带空格（msg=disk full），
+		// 无 "=" 的片段并入上一个属性值，避免被截成半个词。
+		if lastKey != "" && pair != "" {
+			result[lastKey] += " " + pair
 		}
 	}
 	return result

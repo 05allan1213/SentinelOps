@@ -1,9 +1,9 @@
 import { chatService } from '@/services/chat'
 import api from '@/services/api'
-vi.mock('@/services/api', () => ({ default: { post: vi.fn() } }))
+vi.mock('@/services/api', () => ({ default: { post: vi.fn(), get: vi.fn() } }))
 const frame = (seq: number, type: string, summary = '', data = {}) => `id: ${seq}\nevent: ${type}\ndata: ${JSON.stringify({ summary, data })}\n\n`
 const response = (body: string) => new Response(body, { headers: { 'Content-Type': 'text/event-stream' } })
-beforeEach(() => { localStorage.clear(); sessionStorage.clear(); vi.mocked(api.post).mockReset(); vi.stubGlobal('fetch', vi.fn()); vi.mocked(api.post).mockResolvedValue({ data: { data: { run_id: 'run-1', session_id: 'session', status: 'pending' } } }) })
+beforeEach(() => { localStorage.clear(); sessionStorage.clear(); vi.mocked(api.post).mockReset(); vi.mocked(api.get).mockReset(); vi.mocked(api.get).mockRejectedValue(new Error('run detail unavailable')); vi.stubGlobal('fetch', vi.fn()); vi.mocked(api.post).mockResolvedValue({ data: { data: { run_id: 'run-1', session_id: 'session', status: 'pending' } } }) })
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 function chat(options?: { newTurn: boolean }) {
   const message = vi.fn(), done = vi.fn(), error = vi.fn()
@@ -32,6 +32,29 @@ it('delivers the executor answer once when the replanner repeats the same respon
   ))
   const call = chat(); await call.finished
   expect(call.message.mock.calls.filter(([type]) => type === 'assistant')).toEqual([['assistant', answer]])
+})
+
+it('replaces a truncated streamed answer with the authoritative Run answer on success', async () => {
+  const full = '完整回答：' + 'A'.repeat(600) + '（结尾）'
+  vi.mocked(fetch).mockResolvedValue(response(
+    frame(1, 'agent.plan', '{"steps":["inspect"]}') +
+    frame(2, 'agent.plan', '完整回答：' + 'A'.repeat(480)) +
+    frame(3, 'run.completed', '', { to_status: 'succeeded' }),
+  ))
+  vi.mocked(api.get).mockResolvedValue({ data: { data: { item: { answer: { content: JSON.stringify({ response: full }) } } } } })
+  const call = chat(); await call.finished
+  expect(vi.mocked(api.get).mock.calls[0][0]).toBe('/runtime/v1/runs/run-1')
+  expect(call.message).toHaveBeenCalledWith('final_answer', full)
+})
+
+it('keeps the streamed answer when the authoritative Run answer is unavailable', async () => {
+  vi.mocked(fetch).mockResolvedValue(response(
+    frame(1, 'agent.plan', '{"response":"streamed body"}') +
+    frame(2, 'run.completed', '', { to_status: 'succeeded' }),
+  ))
+  const call = chat(); await call.finished
+  expect(call.message).toHaveBeenCalledWith('assistant', 'streamed body')
+  expect(call.message.mock.calls.some(([type]) => type === 'final_answer')).toBe(false)
 })
 
 it('reload tails stored cursor and never replaces an unauthorized stored run', async () => {

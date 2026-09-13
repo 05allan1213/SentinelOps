@@ -414,6 +414,7 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 			}
 		}
 		now := time.Now()
+		usageQuality := baseBudgetUsageQuality(run)
 		updates := map[string]any{
 			"status":             input.TargetStatus,
 			"active_session_key": nil,
@@ -424,6 +425,7 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 			"duration_ms":        max(now.Sub(run.StartedAt).Milliseconds(), 0),
 			"output_payload":     outputPayload,
 			"error_message":      errorMessage,
+			"usage_quality":      usageQuality,
 			"trace_quality":      input.TraceQuality,
 			"park_reason":        nil,
 		}
@@ -452,7 +454,7 @@ func (s *GORMStore) CompleteRunAndCommitSession(ctx context.Context, input Compl
 		if err := attachAttemptTraceTx(tx, run, input.Lease, input.TraceID); err != nil {
 			return err
 		}
-		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: input.TargetStatus, CurrentPhase: phase, FailureMessage: input.ErrorMessage, TraceQuality: input.TraceQuality, FinishedAt: now, OperationID: input.OperationID}); err != nil {
+		if err := finishAttemptTx(tx, run, FinishAttemptInput{Lease: input.Lease, Status: input.TargetStatus, CurrentPhase: phase, FailureMessage: input.ErrorMessage, UsageQuality: usageQuality, TraceQuality: input.TraceQuality, FinishedAt: now, OperationID: input.OperationID}); err != nil {
 			return err
 		}
 		if input.OperationID != "" {

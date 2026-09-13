@@ -299,16 +299,6 @@ export interface TrendData {
   info: number
 }
 
-// ==================== 文件上传配置类型 ====================
-export interface UploadConfig {
-  strategy: 'sliding_window' | 'hierarchical'
-  chunk_size?: number
-  overlap_size?: number
-  min_chars?: number
-  max_chars?: number
-  target_chars?: number
-}
-
 // ==================== 审计日志类型 ====================
 export interface AuditLog {
   id: number

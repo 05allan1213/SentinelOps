@@ -75,6 +75,50 @@ func TestBaseBudgetPreCallHardStopAndSettlement(t *testing.T) {
 	}
 }
 
+func TestCompleteRunDerivesUsageQualityFromSettledBudget(t *testing.T) {
+	db := newP07Database(t, "phase14_usage_quality")
+	store, ctx, token := fixture14BudgetRun(t, db, "usage-quality", BaseBudgetLimits{
+		MaxModelCalls: 2, MaxL0ToolCalls: 1, MaxDurationMS: int64(time.Hour / time.Millisecond),
+	}, time.Now().Add(time.Hour))
+	model := fixture14ModelBudgetMetadata("provider_a/chat", "provider_a", "same-model")
+	reservation, err := store.ReserveBaseBudget(ctx, ReserveBaseBudgetInput{
+		Lease: token, Identity: "model-1", Kind: BaseBudgetKindModelCall, Subject: model.CatalogRef,
+		TraceID: "trace-usage-quality", Metadata: model,
+	})
+	if err != nil {
+		t.Fatalf("reserve model call: %v", err)
+	}
+	if err = store.SettleBaseBudget(ctx, SettleBaseBudgetInput{
+		Lease: token, Identity: reservation.Identity, Outcome: BaseBudgetOutcomeSucceeded,
+		TraceID: "trace-usage-quality", UsageQuality: "reliable",
+		Actual: &BaseBudgetActual{InputTokens: 11, OutputTokens: 7, CostCNY: 0.5},
+	}); err != nil {
+		t.Fatalf("settle model call: %v", err)
+	}
+	if err = store.CompleteRunAndCommitSession(ctx, CompleteRunInput{
+		RunID: token.RunID, ExpectedStatus: RunStatusRunning, TargetStatus: RunStatusSucceeded,
+		Lease: token, OutputPayload: `{"answer":"done"}`, TraceQuality: "complete",
+		RevisionStateJSON: json.RawMessage(`{"schema":"fo/session-state/v1","summary":"completed"}`),
+	}); err != nil {
+		t.Fatalf("complete run: %v", err)
+	}
+
+	var run mysql.WorkflowRun
+	if err = db.First(&run, "id = ?", token.RunID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if run.UsageQuality != "complete" {
+		t.Fatalf("run usage_quality=%q want complete", run.UsageQuality)
+	}
+	var attempt mysql.WorkflowAttempt
+	if err = db.Where("run_id = ?", token.RunID).Order("attempt DESC").First(&attempt).Error; err != nil {
+		t.Fatal(err)
+	}
+	if attempt.UsageQuality == nil || *attempt.UsageQuality != "complete" {
+		t.Fatalf("attempt usage_quality=%v want complete", attempt.UsageQuality)
+	}
+}
+
 func TestBudgetCrashReservationPreservedAcrossLeaseHandoff(t *testing.T) {
 	db := newP07Database(t, "phase14_budget_crash")
 	store, ctx, firstLease := fixture14BudgetRun(t, db, "crash", BaseBudgetLimits{

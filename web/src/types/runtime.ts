@@ -141,6 +141,13 @@ export interface RunSummaryDTO extends ResourceMeta {
   duration_ms: number
 }
 
+// RuntimeAnswerDTO：Run 终态权威答案（SSE summary 会被截断，长回答以此为准）。
+export interface RuntimeAnswerDTO {
+  content: string
+  grounding?: string
+  grounding_reason?: string
+}
+
 export interface RunDetailDTO extends ResourceMeta {
   summary: RunSummaryDTO
   overview: RunOverviewDTO
@@ -150,6 +157,7 @@ export interface RunDetailDTO extends ResourceMeta {
   context_summary: RuntimeContextSummaryDTO
   gate_summary: RuntimeGateSummaryDTO
   allowed_recovery_actions: RecoveryAction[]
+  answer?: RuntimeAnswerDTO | null
 }
 
 export interface RuntimeEventDTO extends ResourceMeta {

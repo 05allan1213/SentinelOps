@@ -1,9 +1,9 @@
 import api from './api'
 import { streamFetch, bindSSEVisibility, SSEError } from '@/utils/sse'
+import { runtimeService } from './runtime'
 import { useAuthStore } from '@/stores/authStore'
 import {
   ApiResponse,
-  UploadConfig,
 } from '@/types'
 
 export interface DurableRun { run_id: string; session_id: string; status: string }
@@ -14,6 +14,42 @@ function canonicalStatus(status?: string) { return status && runStatuses.include
 function runEventStatus(type: string, payload: DurablePayload): string | undefined {
   if (type === 'run.failed') return payload.data?.retryable ? 'retryable_failed' : 'failed'
   return ({ 'run.completed': 'succeeded', 'run.parked': 'parked', 'run.reconciling': 'reconciling', 'run.claimed': 'running', 'run.resumed': 'running', 'run.replayed': 'running', 'approval.requested': 'waiting_approval', 'run.created': 'pending' } as Record<string, string>)[type]
+}
+
+// planexecute 的 Replanner 以 {"response": "..."} 复述最终答案，Executor 则投影
+// 纯文本；Run 终态 output_payload.answer 可能是两种形态之一。统一在此解包，
+// 事件投影与终态答案复用同一逻辑，避免出现第二套解析。
+function unwrapPlanResponse(text: string): string | null {
+  const trimmed = text.trim()
+  if (!trimmed.startsWith('{')) return null
+  try {
+    const parsed = JSON.parse(trimmed) as { response?: unknown }
+    return typeof parsed.response === 'string' && parsed.response.trim() ? parsed.response : null
+  } catch {
+    return null
+  }
+}
+
+function authoritativeAnswerText(raw: string): string {
+  return unwrapPlanResponse(raw) ?? raw
+}
+
+// RAG 工具结果带有 prompt 注入防护信封（<untrusted_evidence> + Evidence ID/Source/
+// Version/Content hash/Access scope 元数据 + "Content (untrusted data):" 标记）。
+// 事件与 Runtime 时间线保留原文供审计，聊天展示只保留证据正文。
+const EVIDENCE_META_PREFIXES = [
+  '<untrusted_evidence>', '</untrusted_evidence>', 'Evidence ID:', 'Source:',
+  'Version:', 'Content hash:', 'Access scope:', 'Content (untrusted data):',
+]
+
+export function stripEvidenceEnvelope(text: string): string {
+  if (!text.includes('<untrusted_evidence>')) return text
+  const kept = text.split('\n').filter((line) => {
+    const trimmed = line.trim()
+    if (trimmed === '---') return false
+    return !EVIDENCE_META_PREFIXES.some((prefix) => trimmed.startsWith(prefix))
+  })
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
 // Only in-flight POST promises live here; settled results remain in the existing
@@ -207,8 +243,21 @@ export const chatService = {
       const savedState = sessionStorage.getItem(stateKey)
       if (savedState) emitState(JSON.parse(savedState) as DurableChatState)
       const savedSeq = Number(sessionStorage.getItem(`chat_last_seq_${sid}`) || '0')
+      // 事件流的 summary 是有界投影（truncateEventSummary），长回答会被截断；
+      // 终态成功后用 Run 读模型的权威 answer 校正展示文本，失败则保留已流式内容。
+      let runSucceeded = false
       const control = chatService.tailDurableRun({
-        runId, afterSeq: savedSeq, signal, onDone,
+        runId, afterSeq: savedSeq, signal,
+        onDone: () => { void (async () => {
+          if (runSucceeded) {
+            try {
+              const detail = await runtimeService.getRun(runId)
+              const content = detail?.item?.answer?.content
+              if (content) onMessage('final_answer', authoritativeAnswerText(content))
+            } catch { /* 读模型不可用时保留流式文本 */ }
+          }
+          onDone()
+        })() },
         onState: emitState,
         onError: (error) => { if (!(error instanceof SSEError && error.code === 'aborted')) onError?.(error) },
         onEvent: (() => {
@@ -222,18 +271,20 @@ export const chatService = {
             onMessage('assistant', text)
           }
           return (type: string, content: string, seq: number) => {
-          const payload = JSON.parse(content) as DurablePayload
-          const summary = payload.summary ?? ''
-          if (type === 'agent.plan' && summary) {
-            let plan: { response?: string; steps?: string[] } | undefined
-            try { plan = JSON.parse(summary) } catch { /* Unstructured planner response. */ }
-            if (plan?.response) emitAssistant(plan.response)
-            else if (Array.isArray(plan?.steps)) onMessage('plan_step', JSON.stringify({ type: 'plan_steps', steps: plan.steps }))
-            else emitAssistant(summary)
-          } else if (type === 'agent.tool_result' && summary) onMessage('tool_result', summary)
-          // Consumer delivery (including the page's durable message snapshot)
-          // precedes the accepted cursor; a reload cannot skip buffered text.
-          sessionStorage.setItem(`chat_last_seq_${sid}`, String(seq))
+            const payload = JSON.parse(content) as DurablePayload
+            const summary = payload.summary ?? ''
+            if (type === 'run.completed' && (payload.data?.to_status ?? 'succeeded') === 'succeeded') runSucceeded = true
+            if (type === 'agent.plan' && summary) {
+              let plan: { response?: string; steps?: string[] } | undefined
+              try { plan = JSON.parse(summary) } catch { /* Unstructured planner response. */ }
+              const planResponse = unwrapPlanResponse(summary)
+              if (planResponse) emitAssistant(planResponse)
+              else if (Array.isArray(plan?.steps)) onMessage('plan_step', JSON.stringify({ type: 'plan_steps', steps: plan.steps }))
+              else emitAssistant(summary)
+            } else if (type === 'agent.tool_result' && summary) onMessage('tool_result', stripEvidenceEnvelope(summary))
+            // Consumer delivery (including the page's durable message snapshot)
+            // precedes the accepted cursor; a reload cannot skip buffered text.
+            sessionStorage.setItem(`chat_last_seq_${sid}`, String(seq))
           }
         })(),
       })
@@ -272,41 +323,6 @@ export const chatService = {
     if (returnedRunId) {
       await chatService.multiAgentChat(query, messageIndex, deepThinking, webSearch, onMessage, onDone, onError, signal, sid)
     } else onDone()
-  },
-
-  // 文件上传（支持多格式和分块配置）
-  async uploadFile(
-    file: File,
-    config?: UploadConfig,
-    onProgress?: (progress: number) => void
-  ): Promise<{ file_id: string; filename: string }> {
-    const formData = new FormData()
-    formData.append('file', file)
-    if (config) {
-      formData.append('strategy', config.strategy)
-      if (config.chunk_size)   formData.append('chunk_size',   String(config.chunk_size))
-      if (config.overlap_size) formData.append('overlap_size', String(config.overlap_size))
-      if (config.target_chars) formData.append('target_chars', String(config.target_chars))
-      if (config.max_chars)    formData.append('max_chars',    String(config.max_chars))
-      if (config.min_chars)    formData.append('min_chars',    String(config.min_chars))
-    }
-    const res = await api.post<ApiResponse<{ fileName: string; filePath: string; fileSize: number }>>(
-      '/upload',
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        onUploadProgress: (progressEvent) => {
-          if (onProgress && progressEvent.total) {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-            onProgress(progress)
-          }
-        },
-      }
-    )
-    const d = res.data.data
-    return { file_id: d.filePath || d.fileName, filename: d.fileName }
   },
 
   // 导出会话快照

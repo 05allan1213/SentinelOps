@@ -1,6 +1,10 @@
 package mysql
 
-import "context"
+import (
+	"context"
+
+	"gorm.io/gorm"
+)
 
 // ListReports 查询报告列表，按创建时间倒序，支持分页（limit+offset）。
 // 同时返回符合过滤条件的总记录数。
@@ -47,10 +51,19 @@ func GetReportByID(ctx context.Context, id string) (*Report, error) {
 }
 
 // DeleteReport 软删除安全报告（设置 deleted_at 字段）。
+// 目标不存在时必须返回 gorm.ErrRecordNotFound，HTTP 层据此返回 404，
+// 避免调用方把「没有删除任何记录」当成删除成功。
 func DeleteReport(ctx context.Context, id string) error {
 	db, err := DB(ctx)
 	if err != nil {
 		return err
 	}
-	return db.Where("id = ?", id).Delete(&Report{}).Error
+	result := db.Where("id = ?", id).Delete(&Report{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }

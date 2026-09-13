@@ -450,6 +450,12 @@ export default function Chat() {
                 m.id === assistantMessage.id ? { ...m, agentStatus: content } : m
               )
             )
+          } else if (agent === 'final_answer') {
+            // Run 终态的权威答案：事件 summary 可能被截断，这里用完整文本校正。
+            if (content) {
+              streamingContent = content
+              queueContent()
+            }
           } else if (agent === 'meta') {
             try {
               const meta = JSON.parse(content) as Record<string, string>

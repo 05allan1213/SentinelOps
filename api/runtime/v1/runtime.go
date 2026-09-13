@@ -579,6 +579,16 @@ type RunSummaryDTO struct {
 	DurationMs               int64            `json:"duration_ms"`
 	ResourceMeta
 }
+
+// RuntimeAnswerDTO 暴露 Run 终态的权威答案原文。
+// SSE 事件只承载截断后的 summary，长回答需要读模型给出完整文本；
+// 该字段直接来自 output_payload，不新增持久化。
+type RuntimeAnswerDTO struct {
+	Content         string `json:"content"`
+	Grounding       string `json:"grounding,omitempty"`
+	GroundingReason string `json:"grounding_reason,omitempty"`
+}
+
 type RunDetailDTO struct {
 	Summary                RunSummaryDTO            `json:"summary"`
 	Overview               RunOverviewDTO           `json:"overview"`
@@ -588,6 +598,7 @@ type RunDetailDTO struct {
 	ContextSummary         RuntimeContextSummaryDTO `json:"context_summary"`
 	GateSummary            RuntimeGateSummaryDTO    `json:"gate_summary"`
 	AllowedRecoveryActions []RecoveryAction         `json:"allowed_recovery_actions"`
+	Answer                 *RuntimeAnswerDTO        `json:"answer,omitempty"`
 	ResourceMeta
 }
 type RuntimeEventDTO struct {

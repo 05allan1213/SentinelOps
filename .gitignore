@@ -13,6 +13,9 @@ main
 main.exe
 output/
 manifest/output/
+# 运行时上传产物：Chat 文件上传（file_dir: docs）与知识库原文落盘目录
+/docs/
+/manifest/upload/
 temp/
 temp.yaml
 bin
