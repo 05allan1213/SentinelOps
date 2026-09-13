@@ -372,10 +372,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 			OutputPayload: result.OutputPayload, RevisionStateJSON: result.RevisionStateJSON,
 			TraceQuality: result.TraceQuality, TraceID: result.TraceID,
 		})
-		if err == nil {
-			_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, "")
-		}
-		return true, err
+		return w.settleRunCompletion(ctx, err, "")
 	}
 
 	var classified *classifiedExecutionError
@@ -386,10 +383,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 			Event: workflow.WorkflowEventInput{Type: workflow.EventRunParked, TraceID: result.TraceID,
 				Payload: workflow.EventPayload{Attributes: map[string]any{"park_reason": classified.parkReason}}},
 		})
-		if err == nil {
-			_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, executionErr.Error())
-		}
-		return true, err
+		return w.settleRunCompletion(ctx, err, executionErr.Error())
 	}
 	if errors.As(executionErr, &classified) && classified.retryable && claimed.Run.Attempt < claimed.Run.MaxAttempts {
 		err = w.transition(context.WithoutCancel(runCtx), workflow.RunTransition{
@@ -398,10 +392,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 			Lease: claimed.Token, Event: workflow.WorkflowEventInput{Type: workflow.EventRunFailed, TraceID: result.TraceID,
 				Payload: workflow.EventPayload{Attributes: map[string]any{"retryable": true, "attempt": claimed.Run.Attempt}}},
 		})
-		if err == nil {
-			_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, executionErr.Error())
-		}
-		return true, err
+		return w.settleRunCompletion(ctx, err, executionErr.Error())
 	}
 	target := workflow.RunStatusFailed
 	if errors.Is(executionErr, context.Canceled) {
@@ -411,10 +402,19 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		RunID: claimed.Run.ID, ExpectedStatus: workflow.RunStatusRunning, TargetStatus: target,
 		Lease: claimed.Token, ErrorMessage: executionErr.Error(), TraceQuality: result.TraceQuality, TraceID: result.TraceID,
 	})
-	if err == nil {
-		_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, executionErr.Error())
+	return w.settleRunCompletion(ctx, err, executionErr.Error())
+}
+
+// settleRunCompletion 收敛执行完成阶段的 CAS 冲突：Attempt 内的 park 或
+// approval 发布已经完成 Run 的状态转移，完成路径再提交终态只会命中
+// "expected=running actual=parked"。这不是 Worker 自身的失败，不应写入
+// Worker Health 的 last_error（真实租约丢失仍以 ErrLeaseLost 上抛）。
+func (w *Worker) settleRunCompletion(ctx context.Context, completeErr error, lastError string) (bool, error) {
+	if completeErr != nil && !errors.Is(completeErr, workflow.ErrRunCASConflict) {
+		return true, completeErr
 	}
-	return true, err
+	_ = w.refreshSnapshot(context.WithoutCancel(ctx), WorkerStatusIdle, "", 0, lastError)
+	return true, nil
 }
 
 // consumeRecoveryOperation polls at most one accepted/reclaimable command per
