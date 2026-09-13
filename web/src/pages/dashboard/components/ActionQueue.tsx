@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from '@/components/common/ConfirmDialog'
 import { getApiErrorStatus } from '@/services/api'
 import { opsQueryKeys, opsService, type ApprovalItem, type UnknownEffectItem } from '@/services/ops'
+import { runtimeService } from '@/services/runtime'
 import { useAuthStore } from '@/stores/authStore'
 
 interface Props { pendingReports?: number }
@@ -99,6 +100,13 @@ export default function ActionQueue({ pendingReports = 0 }: Props) {
   const canDecide = role === 'approver' || role === 'admin'
   const canResolve = role === 'admin'
   const queryClient = useQueryClient()
+  const safety = useQuery({
+    queryKey: ['runtime', 'safety', 'action-queue'],
+    queryFn: () => runtimeService.getSafety(),
+    enabled: canDecide,
+    staleTime: 30_000,
+  })
+  const shadowMode = safety.data?.item?.shadow_mode === true
   const approvals = useQuery({ queryKey: opsQueryKeys.approvals(), queryFn: () => opsService.listApprovals(20), refetchInterval: 3000 })
   // unknown Effect 队列是 admin-only 接口：非 admin 请求会被拒绝(403)，
   // 若照常发起查询会让整块待办区进入错误态，审批人将看不到可审批的 Approval。
@@ -146,6 +154,12 @@ export default function ActionQueue({ pendingReports = 0 }: Props) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="action-queue">
       <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4"><Shield className="h-4 w-4 text-indigo-500" /><h2 className="text-sm font-semibold text-slate-800">Approval / Effect 待办</h2><span className="ml-auto text-xs text-slate-400">{total ? `${total} 项` : '全部完成'}</span></div>
+      {shadowMode && (
+        <div className="flex items-start gap-2 border-b border-amber-100 bg-amber-50 px-5 py-3 text-xs text-amber-800">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+          <span>Shadow Mode 开启：L1/L2 有效写入关闭。此时批准提案不会执行，Run 会以 approval_invalidated 结束。</span>
+        </div>
+      )}
       {approvals.isLoading ? <div className="px-5 py-8 text-center text-sm text-slate-400">加载待办状态…</div> : approvals.isError ? <div className="flex items-center gap-3 px-5 py-8 text-sm text-amber-700"><TriangleAlert className="h-4 w-4" />待办状态暂不可用，未确认成功或已完成。</div> : total === 0 ? <div className="flex items-center gap-3 px-5 py-8 text-sm text-slate-500"><CheckCircle className="h-4 w-4 text-emerald-500" />暂无待办事项，系统运行正常</div> : <>
         {(approvals.data || []).map(item => <ApprovalCard key={item.id} approval={item} canDecide={canDecide} onDecide={(approval, kind) => { setDecision({ approval, kind }); setReason('') }} conflict={conflicts[item.id]} />)}
         {canResolve && unknownEffects.isError && <div className="flex items-center gap-3 border-t border-slate-100 px-5 py-3 text-xs text-amber-700"><TriangleAlert className="h-3.5 w-3.5" />unknown Effect 待办暂不可用，未确认成功或已完成。</div>}

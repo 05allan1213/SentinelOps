@@ -138,6 +138,33 @@ func TestGetManyRequiredIsolatesToolInfoMutation(t *testing.T) {
 	}
 }
 
+func TestGetManyHandsOutMutationIsolatedViews(t *testing.T) {
+	mu.RLock()
+	raw := registry["trigger_ops"]
+	mu.RUnlock()
+	if raw == nil {
+		t.Fatal("trigger_ops is not registered")
+	}
+	got := GetMany([]string{"trigger_ops"})
+	if len(got) != 1 {
+		t.Fatalf("GetMany returned %d tools, want 1", len(got))
+	}
+	if got[0] == raw {
+		t.Fatal("GetMany must not expose the shared registry instance to legacy model adapters")
+	}
+	if _, err := GetManyRequired([]string{"trigger_ops"}); err != nil {
+		t.Fatalf("strict registry resolution must stay valid after GetMany: %v", err)
+	}
+	for name, instance := range All() {
+		mu.RLock()
+		registered := registry[name]
+		mu.RUnlock()
+		if instance == registered {
+			t.Fatalf("All must not expose the shared registry instance for %q", name)
+		}
+	}
+}
+
 func withRegistryMutation(t *testing.T, mutate func()) {
 	t.Helper()
 	mu.Lock()

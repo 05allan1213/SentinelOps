@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react'
-import { Settings as SettingsIcon, Save, Loader2, User, LogOut } from 'lucide-react'
+import { Settings as SettingsIcon, Save, Loader2, User, LogOut, UserPlus } from 'lucide-react'
 import { cn } from '@/utils'
 import toast from 'react-hot-toast'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { settingsService } from '@/services/settings'
 import { useAuthStore } from '@/stores/authStore'
+import { usersService, type CreateUserInput, type UserItem, type UserRole } from '@/services/users'
+
+const roleLabels: Record<string, string> = {
+  viewer: '只读',
+  operator: '操作员',
+  approver: '审批人',
+  admin: '管理员',
+}
 
 export default function Settings() {
   const { siteName, autoMarkRead, setSettings } = useSettingsStore()
@@ -12,6 +20,10 @@ export default function Settings() {
   const [draftName, setDraftName] = useState(siteName)
   const [isSaving, setIsSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const isAdmin = role === 'admin'
+  const [users, setUsers] = useState<UserItem[]>([])
+  const [userDraft, setUserDraft] = useState<CreateUserInput>({ username: '', password: '', role: 'viewer' })
+  const [creatingUser, setCreatingUser] = useState(false)
 
   // 页面加载时从后端拉取最新配置，同步到 store 和本地草稿
   useEffect(() => {
@@ -23,6 +35,13 @@ export default function Settings() {
       .catch(() => { /* 后端不可用时保留 localStorage 中的值 */ })
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    usersService.list()
+      .then(setUsers)
+      .catch(() => { /* 非管理员或后端不可用时保持空列表 */ })
+  }, [isAdmin])
 
   const handleSiteNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -40,6 +59,29 @@ export default function Settings() {
       toast.error('保存失败，请检查服务连接')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleCreateUser = async () => {
+    const username = userDraft.username.trim()
+    if (username.length < 3) {
+      toast.error('用户名至少 3 个字符')
+      return
+    }
+    if (userDraft.password.length < 6) {
+      toast.error('密码至少 6 位')
+      return
+    }
+    setCreatingUser(true)
+    try {
+      await usersService.create({ ...userDraft, username })
+      toast.success('用户已创建')
+      setUserDraft({ username: '', password: '', role: 'viewer' })
+      setUsers(await usersService.list())
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '创建用户失败')
+    } finally {
+      setCreatingUser(false)
     }
   }
 
@@ -148,6 +190,68 @@ export default function Settings() {
               </div>
             </div>
           </div>
+
+          {isAdmin && (
+            <div className="card">
+              <div className="card-body space-y-6">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">用户管理</h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    仅管理员可创建账号；审批人（approver）用于处理 HITL 审批。
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-[1fr_1fr_150px_auto]">
+                  <input
+                    className="input"
+                    placeholder="用户名（3-32 字符）"
+                    value={userDraft.username}
+                    onChange={(e) => setUserDraft((draft) => ({ ...draft, username: e.target.value }))}
+                  />
+                  <input
+                    className="input"
+                    type="password"
+                    placeholder="密码（至少 6 位）"
+                    value={userDraft.password}
+                    onChange={(e) => setUserDraft((draft) => ({ ...draft, password: e.target.value }))}
+                  />
+                  <select
+                    className="input"
+                    value={userDraft.role}
+                    onChange={(e) => setUserDraft((draft) => ({ ...draft, role: e.target.value as UserRole }))}
+                  >
+                    <option value="viewer">只读</option>
+                    <option value="operator">操作员</option>
+                    <option value="approver">审批人</option>
+                    <option value="admin">管理员</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleCreateUser}
+                    disabled={creatingUser}
+                    className="btn-primary"
+                  >
+                    {creatingUser ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" />创建中...</>
+                    ) : (
+                      <><UserPlus className="w-4 h-4" />创建用户</>
+                    )}
+                  </button>
+                </div>
+
+                <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+                  {users.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-gray-500">暂无用户数据</p>
+                  ) : users.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between px-4 py-3">
+                      <span className="text-sm font-medium text-gray-900">{item.username}</span>
+                      <span className="text-xs text-gray-500">{roleLabels[item.role] ?? item.role}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

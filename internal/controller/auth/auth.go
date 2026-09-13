@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	v1 "SentinelOps/api/auth/v1"
 	authsvc "SentinelOps/internal/service/auth"
@@ -33,13 +34,31 @@ func (c *ControllerV1) Login(ctx context.Context, req *v1.LoginReq) (*v1.LoginRe
 	return &v1.LoginRes{Token: token, UserID: userID, Role: role, Username: username}, nil
 }
 
-// Register 注册新用户，成功后直接签发 JWT Token。
+// Register 由管理员创建新用户（可指定角色），成功后直接签发 JWT Token。
 func (c *ControllerV1) Register(ctx context.Context, req *v1.RegisterReq) (*v1.RegisterRes, error) {
-	token, userID, role, username, err := authsvc.Register(ctx, req.Username, req.Password)
+	token, userID, role, username, err := authsvc.Register(ctx, req.Username, req.Password, req.Role)
 	if err != nil {
 		return nil, mapAuthError(err)
 	}
 	return &v1.RegisterRes{Token: token, UserID: userID, Role: role, Username: username}, nil
+}
+
+// ListUsers 返回用户管理列表；仅管理员可读，响应不含密码哈希。
+func (c *ControllerV1) ListUsers(ctx context.Context, _ *v1.ListUsersReq) (*v1.ListUsersRes, error) {
+	users, err := authsvc.ListUsers(ctx)
+	if err != nil {
+		return nil, mapAuthError(err)
+	}
+	items := make([]v1.UserItem, 0, len(users))
+	for _, user := range users {
+		items = append(items, v1.UserItem{
+			ID:        user.ID,
+			Username:  user.Username,
+			Role:      user.Role,
+			CreatedAt: user.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	return &v1.ListUsersRes{Items: items}, nil
 }
 
 // mapAuthError 把认证业务错误映射为真实 HTTP 状态，避免 200 + message 或
@@ -50,6 +69,8 @@ func mapAuthError(err error) error {
 		return gerror.NewCode(codeInvalidCredentials, authsvc.ErrInvalidCredentials.Error())
 	case errors.Is(err, authsvc.ErrPasswordTooShort):
 		return gerror.NewCode(gcode.CodeValidationFailed, authsvc.ErrPasswordTooShort.Error())
+	case errors.Is(err, authsvc.ErrInvalidRole):
+		return gerror.NewCode(gcode.CodeValidationFailed, authsvc.ErrInvalidRole.Error())
 	default:
 		return err
 	}

@@ -7,7 +7,6 @@ import { useAuthStore } from '@/stores/authStore'
 export default function Login() {
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
-  const [tab, setTab] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -16,20 +15,13 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     try {
-      const endpoint = tab === 'login' ? '/auth/v1/login' : '/auth/v1/register'
-      const res = await api.post(endpoint, { username, password })
+      const res = await api.post('/auth/v1/login', { username, password })
       const data = res.data?.data ?? res.data
-      if (tab === 'register') {
-        toast.success('注册成功，请登录')
-        setTab('login')
-        setPassword('')
-        return
-      }
       const { token, user_id, role, username: uname } = data
       setAuth(token, user_id, role, uname)
       navigate('/', { replace: true })
     } catch (err: any) {
-      toast.error(err.message || (tab === 'login' ? '登录失败' : '注册失败'))
+      toast.error(err.message || '登录失败')
     } finally {
       setLoading(false)
     }
@@ -131,30 +123,8 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* 标题 */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white mb-1">
-              {tab === 'login' ? '欢迎回来' : '创建账号'}
-            </h1>
-            <p className="text-zinc-500 text-sm">
-              {tab === 'login' ? '登录以继续使用平台' : '注册后即可开始使用'}
-            </p>
-          </div>
-
-          {/* 登录方式标签页 */}
-          <div className="flex gap-1 mb-8 border-b border-zinc-800">
-            {(['login', 'register'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => { setTab(t); setUsername(''); setPassword('') }}
-                className={`pb-3 px-1 text-sm font-medium transition-all border-b-2 -mb-px ${
-                  tab === t
-                    ? 'text-white border-indigo-500'
-                    : 'text-zinc-500 border-transparent hover:text-zinc-300'
-                }`}
-              >
-                {t === 'login' ? '登录' : '注册'}
-              </button>
-            ))}
+            <h1 className="text-2xl font-bold text-white mb-1">欢迎回来</h1>
+            <p className="text-zinc-500 text-sm">登录以继续使用平台</p>
           </div>
 
           {/* 表单 */}
@@ -168,7 +138,7 @@ export default function Login() {
                 required
                 autoFocus
                 autoComplete="off"
-                placeholder={tab === 'register' ? '3-32 个字符' : '请输入用户名'}
+                placeholder="请输入用户名"
                 className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-sm text-white placeholder-zinc-600
                   focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
               />
@@ -180,8 +150,8 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                autoComplete="new-password"
-                placeholder={tab === 'register' ? '至少 6 位' : '请输入密码'}
+                autoComplete="current-password"
+                placeholder="请输入密码"
                 className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-sm text-white placeholder-zinc-600
                   focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
               />
@@ -200,21 +170,12 @@ export default function Login() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
               )}
-              {loading
-                ? (tab === 'login' ? '登录中...' : '注册中...')
-                : (tab === 'login' ? '登录' : '注册')}
+              {loading ? '登录中...' : '登录'}
             </button>
           </form>
 
           <p className="mt-6 text-center text-xs text-zinc-600">
-            {tab === 'login' ? '还没有账号？' : '已有账号？'}
-            <button
-              type="button"
-              onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setUsername(''); setPassword('') }}
-              className="ml-1 text-indigo-400 hover:text-indigo-300 transition-colors"
-            >
-              {tab === 'login' ? '立即注册' : '去登录'}
-            </button>
+            账号由管理员在「系统设置 → 用户管理」中创建
           </p>
         </div>
       </div>

@@ -3,6 +3,7 @@ package stringutil
 import (
 	"errors"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestTruncateRunes(t *testing.T) {
@@ -57,11 +58,16 @@ func TestTruncateError(t *testing.T) {
 		{"nil错误", nil, 10, ""},
 		{"短错误", errors.New("err"), 10, "err"},
 		{"长错误", errors.New("very long error message"), 10, "very long "},
+		{"中文错误边界", errors.New("错误信息很长"), 10, "错误信"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := TruncateError(tt.err, tt.maxLen); got != tt.want {
+			got := TruncateError(tt.err, tt.maxLen)
+			if got != tt.want {
 				t.Errorf("TruncateError() = %v, want %v", got, tt.want)
+			}
+			if !utf8.ValidString(got) {
+				t.Errorf("TruncateError() = %q 不是合法 UTF-8", got)
 			}
 		})
 	}

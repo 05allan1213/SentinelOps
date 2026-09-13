@@ -189,16 +189,6 @@ export interface ReportTemplate {
   updated_at: string
 }
 
-export interface GenerateReportRequest {
-  title: string
-  type: ReportType
-  start_time?: string
-  end_time?: string
-  event_ids?: number[]
-  subscription_ids?: number[]
-  template_id?: number
-}
-
 export interface CreateTemplateRequest {
   name: string
   description?: string

@@ -23,7 +23,7 @@ func TestServiceLayerRechecksScope(t *testing.T) {
 	ctx := policy.WithIdentity(context.Background(), policy.DisabledIdentity())
 	tests := map[string]func() error{
 		"auth register": func() error {
-			_, _, _, _, err := authsvc.Register(ctx, "blocked", "blocked-password")
+			_, _, _, _, err := authsvc.Register(ctx, "blocked", "blocked-password", "")
 			return err
 		},
 		"chat rollback": func() error {

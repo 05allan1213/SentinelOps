@@ -59,7 +59,11 @@ func GetMany(names []string) []tool.BaseTool {
 	result := make([]tool.BaseTool, 0, len(names))
 	for _, name := range names {
 		if t, ok := registry[name]; ok {
-			result = append(result, t)
+			// Legacy pipelines share the registry singleton. Returning the raw
+			// instance lets Eino normalize its shared ToolInfo in place, which
+			// then breaks the strict schema-hash validation of the same Tool in
+			// durable pipelines. Always hand out the mutation-isolated view.
+			result = append(result, stableInfoTool(t))
 		}
 	}
 	return result
@@ -189,7 +193,7 @@ func All() map[string]tool.BaseTool {
 	defer mu.RUnlock()
 	snapshot := make(map[string]tool.BaseTool, len(registry))
 	for k, v := range registry {
-		snapshot[k] = v
+		snapshot[k] = stableInfoTool(v)
 	}
 	return snapshot
 }

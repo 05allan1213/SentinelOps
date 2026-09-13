@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { X, Sparkles, Loader2, CheckCircle } from 'lucide-react'
 import { reportService } from '@/services/report'
+import { chatService } from '@/services/chat'
+import { runtimeService } from '@/services/runtime'
 import toast from 'react-hot-toast'
 
 interface GenerateReportModalProps {
@@ -44,6 +46,23 @@ function getTimeRange(type: string): { start: string; end: string } {
   return { start: start + ' 00:00:00', end: end + ' 23:59:59' }
 }
 
+function buildReportQuery(type: string, title: string, start: string, end: string, eventIds: number[]): string {
+  const label = reportTypes.find((item) => item.value === type)?.label ?? type
+  const lines = [
+    `请生成一份${label}，报告标题为「${title || `${label} ${start.slice(0, 10)}`}」。`,
+    `统计周期：${start} 至 ${end}。`,
+    '要求：',
+    '1. 输出完整 Markdown 报告正文，至少包含：概况、关键指标、重点事件、风险研判、处置建议。',
+    '2. 只输出报告正文，不要调用 create_report、保存或通知类工具。',
+  ]
+  if (eventIds.length > 0) lines.push(`重点关注事件 ID：${eventIds.join(', ')}。`)
+  return lines.join('\n')
+}
+
+function createReportSessionId(): string {
+  return `report-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 export default function GenerateReportModal({ isOpen, onClose, onSuccess }: GenerateReportModalProps) {
   const [step, setStep] = useState(1)
   const [reportType, setReportType] = useState('')
@@ -54,29 +73,82 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
 
   const handleGenerate = async () => {
     setIsGenerating(true)
-    setProgress(0)
-
-    // 模拟进度
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 90) {
-          return prev
-        }
-        return prev + Math.random() * 15
-      })
-    }, 500)
+    setProgress(5)
 
     try {
       const { start, end } = getTimeRange(reportType)
-      await reportService.generate({
-        type: reportType as 'daily' | 'weekly' | 'monthly' | 'vuln_alert' | 'threat_brief' | 'custom',
-        title,
-        start_time: start,
-        end_time: end,
-        event_ids: selectedEvents,
+      // 复用 durable Runtime：由现有 Report Agent 生成正文，再用现有报告写接口落库。
+      const sessionId = createReportSessionId()
+      const run = await chatService.createDurableRun({
+        sessionId,
+        query: buildReportQuery(reportType, title, start, end, selectedEvents),
       })
 
-      clearInterval(interval)
+      let content = ''
+      let sawApproval = false
+      let streamError = ''
+      let abortForApproval: (() => void) | null = null
+      const stopAtApproval = () => {
+        sawApproval = true
+        abortForApproval?.()
+      }
+      const control = chatService.tailDurableRun({
+        runId: run.run_id,
+        onEvent: (type, raw) => {
+          setProgress((prev) => Math.min(90, prev + 3))
+          if (type === 'approval.requested') {
+            // 聊天页需要保持长连等待审批结果；报告弹窗提交完提案即可收尾，
+            // 否则 SSE 会一直处于 reconnecting，弹窗进度卡在 90%。
+            stopAtApproval()
+            return
+          }
+          if (type !== 'agent.plan') return
+          try {
+            const summary = (JSON.parse(raw) as { summary?: string }).summary?.trim()
+            if (!summary) return
+            try {
+              const plan = JSON.parse(summary) as { response?: string }
+              if (plan.response?.trim()) content = plan.response.trim()
+            } catch {
+              content = summary
+            }
+          } catch { /* 忽略格式异常的事件负载 */ }
+        },
+        onState: (state) => {
+          if (state.kind !== 'run') return
+          if (['failed', 'retryable_failed', 'canceled'].includes(state.status)) {
+            streamError = state.error || '报告生成失败'
+          }
+          if (['waiting_approval', 'parked'].includes(state.status)) {
+            stopAtApproval()
+          }
+        },
+        onError: (error) => { streamError = error.message || '报告生成失败' },
+      })
+      abortForApproval = () => control.abort()
+      await control.finished
+
+      // SSE 断开不等于 Run 失败，终态必须回查服务端权威状态。
+      const detail = await runtimeService.getRun(run.run_id)
+      const status = detail.item?.summary?.status
+      if (status === 'waiting_approval' || status === 'parked' || sawApproval) {
+        setProgress(100)
+        toast.success('报告提案已提交审批，请在控制台待办中处理，通过后自动入库')
+        setTimeout(() => { onSuccess?.(); handleClose() }, 500)
+        return
+      }
+      if (status !== 'succeeded') {
+        throw new Error(streamError || `报告生成未完成（${status ?? 'unknown'}）`)
+      }
+
+      const effects = await runtimeService.getEffects(run.run_id)
+      const createdByEffect = (effects.items ?? []).some(
+        (effect) => effect.tool_name === 'create_report' && effect.status === 'succeeded',
+      )
+      if (!createdByEffect) {
+        if (!content.trim()) throw new Error('模型未返回报告正文')
+        await reportService.save(title || '安全报告', content, reportType)
+      }
       setProgress(100)
       toast.success('报告生成成功')
 
@@ -85,8 +157,7 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
         handleClose()
       }, 500)
     } catch (error) {
-      clearInterval(interval)
-      toast.error('报告生成失败')
+      toast.error(error instanceof Error ? error.message : '报告生成失败')
       console.error(error)
       setIsGenerating(false)
     }
@@ -198,6 +269,9 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
                         })()}
                       </span>
                     </div>
+                  </div>
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                    报告入库属于 L1 变更：Agent 生成内容后会提交审批，审批通过后自动写入报告库。
                   </div>
                 </div>
               ) : (

@@ -28,9 +28,7 @@ func TruncateError(err error, maxLen int) string {
 	if err == nil {
 		return ""
 	}
-	msg := err.Error()
-	if len(msg) > maxLen {
-		return msg[:maxLen]
-	}
-	return msg
+	// 错误消息可能包含多字节字符；按字节裸切会劈开 UTF-8 序列，写入
+	// MySQL VARCHAR 时报 Incorrect string value 并丢失整条 trace 错误。
+	return TruncateBytes(err.Error(), maxLen)
 }

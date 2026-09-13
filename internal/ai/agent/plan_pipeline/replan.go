@@ -33,7 +33,7 @@ func NewRePlanAgent(ctx context.Context) (adk.Agent, error) {
 		return nil, err
 	}
 	return planexecute.NewReplanner(ctx, &planexecute.ReplannerConfig{
-		ChatModel: model,
+		ChatModel: withReplannerRequiredToolCalls(model, planexecute.RespondToolInfo.Name),
 	})
 }
 
@@ -51,7 +51,7 @@ func NewRePlanAgentWithRuntimeHandler(ctx context.Context, handler *airuntime.Ru
 		return nil, err
 	}
 	return planexecute.NewReplanner(ctx, &planexecute.ReplannerConfig{
-		ChatModel:  chatModel,
+		ChatModel:  withReplannerRequiredToolCalls(chatModel, planexecute.RespondToolInfo.Name),
 		GenInputFn: durableReplannerInput,
 	})
 }
@@ -79,9 +79,14 @@ func durableReplannerInput(ctx context.Context, in *planexecute.ExecutionContext
 		return nil, fmt.Errorf("format replanner prompt: %w", err)
 	}
 	msgs = append(msgs, schema.UserMessage(
-		"If the most recent executed step result is already a complete answer to the user request, "+
-			"you MUST call the Respond tool immediately with that answer and return an empty plan. "+
-			"Do not add any more steps.",
+		"Termination rules you MUST follow:\n"+
+			"1. If the most recent executed step already completed the user request, call the Respond tool "+
+			"immediately with that completed result. This includes steps that created, saved, archived, "+
+			"or returned a final artifact.\n"+
+			"2. NEVER call the plan tool with a step that repeats, paraphrases, or re-executes any step "+
+			"listed in executed_steps. Duplicate or reworded duplicate steps are forbidden.\n"+
+			"3. Only call the plan tool when the user request still has genuinely new, unexecuted work; "+
+			"otherwise call Respond.",
 	))
 	return msgs, nil
 }

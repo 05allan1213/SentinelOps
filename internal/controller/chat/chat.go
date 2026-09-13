@@ -84,12 +84,14 @@ func (c *ControllerV1) FileUpload(ctx context.Context, req *v1.FileUploadReq) (*
 			return nil, gerror.Wrapf(err, "创建目录失败: %s", fileDirPath)
 		}
 	}
-	savePath := filepath.Join(fileDirPath)
-	// 保存文件到磁盘，false 表示不覆盖同名文件
-	if _, err := uploadFile.Save(savePath, false); err != nil {
+	// GoFrame 的 Save 接收目录路径并返回实际落盘文件名；这里必须用返回的文件名
+	// 组装完整路径，否则后续 Stat/索引都会指向目录（filePath=目录、fileSize=目录大小）。
+	savedName, err := uploadFile.Save(fileDirPath, false)
+	if err != nil {
 		uploadErr = err
 		return nil, gerror.Wrapf(err, "保存文件失败")
 	}
+	savePath := filepath.Join(fileDirPath, savedName)
 	fileInfo, err := os.Stat(savePath)
 	if err != nil {
 		uploadErr = err
@@ -109,7 +111,7 @@ func (c *ControllerV1) FileUpload(ctx context.Context, req *v1.FileUploadReq) (*
 	}
 
 	// 构建向量索引（Milvus 去重 + 嵌入写入）
-	if err = chatsvc.BuildFileIndex(ctx, fileDirPath+"/"+uploadFile.Filename, cfg); err != nil {
+	if err = chatsvc.BuildFileIndex(ctx, savePath, cfg); err != nil {
 		uploadErr = err
 		return nil, gerror.Wrapf(err, "构建知识库失败")
 	}

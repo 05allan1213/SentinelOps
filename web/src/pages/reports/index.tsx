@@ -10,12 +10,14 @@ import {
   Clock,
   AlertOctagon,
   Inbox,
+  Sparkles,
 } from 'lucide-react'
 import { cn, formatDate } from '@/utils'
 import Pagination from '@/components/common/Pagination'
 import StatCard from '@/components/common/StatCard'
 import ConfirmDialog from '@/components/common/ConfirmDialog'
 import ReportDetailModal from './components/ReportDetailModal'
+import GenerateReportModal from './components/GenerateReportModal'
 import { reportService } from '@/services/report'
 import type { Report } from '@/types'
 import toast from 'react-hot-toast'
@@ -38,6 +40,7 @@ export default function Reports() {
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
+  const [generateOpen, setGenerateOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id?: string; isBatch?: boolean }>({ open: false })
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -179,6 +182,10 @@ export default function Reports() {
               { value: 'custom', label: '分析报告' },
             ] satisfies SelectOption[]}
           />
+          <button onClick={() => setGenerateOpen(true)} className="btn-primary">
+            <Sparkles className="w-4 h-4" />
+            生成报告
+          </button>
           <button onClick={fetchReports} disabled={loading} className="btn-default">
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
             刷新
@@ -353,6 +360,13 @@ export default function Reports() {
 
       {/* 报告详情弹窗 */}
       <ReportDetailModal report={selectedReport} onClose={() => setSelectedReport(null)} />
+
+      {/* AI 生成报告弹窗：durable Run 生成 + L1 审批入库 */}
+      <GenerateReportModal
+        isOpen={generateOpen}
+        onClose={() => setGenerateOpen(false)}
+        onSuccess={fetchReports}
+      />
 
       {/* 删除确认弹窗 */}
       <ConfirmDialog

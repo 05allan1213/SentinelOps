@@ -41,7 +41,7 @@ func NewPlanner(ctx context.Context) (adk.Agent, error) {
 	// ToolCallingChatModel：Planner 通过 Tool Call 输出结构化 Plan，
 	// 比自由文本生成更稳定，JSON 解析成功率更高。
 	return planexecute.NewPlanner(ctx, &planexecute.PlannerConfig{
-		ToolCallingChatModel: planModel,
+		ToolCallingChatModel: withPlannerRequiredToolCalls(planModel),
 		GenInputFn:           customPlannerGenInput,
 	})
 }
@@ -60,7 +60,7 @@ func NewPlannerWithRuntimeHandler(ctx context.Context, handler *airuntime.Runtim
 		return nil, err
 	}
 	return planexecute.NewPlanner(ctx, &planexecute.PlannerConfig{
-		ToolCallingChatModel: planModel,
+		ToolCallingChatModel: withPlannerRequiredToolCalls(planModel),
 		GenInputFn:           customPlannerGenInput,
 	})
 }

@@ -1,7 +1,6 @@
 import api from './api'
 import {
   Report,
-  GenerateReportRequest,
   ApiResponse,
   PaginatedResponse,
 } from '@/types'
@@ -14,41 +13,12 @@ interface ReportListResponse {
     id: string
     title: string
     type: string
-    period: string
     content: string
     created_at: string
   }>
 }
 
 export const reportService = {
-  // 生成报告（后端 POST /report/v1/create，参数 title, content, type, period）
-  async generate(data: GenerateReportRequest): Promise<Report> {
-    const res = await api.post<ApiResponse<{ id: string }>>('/report/v1/create', {
-      title: data.title || '新报告',
-      content: '',
-      type: data.type || 'custom',
-      period: data.start_time && data.end_time ? `${data.start_time}~${data.end_time}` : '',
-    })
-    return {
-      id: res.data.data?.id || '',
-      title: data.title || '新报告',
-      type: (data.type || 'custom') as Report['type'],
-      status: 'completed',
-      start_time: data.start_time || '',
-      end_time: data.end_time || '',
-      content: '',
-      summary: '',
-      event_ids: '',
-      subscription_ids: '',
-      event_count: 0,
-      critical_count: 0,
-      high_count: 0,
-      generated_by: 'manual',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-  },
-
   // 获取报告列表（后端 GET /report/v1/list?limit=&offset=&type=）
   async list(page = 1, pageSize = 20, type?: string): Promise<PaginatedResponse<Report>> {
     const params: Record<string, unknown> = {
@@ -93,7 +63,7 @@ export const reportService = {
 
   // 获取单个报告（后端 GET /report/v1/get?id=）
   async get(id: string): Promise<Report> {
-    const res = await api.get<ApiResponse<{ report: { id: string; title: string; type: string; period: string; content: string; created_at: string } }>>('/report/v1/get', { params: { id } })
+    const res = await api.get<ApiResponse<{ report: { id: string; title: string; type: string; content: string; created_at: string } }>>('/report/v1/get', { params: { id } })
     const item = res.data.data?.report
     if (!item) throw new Error('报告不存在')
     return {
