@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"SentinelOps/internal/ai/policy"
+
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -32,6 +34,7 @@ func TestClassifiedErrorHTTPStatus(t *testing.T) {
 		{"not supported", gerror.NewCode(gcode.CodeNotSupported, "暂不支持"), http.StatusNotImplemented},
 		{"not authorized", gerror.NewCode(gcode.CodeNotAuthorized, "无权限"), http.StatusForbidden},
 		{"custom 401 code", gerror.NewCode(gcode.New(http.StatusUnauthorized, "Invalid Credentials", nil), "用户名或密码错误"), http.StatusUnauthorized},
+		{"policy forbidden", fmt.Errorf("ops list: %w", policy.ErrForbidden), http.StatusForbidden},
 		{"unclassified business error", errors.New("策略不存在"), 0},
 	}
 	for _, tc := range cases {

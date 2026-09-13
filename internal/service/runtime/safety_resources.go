@@ -542,7 +542,11 @@ func validRuntimeEffectIdentity(row mysql.AgentEffect) bool {
 	// GetRuntimeEffect returns the persisted key for compatibility, while list
 	// projections return only SHA-256(idempotency_key).  Accept exactly those
 	// two representations; an arbitrary digest must not pass identity checks.
-	return row.IdempotencyKey == row.ID || row.IdempotencyKey == effectKeyDigest(row.ID)
+	// The digest must be computed explicitly: effectKeyDigest returns 64-hex
+	// input unchanged, so reusing it here would reject every list projection
+	// (production always persists idempotency_key == effect id).
+	digest := sha256.Sum256([]byte(row.ID))
+	return row.IdempotencyKey == row.ID || row.IdempotencyKey == hex.EncodeToString(digest[:])
 }
 
 func validStablePrimaryEffect(parent, child mysql.AgentEffect) bool {

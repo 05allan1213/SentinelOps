@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -91,6 +93,39 @@ func TestRuntimeEffectHistoryCorrelatesEvents(t *testing.T) {
 	history, ok := buildEffectHistory(effect, events)
 	if !ok || len(history) != 2 || history[1].ActorID != actor || history[1].Reason != reason || history[1].EvidenceReference != "evidence-1" {
 		t.Fatalf("history=%+v observed=%t", history, ok)
+	}
+}
+
+// 列表投影只携带 SHA-256(idempotency_key)，而 GetRuntimeEffect 携带原始 key。
+// 两种表示都必须通过身份校验，否则 Runtime Effect Ledger 会把已成功的 Effect
+// 报成 invalid_effect_identity 并丢失全部元数据。
+func TestRuntimeEffectAcceptsListProjectionDigestIdentity(t *testing.T) {
+	runID := "run-effect-projection-digest"
+	proposalHash := strings.Repeat("9", 64)
+	effectID, err := policy.EffectKey(runID, proposalHash, workflow.EffectStepPrimary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	persisted := effectProjectionFixture(runID, effectID, proposalHash, workflow.EffectRolePrimary, workflow.EffectStepPrimary, nil, workflow.EffectStatusSucceeded)
+	projected := persisted
+	projectionDigest := sha256.Sum256([]byte(persisted.IdempotencyKey))
+	projected.IdempotencyKey = hex.EncodeToString(projectionDigest[:]) // SQL: SHA2(idempotency_key,256)
+	if projected.IdempotencyKey == persisted.IdempotencyKey {
+		t.Fatalf("projection fixture did not hash the idempotency key: %q", projected.IdempotencyKey)
+	}
+	events := []mysql.WorkflowEvent{
+		effectEventWithRun(runID, effectID, workflow.EventEffectStarted, workflow.EffectStatusRunning, 1),
+		effectEventWithRun(runID, effectID, workflow.EventEffectSucceeded, workflow.EffectStatusSucceeded, 2),
+	}
+
+	for name, row := range map[string]mysql.AgentEffect{"persisted": persisted, "projected": projected} {
+		item, meta := mapRuntimeEffect(row, events)
+		if meta.DataQuality != v1.DataQualityComplete || meta.ReasonCode != "" {
+			t.Fatalf("%s identity reported incomplete: item=%+v meta=%+v", name, item, meta)
+		}
+		if item.ToolName != "block_ip" || item.ToolRevision != "v1" || item.Version != 1 || len(item.History) != 2 {
+			t.Fatalf("%s identity lost effect metadata: %+v", name, item)
+		}
 	}
 }
 

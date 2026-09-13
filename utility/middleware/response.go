@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"SentinelOps/internal/ai/policy"
+
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -68,6 +70,11 @@ func classifiedErrorHTTPStatus(err error) int {
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return http.StatusNotFound
+	}
+	// 控制器内部的 RBAC 判定（例如 admin-only 的 unknown Effect 队列）也要
+	// 返回 403，而不是 200 + message，否则调用方无法区分成功与拒绝。
+	if errors.Is(err, policy.ErrForbidden) {
+		return http.StatusForbidden
 	}
 	switch gerror.Code(err) {
 	case gcode.CodeNotFound:

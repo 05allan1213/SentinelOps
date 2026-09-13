@@ -100,7 +100,14 @@ export default function ActionQueue({ pendingReports = 0 }: Props) {
   const canResolve = role === 'admin'
   const queryClient = useQueryClient()
   const approvals = useQuery({ queryKey: opsQueryKeys.approvals(), queryFn: () => opsService.listApprovals(20), refetchInterval: 3000 })
-  const unknownEffects = useQuery({ queryKey: opsQueryKeys.unknownEffects(), queryFn: () => opsService.listUnknownEffects(20), refetchInterval: 3000 })
+  // unknown Effect 队列是 admin-only 接口：非 admin 请求会被拒绝(403)，
+  // 若照常发起查询会让整块待办区进入错误态，审批人将看不到可审批的 Approval。
+  const unknownEffects = useQuery({
+    queryKey: opsQueryKeys.unknownEffects(),
+    queryFn: () => opsService.listUnknownEffects(20),
+    enabled: canResolve,
+    refetchInterval: canResolve ? 3000 : false,
+  })
   const [decision, setDecision] = useState<{ approval: ApprovalItem; kind: DecisionKind } | null>(null)
   const [resolution, setResolution] = useState<{ effect: UnknownEffectItem; kind: Resolution } | null>(null)
   const [reason, setReason] = useState('')
@@ -139,8 +146,9 @@ export default function ActionQueue({ pendingReports = 0 }: Props) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="action-queue">
       <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4"><Shield className="h-4 w-4 text-indigo-500" /><h2 className="text-sm font-semibold text-slate-800">Approval / Effect 待办</h2><span className="ml-auto text-xs text-slate-400">{total ? `${total} 项` : '全部完成'}</span></div>
-      {approvals.isLoading || unknownEffects.isLoading ? <div className="px-5 py-8 text-center text-sm text-slate-400">加载待办状态…</div> : approvals.isError || unknownEffects.isError ? <div className="flex items-center gap-3 px-5 py-8 text-sm text-amber-700"><TriangleAlert className="h-4 w-4" />待办状态暂不可用，未确认成功或已完成。</div> : total === 0 ? <div className="flex items-center gap-3 px-5 py-8 text-sm text-slate-500"><CheckCircle className="h-4 w-4 text-emerald-500" />暂无待办事项，系统运行正常</div> : <>
+      {approvals.isLoading ? <div className="px-5 py-8 text-center text-sm text-slate-400">加载待办状态…</div> : approvals.isError ? <div className="flex items-center gap-3 px-5 py-8 text-sm text-amber-700"><TriangleAlert className="h-4 w-4" />待办状态暂不可用，未确认成功或已完成。</div> : total === 0 ? <div className="flex items-center gap-3 px-5 py-8 text-sm text-slate-500"><CheckCircle className="h-4 w-4 text-emerald-500" />暂无待办事项，系统运行正常</div> : <>
         {(approvals.data || []).map(item => <ApprovalCard key={item.id} approval={item} canDecide={canDecide} onDecide={(approval, kind) => { setDecision({ approval, kind }); setReason('') }} conflict={conflicts[item.id]} />)}
+        {canResolve && unknownEffects.isError && <div className="flex items-center gap-3 border-t border-slate-100 px-5 py-3 text-xs text-amber-700"><TriangleAlert className="h-3.5 w-3.5" />unknown Effect 待办暂不可用，未确认成功或已完成。</div>}
         {(unknownEffects.data || []).map(item => <UnknownEffectCard key={item.id} effect={item} canResolve={canResolve} onResolve={(effect, kind) => { setResolution({ effect, kind }); setReason('') }} />)}
         {pendingReports > 0 && <a href="/reports" className="flex items-center gap-3 border-t border-slate-100 p-4 text-sm hover:bg-slate-50"><Clock3 className="h-4 w-4 text-amber-500" /><span className="flex-1">{pendingReports} 份报告待审阅</span><ChevronRight className="h-4 w-4 text-slate-400" /></a>}
       </>}
