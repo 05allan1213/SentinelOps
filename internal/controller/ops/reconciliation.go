@@ -141,7 +141,7 @@ func reconciliationHTTPStatus(err error) int {
 func writeReconciliationHTTPStatus(ctx context.Context, err error) {
 	if status := reconciliationHTTPStatus(err); status != 0 {
 		if request := g.RequestFromCtx(ctx); request != nil {
-			request.Response.WriteStatus(status)
+			request.Response.WriteHeader(status)
 		}
 	}
 }

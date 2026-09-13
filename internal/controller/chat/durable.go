@@ -37,7 +37,7 @@ func (c *ControllerV2) CreateRun(ctx context.Context, req *v2.CreateRunReq) (*v2
 	if err != nil {
 		request := g.RequestFromCtx(ctx)
 		if status := durableHTTPStatus(err); status != 0 {
-			request.Response.WriteStatus(status)
+			request.Response.WriteHeader(status)
 		}
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (c *ControllerV2) RunEvents(ctx context.Context, req *v2.RunEventsReq) (*v2
 	})
 	if err != nil && !errors.Is(err, context.Canceled) {
 		if status := durableHTTPStatus(err); status != 0 {
-			g.RequestFromCtx(ctx).Response.WriteStatus(status)
+			g.RequestFromCtx(ctx).Response.WriteHeader(status)
 		}
 		return nil, err
 	}

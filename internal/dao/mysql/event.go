@@ -26,7 +26,11 @@ func ListEvents(ctx context.Context, limit, offset int, severity, status, keywor
 		q = q.Where("status = ?", status)
 	}
 	if keyword != "" {
-		q = q.Where("title LIKE ? OR cve_id LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		// 事件正文不单独建列（Event.Content 是 gorm:"-" 的仅内存字段），原始告警
+		// 正文保留在 raw_payload。只匹配 title/cve_id 会让正文里的关键信息
+		// （如攻击手法、源 IP）永远搜不到，因此这里同时匹配 raw_payload。
+		pattern := "%" + keyword + "%"
+		q = q.Where("title LIKE ? OR cve_id LIKE ? OR raw_payload LIKE ?", pattern, pattern, pattern)
 	}
 	var total int64
 	if err = q.Count(&total).Error; err != nil {
@@ -314,7 +318,8 @@ func GetEventTrend(ctx context.Context, days int) ([]EventTrendItem, error) {
 		Count    int64
 	}
 	var rows []row
-	since := time.Now().AddDate(0, 0, -days).Format("2006-01-02")
+	// 与 GetEventStats 保持同一 UTC 日基准，趋势图的日期和“今日新增”才能对齐。
+	since := time.Now().UTC().AddDate(0, 0, -days).Format("2006-01-02")
 	if err = db.Model(&Event{}).
 		Select("DATE_FORMAT(created_at, '%Y-%m-%d') AS date, severity, COUNT(*) AS count").
 		Where("DATE(created_at) >= ?", since).
@@ -381,8 +386,11 @@ func GetEventStats(ctx context.Context) (*EventStats, error) {
 		return nil, err
 	}
 
-	// DATE(created_at) 与 loc=Local 驱动存储格式一致，避免跨时区边界误差
-	todayStr := time.Now().Format("2006-01-02")
+	// 连接由 normalizeApplicationDSN 固定为 loc=UTC + time_zone='+00:00'，
+	// DATETIME 与 SQL 日期函数都以 UTC 为基准；“今日/近 7 天”必须使用同一
+	// 基准，否则本地时区在 00:00-08:00 之间会把当天统计算成 0。
+	now := time.Now().UTC()
+	todayStr := now.Format("2006-01-02")
 	if err = db.Model(&Event{}).Where("DATE(created_at) = ?", todayStr).Count(&stats.TodayCount).Error; err != nil {
 		return nil, err
 	}
@@ -403,7 +411,7 @@ func GetEventStats(ctx context.Context) (*EventStats, error) {
 		stats.BySeverity[r.Severity] = r.Count
 	}
 
-	sevenDaysAgo := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	sevenDaysAgo := now.AddDate(0, 0, -7).Format("2006-01-02")
 	if err = db.Model(&Event{}).Where("DATE(created_at) >= ?", sevenDaysAgo).Count(&stats.New7Days).Error; err != nil {
 		return nil, err
 	}

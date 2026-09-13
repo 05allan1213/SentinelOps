@@ -13,6 +13,9 @@ import (
 
 	v1 "SentinelOps/api/report/v1"
 	reportsvc "SentinelOps/internal/service/report"
+
+	"github.com/gogf/gf/v2/errors/gcode"
+	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 )
 
@@ -89,12 +92,12 @@ func (c *ControllerV1) TemplateList(ctx context.Context, req *v1.TemplateListReq
 
 // TemplateCreate 模板现已内置，不支持通过 API 创建，直接返回不支持错误。
 func (c *ControllerV1) TemplateCreate(_ context.Context, _ *v1.TemplateCreateReq) (*v1.TemplateCreateRes, error) {
-	return nil, fmt.Errorf("模板已内置，不支持自定义创建")
+	return nil, gerror.NewCode(gcode.CodeNotSupported, "模板已内置，不支持自定义创建")
 }
 
 // TemplateDelete 模板现已内置，不支持通过 API 删除，直接返回不支持错误。
 func (c *ControllerV1) TemplateDelete(_ context.Context, _ *v1.TemplateDeleteReq) (*v1.TemplateDeleteRes, error) {
-	return nil, fmt.Errorf("模板已内置，不支持删除")
+	return nil, gerror.NewCode(gcode.CodeNotSupported, "模板已内置，不支持删除")
 }
 
 // Delete 删除安全报告，委托 reportsvc.DeleteReport 执行软删除。

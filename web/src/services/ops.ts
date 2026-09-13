@@ -178,7 +178,9 @@ export const opsService = {
     await api.post<ApiResponse<void>>('/ops/v1/playbooks/trigger_for_event', { event_id: eventId })
   },
 
-  // DirectRunForEvent：直接触发 AI 运维，返回 run_id
+  // DirectRunForEvent：直接触发 AI 运维，返回 run_id。
+  // 该入口受运行时 Gate 兼容窗口约束（agent_runtime.enabled && shadow_mode），
+  // Gate 关闭时会返回 legacy Ops direct writes are disabled。
   async directRun(eventId: string): Promise<string> {
     const res = await api.post<ApiResponse<{ run_id: string }>>('/ops/v1/runs/direct', { event_id: eventId })
     return res.data.data?.run_id || ''

@@ -35,25 +35,25 @@ func jwtMiddleware(authEnabled func(context.Context) bool, allowedRoles ...strin
 		}
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			r.Response.WriteStatus(401)
+			r.Response.WriteHeader(401)
 			r.Response.WriteJson(g.Map{"message": "missing Authorization header"})
 			return
 		}
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			r.Response.WriteStatus(401)
+			r.Response.WriteHeader(401)
 			r.Response.WriteJson(g.Map{"message": "invalid Authorization format"})
 			return
 		}
 		claims, err := auth.Parse(parts[1])
 		if err != nil {
-			r.Response.WriteStatus(401)
+			r.Response.WriteHeader(401)
 			r.Response.WriteJson(g.Map{"message": "invalid token"})
 			return
 		}
 		identity, err := policy.NewIdentity(claims.UserID, claims.Username, claims.Role)
 		if err != nil {
-			r.Response.WriteStatus(403)
+			r.Response.WriteHeader(403)
 			r.Response.WriteJson(g.Map{"message": "invalid identity"})
 			return
 		}
@@ -67,7 +67,7 @@ func jwtMiddleware(authEnabled func(context.Context) bool, allowedRoles ...strin
 				}
 			}
 			if !allowed {
-				r.Response.WriteStatus(403)
+				r.Response.WriteHeader(403)
 				r.Response.WriteJson(g.Map{"message": "insufficient permission"})
 				return
 			}

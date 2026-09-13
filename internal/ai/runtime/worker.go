@@ -37,6 +37,10 @@ type WorkerConfig struct {
 	Observation            WorkerObservation
 	PersistSnapshot        func(context.Context, WorkerObservation) error
 	HeartbeatSnapshot      func(context.Context, WorkerObservation) error
+	// ObservationRefresh 在动态 Gate 向量变化时重建 Worker 观测身份。常驻
+	// Worker 必须跟随运行期 Gate 变更刷新 runtime compatibility hash，否则
+	// Gate 变更后创建的 Run 会因 hash 与 Worker 启动快照不一致而永远无法认领。
+	ObservationRefresh func(context.Context) (WorkerObservation, error)
 	// ConsumeRecovery executes one claimed operation through the existing
 	// RuntimeHandler/Eino path. It returns operation status, controlled error
 	// code/reason, and must not invoke Effects directly.
@@ -59,6 +63,8 @@ type Worker struct {
 	retention             *RetentionCoordinator
 	snapshotMu            sync.Mutex
 	observation           WorkerObservation
+	observedGates         GateVector
+	observedGatesSet      bool
 	persistSnapshot       func(context.Context, WorkerObservation) error
 	heartbeatSnapshot     func(context.Context, WorkerObservation) error
 	consumeRecovery       func(context.Context, *workflow.RecoveryOperationClaim) (string, string, string, error)
@@ -205,12 +211,67 @@ func (w *Worker) ClaimNext(ctx context.Context) (*workflow.ClaimedRun, bool, err
 		if !current.Enabled(GateAgentRuntimeEnabled) {
 			return nil, false, nil
 		}
+		if err := w.syncObservationWithGates(ctx, current); err != nil {
+			return nil, false, err
+		}
 	}
 	return w.store.ClaimNextRun(ctx, workflow.ClaimInput{
 		Owner: w.config.Owner, LeaseDuration: w.config.LeaseDuration,
 		RuntimeVersion:             w.config.RuntimeVersion,
 		ExecutingWorkerFingerprint: w.observation.RuntimeCompatibilityHash,
 	})
+}
+
+// syncObservationWithGates 让同一进程内常驻的 Worker 跟随运行期 Gate 变更。
+// Gate 向量未变化时不重建观测，避免每次 poll 重复解析 Skill/MCP 目录。
+func (w *Worker) syncObservationWithGates(ctx context.Context, current GateVector) error {
+	if w == nil || w.config.ObservationRefresh == nil {
+		return nil
+	}
+	w.snapshotMu.Lock()
+	changed := !w.observedGatesSet || w.observedGates != current
+	w.snapshotMu.Unlock()
+	if !changed {
+		return nil
+	}
+	observation, err := w.config.ObservationRefresh(ctx)
+	if err != nil {
+		return err
+	}
+	w.snapshotMu.Lock()
+	w.observation.RuntimeVersion = observation.RuntimeVersion
+	w.observation.RuntimeCompatibilityHash = observation.RuntimeCompatibilityHash
+	w.observation.ConfiguredCatalogHash = observation.ConfiguredCatalogHash
+	w.observation.ObservedMCP = observation.ObservedMCP
+	w.observation.ObservedSkill = observation.ObservedSkill
+	w.observedGates = current
+	w.observedGatesSet = true
+	status, runID, generation, lastError := w.observation.Status, w.observation.ActiveRunID, w.observation.ActiveGeneration, w.observation.LastError
+	w.snapshotMu.Unlock()
+	if status == "" {
+		status = WorkerStatusIdle
+	}
+	// Worker Health 必须展示真实生效的 hash，而不是启动时的旧值。
+	return w.refreshSnapshot(ctx, status, runID, generation, lastError)
+}
+
+// reportClaimConflict 让 lease/hash 冲突在 Worker Health 可见。相同错误只写一次，
+// 避免退避轮询把审计写入放大成持续写库。
+func (w *Worker) reportClaimConflict(ctx context.Context, err error) {
+	if w == nil || err == nil {
+		return
+	}
+	message := errorText(err)
+	w.snapshotMu.Lock()
+	changed := w.observation.LastError != message
+	if changed {
+		w.observation.LastError = message
+	}
+	w.snapshotMu.Unlock()
+	if !changed {
+		return
+	}
+	_ = w.heartbeatCurrentSnapshot(ctx)
 }
 
 // RunOnce 认领并执行一个 Run；API/SSE 生命周期不参与此调用。
@@ -633,6 +694,7 @@ func (w *Worker) Run(ctx context.Context) error {
 				return ctx.Err()
 			}
 			if errors.Is(err, workflow.ErrLeaseLost) || errors.Is(err, workflow.ErrRunCASConflict) {
+				w.reportClaimConflict(ctx, err)
 				timer := time.NewTimer(w.config.MinPollBackoff)
 				select {
 				case <-ctx.Done():

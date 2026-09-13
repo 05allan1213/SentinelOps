@@ -13,13 +13,13 @@ func IngestAPIKeyMiddleware() ghttp.HandlerFunc {
 		ctx := r.Context()
 		key := r.Header.Get("X-API-Key")
 		if key == "" {
-			r.Response.WriteStatus(401)
+			r.Response.WriteHeader(401)
 			r.Response.WriteJson(map[string]string{"message": "missing X-API-Key header"})
 			return
 		}
 		stored, err := dao.GetSetting(ctx, "ingest.api_key")
 		if err != nil || stored == "" || stored != key {
-			r.Response.WriteStatus(401)
+			r.Response.WriteHeader(401)
 			r.Response.WriteJson(map[string]string{"message": "invalid API key"})
 			return
 		}

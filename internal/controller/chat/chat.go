@@ -129,7 +129,7 @@ func (c *ControllerV1) Chat(ctx context.Context, req *v1.ChatReq) (*v1.ChatRes, 
 	run, afterSeq, err := c.resolveRun(ctx, req)
 	if err != nil {
 		if status := durableHTTPStatus(err); status != 0 {
-			g.RequestFromCtx(ctx).Response.WriteStatus(status)
+			g.RequestFromCtx(ctx).Response.WriteHeader(status)
 		}
 		return nil, err
 	}

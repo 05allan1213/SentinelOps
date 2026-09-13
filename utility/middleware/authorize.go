@@ -22,7 +22,7 @@ func AuthDisabledWriteGuard() ghttp.HandlerFunc {
 func authDisabledWriteGuard(authEnabled func(context.Context) bool) ghttp.HandlerFunc {
 	return func(r *ghttp.Request) {
 		if !authEnabled(r.Context()) {
-			r.Response.WriteStatus(http.StatusForbidden)
+			r.Response.WriteHeader(http.StatusForbidden)
 			r.Response.WriteJson(g.Map{"message": "authentication disabled: writes are read-only"})
 			return
 		}
@@ -39,7 +39,7 @@ func AuthorizationMiddleware() ghttp.HandlerFunc {
 			return
 		}
 		if err := policy.Authorize(r.Context(), permission, policy.Resource{}); err != nil {
-			r.Response.WriteStatus(http.StatusForbidden)
+			r.Response.WriteHeader(http.StatusForbidden)
 			r.Response.WriteJson(g.Map{"message": "insufficient permission"})
 			return
 		}

@@ -104,10 +104,16 @@ func BuildAndIndex(ctx context.Context, input IndexInput) ([]aidoc.ChunkResult, 
 	for i, c := range chunks {
 		id := uuid.New().String()
 		chunks[i].ID = id
+		// chunk_id/source_id/document_id 是 Evidence 身份重建的必需字段：
+		// 缺少 chunk_id 时检索端会退化成文档级 Evidence ID，Runtime Evidence
+		// 读模型按 chunk 重建身份时必然对不上，只能报 evidence_source_not_observed。
 		meta := map[string]any{
 			"_type":           "document",
 			"base_id":         input.BaseID,
 			"doc_id":          input.DocID,
+			"document_id":     input.DocID,
+			"chunk_id":        id,
+			"source_id":       id,
 			"doc_title":       input.DocTitle,
 			"chunk_index":     c.ChunkIndex,
 			"section_title":   c.SectionTitle,

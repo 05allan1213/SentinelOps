@@ -97,6 +97,9 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 			MinPollBackoff: 100 * time.Millisecond, MaxPollBackoff: 2 * time.Second,
 			Retention: retention,
 			Gates:     evaluator, SnapshotDB: db, Observation: observation,
+			ObservationRefresh: func(refreshCtx context.Context) (airuntime.WorkerObservation, error) {
+				return configuredWorkerObservation(refreshCtx, config, evaluator, owner)
+			},
 		})
 	}
 	handler, err := airuntime.NewHITLRuntimeHandler(store, evaluator)
@@ -122,6 +125,9 @@ func newDurableWorker(ctx context.Context, config *appconfig.Config) (*airuntime
 		Execute: executor.ExecuteClaimedRun, QueryEffectTargetState: queryEffectTargetState,
 		Retention: retention, RuntimeVersion: airuntime.CurrentRuntimeVersion(), Gates: evaluator,
 		SnapshotDB: db, Observation: observation,
+		ObservationRefresh: func(refreshCtx context.Context) (airuntime.WorkerObservation, error) {
+			return configuredWorkerObservation(refreshCtx, config, evaluator, owner)
+		},
 		ConsumeRecoveryResult: func(recoveryCtx context.Context, claim *workflow.RecoveryOperationClaim) (workflow.FinishRecoveryOperationResult, error) {
 			if claim == nil {
 				return workflow.FinishRecoveryOperationResult{Status: workflow.OperationStatusFailed, ErrorCode: "recovery_claim_missing", Reason: "claim_missing"}, fmt.Errorf("recovery claim is required")

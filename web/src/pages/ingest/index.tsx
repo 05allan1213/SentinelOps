@@ -206,30 +206,37 @@ export default function IngestPage() {
       {/* 格式选择卡片 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0">
         {formatTabs.map(t => (
-          <button
+          <div
             key={t.key}
-            onClick={() => switchTab(t.key)}
             className={cn(
-              'rounded-xl border p-3 text-left transition-all',
+              'relative rounded-xl border p-3 text-left transition-all',
               activeTab === t.key
                 ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-300'
                 : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/50'
             )}
           >
-            <div className="flex items-center justify-between mb-1">
+            {/* 复制按钮与切换标签必须是并列的兄弟节点：button 内再嵌 button 会产生
+                非法 HTML 并触发 React hydration 报错。 */}
+            <button
+              type="button"
+              onClick={() => switchTab(t.key)}
+              aria-pressed={activeTab === t.key}
+              className="w-full pr-6 text-left"
+            >
               <span className={cn('text-sm font-semibold', activeTab === t.key ? 'text-indigo-700' : 'text-gray-800')}>
                 {t.label}
               </span>
-              <button
-                onClick={e => { e.stopPropagation(); copyEndpoint(t.key) }}
-                className="text-gray-400 hover:text-indigo-500 transition-colors"
-                title="复制端点"
-              >
-                <Copy className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 leading-tight">{t.desc}</p>
-          </button>
+            </button>
+            <button
+              type="button"
+              onClick={() => copyEndpoint(t.key)}
+              className="absolute right-3 top-3 text-gray-400 hover:text-indigo-500 transition-colors"
+              title="复制端点"
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+            <p className="mt-1 text-xs text-gray-500 leading-tight">{t.desc}</p>
+          </div>
         ))}
       </div>
 

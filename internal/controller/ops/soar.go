@@ -3,12 +3,14 @@ package ops
 
 import (
 	"context"
+	"errors"
 
 	soarv1 "SentinelOps/api/ops/v1"
 	"SentinelOps/internal/ai/ops/engine"
 	"SentinelOps/internal/ai/policy"
 	dao "SentinelOps/internal/dao/mysql"
 
+	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 )
 
@@ -32,6 +34,15 @@ func requireBusinessWrite(ctx context.Context) error {
 
 func requireAdmin(ctx context.Context) error {
 	return policy.Authorize(ctx, policy.PermissionManageUsersPolicyGates, policy.Resource{})
+}
+
+// legacyWriteError 把关闭的 legacy Ops 直写兼容窗口映射为明确的 403，
+// 避免调用方收到 200 + message 后误判为“已受理”。
+func legacyWriteError(err error) error {
+	if err != nil && errors.Is(err, engine.ErrLegacyOpsWritesDisabled) {
+		return gerror.NewCode(gcode.CodeNotAuthorized, err.Error())
+	}
+	return err
 }
 
 // ---- 响应剧本 ----
@@ -60,7 +71,7 @@ func (c *ControllerV1) GetPlaybook(ctx context.Context, req *soarv1.GetPlaybookR
 	}
 	p, err := dao.GetPlaybook(ctx, req.ID)
 	if err != nil {
-		return nil, gerror.New("策略不存在")
+		return nil, gerror.NewCode(gcode.CodeNotFound, "策略不存在")
 	}
 	return &soarv1.GetPlaybookRes{Item: soarv1.PlaybookItem{ID: p.ID, Name: p.Name, Description: p.Description, Enabled: p.Enabled, CreatedAt: p.CreatedAt.Format("2006-01-02 15:04:05")}}, nil
 }
@@ -82,7 +93,7 @@ func (c *ControllerV1) UpdatePlaybook(ctx context.Context, req *soarv1.UpdatePla
 	}
 	p, err := dao.GetPlaybook(ctx, req.ID)
 	if err != nil {
-		return nil, gerror.New("策略不存在")
+		return nil, gerror.NewCode(gcode.CodeNotFound, "策略不存在")
 	}
 	if req.Name != "" {
 		p.Name = req.Name
@@ -158,11 +169,11 @@ func (c *ControllerV1) DirectRunForEvent(ctx context.Context, req *soarv1.Direct
 	}
 	event, err := dao.GetEventByID(ctx, req.EventID)
 	if err != nil {
-		return nil, gerror.New("事件不存在")
+		return nil, gerror.NewCode(gcode.CodeNotFound, "事件不存在")
 	}
 	runID, err := c.directRunForEvent(ctx, event)
 	if err != nil {
-		return nil, err
+		return nil, legacyWriteError(err)
 	}
 	return &soarv1.DirectRunForEventRes{RunID: runID}, nil
 }
@@ -172,15 +183,15 @@ func (c *ControllerV1) TestPlaybook(ctx context.Context, req *soarv1.TestPlayboo
 		return nil, err
 	}
 	if _, err := dao.GetPlaybook(ctx, req.ID); err != nil {
-		return nil, gerror.New("策略不存在")
+		return nil, gerror.NewCode(gcode.CodeNotFound, "策略不存在")
 	}
 	event, err := dao.GetEventByID(ctx, req.EventID)
 	if err != nil {
-		return nil, gerror.New("事件不存在")
+		return nil, gerror.NewCode(gcode.CodeNotFound, "事件不存在")
 	}
 	runID, err := c.directRunForEvent(ctx, event)
 	if err != nil {
-		return nil, err
+		return nil, legacyWriteError(err)
 	}
 	return &soarv1.TestPlaybookRes{RunID: runID}, nil
 }
@@ -191,11 +202,11 @@ func (c *ControllerV1) TriggerForEvent(ctx context.Context, req *soarv1.TriggerF
 	}
 	event, err := dao.GetEventByID(ctx, req.EventID)
 	if err != nil {
-		return nil, gerror.New("事件不存在")
+		return nil, gerror.NewCode(gcode.CodeNotFound, "事件不存在")
 	}
 	runID, err := engine.TriggerForEvent(ctx, c.legacyWrites, event)
 	if err != nil {
-		return nil, err
+		return nil, legacyWriteError(err)
 	}
 	return &soarv1.TriggerForEventRes{RunID: runID}, nil
 }

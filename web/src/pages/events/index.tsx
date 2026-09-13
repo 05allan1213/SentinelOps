@@ -26,6 +26,7 @@ import EventDetailModal from './components/EventDetailModal'
 import type { SecurityEvent } from '@/types'
 import { eventService } from '@/services/event'
 import { opsService } from '@/services/ops'
+import { ApiRequestError } from '@/services/api'
 import toast from 'react-hot-toast'
 import CustomSelect, { type SelectOption } from '@/components/common/CustomSelect'
 
@@ -184,8 +185,11 @@ export default function Events() {
     try {
       await opsService.directRun(event.id)
       navigate(`/ops`)
-    } catch {
-      toast.error('触发失败')
+    } catch (error) {
+      // legacy 兼容窗口关闭时后端会拒绝直写，必须把真实原因展示给用户，
+      // 而不是统一显示为“触发失败”。
+      const message = error instanceof ApiRequestError ? error.message : '触发失败'
+      toast.error(message)
     }
   }
 
