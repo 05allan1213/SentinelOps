@@ -131,9 +131,24 @@ func (s *GORMStore) ClaimNextRecoveryOperation(ctx context.Context, owner string
 		query := applyDurableRuntimeContract(tx.Model(&mysql.WorkflowRun{})).
 			Where("runtime_mode = ?", RuntimeModeDurableV1).
 			Where("status NOT IN ?", []string{RunStatusSucceeded, RunStatusSuccess, RunStatusFailed, RunStatusCanceled}).
-			Where("EXISTS (SELECT 1 FROM workflow_events e WHERE e.run_id = workflow_runs.id AND e.event_type = ? AND e.operation_id IS NOT NULL)", EventOperationAccepted).
+			// 必须存在“未终结”的命令事件：只判断曾出现过 operation.accepted 会把
+			// 已终结命令的旧 Run 反复选中，遮蔽后面真正可认领的命令（head-of-line）。
+			Where(`EXISTS (
+				SELECT 1 FROM workflow_events e
+				WHERE e.run_id = workflow_runs.id AND e.event_type = ? AND e.operation_id IS NOT NULL
+				  AND NOT EXISTS (
+					SELECT 1 FROM workflow_events t
+					WHERE t.run_id = e.run_id AND t.operation_id = e.operation_id
+					  AND t.event_type IN (?, ?, ?, ?)
+				  )
+			)`, EventOperationAccepted, EventOperationSucceeded, EventOperationFailed, EventOperationCanceled, EventOperationRejected).
 			Order("priority DESC, available_at ASC, id ASC").
 			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Limit(1)
+		// 与 Run 认领同理：不兼容的冻结身份不能参与选择，否则它会每次被选中、
+		// 校验失败并回滚，阻塞其他 Run 的恢复命令。
+		if fingerprint := strings.TrimSpace(executingWorkerFingerprint); fingerprint != "" {
+			query = query.Where("runtime_compatibility_hash = ?", fingerprint)
+		}
 		if err := query.First(&run).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil
@@ -147,7 +162,18 @@ func (s *GORMStore) ClaimNextRecoveryOperation(ctx context.Context, owner string
 		if len(ops) == 0 {
 			return nil
 		}
-		op := ops[0]
+		// 同一 Run 上可能同时保留历史终态事件与新的 active 命令：只取可认领的那条。
+		var op Operation
+		claimable := false
+		for _, candidate := range ops {
+			if candidate.Status == OperationStatusAccepted || candidate.Status == OperationStatusRunning {
+				op, claimable = candidate, true
+				break
+			}
+		}
+		if !claimable {
+			return nil
+		}
 		var now time.Time
 		if err := tx.Raw("SELECT CURRENT_TIMESTAMP(3)").Scan(&now).Error; err != nil {
 			return err
@@ -164,6 +190,12 @@ func (s *GORMStore) ClaimNextRecoveryOperation(ctx context.Context, owner string
 			if err := validateClaimWorkerFingerprint(&run, executingWorkerFingerprint); err != nil {
 				return fmt.Errorf("%w: worker fingerprint does not match frozen run runtime compatibility hash", ErrOperationPrecondition)
 			}
+		} else if closed, closeErr := closeOrphanedRecoveryOperationTx(tx, &run, op); closeErr != nil {
+			return closeErr
+		} else if closed {
+			// 该 operation 的 Attempt 已经结束（例如恢复后再次 park）却未终结。
+			// 就地关闭孤儿命令，避免它永久占用 Run 的命令队列并阻塞后续认领。
+			return nil
 		}
 		acceptedGeneration := run.LeaseGeneration
 		if firstClaim {
@@ -300,6 +332,36 @@ func setAttemptOperationTx(tx *gorm.DB, run *mysql.WorkflowRun, token LeaseToken
 		return ErrLeaseLost
 	}
 	return nil
+}
+
+// closeOrphanedRecoveryOperationTx 终结“Attempt 已结束但 operation 仍 running”
+// 的孤儿恢复命令：该命令的执行已经不存在，既不失败也不成功会永久锁死 Run 的
+// 命令队列（后续恢复命令一律 409）。关闭动作与认领共用同一事务。
+func closeOrphanedRecoveryOperationTx(tx *gorm.DB, run *mysql.WorkflowRun, op Operation) (bool, error) {
+	if run == nil || run.Attempt == 0 || strings.TrimSpace(op.OperationID) == "" {
+		return false, nil
+	}
+	var attempt mysql.WorkflowAttempt
+	lookup := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("run_id = ? AND operation_id = ?", run.ID, op.OperationID).
+		Order("attempt DESC").First(&attempt)
+	switch {
+	case errors.Is(lookup.Error, gorm.ErrRecordNotFound):
+		// 没有绑定 Attempt 的 running operation 同样无法继续执行。
+	case lookup.Error != nil:
+		return false, fmt.Errorf("lock orphaned recovery Attempt: %w", lookup.Error)
+	case attempt.FinishedAt == nil:
+		return false, nil
+	}
+	correlation, err := latestPriorRunEventSeqTx(tx, run.ID)
+	if err != nil {
+		return false, err
+	}
+	if err := insertOperationTerminalEventTx(tx, run.ID, op.OperationID, op.Action,
+		EventOperationFailed, correlation, "recovery_attempt_closed", "recovery_attempt_closed"); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // reclaimAttemptTx rebinds an unfinished recovery Attempt to a newly fenced

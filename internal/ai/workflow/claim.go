@@ -70,6 +70,11 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 		if strings.TrimSpace(input.RuntimeVersion) != "" {
 			query = query.Where("runtime_version = ?", input.RuntimeVersion)
 		}
+		// 只挑选与 Worker 冻结身份兼容的 Run：否则一个旧 hash 的 Run 会被反复
+		// 选中、校验失败并回滚，永久阻塞排在它后面的所有可执行 Run。
+		if fingerprint := strings.TrimSpace(input.ExecutingWorkerFingerprint); fingerprint != "" {
+			query = query.Where("runtime_compatibility_hash = ?", fingerprint)
+		}
 		result := query.Take(&run)
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil

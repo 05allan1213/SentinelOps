@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"strings"
+
+	"SentinelOps/internal/ai/policy"
 )
 
 // Scope 是检索授权和缓存隔离所需的最小身份快照。
@@ -26,6 +28,27 @@ func WithScope(ctx context.Context, scope Scope) context.Context {
 func ScopeFromContext(ctx context.Context) (Scope, bool) {
 	scope, ok := ctx.Value(scopeKey{}).(Scope)
 	return scope, ok
+}
+
+// WithIdentityScope 用当前认证身份补齐检索 Scope；调用方 Context 已显式设置
+// Scope 时保持不变（durable Attempt 自带更精确的冻结 Scope）。
+// 非 durable 的 Agent 入口共用该助手，避免只设置 Collector 而让
+// query_internal_docs 以 "missing retrieval scope" fail-closed。
+func WithIdentityScope(ctx context.Context) context.Context {
+	if ctx == nil {
+		return ctx
+	}
+	if _, ok := ScopeFromContext(ctx); ok {
+		return ctx
+	}
+	identity, err := policy.IdentityFromContext(ctx)
+	if err != nil {
+		return ctx
+	}
+	return WithScope(ctx, Scope{
+		UserID: identity.UserID, Role: string(identity.Role),
+		AccessScope: "user:" + identity.UserID,
+	})
 }
 
 // Namespace 返回不会跨用户、角色、知识库、索引版本或 Policy 命中的缓存命名空间。

@@ -425,8 +425,13 @@ func (w *Worker) consumeRecoveryOperation(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 	claim, ok, err := w.store.ClaimNextRecoveryOperation(ctx, w.config.Owner, w.config.LeaseDuration, w.observation.RuntimeCompatibilityHash)
-	if err != nil || !ok {
-		return ok, err
+	if err != nil {
+		// 认领失败必须上抛：RunOnce 只在 didRecovery=true 时处理 error，
+		// 静默丢弃会让命令永远停在 accepted 且没有任何可见信号。
+		return true, err
+	}
+	if !ok {
+		return false, nil
 	}
 	recoveryCtx, _, _, identityErr := claimedRunIdentityContext(ctx, claim.Run)
 	if identityErr != nil {
@@ -693,7 +698,7 @@ func (w *Worker) Run(ctx context.Context) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			if errors.Is(err, workflow.ErrLeaseLost) || errors.Is(err, workflow.ErrRunCASConflict) {
+			if errors.Is(err, workflow.ErrLeaseLost) || errors.Is(err, workflow.ErrRunCASConflict) || errors.Is(err, workflow.ErrOperationPrecondition) {
 				w.reportClaimConflict(ctx, err)
 				timer := time.NewTimer(w.config.MinPollBackoff)
 				select {

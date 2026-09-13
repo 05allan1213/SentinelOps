@@ -115,6 +115,7 @@ func (h *RuntimeHandler) handleApprovalToolCall(
 			ToolName: restored.ToolName, ToolRevision: restored.ToolRevision, ToolSchemaHash: restored.ToolSchemaHash,
 			PolicyHash: restored.PolicyHash, RuntimeCompatibilityHash: restored.RuntimeCompatibilityHash,
 			ExplicitTarget: true, GateAllowed: gateAllowed,
+			OperationID: attempt.OperationID, OperationAction: attempt.OperationAction,
 		})
 		if err != nil {
 			return nil, true, err

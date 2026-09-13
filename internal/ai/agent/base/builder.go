@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"SentinelOps/internal/ai/evidence"
+	"SentinelOps/internal/ai/tools"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/prompt"
@@ -122,6 +123,9 @@ func BuildReactAgentGraph(ctx context.Context, cfg BuildConfig) (compose.Runnabl
 	agentCfg := &react.AgentConfig{MaxStep: maxStep}
 	agentCfg.ToolCallingModel = cfg.Model
 	agentCfg.ToolsConfig.Tools = cfg.Tools
+	// 与 durable Specialist 共用同一参数归一化：部分模型把 trigger_ops 的
+	// proposals[].arguments_json 输出为 JSON 对象，工具契约要求字符串。
+	agentCfg.ToolsConfig.ToolArgumentsHandler = tools.NormalizeTriggerOpsArguments
 	// 部分模型的流式输出顺序是先文字内容、后 Tool Calls。
 	// 默认 firstChunkStreamToolCallChecker 只检查第一个 chunk：遇到文字内容就返回 false（无工具调用），
 	// 导致 agent 提前路由到 END，工具永远不会被执行，只有规划文字出现在输出中。

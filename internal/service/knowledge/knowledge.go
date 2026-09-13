@@ -485,7 +485,11 @@ func EnableDoc(ctx context.Context, docID string, enabled bool) error {
 	if err != nil {
 		return err
 	}
-	return db.Model(&dao.KnowledgeDocument{}).Where("id = ?", docID).Updates(map[string]any{"enabled": enabled, "indexed_version": gorm.Expr("indexed_version + 1")}).Error
+	// 启停只切换 enabled：indexed_version 是“向量与 MySQL 行同一身份”的校验字段
+	// (retrieval.metadataMatchesRecord)，改写它会让 Milvus 元数据与 MySQL 永久失配，
+	// 文档重新启用后也再也检索不到。缓存失效由 FilterDocuments 每次按 MySQL 状态
+	// 复核保证，无需改版本。
+	return db.Model(&dao.KnowledgeDocument{}).Where("id = ?", docID).Updates(map[string]any{"enabled": enabled}).Error
 }
 
 // EnableChunks 批量启用或禁用分块。
@@ -500,9 +504,9 @@ func EnableChunks(ctx context.Context, docID string, ids []string, enabled bool)
 	}
 	var tx *gorm.DB
 	if len(ids) > 0 {
-		tx = db.Model(&dao.KnowledgeChunk{}).Where("id IN ?", ids).Updates(map[string]any{"enabled": enabled, "indexed_version": gorm.Expr("indexed_version + 1")})
+		tx = db.Model(&dao.KnowledgeChunk{}).Where("id IN ?", ids).Updates(map[string]any{"enabled": enabled})
 	} else if docID != "" {
-		tx = db.Model(&dao.KnowledgeChunk{}).Where("doc_id = ?", docID).Updates(map[string]any{"enabled": enabled, "indexed_version": gorm.Expr("indexed_version + 1")})
+		tx = db.Model(&dao.KnowledgeChunk{}).Where("doc_id = ?", docID).Updates(map[string]any{"enabled": enabled})
 	} else {
 		return 0, nil
 	}

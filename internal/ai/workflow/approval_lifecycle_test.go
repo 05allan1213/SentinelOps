@@ -374,6 +374,60 @@ func TestResumeAuthorizationClosedGateParksWithoutChangingApprovedAudit(t *testi
 	}
 }
 
+// write_gate_closed 失效必须在同一事务内终结触发本次恢复的 Recovery Operation。
+// 否则该命令既不会成功也不会失败，并永久占用该 Run 的命令队列（后续恢复 409）。
+func TestResumeAuthorizationClosedGateClosesRecoveryOperation(t *testing.T) {
+	db := newP07Database(t, "phase22_closed_gate_operation")
+	store, ownerCtx, run, lease := fixture22RunningRun(t, db, "closed-gate-operation")
+	prepared := fixture22Prepare(t, store, ownerCtx, run, lease, "block_ip", policy.RiskL2, time.Now().Add(time.Hour))
+	fixture22Publish(t, store, ownerCtx, run.ID, lease, prepared)
+	if _, err := store.DecideApprovalAndWakeRun(fixture21Identity("phase22-gate-op-approver", policy.RoleApprover), DecideApprovalInput{
+		ApprovalID: prepared.ID, ProposalHash: prepared.ProposalHash, ExpectedVersion: prepared.Version, Decision: ApprovalStatusApproved,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	claimed, ok, err := store.ClaimNextRun(context.Background(), ClaimInput{Owner: "worker-phase22-gate-op", LeaseDuration: time.Hour})
+	if err != nil || !ok {
+		t.Fatalf("claim Run: ok=%v err=%v", ok, err)
+	}
+	accepted, err := store.AcceptRecoveryOperation(fixtureOperationAdminContext("admin-phase22-gate-op"),
+		fixtureAcceptRecoveryInput(run.ID, OperationActionResume, claimed.Token.Generation, "phase22-gate-op-key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	recoveryClaim, ok, err := store.ClaimNextRecoveryOperation(context.Background(), "worker-phase22-gate-op", time.Hour, "")
+	if err != nil || !ok || recoveryClaim == nil || recoveryClaim.Operation.OperationID != accepted.OperationID {
+		t.Fatalf("claim recovery operation: claim=%#v ok=%v err=%v", recoveryClaim, ok, err)
+	}
+
+	resumeCtx := fixture22OperatorContext(claimed.Run.UserID)
+	_, err = store.AuthorizeApprovalResume(resumeCtx, AuthorizeApprovalResumeInput{
+		Lease: recoveryClaim.Lease, ApprovalID: prepared.ID, ProposalHash: prepared.ProposalHash,
+		ToolName: prepared.ToolName, ToolRevision: prepared.ToolRevision, ToolSchemaHash: prepared.ToolSchemaHash,
+		PolicyHash: prepared.PolicyHash, RuntimeCompatibilityHash: prepared.RuntimeCompatibilityHash,
+		ExplicitTarget: true, GateAllowed: false,
+		OperationID: recoveryClaim.Operation.OperationID, OperationAction: recoveryClaim.Operation.Action,
+	})
+	if !errors.Is(err, ErrApprovalInvalidated) {
+		t.Fatalf("closed Gate Resume error=%v, want ErrApprovalInvalidated", err)
+	}
+	var storedRun mysql.WorkflowRun
+	if err := db.First(&storedRun, "id = ?", run.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if storedRun.Status != RunStatusParked {
+		t.Fatalf("run status=%s, want %s", storedRun.Status, RunStatusParked)
+	}
+	var terminal mysql.WorkflowEvent
+	if err := db.Where("run_id = ? AND operation_id = ? AND event_type = ?", run.ID, accepted.OperationID, EventOperationFailed).
+		First(&terminal).Error; err != nil {
+		t.Fatalf("recovery operation terminal event: %v", err)
+	}
+	if !strings.Contains(terminal.Payload, "approval_invalidated") {
+		t.Fatalf("recovery operation terminal payload=%s", terminal.Payload)
+	}
+}
+
 func TestResumeAuthorizationRejectsL2SelfApproval(t *testing.T) {
 	db := newP07Database(t, "phase22_l2_self_approval")
 	store, ownerCtx, run, lease := fixture22RunningRun(t, db, "l2-self-approval")

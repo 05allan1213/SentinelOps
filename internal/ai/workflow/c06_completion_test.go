@@ -242,23 +242,73 @@ func TestC06RecoveryFirstClaimPersistsExecutingWorkerFingerprint(t *testing.T) {
 	}
 }
 
-func TestC06RecoveryFirstClaimRejectsMismatchedWorkerFingerprint(t *testing.T) {
+func TestC06RecoveryFirstClaimSkipsMismatchedWorkerFingerprint(t *testing.T) {
 	db := newP07Database(t, "c06_recovery_fingerprint_mismatch")
 	store, token := fixture09ClaimRun(t, db, "c06-recovery-fingerprint-mismatch", time.Hour)
 	var run mysql.WorkflowRun
 	if err := db.First(&run, "id = ?", token.RunID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.AcceptRecoveryOperation(fixtureOperationAdminContext("admin-c06"), fixtureAcceptRecoveryInput(run.ID, OperationActionReplay, token.Generation, "c06-recovery-mismatch-key")); err != nil {
+	accepted, err := store.AcceptRecoveryOperation(fixtureOperationAdminContext("admin-c06"), fixtureAcceptRecoveryInput(run.ID, OperationActionReplay, token.Generation, "c06-recovery-mismatch-key"))
+	if err != nil {
 		t.Fatal(err)
 	}
 	mismatch := strings.Repeat("b", 64)
 	if *run.RuntimeCompatibilityHash == mismatch {
 		t.Fatalf("fixture fingerprint collision: %q", mismatch)
 	}
+	var before mysql.WorkflowRun
+	if err := db.First(&before, "id = ?", run.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	// 不兼容的 Worker 跳过该命令而不是抛错：抛错会永久阻塞整个恢复队列。
 	claim, ok, err := store.ClaimNextRecoveryOperation(context.Background(), token.Owner, time.Hour, mismatch)
-	if err == nil || ok || claim != nil || !errors.Is(err, ErrOperationPrecondition) {
-		t.Fatalf("mismatched recovery claim=%#v ok=%v err=%v, want ErrOperationPrecondition", claim, ok, err)
+	if err != nil || ok || claim != nil {
+		t.Fatalf("mismatched recovery claim=%#v ok=%v err=%v, want skipped without error", claim, ok, err)
+	}
+	var untouched mysql.WorkflowRun
+	if err := db.First(&untouched, "id = ?", run.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if untouched.Status != before.Status || untouched.LeaseGeneration != before.LeaseGeneration || (untouched.LeaseOwner == nil) != (before.LeaseOwner == nil) {
+		t.Fatalf("mismatched recovery claim mutated Run: before=%s/%d after=%s/%d", before.Status, before.LeaseGeneration, untouched.Status, untouched.LeaseGeneration)
+	}
+	// 指纹匹配且持有当前租约的 Worker 仍可认领同一命令。
+	matched, ok, err := store.ClaimNextRecoveryOperation(context.Background(), token.Owner, time.Hour, *run.RuntimeCompatibilityHash)
+	if err != nil || !ok || matched == nil || matched.Operation.OperationID != accepted.OperationID {
+		t.Fatalf("matched recovery claim=%#v ok=%v err=%v", matched, ok, err)
+	}
+}
+
+// 一个已经结束 Attempt 的 running 命令（例如恢复后又 park）必须被就地终结，
+// 否则它永久占用该 Run 的命令队列，后续恢复命令一律 409。
+func TestC06RecoveryClaimClosesOrphanedOperationWithFinishedAttempt(t *testing.T) {
+	db := newP07Database(t, "c06_orphan_recovery")
+	store, _, claim := fixtureC06StartedOperation(t, db, "orphan")
+	if err := db.Model(&mysql.WorkflowAttempt{}).
+		Where("run_id = ? AND attempt = ?", claim.Run.ID, claim.Run.Attempt).
+		Updates(map[string]any{"finished_at": time.Now().UTC(), "status": RunStatusParked}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&mysql.WorkflowRun{}).Where("id = ?", claim.Run.ID).
+		Updates(map[string]any{
+			"status": RunStatusParked, "park_reason": ParkReasonApprovalInvalidated,
+			"lease_owner": nil, "lease_until": nil, "heartbeat_at": nil,
+		}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	claimed, ok, err := store.ClaimNextRecoveryOperation(context.Background(), "worker-c06-orphan", time.Hour, "")
+	if err != nil || ok || claimed != nil {
+		t.Fatalf("orphan claim=%#v ok=%v err=%v, want closed without claim", claimed, ok, err)
+	}
+	var terminal mysql.WorkflowEvent
+	if err := db.Where("run_id = ? AND operation_id = ? AND event_type = ?", claim.Run.ID, claim.Operation.OperationID, EventOperationFailed).
+		First(&terminal).Error; err != nil {
+		t.Fatalf("orphan operation terminal event: %v", err)
+	}
+	if !strings.Contains(terminal.Payload, "recovery_attempt_closed") {
+		t.Fatalf("orphan terminal payload=%s", terminal.Payload)
 	}
 }
 

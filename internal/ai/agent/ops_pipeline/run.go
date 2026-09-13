@@ -12,6 +12,7 @@ import (
 	"SentinelOps/internal/ai/agent/base"
 	"SentinelOps/internal/ai/agent/event_analysis_pipeline"
 	"SentinelOps/internal/ai/effects"
+	"SentinelOps/internal/ai/evidence"
 	"SentinelOps/internal/ai/prompt/agents"
 	dao "SentinelOps/internal/dao/mysql"
 
@@ -25,6 +26,9 @@ func ExecuteRun(ctx context.Context, gate LegacyWriteGate, runID string, event *
 	if err := RequireLegacyOpsWrites(ctx, gate); err != nil {
 		return err
 	}
+	// 非 durable 入口同样补齐检索 Scope：只设置 Collector 会让
+	// query_internal_docs 以 "missing retrieval scope" fail-closed。
+	ctx = evidence.WithIdentityScope(ctx)
 	ctx = effects.WithLegacyMutationContext(ctx)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
@@ -78,7 +82,7 @@ func nextAutoOpsStatus(current string) string {
 
 // RunEventAnalysis 调用事件分析 Agent，返回分析文本（供 ai_analyze action 注入使用）
 func RunEventAnalysis(ctx context.Context, event *dao.Event) (string, error) {
-	agentCtx := ctx
+	agentCtx := evidence.WithIdentityScope(ctx)
 	runner, err := event_analysis_pipeline.GetEventAnalysisAgent(agentCtx)
 	if err != nil {
 		return "", fmt.Errorf("初始化事件分析 Agent 失败: %w", err)

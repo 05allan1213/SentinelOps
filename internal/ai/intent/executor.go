@@ -79,7 +79,7 @@ func newExecutorLambda() *compose.Lambda {
 		// Go HTTP server 在客户端断连时自动取消 request context，若不隔离则会导致
 		// LLM streaming 中途收到 context canceled，使整个 ReAct 循环失败。
 		// WithoutCancel 保留所有 context value（trace、session 等），仅移除取消传播。
-		agentCtx := evidence.WithCollector(context.WithoutCancel(spanCtx), evidence.NewCollector(task.ID))
+		agentCtx := evidence.WithIdentityScope(evidence.WithCollector(context.WithoutCancel(spanCtx), evidence.NewCollector(task.ID)))
 
 		// 执行子 Agent（内部通过 Callback 流式回传结果）
 		// Execute 内部的错误不向 Graph 上抛，而是封装在 IntentOutput.Error，

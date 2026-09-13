@@ -86,6 +86,11 @@ type AuthorizeApprovalResumeInput struct {
 	RuntimeCompatibilityHash string
 	ExplicitTarget           bool
 	GateAllowed              bool
+	// OperationID/OperationAction 指向触发本次恢复的 Recovery Operation。
+	// 审批在 endpoint 前失效时，Run 会被 park；同一事务必须用该身份终结
+	// operation，否则它既不会成功也不会失败，并永久占用该 Run 的命令队列。
+	OperationID     string
+	OperationAction string
 }
 
 // PrepareApproval 只插入或刷新同一 generation 可见的 preparing；任何后续状态只读返回。
@@ -395,21 +400,21 @@ func (s *GORMStore) AuthorizeApprovalResume(ctx context.Context, input Authorize
 			approval.ToolSchemaHash != input.ToolSchemaHash || approval.PolicyHash != input.PolicyHash ||
 			approval.RuntimeCompatibilityHash != input.RuntimeCompatibilityHash || run.RuntimeCompatibilityHash == nil ||
 			*run.RuntimeCompatibilityHash != input.RuntimeCompatibilityHash {
-			if err := invalidateApprovalAndParkTx(tx, run, input.Lease, &approval, "proposal_policy_or_runtime_mismatch"); err != nil {
+			if err := invalidateApprovalAndParkTx(tx, run, input.Lease, &approval, "proposal_policy_or_runtime_mismatch", input.OperationID, input.OperationAction); err != nil {
 				return err
 			}
 			resultErr = ErrApprovalInvalidated
 			return nil
 		}
 		if err := validateApprovalCheckpointBinding(tx, run, &approval); err != nil {
-			if parkErr := invalidateApprovalAndParkTx(tx, run, input.Lease, &approval, "checkpoint_fingerprint_mismatch"); parkErr != nil {
+			if parkErr := invalidateApprovalAndParkTx(tx, run, input.Lease, &approval, "checkpoint_fingerprint_mismatch", input.OperationID, input.OperationAction); parkErr != nil {
 				return parkErr
 			}
 			resultErr = ErrApprovalCheckpointMismatch
 			return nil
 		}
 		if !input.GateAllowed {
-			if err := invalidateApprovalAndParkTx(tx, run, input.Lease, &approval, "write_gate_closed"); err != nil {
+			if err := invalidateApprovalAndParkTx(tx, run, input.Lease, &approval, "write_gate_closed", input.OperationID, input.OperationAction); err != nil {
 				return err
 			}
 			resultErr = ErrApprovalInvalidated

@@ -94,7 +94,7 @@ func TestAttemptPersistsExecutingWorkerFingerprintOnClaim(t *testing.T) {
 	}
 }
 
-func TestAttemptClaimRejectsMismatchedWorkerFingerprint(t *testing.T) {
+func TestAttemptClaimSkipsMismatchedWorkerFingerprint(t *testing.T) {
 	db := newP07Database(t, "c02_attempt_fingerprint_mismatch")
 	store := NewGORMStore(db)
 	ctx := fixture08UserContext("user-c02-attempt-fingerprint-mismatch")
@@ -106,11 +106,13 @@ func TestAttemptClaimRejectsMismatchedWorkerFingerprint(t *testing.T) {
 	if *created.RuntimeCompatibilityHash == mismatch {
 		t.Fatalf("fixture fingerprint collision: %q", mismatch)
 	}
+	// 不兼容的 Worker 必须跳过而不是抛错：抛错会让该 Run 每次都被选中并回滚，
+	// 永久阻塞排在它后面的可执行 Run（head-of-line starvation）。
 	claimed, ok, err := store.ClaimNextRun(context.Background(), ClaimInput{
 		Owner: "worker-c02-mismatch", LeaseDuration: time.Minute, ExecutingWorkerFingerprint: mismatch,
 	})
-	if err == nil || ok || claimed != nil || !errors.Is(err, ErrRunCASConflict) {
-		t.Fatalf("mismatched claim=%#v ok=%v err=%v, want ErrRunCASConflict", claimed, ok, err)
+	if err != nil || ok || claimed != nil {
+		t.Fatalf("mismatched claim=%#v ok=%v err=%v, want skipped without error", claimed, ok, err)
 	}
 	var run mysql.WorkflowRun
 	if err := db.First(&run, "id = ?", created.ID).Error; err != nil {
@@ -125,6 +127,13 @@ func TestAttemptClaimRejectsMismatchedWorkerFingerprint(t *testing.T) {
 	}
 	if attempts != 0 {
 		t.Fatalf("mismatched claim created %d Attempt rows", attempts)
+	}
+	// 指纹匹配的 Worker 仍必须能够认领同一个 Run。
+	matched, ok, err := store.ClaimNextRun(context.Background(), ClaimInput{
+		Owner: "worker-c02-matched", LeaseDuration: time.Minute, ExecutingWorkerFingerprint: *created.RuntimeCompatibilityHash,
+	})
+	if err != nil || !ok || matched == nil || matched.Run.ID != created.ID {
+		t.Fatalf("matched claim=%#v ok=%v err=%v, want the same Run", matched, ok, err)
 	}
 }
 
