@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -51,6 +52,57 @@ func TestListRuntimeRunsSafeAgentProjectionQuality(t *testing.T) {
 }
 
 func ptrString(v string) *string { return &v }
+
+// TestListRuntimeRunsCarriesBudgetState 保护 Run 列表的 Budget 契约：
+// 列表 DTO 暴露 model_calls/tool_calls 等计数，因此 list projection 必须
+// 携带 budget_* 列；否则每一行都会被读模型判定为 invalid_budget_json。
+func TestListRuntimeRunsCarriesBudgetState(t *testing.T) {
+	store, db := runtimeQueryStore(t, "runtime_query_budget")
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	limits := `{"max_model_calls":8,"max_l0_tool_calls":4,"max_duration_ms":60000}`
+	usage := `{"schema":"sentinelops/run-base-budget/v1","model_calls":2,"l0_tool_calls":1}`
+	reservations := `{"schema":"sentinelops/run-base-budget/v1","items":{}}`
+	row := WorkflowRun{
+		ID: "runtime-budget", WorkflowKey: "wf", UserID: "alice", SessionID: "s-budget",
+		Status: "succeeded", RuntimeMode: "durable_v1",
+		BudgetLimitsJSON: &limits, BudgetUsageJSON: &usage, BudgetReservationsJSON: &reservations,
+		StartedAt: now, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&row).Error; err != nil {
+		t.Fatal(err)
+	}
+	ctx := policy.WithIdentity(context.Background(), policy.Identity{UserID: "alice", Role: policy.RoleViewer, Scope: policy.Scope{UserID: "alice"}})
+	rows, _, err := store.ListRuntimeRuns(ctx, RuntimeRunFilter{Sort: "id", Direction: "asc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows=%d want 1", len(rows))
+	}
+	got := rows[0]
+	var gotLimits struct {
+		MaxModelCalls  int64 `json:"max_model_calls"`
+		MaxL0ToolCalls int64 `json:"max_l0_tool_calls"`
+		MaxDurationMS  int64 `json:"max_duration_ms"`
+	}
+	if got.BudgetLimitsJSON == nil || json.Unmarshal([]byte(*got.BudgetLimitsJSON), &gotLimits) != nil || gotLimits.MaxModelCalls != 8 || gotLimits.MaxL0ToolCalls != 4 || gotLimits.MaxDurationMS != 60000 {
+		t.Fatalf("budget limits=%v want %s", got.BudgetLimitsJSON, limits)
+	}
+	var gotUsage struct {
+		Schema     string `json:"schema"`
+		ModelCalls int64  `json:"model_calls"`
+	}
+	if got.BudgetUsageJSON == nil || json.Unmarshal([]byte(*got.BudgetUsageJSON), &gotUsage) != nil || gotUsage.Schema != "sentinelops/run-base-budget/v1" || gotUsage.ModelCalls != 2 {
+		t.Fatalf("budget usage=%v want %s", got.BudgetUsageJSON, usage)
+	}
+	var gotReservations struct {
+		Schema string          `json:"schema"`
+		Items  json.RawMessage `json:"items"`
+	}
+	if got.BudgetReservationsJSON == nil || json.Unmarshal([]byte(*got.BudgetReservationsJSON), &gotReservations) != nil || gotReservations.Schema != "sentinelops/run-base-budget/v1" || len(gotReservations.Items) == 0 {
+		t.Fatalf("budget reservations=%v want %s", got.BudgetReservationsJSON, reservations)
+	}
+}
 
 func TestListRuntimeRunsDefaultsToDurable(t *testing.T) {
 	store, db := runtimeQueryStore(t, "runtime_query_default")

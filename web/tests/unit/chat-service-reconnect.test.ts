@@ -22,6 +22,18 @@ it('creates once via Axios v2 and deduplicates body, plan and tool with monotoni
   expect(sessionStorage.getItem('chat_last_seq_session')).toBe('5')
   expect(call.done).toHaveBeenCalledOnce()
 })
+it('delivers the executor answer once when the replanner repeats the same response', async () => {
+  const answer = 'SentinelOps 的 durable runtime 解决的是恢复与审计问题。'
+  vi.mocked(fetch).mockResolvedValue(response(
+    frame(1, 'agent.plan', '{"steps":["inspect"]}') +
+    frame(2, 'agent.plan', answer) +
+    frame(3, 'agent.plan', JSON.stringify({ response: answer })) +
+    frame(4, 'run.completed', '', { to_status: 'succeeded' }),
+  ))
+  const call = chat(); await call.finished
+  expect(call.message.mock.calls.filter(([type]) => type === 'assistant')).toEqual([['assistant', answer]])
+})
+
 it('reload tails stored cursor and never replaces an unauthorized stored run', async () => {
   sessionStorage.setItem('chat_run_id_session', 'stored'); sessionStorage.setItem('chat_last_seq_session', '12')
   vi.mocked(fetch).mockResolvedValue(new Response('', { status: 403 }))

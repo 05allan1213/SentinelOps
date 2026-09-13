@@ -211,20 +211,31 @@ export const chatService = {
         runId, afterSeq: savedSeq, signal, onDone,
         onState: emitState,
         onError: (error) => { if (!(error instanceof SSEError && error.code === 'aborted')) onError?.(error) },
-        onEvent: (type, content, seq) => {
+        onEvent: (() => {
+          // planexecute 会先投影 Executor 的纯文本回答，再由 Replanner 以
+          // {"response": "..."} 复述同一段最终答案。逐字相同的连续回答是同一
+          // 段内容的重复投影，只向前端交付一次，避免气泡内答案出现两遍。
+          let lastAssistantText = ''
+          const emitAssistant = (text: string) => {
+            if (!text || text === lastAssistantText) return
+            lastAssistantText = text
+            onMessage('assistant', text)
+          }
+          return (type: string, content: string, seq: number) => {
           const payload = JSON.parse(content) as DurablePayload
           const summary = payload.summary ?? ''
           if (type === 'agent.plan' && summary) {
             let plan: { response?: string; steps?: string[] } | undefined
             try { plan = JSON.parse(summary) } catch { /* Unstructured planner response. */ }
-            if (plan?.response) onMessage('assistant', plan.response)
+            if (plan?.response) emitAssistant(plan.response)
             else if (Array.isArray(plan?.steps)) onMessage('plan_step', JSON.stringify({ type: 'plan_steps', steps: plan.steps }))
-            else onMessage('assistant', summary)
+            else emitAssistant(summary)
           } else if (type === 'agent.tool_result' && summary) onMessage('tool_result', summary)
           // Consumer delivery (including the page's durable message snapshot)
           // precedes the accepted cursor; a reload cannot skip buffered text.
           sessionStorage.setItem(`chat_last_seq_${sid}`, String(seq))
-        },
+          }
+        })(),
       })
       await control.finished
     } catch (error) {

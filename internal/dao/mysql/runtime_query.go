@@ -90,6 +90,7 @@ var runtimeRunListColumns = []string{
 	"lease_generation", "heartbeat_at", "session_revision", "runtime_version",
 	"runtime_compatibility_hash", "agent_revision", "mcp_catalog_hash", "prompt_hash", "policy_hash",
 	"config_hash", "usage_quality", "trace_quality", "last_event_seq", "cancel_requested_at", "park_reason",
+	"budget_limits_json", "budget_usage_json", "budget_reservations_json",
 	"started_at", "finished_at", "duration_ms", "created_at", "updated_at",
 }
 
@@ -125,11 +126,14 @@ func (p runtimeRunProjection) workflowRun() WorkflowRun {
 }
 
 // runtimeRunDetailColumns is intentionally separate from the list projection.
-// Runtime detail needs persisted facts (Context, Budget and answer citation
-// metadata) to build its read-only subresources.  Omitting those columns here
-// silently turns a valid Run into an apparently missing/partial Run, while
-// selecting them in the list would unnecessarily load raw payloads for every
-// row.  The service never serializes the raw columns themselves.
+// Runtime detail needs persisted facts (Context and answer citation metadata)
+// to build its read-only subresources.  Omitting those columns here silently
+// turns a valid Run into an apparently missing/partial Run, while selecting
+// them in the list would unnecessarily load raw payloads for every row.  The
+// budget columns are the exception: the list DTO exposes Budget counts, so the
+// list projection must carry budget_limits_json/budget_usage_json/
+// budget_reservations_json or every list row reports invalid_budget_json.
+// The service never serializes the raw columns themselves.
 var runtimeRunDetailColumns = []string{
 	"id", "workflow_key", "user_id", "session_id", "parent_run_id", "active_session_key",
 	"status", "available_at", "priority", "runtime_mode", "attempt", "max_attempts",
