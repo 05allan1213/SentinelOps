@@ -5,10 +5,18 @@ package auth
 
 import (
 	"context"
+	"errors"
+	"net/http"
 
 	v1 "SentinelOps/api/auth/v1"
 	authsvc "SentinelOps/internal/service/auth"
+
+	"github.com/gogf/gf/v2/errors/gcode"
+	"github.com/gogf/gf/v2/errors/gerror"
 )
+
+// codeInvalidCredentials 是登录失败专用的 401 状态码。
+var codeInvalidCredentials = gcode.New(http.StatusUnauthorized, "Invalid Credentials", nil)
 
 type ControllerV1 struct{}
 
@@ -20,7 +28,7 @@ func NewV1() *ControllerV1 {
 func (c *ControllerV1) Login(ctx context.Context, req *v1.LoginReq) (*v1.LoginRes, error) {
 	token, userID, role, username, err := authsvc.Login(ctx, req.Username, req.Password)
 	if err != nil {
-		return nil, err
+		return nil, mapAuthError(err)
 	}
 	return &v1.LoginRes{Token: token, UserID: userID, Role: role, Username: username}, nil
 }
@@ -29,7 +37,20 @@ func (c *ControllerV1) Login(ctx context.Context, req *v1.LoginReq) (*v1.LoginRe
 func (c *ControllerV1) Register(ctx context.Context, req *v1.RegisterReq) (*v1.RegisterRes, error) {
 	token, userID, role, username, err := authsvc.Register(ctx, req.Username, req.Password)
 	if err != nil {
-		return nil, err
+		return nil, mapAuthError(err)
 	}
 	return &v1.RegisterRes{Token: token, UserID: userID, Role: role, Username: username}, nil
+}
+
+// mapAuthError 把认证业务错误映射为真实 HTTP 状态，避免 200 + message 或
+// 泄露 bcrypt/DAO 内部错误文本。
+func mapAuthError(err error) error {
+	switch {
+	case errors.Is(err, authsvc.ErrInvalidCredentials):
+		return gerror.NewCode(codeInvalidCredentials, authsvc.ErrInvalidCredentials.Error())
+	case errors.Is(err, authsvc.ErrPasswordTooShort):
+		return gerror.NewCode(gcode.CodeValidationFailed, authsvc.ErrPasswordTooShort.Error())
+	default:
+		return err
+	}
 }

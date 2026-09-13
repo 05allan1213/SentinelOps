@@ -65,8 +65,13 @@ api.interceptors.response.use(
 
     if (status === 401) {
       localStorage.removeItem('token')
-      window.location.href = '/login'
-      return Promise.reject(error)
+      // 登录/注册接口自身的 401 是凭证错误，必须交给页面提示；
+      // 其余 401 表示会话失效，跳回登录页。
+      const url = String(config?.url ?? '')
+      if (!url.includes('/auth/v1/')) {
+        window.location.href = '/login'
+        return Promise.reject(error)
+      }
     }
 
     // 429 自动重试（指数退避，最多 3 次）

@@ -80,7 +80,10 @@ func classifiedErrorHTTPStatus(err error) int {
 		return http.StatusNotImplemented
 	case gcode.CodeOperationFailed, gcode.CodeInternalError:
 		return http.StatusInternalServerError
-	default:
-		return 0
 	}
+	// 自定义 code 直接落在标准 HTTP 失败区间时按该状态返回（例如登录失败的 401）。
+	if value := gerror.Code(err).Code(); value >= 400 && value <= 599 {
+		return value
+	}
+	return 0
 }

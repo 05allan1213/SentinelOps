@@ -31,6 +31,7 @@ func TestClassifiedErrorHTTPStatus(t *testing.T) {
 		{"validation", gerror.NewCode(gcode.CodeValidationFailed, "参数不合法"), http.StatusBadRequest},
 		{"not supported", gerror.NewCode(gcode.CodeNotSupported, "暂不支持"), http.StatusNotImplemented},
 		{"not authorized", gerror.NewCode(gcode.CodeNotAuthorized, "无权限"), http.StatusForbidden},
+		{"custom 401 code", gerror.NewCode(gcode.New(http.StatusUnauthorized, "Invalid Credentials", nil), "用户名或密码错误"), http.StatusUnauthorized},
 		{"unclassified business error", errors.New("策略不存在"), 0},
 	}
 	for _, tc := range cases {

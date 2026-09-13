@@ -4,6 +4,7 @@ package authsvc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +14,15 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+)
+
+var (
+	// ErrInvalidCredentials 是登录失败唯一对外错误：用户不存在与密码错误必须
+	// 返回同一消息，既防止账号枚举，也不把 bcrypt/DAO 内部细节暴露给客户端。
+	ErrInvalidCredentials = errors.New("用户名或密码错误")
+	// ErrPasswordTooShort 由 HTTP 层映射为 400，而不是 200 + message。
+	ErrPasswordTooShort = errors.New("密码长度不能少于 6 位")
 )
 
 // Login 校验用户名/密码，成功后签发 JWT Token。
@@ -21,10 +31,13 @@ import (
 func Login(ctx context.Context, username, password string) (token, userID, role, uname string, err error) {
 	user, err := dao.FindUserByUsername(ctx, username)
 	if err != nil {
-		return
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", "", "", "", ErrInvalidCredentials
+		}
+		return "", "", "", "", err
 	}
 	if err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		return
+		return "", "", "", "", ErrInvalidCredentials
 	}
 	token, userID, role, err = issueToken(ctx, user.ID, user.Username, user.Role)
 	uname = user.Username
@@ -37,7 +50,7 @@ func Register(ctx context.Context, username, password string) (token, userID, ro
 		return
 	}
 	if len(password) < 6 {
-		err = fmt.Errorf("密码长度不能少于 6 位")
+		err = ErrPasswordTooShort
 		return
 	}
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
