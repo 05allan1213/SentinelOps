@@ -30,8 +30,23 @@ function unwrapPlanResponse(text: string): string | null {
   }
 }
 
+// 与后端 mutation_claim.go 的提示前缀保持一致：Runtime 在缺少 Effect/Approval
+// 事实时会为“已执行/已保存”类声明加上该前缀。
+const MUTATION_NOTICE_PREFIX = '【未验证】'
+
 function authoritativeAnswerText(raw: string): string {
-  return unwrapPlanResponse(raw) ?? raw
+  // Run 终态可能带 Runtime 的「未验证」提示前缀；此时 JSON 信封不再位于
+  // 字符串开头，需要先拆出提示，解包正文后再还原，避免把 JSON 原样显示。
+  let prefix = ''
+  let body = raw
+  if (raw.startsWith(MUTATION_NOTICE_PREFIX)) {
+    const splitAt = raw.indexOf('\n\n')
+    if (splitAt >= 0) {
+      prefix = raw.slice(0, splitAt + 2)
+      body = raw.slice(splitAt + 2)
+    }
+  }
+  return prefix + (unwrapPlanResponse(body) ?? body)
 }
 
 // RAG 工具结果带有 prompt 注入防护信封（<untrusted_evidence> + Evidence ID/Source/

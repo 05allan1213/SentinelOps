@@ -47,6 +47,19 @@ it('replaces a truncated streamed answer with the authoritative Run answer on su
   expect(call.message).toHaveBeenCalledWith('final_answer', full)
 })
 
+it('keeps the Runtime unverified notice while unwrapping the JSON answer envelope', async () => {
+  const notice = '【未验证】本轮没有记录到对应的 Effect 或审批事实，以下“已执行/已保存”类描述无法被服务端证实。'
+  vi.mocked(fetch).mockResolvedValue(response(
+    frame(1, 'agent.plan', '{"steps":["inspect"]}') +
+    frame(2, 'run.completed', '', { to_status: 'succeeded' }),
+  ))
+  vi.mocked(api.get).mockResolvedValue({
+    data: { data: { item: { answer: { content: `${notice}\n\n${JSON.stringify({ response: '报告已保存至报告库。' })}` } } } },
+  })
+  const call = chat(); await call.finished
+  expect(call.message).toHaveBeenCalledWith('final_answer', `${notice}\n\n报告已保存至报告库。`)
+})
+
 it('keeps the streamed answer when the authoritative Run answer is unavailable', async () => {
   vi.mocked(fetch).mockResolvedValue(response(
     frame(1, 'agent.plan', '{"response":"streamed body"}') +

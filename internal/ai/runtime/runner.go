@@ -232,6 +232,17 @@ func (e *DurableExecutor) ExecuteClaimedRun(ctx context.Context, claimed *workfl
 	if err != nil {
 		return RunExecutionResult{TraceID: attempt.Trace.ID}, err
 	}
+	// 事实优先：如果答案宣称已保存/已执行，但本 Run 没有任何 Effect 或 Approval
+	// 事实，则打上确定性提示并把 grounding 标为推断，避免把模型口头声明当成执行结果。
+	if noticed, unverified := withMutationClaimNotice(finalOutput, RunMutationFacts(attemptCtx, e.store, attempt.Run.ID)); unverified {
+		finalOutput = noticed
+		if answerValidation.Grounding == "" {
+			answerValidation.Grounding = evidence.GroundingInference
+		}
+		if answerValidation.Reason == "" {
+			answerValidation.Reason = "mutation_claim_without_effect"
+		}
+	}
 	if collector, ok := evidence.CollectorFromContext(attemptCtx); ok {
 		runEvidence := collector.RunEvidence()
 		if len(runEvidence.Refs) > 0 {
