@@ -38,6 +38,28 @@ const numeric = (value: unknown): number | null => {
   const number = Number(value)
   return Number.isFinite(number) && number >= 0 ? number : null
 }
+
+/** Shared display contract for dashboard metrics. Null means unavailable. */
+export function formatDurationMs(ms: number | null): string {
+  if (ms === null || !Number.isFinite(ms) || ms < 0) return '—'
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
+export function formatPercentage(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return '—'
+  return `${(value * 100).toFixed(1)}%`
+}
+
+export function formatMetricScore(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return '—'
+  return value.toFixed(2)
+}
+
+export function formatMetricCount(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return '—'
+  return Math.round(value).toLocaleString('en-US')
+}
 export function normalizeDashboardPayload(value: unknown): DashboardMetricsState {
   const absent: DashboardMetricsState = { metrics: null, trends: null, availability: 'unavailable', data_quality: 'unknown', reason_code: 'invalid_dashboard_payload', not_run: 'No valid dashboard metrics received' }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return absent

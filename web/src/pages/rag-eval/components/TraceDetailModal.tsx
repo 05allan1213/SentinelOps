@@ -2,18 +2,12 @@ import { createPortal } from 'react-dom'
 import { X, Loader2, ChevronRight, ChevronDown, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/utils'
-import type { TraceDetail, TraceNodeItem } from '@/services/rageval'
+import { formatDurationMs, type TraceDetail, type TraceNodeItem } from '@/services/rageval'
 
 interface Props {
   detail: TraceDetail | null
   loading: boolean
   onClose: () => void
-}
-
-function fmtMs(ms: number) {
-  if (ms <= 0) return '—'
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(1)}s`
 }
 
 const NODE_TYPE_COLOR: Record<string, string> = {
@@ -72,7 +66,7 @@ function NodeRow({ node, depth = 0 }: { node: TraceNodeItem; depth?: number }) {
             )}>
               {node.status}
             </span>
-            <span className="text-[10px] text-gray-400 tabular-nums">{fmtMs(node.duration_ms)}</span>
+            <span className="text-[10px] text-gray-400 tabular-nums">{formatDurationMs(node.duration_ms)}</span>
             {node.input_tokens ? (
               <span className="text-[10px] text-gray-400">↑{node.input_tokens} ↓{node.output_tokens}</span>
             ) : null}
@@ -153,7 +147,7 @@ export default function TraceDetailModal({ detail, loading, onClose }: Props) {
               </div>
               <div>
                 <p className="text-gray-400">总耗时</p>
-                <p className="font-medium text-gray-700 mt-0.5">{fmtMs(detail.duration_ms)}</p>
+                <p className="font-medium text-gray-700 mt-0.5">{formatDurationMs(detail.duration_ms)}</p>
               </div>
               <div>
                 <p className="text-gray-400">Token 消耗</p>

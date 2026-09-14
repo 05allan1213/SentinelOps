@@ -10,7 +10,7 @@ import ReactECharts from 'echarts-for-react'
 import StatCard from '@/components/common/StatCard'
 import Pagination from '@/components/common/Pagination'
 import ConfirmDialog from '@/components/common/ConfirmDialog'
-import { ragevalService, type DashboardMetricsState, type TrendPoint, type TraceItem, type FeedbackStats, type TraceDetail } from '@/services/rageval'
+import { ragevalService, formatDurationMs, formatPercentage, type DashboardMetricsState, type TrendPoint, type TraceItem, type FeedbackStats, type TraceDetail } from '@/services/rageval'
 import { cn } from '@/utils'
 import toast from 'react-hot-toast'
 import TraceDetailModal from './components/TraceDetailModal'
@@ -18,17 +18,8 @@ import CustomSelect, { type SelectOption } from '@/components/common/CustomSelec
 
 type Window = '24h' | '7d' | '30d'
 
-function fmtMs(ms: number | null) {
-  if (ms === null) return '—'
-  if (ms <= 0) return '—'
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(1)}s`
-}
-
-function fmtPct(v: number | null) {
-  if (v === null) return '—'
-  return `${(v * 100).toFixed(1)}%`
-}
+const fmtMs = formatDurationMs
+const fmtPct = formatPercentage
 
 const statusConfig: Record<string, { label: string; class: string; icon: typeof CheckCircle2 }> = {
   success: { label: '成功', class: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
@@ -66,7 +57,7 @@ function buildChartOption(metrics: { trends: TrendPoint[] }) {
         if (!params.length) return ''
         const header = `<div style="font-weight:600;margin-bottom:6px;color:#94a3b8">${params[0].name}</div>`
         const rows = params.map((p: { marker: string; seriesName: string; value: number; seriesIndex: number }) => {
-          const val = p.seriesIndex === 2 ? fmtMs(p.value) : fmtPct(p.value)
+          const val = p.seriesName === '平均延迟' ? fmtMs(p.value) : fmtPct(p.value)
           return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">${p.marker}<span style="color:#cbd5e1">${p.seriesName}</span><strong>${val}</strong></div>`
         })
         return header + rows.join('')
