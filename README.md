@@ -2,676 +2,458 @@
 
 [![CI](https://github.com/05allan1213/SentinelOps/actions/workflows/pr.yml/badge.svg)](https://github.com/05allan1213/SentinelOps/actions/workflows/pr.yml) [![Go 1.27.0](https://img.shields.io/badge/Go-1.27.0-00ADD8?logo=go)](https://go.dev/) [![Eino v0.9.15](https://img.shields.io/badge/Eino-v0.9.15-6f42c1)](https://github.com/cloudwego/eino)
 
-面向安全运营的 Agent Runtime 与响应平台：基于 Cloudwego Eino，把 Agent 的规划、执行、暂停审批、恢复重放和副作用落账组织成一条可追踪、可校验的工程链路。
+面向安全运营的 AI 研判与响应平台，核心是一套 **Durable Agent Runtime**：把 Agent 的规划、执行、暂停审批、恢复重放和副作用落账，从进程内状态提升为可恢复、可审计、可治理的工程链路。
 
-> 不只回答“模型说了什么”，还记录“运行到哪一步、谁批准了什么、哪些副作用已经发生”。
+它回答的不只是“模型说了什么”，还有“运行到哪一步、谁批准了什么、哪些副作用已经真的发生”。判定一次运行的结果时，以 MySQL 中的 Run 状态、workflow event 与 Approval/Effect 账本为准，而不是以模型输出或前端渲染为准。
 
-**项目定位**：把 Eino Agent 放进一个可恢复、可审计、可治理的 Runtime。核心实现集中在 Eino Plan–Execute–Replan、MySQL Durable Runtime、RBAC + HITL + Effect Ledger，以及 Evidence RAG + MCP/Skill。
+| 核心能力 | 工程含义 |
+| --- | --- |
+| **Durable Agent Runtime** | API 不持有 Agent 执行权，负责创建/查询 Run、事件流与控制面请求；独立 Worker 通过 claim + lease / generation fencing 独占 Durable Run 执行，支持 heartbeat、过期回收、恢复与重放。 |
+| **Safe HITL Side Effects** | 高风险工具先冻结 Proposal，经人工审批后以稳定幂等键落 Effect 账本；外部结果不可判定时停车对账，而不是盲目重放副作用。 |
+| **Evidence-aware RAG** | 知识文档经解析分块、安全事件经归一化后分别向量化进入 Milvus；检索按 Access Scope fail-closed 过滤，命中的内容以带引用校验的 Evidence 注入 Agent。 |
+| **Governed Model / Tool Runtime** | Durable Agent 中的 ChatModel 与 Tool 调用统一经过 `RuntimeHandler`：Gate、Policy、冻结 Snapshot、预算与 Trace 在同一治理边界生效。 |
 
-| Durable Agent Runtime | HITL + Effect Ledger | Evidence RAG + MCP + Skill |
-| --- | --- | --- |
-| Eino Plan–Execute–Replan、专业 AgentTool、MySQL Run/Checkpoint，以及 generation-fenced lease。 | RuntimeHandler 统一接入 RBAC、Policy、Gate、Approval 生命周期和幂等 Effect。 | Scope-aware 混合检索输出 Evidence；MCP 只读目录与 Skill Pipeline 复用 Runtime 的 Policy、Budget、Trace。 |
+```mermaid
+C4Container
+  title SentinelOps - Container Architecture
 
-~~~mermaid
-flowchart LR
-  UI["Web Console"] --> API["GoFrame API"]
-  API --> ROUTER["Intent Router + Agent Registry"]
-  ROUTER --> SUBAGENTS["Chat / Event / Report / Risk / Solve / Intelligence / Ops"]
-  SUBAGENTS --> RAG["Evidence RAG"]
-  API --> RUN["Durable Run API"]
-  RUN --> WORKER["Worker"]
-  WORKER --> RT["RuntimeHandler: Gate / Policy / Budget / Trace"]
-  RT --> PLAN["Eino Plan → Execute → Replan"]
-  PLAN --> TOOLS["Specialist AgentTool: MCP / Skill"]
-  PLAN --> RAG
-  RT --> HITL["HITL Approval"]
-  RT --> EFFECT["Effect Ledger"]
-  RT --> STORE["GORMStore: Run / Event / Checkpoint"]
-  STORE --> MYSQL[("MySQL")]
-  RAG --> MILVUS[("Milvus")]
-  RAG --> REDIS[("Redis semantic cache")]
-~~~
+  Person(operator, "安全运营人员", "查看事件、发起研判、审批高风险动作")
+  System_Ext(alerts, "外部告警源", "Webhook / CEF / LEEF / API Push")
+  System_Ext(models, "Model Provider", "Chat / Embedding / Rerank")
+  System_Ext(mcp, "MCP Server", "可选的内部系统与文档工具")
+  System_Ext(actions, "外部处置与通知系统", "Webhook / SMTP / 钉钉 / 企业微信")
 
-上图是首屏摘要；下面的 C4 Context/Container、核心流程和能力边界会展开部署边界、数据流以及实际代码约束。
+  System_Boundary(platform, "SentinelOps") {
+    Container(web, "Web Console", "React 19 + Vite", "事件、聊天、知识库、Runtime、Ops 页面")
+    Container(api, "API Service", "GoFrame v2", "认证与 RBAC、业务查询、创建 Run、SSE 事件回放")
+    Container(worker, "Worker Service", "Go + Eino ADK", "认领并执行 Run、知识索引、订阅调度、对账、Retention")
+    Container(migrate, "Migration Job", "Goose", "执行版本化 MySQL migrations")
+    ContainerDb(mysql, "MySQL", "MySQL 8.0", "业务实体与 workflow / approval / effect 真值")
+    ContainerDb(redis, "Redis", "Redis 7.x", "会话记忆与语义缓存")
+    ContainerDb(milvus, "Milvus", "Milvus 2.5", "rag_store 集合的 dense / sparse 向量与 metadata")
+  }
+
+  Rel(operator, web, "使用", "HTTPS")
+  Rel(alerts, api, "推送告警", "HTTP + X-API-Key")
+  Rel(web, api, "调用业务 API 与事件流", "JSON / SSE")
+  Rel(api, mysql, "读写业务与 Run 事实", "GORM")
+  Rel(api, redis, "读写会话与缓存", "Redis")
+  Rel(api, milvus, "执行检索", "Milvus SDK")
+  Rel(api, models, "知识检索 Embedding 与兼容链路模型调用", "HTTPS")
+  Rel(worker, mysql, "认领、续租、提交事件与账本", "GORM")
+  Rel(worker, redis, "读写会话与缓存", "Redis")
+  Rel(worker, milvus, "写入与检索向量", "Milvus SDK")
+  Rel(worker, models, "Chat / Embedding / Rerank 调用", "HTTPS")
+  Rel(worker, mcp, "工具调用", "MCP，按 allowlist")
+  Rel(worker, actions, "Effect 执行", "HTTPS / SMTP，审批通过后")
+  Rel(migrate, mysql, "执行迁移", "Goose")
+```
 
 ---
 
-## 目录
+## Overview
 
-- [项目简介](#项目简介)
-- [能力边界](#能力边界)
-- [系统架构](#系统架构)
-  - [C4 System Context](#c4-system-context)
-  - [C4 Container](#c4-container)
-  - [部署形态](#部署形态)
-- [核心流程](#核心流程)
-- [核心能力](#核心能力)
-  - [Agent 编排](#1-agent-编排)
-  - [RAG 检索](#2-rag-检索)
-  - [知识库与文档索引](#3-知识库与文档索引)
-  - [告警接入与订阅调度](#4-告警接入与订阅调度)
-  - [Durable Runtime、HITL 与 Effect](#5-durable-runtimehitl-与-effect)
-  - [安全、策略与可靠性](#6-安全策略与可靠性)
-  - [可观测性与 RAG Eval](#7-可观测性与-rag-eval)
-  - [记忆、Skill 与 MCP](#8-记忆skill-与-mcp)
-  - [Web Console](#9-web-console)
-- [技术栈](#技术栈)
-- [快速开始](#快速开始)
-- [部署](#部署)
-- [验证](#验证)
-- [仓库结构](#仓库结构)
-- [当前边界与已知限制](#当前边界与已知限制)
-- [贡献](#贡献)
+安全运营场景的难点不在“让模型回答一个问题”，而在三件事同时成立：结论要有证据、执行过程要能中断和恢复、对外部系统的写操作要可审计且不可盲目重放。SentinelOps 把这些需求拆成四个工程支柱：
 
-## 项目简介
+1. **持久化执行**：一次用户请求或事件研判被固化为不可变的 Run，执行权由 Worker 通过带 generation 的租约独占，进程崩溃、租约过期、审批中断都不会丢失运行状态。
+2. **受控副作用**：模型只能提出动作；真正的写入由 Proposal → Approval → Effect 账本完成，账本与领域写在同一事务内提交，外部调用则单独记录执行状态。
+3. **证据优先**：知识库文档与安全事件进入 Milvus，检索结果按作用域过滤并携带引用，回答会区分 grounded 结论、推断与证据不足。
+4. **统一治理**：Durable Agent 内的 ChatModel 与 Tool 调用经过同一个 `RuntimeHandler`，Gate、Policy、冻结身份、预算与 Trace 不会散落在各个 Agent 中；Embedding、Retrieval、Rerank 等 RAG 组件沿各自的预算与 Trace 链路执行。
 
-SentinelOps 面向需要持续接收安全事件、查询内部知识、生成研判结论并留下审计证据的安全运营场景。代码把在线请求和后台执行拆成两个边界：
+### 与普通 Agent Demo 的区别
 
-1. **标准模式**：请求进入 `ExecuteIntent`，由 `START → Router → Executor → END` 图识别意图，再从 Registry 调用对应 SubAgent；
-2. **深度思考/持久化模式**：API 只创建不可变 Run，Worker 认领并执行官方 `planexecute`，中途把事件、checkpoint、审批和效果写入 MySQL。
+普通 Demo 把执行状态放在进程内存里，把模型输出当作结果，把工具调用直接打到外部系统。SentinelOps 把这三件事都变成了数据库事实：
 
-这两条路径共享模型路由、工具注册、RAG、权限和 Trace 能力，但职责边界不同。当前业务意图 SubAgent 为七个：Chat、Event、Report、Risk、Solve、Intelligence、Ops；Summary 是独立的摘要压缩流水线，Plan 是深度模式的外层编排器。
+- 事件真值是 append-only 的 `workflow_events`，按 `(run_id, seq)` 单调递增，SSE 断线后可以按 `after_seq` 重放；
+- 执行权是带 `lease_generation` 的凭证，过期 Worker 的任何写入都会被拒绝；
+- 副作用是 `agent_effects` 账本中的稳定身份，重复提交只会复用已经成功的记录；
+- 运行创建时会冻结 Runtime Snapshot，执行阶段的有效 Gate 取 frozen capability 与 current effective Gate 的交集：后续 Gate 放宽不会让已有 Run 获得创建时未冻结的能力，Gate 收紧则会立即 fail-closed。
 
-### 能力状态标记
+---
 
-| 标记 | 含义 |
+## Architecture
+
+### System Context
+
+系统面向两类外部输入：安全运营人员通过 Web Console 操作，外部告警源通过 Webhook / CEF / LEEF / API Push 推送事件。系统对外依赖三类外部服务：模型 Provider（Chat、Embedding、Rerank）、可选的 MCP Server，以及可选的处置/通知系统（Webhook、SMTP、钉钉、企业微信）。除模型 Provider 之外，其余外部集成都是可选能力，都需要显式配置与凭据。
+
+### Container Architecture
+
+首屏的 Container 图只包含真实可部署单元：Web Console、API Service、Worker Service、Migration Job 四个进程级单元，以及 MySQL、Redis、Milvus 三个基础设施容器。
+
+以下内容**不是** Container，只是 API 或 Worker 进程内部的实现：Go package、Eino Graph / Agent Pipeline、`internal/ai/workflow` 的状态机、`RuntimeHandler` 中间件、模型路由与可靠性包装。把它们画成独立部署单元会误导读者对部署边界的理解。
+
+### API / Worker Execution Model
+
+同一个二进制由 `main.go` 解析角色参数或 `SENTINELOPS_ROLE`，拆成三种运行角色：
+
+| 角色 | HTTP | 后台执行 | 约束 |
+| --- | --- | --- | --- |
+| `api` | 绑定 `:8001` | 知识索引 Worker Pool；不启动 durable Worker 与订阅调度器 | 负责认证、业务查询、创建/查询 Run、事件流与控制面 API |
+| `worker` | 不绑定 HTTP | durable Worker、知识索引 Worker Pool、订阅调度器、Retention | 生产环境下的 Durable Agent 执行主体 |
+| `all` | 绑定 `:8001` | 同时启动以上两者 | 仅允许 `app.environment = development`；未指定角色时的默认值 |
+
+在 Agent 执行这件事上，两者职责是分离的：
+
+```text
+API    : 创建/查询 Run、读取并推送事件、提交控制面命令（不执行 Agent，不持有执行权）
+Worker : Claim Run、续租心跳、执行 Agent、写事件与 checkpoint、收敛终态、对账
+```
+
+因此浏览器断线只影响读取，不影响正在执行的 Worker；反过来，API 进程重启也不会丢失任何 Run。API / Worker 的分离指的是 **Durable Agent 执行权**的分离，而不是 API 进程完全没有后台 goroutine。
+
+---
+
+## Durable Agent Runtime
+
+这是项目的主线。一次运行涉及的概念与职责如下：
+
+| 概念 | 作用 |
 | --- | --- |
-| 默认可运行 | 仓库提供了对应代码路径和本地启动/Compose wiring；实际运行仍需要通过配置校验。 |
-| 需外部依赖/凭据 | 需要模型 Provider、Milvus、Redis、MySQL、Tavily、Langfuse、SMTP、Webhook 或 MCP 等外部资源。 |
-| 受 Gate/部署条件约束 | 代码会显式检查环境、Gate、Policy、Approval、Worker 或生产部署条件。 |
+| **Run** | 一次执行的不可变输入（agent、query、冻结的 Runtime Snapshot、预算上限）与状态机载体。 |
+| **Claim** | Worker 以 `SELECT ... FOR UPDATE SKIP LOCKED` 原子认领一个可执行 Run，只认领 `runtime_mode = durable_v1` 且兼容哈希与自身冻结指纹一致的 Run。 |
+| **Lease / Generation** | 认领时写入 owner、租约到期时间并令 `lease_generation` 单调递增；此后所有真值写入都必须携带匹配的 `LeaseToken`，否则返回 `ErrLeaseLost`。 |
+| **Attempt** | 一次认领对应一个 attempt，记录 worker、generation、兼容哈希与 trace 关联，是查询投影而不是真值。 |
+| **Workflow Event** | append-only 事件真值（`run.created`、`run.claimed`、`approval.*`、`effect.*`、`run.completed` 等），SSE 与 Runtime 时间线都从这里读。 |
+| **Checkpoint** | 实现 Eino 官方 `adk.CheckPointStore` / `adk.CheckPointDeleter` 契约，按 lease generation 落库并记录 payload 指纹，用于恢复与审批绑定。 |
+| **Recovery** | 依据 Run 状态、checkpoint 完整性与兼容哈希选择 resume、replay 或停车；恢复命令本身也是持久化、幂等的 Operation。 |
+| **Runtime Snapshot** | 冻结模型、工具、Skill、MCP catalog、Policy 与 Feature Gate 身份并形成 compatibility hash，定义该 Run 的执行兼容性与能力上限；运行时仍会与当前 effective Gate 求交集。 |
+| **RuntimeHandler** | Durable Agent 中模型与工具调用的统一治理边界，见下文。 |
 
-## 能力边界
-
-| 能力 | 状态 | 当前实现边界 |
-| --- | --- | --- |
-| 标准聊天与七类意图路由 | 需外部依赖/凭据 | Router 使用 `routing.chat.default`；置信度低于 `0.70`、解析失败或未知意图时降级为 Chat。 |
-| 深度思考与 durable Run | 受 Gate/部署条件约束 | 生产 Worker 当前只接受 `plan_agent`；`agent_runtime.enabled` 与 `accept_new_runs` 必须有效。 |
-| RAG 混合检索与 Rerank | 需外部依赖/凭据 | 依赖 Embedding、Milvus、Redis；混合检索失败时回退到 dense。 |
-| 知识库索引 | 需外部依赖/凭据 | Parser 明确实现 PDF、DOCX、Markdown 和 Go/Python/Java；上传控制器额外接受 TXT/PPTX，但当前 Parser 没有对应实现，不能承诺这两类文件索引成功。 |
-| 告警接入 | 默认可运行 | Webhook、CEF、LEEF、API Push 统一归一化、去重并异步写入向量索引；接入端点使用独立的 `X-API-Key`。 |
-| AI 运维动作 | 受 Gate/部署条件约束 | `update_event_status`、`create_report`、`save_intelligence`、`block_ip` 和通知动作经过 RuntimeHandler、Policy、Approval、Effect 与 Gate。 |
-| Langfuse、Tavily、SMTP、DingTalk、WeCom | 需外部依赖/凭据 | 只有配置了相应端点和 SecretRef 才能形成完整链路。 |
-| L1/L2 写入 | 受 Gate/部署条件约束 | 默认配置是 `shadow_mode: true`；effective Gate 会关闭 L1/L2 writes，即使静态配置中的开关为 true。 |
-
-## 系统架构
-
-### 启动角色
-
-同一个 Go 二进制由 `main.go` 解析角色参数或 `SENTINELOPS_ROLE`：
-
-| 角色 | HTTP | 后台任务 | 约束 |
-| --- | --- | --- | --- |
-| `api` | 绑定 `:8001` | 启动知识索引队列 | 在 durable 路径中只创建/读取 Run，不持有该路径的 Agent 执行。 |
-| `worker` | 不绑定 HTTP | Scheduler、知识索引、durable Worker、Retention | 生产部署建议独立运行。 |
-| `all` | 绑定 `:8001` | 同时启动 | 仅允许 `development`；未指定角色时默认使用它。 |
-
-配置目录默认是 `manifest/config`，可用 `SENTINELOPS_CONFIG_DIR` 覆盖。加载器优先选择同目录下的 `config.local.yaml`，两份 YAML 是“完整替换”关系，不会合并。
-
-### C4 System Context
-
-下面的上下文图只展示 SentinelOps 与人员、外部 Provider 和外部系统之间的边界。
-
-~~~mermaid
-C4Context
-  title SentinelOps - System Context
-
-  Person(operator, "安全运营人员", "查看事件、发起分析、审批高风险动作")
-  System(sentinelops, "SentinelOps", "安全事件接入、Agent 研判、知识检索、响应编排与审计")
-  System_Ext(alerts, "外部告警源", "Webhook / CEF / LEEF / API Push")
-  System_Ext(models, "Model Provider", "Chat / Embedding / Rerank")
-  System_Ext(tavily, "Tavily Search", "可选的联网威胁情报搜索")
-  System_Ext(context7, "Context7 MCP", "配置的文档查询工具")
-  System_Ext(soar, "外部处置与通知系统", "DingTalk / WeCom / SMTP")
-
-  Rel(operator, sentinelops, "使用 Web Console 与分析能力")
-  Rel(alerts, sentinelops, "推送标准化或设备格式告警")
-  Rel(sentinelops, models, "调用模型与向量服务")
-  Rel(sentinelops, tavily, "按配置执行联网搜索")
-  Rel(sentinelops, context7, "按 allowlist 查询外部文档")
-  Rel(sentinelops, soar, "在 Gate/Policy/Approval 允许时执行动作")
-~~~
-
-### C4 Container
-
-容器图对应仓库的可部署边界；MySQL、Redis、Milvus 是持久化/基础设施容器，Agent 的共享库和 Eino Graph 属于 API/Worker 内部实现，不单独虚构成部署容器。
-
-~~~mermaid
-C4Container
-  title SentinelOps - Container Diagram
-
-  Person(operator, "安全运营人员", "操作 Web Console")
-  System_Ext(models, "Model Provider", "Chat / Embedding / Rerank")
-  System_Ext(tavily, "Tavily Search", "可选联网搜索")
-  System_Ext(context7, "Context7 MCP", "配置的 MCP Server")
-  System_Ext(soar, "通知与处置系统", "DingTalk / WeCom / SMTP")
-
-  System_Boundary(platform, "SentinelOps") {
-    Container(gateway, "Nginx Gateway", "Nginx 1.27", "一体化部署的统一入口、SSE 代理、IP deny 规则")
-    Container(web, "Web Console", "React 19 + TypeScript + Vite", "事件、聊天、知识库、Trace、RAG Eval 与 Ops 页面")
-    Container(api, "API Service", "GoFrame v2", "认证、RBAC、限流、业务查询、标准模式与 durable Run API")
-    Container(worker, "Worker Service", "Go + Eino ADK", "订阅调度、索引队列、durable Plan 执行、Retention")
-    Container(migrate, "Migration Job", "Goose v3.27.3", "执行版本化 MySQL migrations")
-    ContainerDb(mysql, "MySQL", "MySQL 8.0", "业务实体、workflow、approval/effect、Trace 与设置")
-    ContainerDb(redis, "Redis", "Redis 7.4", "会话消息、长期摘要与 semantic cache")
-    ContainerDb(milvus, "Milvus", "Milvus 2.5 standalone", "rag_store 集合的 dense/sparse 向量与 metadata")
-  }
-
-  Rel(operator, gateway, "访问一体化部署", "HTTP")
-  Rel(operator, web, "开发模式访问", "HTTP :5173")
-  Rel(gateway, web, "代理静态资源", "HTTP")
-  Rel(gateway, api, "代理 /api、SSE 与 OpenAPI", "HTTP")
-  Rel(web, api, "调用业务模块", "JSON / SSE")
-  Rel(api, mysql, "读写业务与 Run", "GORM / MySQL")
-  Rel(api, redis, "读写会话与缓存", "Redis")
-  Rel(api, milvus, "执行检索", "Milvus SDK")
-  Rel(worker, mysql, "认领 Run、写事件与状态", "GORM / MySQL")
-  Rel(worker, redis, "读取会话与缓存", "Redis")
-  Rel(worker, milvus, "写入事件/文档向量", "Milvus SDK")
-  Rel(migrate, mysql, "执行 migrations", "Goose")
-  Rel(api, models, "Chat / Embedding / Rerank")
-  Rel(worker, models, "Agent 与索引调用")
-  Rel(api, tavily, "可选联网搜索")
-  Rel(worker, tavily, "可选联网搜索")
-  Rel(worker, context7, "受 allowlist 的 MCP 调用")
-  Rel(worker, soar, "受策略控制的处置/通知")
-~~~
-
-### 部署形态
-
-| 形态 | 启动内容 | 适用场景 | 入口 |
-| --- | --- | --- | --- |
-| 开发模式 | `docker-compose.dev.yml` 启动 Context7、etcd、MinIO、Milvus、Attu、Redis、MySQL 和 migrate；API/Worker/前端在宿主机运行 | 本地开发、调试单个模块 | Vite `http://localhost:5173`，API `http://localhost:8001` |
-| 一体化模式 | `docker-compose.yml` 启动基础设施、migrate、API、Worker、frontend、Nginx | 本地演示或单机部署 | Nginx `http://localhost`，Attu `http://localhost:8000` |
-
-一体化 Compose 中，API 容器监听内部 `:8001`，Nginx 对 `/api/chat/` 关闭 buffering 并设置较长 read timeout，便于 SSE 流式传输。IP 黑名单文件由 Worker 写入共享目录，Nginx 通过 `include` 在入口层加载。
-
-## 核心流程
-
-### 标准意图路由
-
-~~~mermaid
-flowchart TD
-  A([收到聊天请求]) --> B{deep_thinking?}
-  B -->|是| P[进入 Plan / Execute / Replan]
-  B -->|否| R[Router 使用 chat.default]
-  R --> C{confidence >= 0.70 且意图有效?}
-  C -->|否| F[降级为 Chat]
-  C -->|是| E[Executor 从 Registry 获取 SubAgent]
-  E --> D{SubAgent 已注册?}
-  D -->|否| F
-  D -->|是| S[执行 Chat / Event / Report / Risk / Solve / Intel / Ops]
-  F --> S
-  S --> Z([流式输出结果])
-  P --> Z
-~~~
-
-### Durable Run、Worker 与 SSE
-
-~~~mermaid
+```mermaid
 sequenceDiagram
   autonumber
   participant UI as Web Console
   participant API as API Service
-  participant DB as MySQL GORMStore
-  participant W as Durable Worker
-  participant E as Eino Plan Agent
+  participant DB as MySQL
+  participant W as Worker
+  participant A as Eino Plan-Execute-Replan
 
-  UI->>API: 创建 durable Run
-  API->>DB: 原子创建 Run、Revision 0、snapshot、run.created
-  API-->>UI: 返回 run_id
-  W->>DB: 轮询并领取 fenced lease
-  W->>E: 执行 Planner / Executor / Replanner
-  E->>DB: 写 workflow_events、checkpoint、approval/effect 状态
-  API->>DB: 按 after_seq 读取事件
-  DB-->>API: 返回持久化事件
-  API-->>UI: SSE meta/status/content/plan_step/done
-  UI-->>API: 断线后携带 run_id + last_seq 重连
-  API->>DB: 只读取 seq > last_seq 的事件
-  DB-->>API: replay 缺失事件
-  Note over UI,W: API 断线只停止读取，不取消 Worker
-~~~
+  UI->>API: POST /api/chat/v2/runs
+  API->>DB: 冻结 Snapshot，原子创建 Run / run.created / revision 0
+  API-->>UI: run_id
+  UI->>API: GET /api/chat/v2/runs/{run_id}/events?after_seq=N
+  API->>DB: 读取 seq > N 的事件并继续 tail
+  DB-->>API: workflow_events
+  API-->>UI: SSE 事件流（断线后按 after_seq 重放）
 
-### RAG 检索
+  W->>DB: ClaimNextRun：行锁 + 租约 + generation+1 + attempt+1
+  DB-->>W: ClaimedRun（LeaseToken 与 checkpoint 指针）
+  W->>A: 执行 Agent，模型与工具经 RuntimeHandler
+  A-->>W: 事件 / 工具调用 / 审批中断
+  W->>DB: 心跳续租，写事件、checkpoint、approval、effect
+  Note over W,DB: 租约丢失则放弃真值写入，不再提交终态
 
-~~~mermaid
-flowchart LR
-  Q[用户查询] --> N[Normalize]
-  N --> RW{启用 Rewrite / Split?}
-  RW -->|Rewrite| R[改写上下文]
-  RW -->|Split| S[拆分子问题]
-  RW -->|否| O[保留原查询]
-  R --> S
-  S --> M[多路并行 Retrieve + Dedup]
-  O --> M
-  M --> EMB[Embedding]
-  EMB --> CACHE{Redis semantic cache 命中?}
-  CACHE -->|是| FIL[文档状态、Scope 与 metadata 交集过滤]
-  CACHE -->|否| HYB[Milvus Dense COSINE + BM25 IP]
-  HYB --> RRF[RRF 融合；失败回退 dense]
-  RRF --> FIL
-  FIL --> RR[Rerank（需要时）]
-  RR --> TOP[FinalTopK 文档]
-  TOP --> PROMPT[以不受信任 User 数据边界注入 Evidence]
-~~~
+  alt 审批中断
+    W->>DB: Run → waiting_approval（保留 session 锁）
+    UI->>API: POST /api/ops/v1/approvals/{id}/approve
+    API->>DB: CAS 决策并唤醒 Run → pending
+    W->>DB: 重新认领，按 checkpoint 恢复（resume / replay）
+  end
 
-### 告警接入与异步索引
+  W->>DB: CompleteRunAndCommitSession（终态 + 会话 revision + trace quality）
+  DB-->>API: 终态事件
+  API-->>UI: 事件流结束
+```
 
-~~~mermaid
+### RuntimeHandler
+
+`RuntimeHandler` 是 Durable Run 的唯一 Model / Tool governance boundary，以最外层中间件挂在 Agent 上，并覆盖模型的 Generate / Stream 与所有工具调用入口（invokable、streamable、enhanced 变体）。每个 Agent 都不需要自己实现一套安全与可靠性逻辑。
+
+```mermaid
 flowchart TD
-  A[Webhook / CEF / LEEF / API Push] --> P[解析并归一化 NormalizedAlert]
-  P --> K[标题 + 来源 + 内容片段生成 SHA-256 去重键]
-  K --> Q{重复?}
-  Q -->|是| R[返回 is_new=false]
-  Q -->|否| DB[(MySQL events)]
-  DB --> IDX[异步 IndexDocuments]
-  IDX --> V[Embedding + Milvus events 分区]
-  V --> DONE[后续 RAG 可检索]
-~~~
+  AGENT["Agent：Planner / Executor / Replanner / 专业 Agent"] --> RH["RuntimeHandler"]
+  RH --> PRE["调用前检查：Gate / Policy / 冻结 Snapshot / Budget"]
+  PRE --> MODEL["模型调用：物理调用身份校验"]
+  PRE --> TOOL["工具调用：目录查询与风险等级判定"]
+  MODEL --> REL["Reliability：Retry / Failover / Breaker / Limiter"]
+  TOOL -->|"L0 只读"| PLAIN["原 endpoint 执行并结算预算"]
+  TOOL -->|"L1 / L2 写入"| MUT["Proposal → HITL Approval → Effect"]
+  REL --> TRACE["Trace / 成本归集"]
+  PLAIN --> TRACE
+  MUT --> TRACE
+```
 
-## 核心能力
+它同时承担这些职责：Gate 判定（静态能力与动态开关取交集）、工具目录与权限校验、冻结 Snapshot 身份校验（模型与工具必须在 Run 创建时冻结的目录内）、预算预留与结算、Trace 与成本归集、以及 HITL 审批与 Effect 路由。模型侧的可靠性由 `internal/ai/models` 提供：Provider → Model Catalog → Routing 逐层解析出有序候选，按 provider-qualified catalog ref 隔离 Retry、Failover、Breaker 与 Limiter，每次物理调用都有独立的预算预留身份。
 
-### 1. Agent 编排
+---
 
-#### 标准模式：Router → Executor → SubAgent
+## Safe Side Effects
 
-标准模式在 `internal/ai/intent` 中构建非单例的 Eino Graph。Router 只负责意图识别和置信度检查，Executor 通过全局 Registry 获取 SubAgent；模型调用失败、JSON 解析失败、未知意图或未注册 Agent 都会安全降级到 Chat。
+模型可以提出动作，但不能直接产生副作用。Durable 路径上的写操作按下面的顺序收敛：
 
-实际业务意图 SubAgent：
+1. **工具目录与风险等级**：`internal/ai/policy` 维护工具目录（L0 只读 / L1 / L2、effect 类型、effect 步骤）。未知工具 fail-closed。
+2. **Proposal 冻结**：mutation 工具调用被转换为 canonical JSON，并冻结为稳定 `proposal_hash`。同一提案的重复提交得到同一个身份。
+3. **HITL 审批**：审批记录分两阶段发布（`preparing` → `pending`），绑定 checkpoint 指纹与 generation；Run 进入 `waiting_approval`，释放 Worker 占用但保留会话锁。
+4. **恢复前的再授权**：Worker 重新认领后，会重新比对工具名与版本、schema hash、参数 canonical 形式、Policy hash、Runtime 兼容哈希与写 Gate，然后才允许继续。
+5. **Effect 执行**：`Transactional` effect 的领域写入与账本状态在同一个数据库事务内提交；`External` effect 先建立稳定 DAG 身份再调用外部系统，其超时上界不得超过当前租约的安全边界。
+6. **对账**：外部调用结果无法判定（超时、网络不确定）时，Run 不会被标成成功，而是原子地停车为 `effect_unknown`；随后由 Worker 自动对账，或由管理员通过 `GET /api/ops/v1/effects/unknown` 查询待处理 Effect，再通过 `POST /api/ops/v1/effects/{id}/resolve` 或 `POST /api/ops/v1/effects/{id}/accept-unknown` 显式决议。
 
-| SubAgent | Profile | RAG 查询处理 | 最大步数/迭代 | 主要工具或职责 |
-| --- | --- | --- | ---: | --- |
-| Chat | default | 共享会话历史与 RAG | 25 | 通用安全问答、事件/订阅/报告查询 |
-| Event | default | Rewrite + Split + 并行检索 + Rerank | 25 | 事件查询、相似事件、关联分析 |
-| Report | reasoning | Rewrite + Split + 并行检索 + Rerank | 30 | 周报/月报/自定义报告与模板 |
-| Risk | reasoning | Rewrite + Split + 并行检索 + Rerank | 25 | CVE、攻击路径、影响范围和风险评估 |
-| Solve | reasoning | 不 Rewrite/Split | 10 | 单事件应急处置方案 |
-| Intelligence | default | 不 Rewrite/Split | 12 | 联网搜索、CVE/威胁组织分析、情报沉淀 |
-| Ops | default | 不 Rewrite/Split | 20 | 状态更新、IP 封禁、通知和响应编排 |
+关于幂等与重试，可以严格承诺的是：每个 effect step 有稳定的幂等键，重复提交会复用已成功的账本记录而不是重放领域写入；Durable 真值写入受 generation fencing 保护；无法确认外部调用是否已经发生时，Runtime 会把 Run 停在对账状态，而不是盲目重放副作用。
 
-公共专业 Agent 由 `internal/ai/agent/base/builder.go` 构建 RAG + ReAct DAG：
+写能力的开关由两层 Gate 同时决定：静态配置（`agent_runtime.enabled`、`l1_writes`、`l2_writes` 等）只提供能力上限，动态开关存放在 `settings` 表。任何一层关闭都会关闭能力；`shadow_mode` 打开时会强制关闭 L1/L2 写入，即使静态开关为 true。
 
-`InputToChat` 与 `RetrievalNode` 并行，`EvidencePrompt` 将检索结果放入不受信任的 User 数据边界，`Template` 使用 `AllPredecessor` fan-in 后驱动 `ReactAgent`。`NewSingletonAgent` 用 `sync.Once` 懒初始化进程级 runner，避免每个请求重复编译图。
+---
 
-#### 深度思考：官方 Plan/Execute/Replan
+## Evidence & Knowledge
 
-`internal/service/chat.ExecuteDeepThink` 先执行可取消的预思考流，再进入官方 Eino `planexecute.New`。Planner 使用 reasoning Profile 生成结构化 Plan，Executor 使用 default Profile 执行当前步骤，Replanner 根据执行结果决定继续还是 Respond，外层最多 20 次迭代。
+知识有两条接入路径，最终都写入 Milvus 的 `rag_store` 集合，并且都同时保存 dense 向量（COSINE）与 BM25 sparse 向量：
 
-Executor 通过官方 `adk.NewAgentTool` 调度：
+- **知识文档**：PDF、DOCX、Markdown 与 Go/Python/Java 代码，经 Parser 解析后按文件类型选择 hierarchical / sliding_window / code 策略分块，再写入 `documents` 分区；MySQL 保留知识库、文档与分块元数据。
+- **安全事件与情报**：告警接入或订阅抓取得到的事件经归一化、抽取与去重后，直接由标题与正文构成 Event Document 写入 `events` 分区，不经过文档 Parser 与文档分块。
 
-- `event_analysis_agent`
-- `report_agent`
-- `risk_assessment_agent`
-- `solve_agent`
-- `intelligence_agent`
-- `ops_agent`
-- `mcp_agent`
-- `skill_agent`
-- `query_internal_docs`
-- `get_current_time`
+查询进入系统的路径：可选查询改写与拆分 → 向量化 → Redis 语义缓存 → Milvus 混合检索（dense + BM25，按 RRF 融合，失败时回退 dense）→ 分数与条数截断 → 作用域过滤 → 可选 Rerank → 作为 Evidence 注入 Agent Prompt。`documents` 分区的过滤是 fail-closed 的：缺少证据作用域或 MySQL 真值不可用时返回“证据不可用”，而不是放宽过滤条件。
 
-生产 durable Worker 只允许外层 `plan_agent`，并复用同一个 `RuntimeHandler`、GORMStore、GateEvaluator 和按 Attempt 创建的 Langfuse runtime。Summary Agent 是独立线性 DAG，用于会话摘要压缩，不计入业务意图路由数量。
+```mermaid
+flowchart LR
+  DOC["知识文档：PDF / DOCX / Markdown / Code"] --> PARSE["Parse + Chunk"]
+  PARSE --> EMB1["Dense Embedding + BM25 Sparse Encoding"]
+  EMB1 --> DOCPART[("Milvus：documents 分区")]
+  PARSE --> META[("MySQL：knowledge_bases / documents / chunks")]
 
-### 2. RAG 检索
+  EVT["告警 / 订阅事件"] --> NORM["Normalize / Extract / Dedup"]
+  NORM --> EVDOC["Event Document：Title + Content"]
+  EVDOC --> EMB2["Dense Embedding + BM25 Sparse Encoding"]
+  EMB2 --> EVPART[("Milvus：events 分区")]
 
-`internal/ai/retrieval.Retriever` 的固定阶段是：
+  Q["查询：Agent 或知识库搜索"] --> REWRITE["Rewrite / Split"]
+  REWRITE --> RET["Retrieve：语义缓存 / Milvus Dense + BM25 → RRF"]
+  RET --> FILTER["截断：分数 / TopK"]
+  FILTER --> SCOPE["Scope 与 metadata 过滤"]
+  SCOPE --> RERANK["可选 Rerank"]
+  RERANK --> EV["Evidence 引用与引用校验"]
+  EV --> PROMPT["注入 Agent Prompt"]
+```
 
-1. 在存在 budget provider 时预留 RAG 预算；
-2. 调用 Embedding；
-3. 查询 Redis semantic cache；
-4. 未命中时访问 Milvus hybrid 或 dense search；
-5. 过滤、截断并写回缓存。
+**MCP** 与 **Skill** 是 Runtime 的扩展能力，而不是项目主角：
 
-当前配置默认值：
+- MCP 由配置驱动，逐个 server 限制 transport、URL 与 host/port allowlist、工具白名单、超时与结果大小；Header 只允许 Secret 引用，接入时会做 SSRF 与 stdio 参数校验。动态发现的工具目录会参与冻结身份（catalog hash），非只读工具不会因为“动态发现”而绕过 Policy；关闭 `mcp.enabled` 时不会建立 session。
+- Skill 使用官方 Eino Skill middleware 与只读的本地文件系统 backend，限制目录大小与字节上限，并受 L0 工具白名单与 Gate 约束。`manifest/skills/` 中提供 `evidence-summary`、`incident-triage`、`response-checklist` 三个示例。
 
-| 参数 | 默认值 |
-| --- | ---: |
-| semantic cache TTL | 24 小时 |
-| cache threshold | 0.85 |
-| 初始 TopK | 5 |
-| FinalTopK | 3 |
-| dense MinScore | 0.30 |
-| hybrid | true |
-| RRF k | 60 |
+---
 
-Hybrid Search 使用 dense vector + COSINE 和 BM25 sparse vector + IP，由 Milvus `HybridSearch` 使用 RRF 融合。混合调用失败时回退到 dense，避免单一路径故障阻断只读分析。专业 Agent 还可以执行 Normalize、Rewrite、Split、多路并行检索、去重和 Rerank。
+## Security Operations
 
-知识库 `documents` 分区是 fail-closed：检索结果必须同时满足 MySQL 文档状态、Access Scope、source/content/indexed version、chunk 状态和 Milvus metadata；缺少 Scope 或 MySQL 真值源不可用时返回不可用证据，而不是放宽过滤。
+**告警接入**：Webhook、CEF、LEEF 与 API Push 统一归一化为 `NormalizedAlert`，按标题、来源与内容片段生成 SHA-256 去重键；新事件写入 MySQL 后异步向量化，进入 Milvus 的 `events` 分区供相似事件检索。接入端点使用独立的 `X-API-Key` 中间件，不复用浏览器 JWT。
 
-当前 Milvus 约定：
+**事件与订阅**：事件提供列表、统计、趋势与状态流转；订阅支持 RSS/Atom 与 GitHub Releases / Security Advisories 抓取，由 Worker 侧的调度器按注册表周期执行，抓取结果经抽取、严重程度推断、CVE 提取、去重后入库并索引。
 
-- Database：`sentinel`
-- Collection：`rag_store`
-- Partition：`events`、`documents`
-- Dense vector：2048 维，COSINE
-- Sparse vector：BM25，IP
-- metadata：JSON
+**研判与响应**：事件分析、报告、风险、处置、情报与 Ops 等专业能力以 Agent 的形式被 Plan Agent 通过 AgentTool 调度；对外动作包括事件状态更新、IP 封禁、报告与情报写入、通知与 Webhook 出站。Agent 路径上的写入经过 Proposal → Approval → Effect，并受 Gate 控制。
 
-### 3. 知识库与文档索引
+**Web Console**：React 19 单页应用，覆盖事件态势、事件分析、聊天与 SSE 事件流、知识库、报告、Trace 与 RAG Eval、告警接入示例、Ops 运行与审批，以及 Runtime 的运行列表、详情、能力、安全与 Worker 健康视图。实时数据通过 SSE 传输，客户端断线重连时携带 `after_seq` 续传。
 
-上传后的文档进入 Worker Pool，由 `knowledge_index_pipeline.BuildAndIndex` 完成解析、分块、Embedding 和 Milvus 写入；该路径是直接调用的索引流水线，不依赖 Eino Graph，以便同时返回完整的 ChunkResult 并写入 MySQL。
+需要注意 Ops 存在两条写入路径：Agent/durable 路径的 mutation 工具走 Proposal → Approval → Effect；而 `/api/ops/v1/runs/direct` 与 playbook 触发属于历史直写路径，受单独的 legacy 写 Gate 控制。不能把它们概括成同一条链路。
 
-#### Parser 与 Chunker
+---
 
-| 文件类型/策略 | 实现 |
+## Observability
+
+- **Workflow events**：每个 Run 的事件流是执行事实的入口，Runtime 时间线与 SSE 都由它投影而来，事件序号保证重放不重复。
+- **Attempt**：每次认领对应一个 attempt 投影，记录 worker、generation、兼容哈希与 trace 关联；缺失字段在读取时会标记为 partial，而不是补默认值。
+- **Trace**：`agent_trace_runs` / `agent_trace_nodes` 记录 Run、Attempt 与节点级耗时、Token 与成本；终态提交前有 Trace Barrier，保证 Trace 写入先于 Run 完成事件。Langfuse 作为可选的 Attempt 级 exporter，需要静态配置与动态 Gate 同时允许。
+- **Evidence**：检索与引用会产生 evidence 事件，Runtime 可以按 Run 查询证据并展开引用，展开时重新校验访问作用域。
+- **Worker health**：Worker 周期性写入脱敏观测快照（运行版本、兼容哈希、配置目录哈希、当前 Run 与 generation、状态与错误摘要），心跳过期即被判定为 stale。
+- **Runtime control surface**：`/api/runtime/v1/*` 提供运行、时间线、attempt、checkpoint、审批、effect、证据、上下文、Trace、能力、安全、Worker 健康、发布与保留策略视图；其中唯一的写入口是提交 Recovery 命令，审批与对账决议位于 `/api/ops/v1/*`。
+
+---
+
+## Tech Stack
+
+| 层 | 技术 |
 | --- | --- |
-| PDF | 文本提取，并在失败时经过 pdfcpu 修复、解密和 legacy xref 兼容路径 |
-| DOCX | 纯文本解析或 Heading 结构解析 |
-| Markdown | 保留标题标记，提取 H1-H6 层级路径 |
-| Go / Python / Java | 代码读取 + 函数/类/接口边界感知分块 |
-| `hierarchical` | 父块/子块分层；默认 parent 1024、child 256、overlap 40 rune |
-| `sliding_window` | 按窗口和重叠切分，优先在换行或句末边界对齐 |
-| `code` | 语法声明边界分块，保留函数/类名为 SectionTitle |
+| 语言 | Go 1.27.0 |
+| HTTP 与配置 | GoFrame v2.10.2 |
+| Agent 编排 | CloudWeGo Eino v0.9.15（`adk` / `planexecute` / `compose`）+ eino-ext（OpenAI 兼容模型、Milvus indexer、Langfuse callbacks、officialmcp） |
+| 持久化 | MySQL 8.0 + GORM v1.31.2；Goose 版本化迁移 |
+| 向量与缓存 | Milvus 2.5（milvus-sdk-go v2.4.2）；Redis 7.x（go-redis v9） |
+| 认证与安全 | golang-jwt v5、bcrypt、SecretRef（`env:` / `file:`） |
+| 可观测性 | OpenTelemetry SDK v1.44、自建 Trace、可选 Langfuse exporter |
+| 前端 | React 19、TypeScript、Vite、TanStack Query、Zustand、TailwindCSS、ECharts |
+| 测试与交付 | Go test（含 race 与合同测试）、Vitest、Playwright、Docker Compose、Nginx |
 
-向量化使用子块内容，检索命中后把 parent content 和 section metadata 交给 LLM，兼顾召回聚焦和回答上下文完整性。索引批次固定为 10 个文档，Worker Pool 并发度和队列容量由配置控制。
+---
 
-### 4. 告警接入与订阅调度
+## Quick Start
 
-#### 外部告警接入
+以下命令均在仓库根目录执行。
 
-`internal/controller/ingest` 将 Webhook、CEF、LEEF 和 API Push 统一转换成 `NormalizedAlert`，随后走同一个 `ingest.Ingest`：
+### Prerequisites
 
-- Webhook 支持通用 JSON 字段别名；
-- CEF 解析 Header/Extension，并映射 severity；
-- LEEF 解析 Tab 分隔属性；
-- API Push 接受标准化 title、content、severity、source、CVE 和扩展字段；
-- 去重键由标题、来源和内容片段生成 SHA-256 截断值；
-- 新事件先写 MySQL，再异步写入 Milvus `events` 分区。
-
-接入路由使用 `AuthDisabledWriteGuard` 与 `IngestAPIKeyMiddleware`，不复用浏览器 JWT 身份。
-
-#### RSS/GitHub 订阅
-
-Scheduler 为每个启用订阅维护独立 goroutine，支持 Create/Update/Resume 时热注册，Pause/Delete 时注销。默认抓取间隔为 15 分钟；新事件和新告警入库后会按调用路径立即或异步触发向量索引，批次大小由 `scheduler.index_batch_size` 控制。
-
-- RSS/Atom 由 gofeed 解析；
-- 普通 GitHub 仓库抓最近 Releases 和 Security Advisories；
-- URL 包含 `/security/advisories` 时只抓 Advisories，减少无关 API 调用；
-- 抓取结果经过 Extract、严重程度推断、CVE 提取、去重、MySQL 入库和向量索引；
-- 另有每 30 分钟一次、单次最多 20 条的高危存量事件补偿扫描。
-
-### 5. Durable Runtime、HITL 与 Effect
-
-durable 路径把执行状态从进程内存提升到 MySQL：
-
-- API 原子创建 Run、Session Revision 0、冻结 Runtime Snapshot、预算和 `run.created`；
-- Worker 通过 fenced lease/generation 认领，过期或失效的 Worker 不能继续提交；
-- workflow event 使用持久化 `seq`，checkpoint 支持 resume/replay；
-- API 与 Worker 解耦，浏览器断线只停止读取，Worker 继续执行；
-- Run 输入 immutable，Snapshot 记录模型、工具、Gate、Skill/MCP 等兼容身份；
-- 终态统一通过 `CompleteRunAndCommitSession` 写入并释放 Session。
-
-HITL 与 Effect 机制把建议和副作用分开：
-
-- L1/L2 mutation 生成 Approval/Effect，Approval 绑定 checkpoint fingerprint；
-- approve/reject/resume 经过角色与资源 Scope 校验；
-- primary/derived effect ledger 提供幂等键和重试边界；
-- 外部副作用结果未知时进入 parked/reconciliation，不把未知状态渲染成成功；
-- `block_ip`、事件状态更新、报告/情报写入和通知均经过 Effect/Gate/Policy 路径。
-
-### 6. 安全、策略与可靠性
-
-#### SecretRef
-
-配置只保存 `env:&lt;name&gt;` 或 `file:&lt;path&gt;` 引用。`UseSecret` 在回调结束后清零解析出的临时字节；生产启动会拒绝缺失、空值或默认 Secret。请勿把真实 Key、密码、Webhook 或 DSN 写入 README、日志、Trace 或提交。
-
-#### Auth、RBAC 与资源 Scope
-
-- JWT Identity 由服务端从 Token 生成，不信任客户端传入的 `user_id`；
-- 角色包含 viewer、operator、approver、admin；
-- HTTP 层执行粗粒度 RBAC，Service 层继续检查资源 Scope 和文档 ACL；
-- auth-disabled 模式注入只读 viewer，并拒绝业务写入；
-- ingest 使用独立 API Key，和用户 JWT 分离。
-
-#### 模型可靠性
-
-模型访问通过 Provider → Model Catalog → Routing 三层解析，不把业务代码绑定到单一厂商。配置提供 Eino Retry、provider-qualified breaker/failover、QPS limiter 和 Agent 超时；失败时由各调用路径按代码定义回退或 fail-closed。
-
-### 7. 可观测性与 RAG Eval
-
-Trace 由 Eino callbacks、手动 spans 和 GORM Plugin 共同产生，节点类型覆盖：
-
-`LLM`、`TOOL`、`RETRIEVER`、`EMBEDDING`、`LAMBDA`、`AGENT`、`CACHE`、`DB`、`RERANK`。
-
-MySQL 中保存请求级 `agent_trace_runs` 和节点级 `agent_trace_nodes`，可记录耗时、Token、成本、召回数量、相似度、Rerank 分数和慢查询信息。Langfuse 是可选的 Attempt-scoped exporter，由 Gate 和 SecretRef 同时控制。
-
-RAG Eval 页面从已有 Trace 聚合 KPI，不重新执行 RAG：
-
-- 成功率、平均/P95 延迟；
-- 召回文档数、最高分、缓存命中率、Rerank 分数；
-- 按模型聚合 Token 和成本；
-- 聊天点赞/点踩写入 `message_feedbacks`；
-- 通过 session_id 关联 Trace 详情。
-
-### 8. 记忆、Skill 与 MCP
-
-#### 分层记忆
-
-- 进程内 `SessionMemory` 保存近期消息；
-- Redis 保存近期消息和长期摘要，默认 Chat TTL 为 30 天；
-- MySQL `user_preferences` 保存跨会话偏好；
-- Token 超过 3000 是摘要主触发器，消息数超过 30 是辅助触发器，每次默认压缩 10 条并至少保留 4 条近期消息；
-- 显式反馈标签可直接更新偏好，其他场景由 Summary/Preference 流程按配置推断。
-
-#### Skill
-
-Skill 使用官方 Eino Skill middleware。当前仓库的 `manifest/skills` 包含 `evidence-summary`、`incident-triage`、`response-checklist`；local filesystem backend 只读，限制最大字节数，并受 L0 tool allowlist 与 Gate 约束。
-
-#### MCP
-
-MCP 使用官方 MCP SDK/Eino officialmcp，按配置限制 transport、host、port、tool allowlist、页数、结果字节数和超时。开发配置提供 Context7 示例；禁用 MCP 时不会创建 session。
-
-### 9. Web Console
-
-前端由 React 19、TypeScript、Vite、Zustand、TailwindCSS 和 ECharts 组成。真实路由来自 `web/src/App.tsx`：
-
-`/login`、`/dashboard`、`/subscriptions`、`/events`、`/events/analysis`、`/reports`、`/chat`、`/settings`、`/term-mapping`、`/traces`、`/traces/:traceId`、`/knowledge`、`/rag-eval`、`/ingest`、`/ops`。
-
-UI 层覆盖登录与权限、事件态势、订阅管理、聊天/SSE、知识库、Trace、RAG Eval、外部接入示例和 Ops Run/Approval。Playwright smoke 测试还验证未认证跳转、关键路由、主布局和暗色模式；审批页面测试覆盖 viewer 权限、unknown effect、并发决定冲突、preview 和失败轮询。
-
-## 技术栈
-
-| 层次 | 技术 | 版本/用途 |
-| --- | --- | --- |
-| 语言与后端 | Go | 1.27.0 |
-| HTTP/配置 | GoFrame | v2.10.2 |
-| Agent 编排 | Cloudwego Eino / Eino ADK | v0.9.15 |
-| 关系数据库 | MySQL + GORM | MySQL 8.0；GORM v1.31.2 |
-| 数据库迁移 | Goose | v3.27.3（迁移文件 00001–00008） |
-| 向量数据库 | Milvus SDK | v2.4.2；Compose 镜像 2.5.10 |
-| 缓存 | go-redis | v9.22.0；Compose Redis 7.4 |
-| 认证 | golang-jwt | v5.3.1 |
-| 可观测性 | OpenTelemetry SDK | v1.44.0，可选 Langfuse exporter |
-| 前端 | React / ReactDOM | 19.2.8 |
-| 类型与构建 | TypeScript / Vite | 7.0.2 / 8.2.2 |
-| UI 状态与样式 | Zustand / TailwindCSS | 5.0.15 / 4.3.3 |
-| 图表与浏览器测试 | ECharts / Playwright | 6.1.0 / 1.62.1 |
-| 网关 | Nginx | 1.27-alpine |
-
-模型、Embedding 和 Rerank 通过配置的 Provider/Model Catalog/Route 解析。仓库示例使用 OpenAI-compatible Chat/Embedding 与 DashScope-compatible Rerank 驱动，但业务代码按路由引用，不把厂商名称写死在 Agent 中。
-
-## 快速开始
-
-### 前置条件
-
-- Go 1.27.0；
-- Node.js 24.19.0 和 npm；
+- Go 1.27.0（见 `go.mod`）；
+- Node.js 24.19.0 与 npm（见 `web/package.json`）；
 - Docker Engine 与 Docker Compose；
-- 可访问的 MySQL 8.0、Redis 7.x、Milvus 2.x（开发模式由 Compose 提供）；
-- 至少一个可用的 Chat/Embedding/Rerank Provider Secret。
+- 至少一个可用的模型 Provider 凭据，覆盖 Chat 与 Embedding（启用 Rerank 时还需要 Rerank 模型）。
 
-以下命令均在仓库根目录 `/home/monody/project/SentinelOps` 执行。
+### Configuration
 
-### 1. 创建本地配置并注入 Secret
+加载器默认读取 `manifest/config`，优先选择 `config.local.yaml`；该文件是**整份替换**，不会与 `config.yaml` 逐字段合并。它已被 Git 忽略：
 
-启动本地 API/Worker 和前端前，先把基础配置复制为本地覆盖文件。`config.local.yaml` 已被 Git 忽略，加载器会优先读取它，并将其作为 `config.yaml` 的完整替换，而不是逐字段合并：
-
-~~~bash
+```bash
 cp manifest/config/config.yaml manifest/config/config.local.yaml
-~~~
+```
 
-后端从该文件读取 Provider、数据库和认证配置；前端本地开发通过 Vite 的 `/api` 代理访问后端，因此前后端启动前都先完成这一步。默认模型 API Key 由 `providers.*.secret_ref: env:SENTINELOPS_MODEL_API_KEY` 注入，不要把明文 `api_key` 写进 YAML。
+如果本机已经存在 `config.local.yaml`（该文件已被 Git 忽略），请直接编辑现有文件，不要覆盖其中已经填好的凭据。
 
-如果本机已经有 `config.local.yaml`，不要重复覆盖其中的 Secret，直接编辑现有文件。然后在环境中提供配置引用所需的值。示例变量名如下（值请使用你自己的 Secret，不要提交）：
+配置中只保存 Secret 引用，实际值在执行时从环境变量或文件解析。最小集合如下（示例值请替换为自己的凭据）：
 
-~~~bash
-export SENTINELOPS_MYSQL_DSN='root:change-me@tcp(127.0.0.1:3307)/sentinelops?parseTime=true&multiStatements=true'
-export SENTINELOPS_MODEL_API_KEY='replace-with-model-provider-key'
-export SENTINELOPS_JWT_SECRET='replace-with-a-random-jwt-secret'
-export SENTINELOPS_ADMIN_PASSWORD='replace-with-admin-password'
-~~~
+```bash
+export SENTINELOPS_MYSQL_DSN='root:<password>@tcp(127.0.0.1:3307)/sentinelops?parseTime=true&multiStatements=true'
+export SENTINELOPS_MODEL_API_KEY='<model-provider-key>'
+export SENTINELOPS_JWT_SECRET='<random-jwt-secret>'
+export SENTINELOPS_ADMIN_PASSWORD='<admin-password>'
+```
 
-`config.yaml` 默认把 Langfuse 标记为 enabled，但没有填写 public/secret key 引用；如果没有 Langfuse 凭据，请在 `config.local.yaml` 中把 `observability.langfuse.enabled` 设为 `false`，否则配置校验会拒绝启动。若启用 Langfuse、SMTP、DingTalk、WeCom、Effect 或 MCP Header，再为对应 `SecretRef` 提供环境变量或文件引用。
+两个需要注意的默认项：
 
-数据库、JWT、Provider、SMTP、MCP 和 Effect 等受 SecretRef 管理的字段只接受 `env:` / `file:` 引用；Tavily/GitHub token 目前仍是配置字段，请只写入被 Git 忽略的本地配置。任何情况下都不要把真实 Secret 写到 README、日志、Trace 或提交。
+- 默认配置启用 Langfuse 并引用 `env:SENTINELOPS_LANGFUSE_PUBLIC_KEY` / `env:SENTINELOPS_LANGFUSE_SECRET_KEY`；不使用 Langfuse 时，在 `config.local.yaml` 中把它关闭，或提供对应环境变量。
+- 默认配置启用 MCP，并指向本地 Context7（`http://127.0.0.1:3333/mcp`）；不运行该服务时请关闭 `mcp.enabled` 或移除该 server。
 
-可用环境变量指定另一份完整配置：
+另外可以用 `SENTINELOPS_CONFIG_DIR` 指定另一份完整配置目录。
 
-~~~bash
-export SENTINELOPS_CONFIG_DIR=/path/to/config-dir
-~~~
+### Start infrastructure
 
-### 2. 启动开发依赖
-
-~~~bash
+```bash
 docker compose -f manifest/docker/docker-compose.dev.yml up -d --build
-~~~
+```
 
-该 Compose 只启动基础设施和 migrate；Context7 默认暴露在 `127.0.0.1:3333/mcp`，Milvus 暴露 `19530`，Redis 暴露 `16379`，MySQL 暴露 `3307`，Attu 暴露 `8000`。
+该 Compose 只启动基础设施与迁移任务：MySQL `3307`、Redis `16379`、Milvus `19530`、Context7 `3333`、Attu `8000`、MinIO `9000` / `9001`。迁移会建表并写入开发环境的默认登录用户；这些仅用于本地开发，部署前必须替换或删除。
 
-全新数据库会执行版本化迁移并写入学习环境的 `admin` 与 `user1` 默认账号（密码均为 `123456`）。它们只用于本地学习，部署前请替换或清理。
+### Start API / Worker
 
-### 3. 启动后端
-
-开发环境可用单进程模式：
-
-~~~bash
+```bash
+# 单进程模式（仅 development）
 go run . all
-~~~
 
-也可以拆分 API 和 Worker：
-
-~~~bash
-# 终端 1
+# 或拆分运行
 go run . api
-
-# 终端 2
 go run . worker
-~~~
+```
 
-默认 API 地址为 `http://localhost:8001`。如果使用 `config.local.yaml` 中的 `127.0.0.1:8001`，前端开发代理仍会把 `/api` 转发到该地址。
+API 默认监听 `http://localhost:8001`，OpenAPI 文档位于 `/api.json`，Swagger 位于 `/swagger`。
 
-### 4. 启动前端
+动态 Gate 在数据库中的种子值是 fail-closed。首次启动后，需要由具备对应权限的管理员通过 `GET/POST /api/settings/v1/runtime-gates` 打开 `agent_runtime.enabled` 与 `agent_runtime.accept_new_runs`，否则创建 Durable Run 会被拒绝；当前 Web Console 的设置页只覆盖通用设置与接入 Key，Gate 开关通过该 API 管理。默认 `shadow_mode: true` 会保持 L1/L2 写入关闭，直到显式调整。
 
-~~~bash
+### Start Web Console
+
+```bash
 npm ci --prefix web
 npm run dev --prefix web
-~~~
+```
 
-默认前端地址为 `http://127.0.0.1:5173`。前端脚本还提供 `npm run lint --prefix web`、`npm run build --prefix web` 和 `npm run test:smoke --prefix web`。
+开发服务器监听 `http://127.0.0.1:5173`，并把 `/api` 代理到 `http://localhost:8001`。
 
-## 部署
+---
 
-### 一体化 Docker Compose
+## Deployment
 
-`manifest/docker/docker.sh` 会按顺序执行前端构建、基础设施启动、migrate/API/Worker/frontend 镜像构建、数据库迁移、服务启动，并等待 API 健康地址 `/api.json`：
+单机/演示部署可以复用一体化 Compose：
 
-~~~bash
-cd manifest/docker
-bash docker.sh
-~~~
+```bash
+bash manifest/docker/docker.sh
+```
 
-脚本最终提供：
+脚本会构建前端、启动基础设施、执行迁移、构建并启动 API / Worker / frontend 容器，最后通过 Nginx 暴露统一入口：Web Console 位于 `http://localhost`，OpenAPI 位于 `/api.json`，Swagger 位于 `/swagger`。Nginx 对 `/api/chat/` 关闭代理缓冲并放宽读超时，使 SSE 可以流式透传。
 
-- Web Console：`http://localhost`
-- OpenAPI 文档：`http://localhost/api.json`
-- Swagger：`http://localhost/swagger`
-- Attu：`http://localhost:8000`
+生产部署的最低要求：
 
-Compose 文件中的默认值是开发/学习示例，不应直接视为生产安全配置。生产部署至少应显式设置 MySQL DSN、JWT Secret、管理员密码、模型 Provider Secret，并根据实际环境关闭不需要的 MCP、Langfuse、外部通知和写入 Gate。
+- 不使用 `all` 角色，API 与 Worker 拆分为独立进程/容器（`./server api`、`./server worker`）；
+- 设置 `app.environment = production`，并保证数据库、JWT、管理员与 Provider 凭据都不是默认值或空值，否则启动校验会拒绝运行；
+- 设置不可变的 `SENTINELOPS_RUNTIME_VERSION`（40 位 Git SHA 或 64 位 sha256 digest），它进入 Run 的冻结身份，保证只有兼容版本的 Worker 会认领既有 Run；
+- 按实际环境审查 MCP、Langfuse、外部通知与写入 Gate，关闭不需要的能力。
 
-### 生产角色拆分
+Compose 文件中的端口、密码与镜像默认值只服务于本地开发与演示，不应直接用于生产。
 
-生产镜像会把 `config.docker.yaml` 复制为容器内的 `config.local.yaml`，并将环境标记为 `production`。生产不允许 `all` 角色；容器内建议单独运行：
+---
 
-~~~bash
-./server api
-./server worker
-~~~
+## Validation
 
-如果在宿主机直接运行二进制，请先准备一份完整的生产 `config.local.yaml`，不要直接把 `config.docker.yaml` 当作可自动选择的文件。
+仓库提供与 PR workflow 对应的本地质量门禁：
 
-生产启动还会校验当前 durable runtime version、数据库引用、JWT/管理员 Secret 和所有已配置 Provider 的 Secret。外部通知、Nginx 黑名单、Docker socket、Langfuse 和真实模型配额应按部署环境单独审查。
-
-## 验证
-
-仓库提供与 Pull Request workflow 对应的本地质量门禁：
-
-~~~bash
-# 后端：gofmt、tidy、vet、staticcheck、govulncheck、race test
-SENTINELOPS_TEST_DSN='root:password@tcp(127.0.0.1:3306)/sentinelops?parseTime=true' \
+```bash
+# 后端：gofmt、go mod tidy、vet、staticcheck、govulncheck、race test
+SENTINELOPS_TEST_DSN='root:<password>@tcp(127.0.0.1:3307)/sentinelops?parseTime=true' \
   scripts/ci/pr.sh --lane backend
 
-# 合同：Workflow、Agent、MCP、Skill、Policy
+# 合同：Agent、MCP、Skill、Policy、Budget
 scripts/ci/pr.sh --lane contracts
 
 # 前端：npm ci、lint、build
 scripts/ci/pr.sh --lane frontend
-~~~
 
-也可以运行全部门禁：
-
-~~~bash
+# 全部门禁
 scripts/ci/pr.sh --lane all
-~~~
+```
 
-前端 smoke 测试：
+其他可单独运行的检查：
 
-~~~bash
-npm run test:smoke --prefix web
-~~~
+```bash
+scripts/ci/workflow-contract.sh          # GitHub Actions 工作流契约
+npm run test:unit --prefix web           # Vitest 单元测试
+npm run test:smoke --prefix web          # Playwright smoke 测试
+```
 
-`scripts/ci/pr.sh --lane backend` 要求 `SENTINELOPS_TEST_DSN`、固定版本的 staticcheck 和 govulncheck；未准备这些依赖时，门禁会按设计失败。Hosted CI 没有在本 README 重写过程中代为运行，外部 Provider、真实通知系统和生产部署也不因本地测试通过而自动获得上线结论。
+后端 lane 需要真实的 MySQL 测试 DSN 以及固定版本的 staticcheck 与 govulncheck，缺失时会按设计失败。依赖外部 Provider、通知系统或 MCP Server 的链路只有在对应凭据与网络可用时才可能跑通。
 
-## 仓库结构
+---
 
-~~~text
+## Repository Structure
+
+```text
 .
-├── api/                     # GoFrame API 请求/响应定义
+├── api/                     # GoFrame 请求/响应定义与 g.Meta 路由
 ├── internal/
-│   ├── bootstrap/           # api / worker / all 启动编排
-│   ├── ai/
-│   │   ├── agent/           # Chat、专业 Agent、Plan、Skill、MCP、索引流水线
-│   │   ├── intent/          # Router、Executor、SubAgent Registry
-│   │   ├── retrieval/       # Milvus dense/hybrid、cache、Scope 过滤
-│   │   ├── workflow/        # Run、lease、checkpoint、approval、effect、recovery
-│   │   ├── policy/          # RBAC、canonical JSON、redaction、工具目录
-│   │   └── trace/           # Span、Token、成本与 Langfuse 适配
-│   ├── controller/          # chat/event/report/knowledge/ops 等控制器
-│   ├── service/             # chat、knowledge、ingest、pipeline、scheduler
-│   └── dao/                 # MySQL 与 Milvus 数据访问
+│   ├── bootstrap/           # api / worker / all 三种角色的组装与依赖接线
+│   ├── config/              # 强类型配置与 SecretRef（env: / file:）
+│   ├── controller/          # HTTP / SSE 边界，只做协议映射
+│   ├── service/             # chat(durable)、runtime、knowledge、event、ingest、ops、scheduler…
+│   ├── dao/                 # MySQL / Milvus / Redis 数据访问
+│   └── ai/
+│       ├── workflow/        # Durable 真值：Run / Event / Attempt / Checkpoint / Approval / Effect / Operation
+│       ├── runtime/         # Worker、DurableExecutor、RuntimeHandler、Gate、Snapshot、Budget
+│       ├── effects/         # Effect 执行器与对账
+│       ├── policy/          # 工具目录、风险等级、RBAC、Proposal 冻结与脱敏
+│       ├── agent/           # plan_pipeline 主链与专业 Agent 管线
+│       ├── models/          # 模型目录与路由、Retry / Failover / Breaker / Limiter
+│       ├── tools/           # L0 工具实现与 MCP 接入
+│       ├── retrieval/       # Retriever、Milvus 混合检索、语义缓存与 scope 过滤
+│       ├── indexer/         # Event / Document 向量写入与 Milvus converter
+│       ├── embedder/        # Dense Embedding 与 BM25 sparse encoding
+│       ├── rerank/          # 检索结果重排
+│       ├── rewrite/         # 查询改写与拆分
+│       ├── evidence/        # 证据作用域、引用与答案校验
+│       ├── trace/           # Span、Token、成本、Trace Barrier 与 Langfuse 适配
+│       └── …                # 其余 AI 支撑包（cache / memory / document / loader / prompt / rule 等）
 ├── manifest/
-│   ├── config/              # 基础、local、Docker 配置与 SecretRef 示例
-│   ├── docker/              # Dockerfile、Compose、Nginx、docker.sh
-│   └── skills/              # evidence-summary、incident-triage、response-checklist
-├── migrations/              # Goose 00001–00008
-├── scripts/ci/              # backend/frontend/contracts 质量门禁
-├── utility/                 # auth、middleware 等通用能力
-├── web/                     # React Web Console 与 Playwright 测试
-├── main.go
+│   ├── config/              # config.yaml / config.local.yaml / config.docker.yaml
+│   ├── docker/              # Dockerfile、Compose、Nginx 配置
+│   └── skills/              # 只读 SOP Skill 目录
+├── migrations/              # Goose 版本化迁移
+├── scripts/ci/              # pr.sh 与 workflow-contract.sh
+├── utility/                 # middleware、SSE、auth、client 等通用能力
+├── web/                     # React Web Console
+├── main.go                  # 进程入口：解析角色后交给 bootstrap
 └── go.mod
-~~~
+```
 
-## 当前边界与已知限制
+---
 
-- Chat、Embedding、Rerank、Tavily、Context7、Langfuse、SMTP 和通知 Webhook 都依赖外部服务；仓库中的 Provider 只是配置示例，不代表服务凭据已提供。
-- `all` 角色仅用于 development；生产 durable Runtime 必须拆分 API 与 Worker，并通过 runtime version、Gate 和 Snapshot 兼容性检查。
-- 默认 `shadow_mode: true` 会关闭 effective L1/L2 writes；AI 运维页面可以展示计划、审批和结果，但不等同于已经打开真实副作用。
+## Current Boundaries
 
-## 贡献
+- 模型、Embedding、Rerank、Tavily、Langfuse、SMTP、钉钉/企业微信与 MCP 都依赖外部服务与凭据；仓库内提供的是配置示例，不代表凭据已就绪。
+- 写入能力同时受静态配置与动态 Gate 限制，默认 `shadow_mode: true` 时 effective L1/L2 写入关闭；Ops 页面可以展示计划与审批流程，但不等于已经打开真实副作用。
+- `all` 角色仅限 development；生产必须拆分 API 与 Worker，并保证 `SENTINELOPS_RUNTIME_VERSION` 是不可变身份。
+- 历史兼容路径：`chatsvc.ExecuteIntent`、`chatsvc.ExecuteDeepThink` 与 `internal/ai/intent` 在当前 Worktree 中没有任何调用者，不属于运行主链；事件分析 SSE（`/api/event/v1/analyze/stream`、`/api/event/v1/pipeline/stream`）属于兼容入口，其实际可用性受当前 Runtime settings / Gate 状态控制，不属于 Durable Agent Runtime 主链。
+- Ops 存在两套写入路径（Agent/Effect 与 legacy 直写），两者是否启用取决于运行时 Gate，因此不能概括为“所有 Ops 写操作都经过 HITL + Effect”。
+- 知识索引当前只支持 PDF、DOCX、Markdown 与 Go/Python/Java 代码；其它扩展名会在解析阶段失败（上传接口本身不做扩展名白名单）。
+- `workflow_runs.runtime_mode = 'legacy'` 的历史数据不会被 durable Worker 认领，需要通过 cutover 流程终止。
 
-欢迎通过 Issue 讨论问题，通过 Pull Request 提交改进。提交前建议：
+---
 
-1. 先确认改动对应的模块和 Gate/Policy 边界；
-2. 为行为变化补充或更新 Go/前端/合同测试；
-3. 运行与改动相关的最小门禁，条件允许时运行 `scripts/ci/pr.sh --lane all`；
-4. 在 PR 中区分本地 PASS、外部依赖未运行的 NOT RUN，以及真实失败的 FAIL。
+## Contributing
+
+欢迎通过 Issue 讨论问题、通过 Pull Request 提交改进。提交前建议：
+
+1. 先确认改动落在哪个边界：API、Worker、Runtime 真值层、Effect/Policy，还是前端；
+2. 行为变化需要补充或更新对应的 Go / 合同 / 前端测试；
+3. 至少运行与改动相关的门禁，条件允许时运行 `scripts/ci/pr.sh --lane all`；
+4. 在 PR 中区分本地 PASS、未运行的外部依赖检查（NOT RUN）与真实 FAIL，不要用局部通过推断整体结论。
