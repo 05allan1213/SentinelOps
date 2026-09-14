@@ -114,11 +114,11 @@ const components: Components = {
       {isValidElement<{ children: ReactNode }>(element) ? element.props.children : undefined}
     </CodeBlock>
   },
-  code: ({ node, children }) => <code className={node?.data?.markdownCode !== undefined ? undefined : 'rounded bg-gray-100 px-1 py-0.5 font-mono text-[0.9em] [overflow-wrap:anywhere] dark:bg-gray-800'}>{children}</code>,
+  code: ({ node, children }) => <code className={node?.data?.markdownCode !== undefined ? undefined : 'rounded bg-gray-100 px-1 py-0.5 font-mono text-[0.9em] [overflow-wrap:anywhere]'}>{children}</code>,
   table: ({ children }) => <div tabIndex={0} role="region" aria-label="Markdown 表格" className="my-3 min-w-0 max-w-full overflow-x-auto" data-testid="markdown-table-scroll"><table className="w-full border-collapse text-left text-sm">{children}</table></div>,
-  thead: ({ children }) => <thead className="bg-gray-50 dark:bg-gray-800">{children}</thead>,
+  thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
   tbody: ({ children }) => <tbody>{children}</tbody>,
-  tr: ({ children }) => <tr className="border-b border-gray-200 dark:border-gray-700">{children}</tr>,
+  tr: ({ children }) => <tr className="border-b border-gray-200">{children}</tr>,
   th: ({ children, style }) => <th style={style} className="whitespace-nowrap px-3 py-2 font-semibold">{children}</th>,
   td: ({ children, style }) => <td style={style} className="px-3 py-2 align-top">{children}</td>,
   h1: ({ children }) => <h1 className="mb-3 mt-5 text-xl font-semibold">{children}</h1>,
@@ -127,8 +127,11 @@ const components: Components = {
   h4: ({ children }) => <h4 className="mb-2 mt-3 font-semibold">{children}</h4>,
   h5: ({ children }) => <h5 className="mb-2 mt-3 font-semibold">{children}</h5>,
   h6: ({ children }) => <h6 className="mb-2 mt-3 font-semibold">{children}</h6>,
+  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+  em: ({ children }) => <em className="italic">{children}</em>,
+  hr: () => <hr className="my-4 border-gray-200" />,
   p: ({ children }) => <p className="my-2">{children}</p>,
-  blockquote: ({ children }) => <blockquote className="my-3 border-l-2 border-primary-300 pl-4 text-gray-500 dark:text-gray-400">{children}</blockquote>,
+  blockquote: ({ children }) => <blockquote className="my-3 border-l-2 border-primary-300 pl-4 text-gray-600">{children}</blockquote>,
   ul: ({ children, className }) => <ul className={cn('my-2 list-disc space-y-1 pl-6', className)}>{children}</ul>,
   ol: ({ children, start }) => <ol start={start} className="my-2 list-decimal space-y-1 pl-6">{children}</ol>,
   li: ({ children, className }) => <li className={cn('pl-1', className, className?.includes('task-list-item') && 'list-none')}>{children}</li>,
@@ -153,7 +156,7 @@ class ParserBoundary extends Component<{ content: string; complete: boolean; chi
   }
   render() {
     return this.state.failed ? <>
-      <span role="status" className="text-xs text-gray-500">Markdown 暂时无法解析，显示原文</span>
+      <span role="status" className="text-xs text-gray-600">Markdown 暂时无法解析，显示原文</span>
       <pre className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{this.props.content}</pre>
     </> : this.props.children
   }
@@ -161,7 +164,7 @@ class ParserBoundary extends Component<{ content: string; complete: boolean; chi
 
 function MarkdownRenderer({ content, variant = 'chat', streaming = false, complete = !streaming, className }: MarkdownRendererProps) {
   const display = streamingMarkdown(content, complete)
-  return <div data-markdown-variant={variant} className={cn('min-w-0 max-w-full text-gray-700 [overflow-wrap:anywhere] dark:text-gray-200', variants[variant], highlightColors, className)}>
+  return <div data-markdown-variant={variant} className={cn('min-w-0 max-w-full text-gray-700 [overflow-wrap:anywhere] [&>:first-child]:mt-0 [&>:last-child]:mb-0', variants[variant], highlightColors, className)}>
     <ParserBoundary content={content} complete={complete}>
       {display.mode === 'plain' ? <pre data-streaming-markdown className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{content}</pre> : <ReactMarkdown
         remarkPlugins={plugins.remark}

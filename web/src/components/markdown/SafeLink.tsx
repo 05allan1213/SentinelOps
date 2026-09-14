@@ -10,7 +10,7 @@ export interface SafeLinkProps {
   className?: string
 }
 
-const linkClassName = 'break-words text-primary-600 underline decoration-primary-300 underline-offset-2 hover:text-primary-700 [overflow-wrap:anywhere] dark:text-primary-400 dark:hover:text-primary-300'
+const linkClassName = 'break-words text-primary-600 underline decoration-primary-300 underline-offset-2 hover:text-primary-700 [overflow-wrap:anywhere]'
 
 export default function SafeLink({ href, children, className }: SafeLinkProps) {
   if (href === undefined || !isAllowedLink(href)) {

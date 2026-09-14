@@ -68,7 +68,7 @@ export default function ReportViewer({ data, logs }: Props) {
   const urgency = data.maxCVSS >= 9 ? '4小时内（P1）' : data.maxCVSS >= 7 ? '24小时内（P2）' : '72小时内（P3）'
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5 text-gray-700 [overflow-wrap:anywhere]">
       {/* 一、执行摘要 */}
       <div>
         <div className="text-sm font-semibold text-gray-800 mb-2">一、执行摘要</div>
@@ -83,7 +83,7 @@ export default function ReportViewer({ data, logs }: Props) {
             { label: '建议响应', value: urgency },
           ].map(({ label, value, highlight }) => (
             <div key={label} className="text-center">
-              <div className="text-xs text-gray-500 mb-1">{label}</div>
+              <div className="text-xs text-gray-600 mb-1">{label}</div>
               <div className={cn('text-sm font-bold', highlight ? 'text-red-600' : 'text-gray-800')}>{value}</div>
             </div>
           ))}
@@ -99,7 +99,7 @@ export default function ReportViewer({ data, logs }: Props) {
           <div>
             <div className="text-sm font-semibold text-gray-800 mb-2">
               二、AI 解决方案
-              <span className="ml-2 text-xs font-normal text-gray-400">（{eventsWithSolution.length} 个事件已生成方案）</span>
+              <span className="ml-2 text-xs font-normal text-gray-600">（{eventsWithSolution.length} 个事件已生成方案）</span>
             </div>
             <div className="space-y-3">
               {SEVERITY_ORDER.flatMap(sev => {
@@ -107,7 +107,7 @@ export default function ReportViewer({ data, logs }: Props) {
                 return sevEvts.map((e) => (
                   <div key={e.event_id} className="rounded-xl border border-gray-200 overflow-hidden">
                     <div className={cn(
-                      'px-4 py-2.5 flex items-center gap-2 border-b border-gray-100',
+                      'px-4 py-2.5 flex flex-wrap items-center gap-2 border-b border-gray-100',
                       e.severity === 'critical' ? 'bg-red-50' :
                       e.severity === 'high' ? 'bg-orange-50' :
                       e.severity === 'medium' ? 'bg-yellow-50' : 'bg-gray-50'
@@ -115,38 +115,37 @@ export default function ReportViewer({ data, logs }: Props) {
                       <span className={severityClass[e.severity] || 'tag-default'}>
                         {severityLabel[e.severity] || e.severity}
                       </span>
-                      <span className="text-sm font-medium text-gray-800 flex-1 truncate">{e.title}</span>
-                      {e.cvss && <span className="text-xs text-gray-500 shrink-0">CVSS {e.cvss}</span>}
-                      {e.cve_id && <span className="text-xs font-mono text-gray-400 shrink-0">{e.cve_id}</span>}
+                      <span className="text-sm font-medium text-gray-800 min-w-0 flex-1 truncate">{e.title}</span>
+                      {e.cvss && <span className="text-xs text-gray-600 shrink-0">CVSS {e.cvss}</span>}
+                      {e.cve_id && <span className="text-xs font-mono text-gray-600">{e.cve_id}</span>}
                       {e.source_url && (
-                        <a href={e.source_url} target="_blank" rel="noopener noreferrer"
-                          className="text-gray-300 hover:text-primary-500 transition-colors shrink-0">
+                        <a aria-label={`查看来源：${e.title}`} href={e.source_url} target="_blank" rel="noopener noreferrer"
+                          className="text-gray-600 hover:text-primary-500 transition-colors shrink-0">
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       )}
                     </div>
                     <div className="px-4 py-3">
-                      <div className="text-xs text-gray-500 font-medium mb-2">AI 应急处置方案</div>
+                      <div className="text-xs text-gray-600 font-medium mb-2">AI 应急处置方案</div>
                       <MarkdownRenderer
                         content={normalizeMarkdown(e.recommendation || '')}
                         variant="report"
-                        className="text-xs text-gray-700"
                       />
                     </div>
                   </div>
                 ))
               })}
               {noSolutionKeyEvents.map((e) => (
-                <div key={e.event_id} className="rounded-xl border border-gray-200 overflow-hidden opacity-60">
+                <div key={e.event_id} className="rounded-xl border border-gray-200 overflow-hidden">
                   <div className={cn(
-                    'px-4 py-2.5 flex items-center gap-2',
+                    'px-4 py-2.5 flex flex-wrap items-center gap-2',
                     e.severity === 'critical' ? 'bg-red-50' : 'bg-orange-50'
                   )}>
                     <span className={severityClass[e.severity] || 'tag-default'}>
                       {severityLabel[e.severity] || e.severity}
                     </span>
-                    <span className="text-sm font-medium text-gray-800 flex-1 truncate">{e.title}</span>
-                    <span className="text-xs text-gray-400 italic shrink-0">方案未生成</span>
+                    <span className="text-sm font-medium text-gray-800 min-w-0 flex-1 truncate">{e.title}</span>
+                    <span className="text-xs text-gray-600 italic shrink-0">方案未生成</span>
                   </div>
                 </div>
               ))}
@@ -170,8 +169,8 @@ export default function ReportViewer({ data, logs }: Props) {
               return (
                 <div key={sev}>
                   <div className="text-xs font-medium text-gray-800 mb-1.5">{grpLabel}</div>
-                  <div className="rounded-xl border border-gray-300 overflow-hidden">
-                    <table className="w-full text-xs">
+                  <div tabIndex={0} role="region" aria-label={`${grpLabel}事件清单`} className="max-w-full overflow-x-auto rounded-xl border border-gray-300">
+                    <table className="w-full min-w-[640px] text-sm">
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
                           <th className="px-3 py-2 text-left text-gray-800 font-medium w-7">#</th>
@@ -186,7 +185,7 @@ export default function ReportViewer({ data, logs }: Props) {
                       <tbody className="divide-y divide-gray-100">
                         {grpEvents.map((e, i) => (
                           <tr key={e.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 text-gray-400">{i + 1}</td>
+                            <td className="px-3 py-2 text-gray-600">{i + 1}</td>
                             <td className="px-3 py-2 max-w-[220px]">
                               <span className="truncate block text-gray-800">{e.title}</span>
                             </td>
@@ -201,8 +200,8 @@ export default function ReportViewer({ data, logs }: Props) {
                             </td>
                             <td className="px-3 py-2">
                               {e.source_url && (
-                                <a href={e.source_url} target="_blank" rel="noopener noreferrer"
-                                  className="text-gray-300 hover:text-primary-500 transition-colors">
+                                <a aria-label={`查看来源：${e.title}`} href={e.source_url} target="_blank" rel="noopener noreferrer"
+                                  className="text-gray-600 hover:text-primary-500 transition-colors">
                                   <ExternalLink className="w-3 h-3" />
                                 </a>
                               )}
@@ -223,8 +222,8 @@ export default function ReportViewer({ data, logs }: Props) {
       {logs.length > 0 && (
         <div>
           <div className="text-sm font-semibold text-gray-800 mb-2">四、Agent 执行日志</div>
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-xs">
+          <div tabIndex={0} role="region" aria-label="Agent 执行日志" className="max-w-full overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-3 py-2 text-left text-gray-800 font-medium w-20">时间</th>
@@ -253,7 +252,7 @@ export default function ReportViewer({ data, logs }: Props) {
       )}
 
       {/* 参考规范 */}
-      <div className="text-xs text-gray-400 border-t border-gray-100 pt-3">
+      <div className="text-xs text-gray-600 border-t border-gray-100 pt-3">
         参考规范：NIST SP 800-61r3 | CVSS v3.1 | CWE Top 25 | ISO/IEC 27035 &nbsp;·&nbsp; 本报告有效期 30 天
       </div>
     </div>

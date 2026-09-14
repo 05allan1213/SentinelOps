@@ -22,7 +22,7 @@ export default function SafeImage({ src, alt, className }: SafeImageProps) {
     return (
       <span
         data-testid="safe-image-wrapper"
-        className="my-3 inline-flex min-h-24 w-full max-w-md items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+        className="my-3 inline-flex min-h-24 w-full max-w-md items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600"
       >
         <span data-image-unavailable>{unavailableLabel(alt)}</span>
       </span>

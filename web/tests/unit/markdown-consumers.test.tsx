@@ -112,3 +112,13 @@ describe('Markdown consumer migration contract', () => {
     expect(liveThinking).toContain('complete={!isThinking}')
   })
 })
+
+// Cleanup is allowed only while the whole source tree remains migrated.
+it('has no legacy prose selectors or caller classes anywhere in source', () => {
+  const srcRelative = '../../src/'
+  const root = fileURLToPath(new URL(srcRelative, import.meta.url))
+  for (const path of sourceFiles(root)) {
+    expect(readFileSync(path, 'utf8')).not.toMatch(/\bprose\b/u)
+  }
+  expect(source('../../src/assets/styles/index.css')).not.toMatch(/\.prose\b/u)
+})

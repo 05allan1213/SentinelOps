@@ -1,8 +1,11 @@
-import { X, Download, Copy, Check, Calendar, FileText, AlertTriangle } from 'lucide-react'
+import { X, Download, Copy, Check, Calendar, FileText } from 'lucide-react'
 import { useState } from 'react'
 import { formatDate, parseReportPayload, normalizeMarkdown } from '@/utils'
 import ReportViewer from '@/components/report/ReportViewer'
 import { MarkdownRenderer } from '@/components/markdown'
+import Alert from '@/components/common/Alert'
+import Button from '@/components/common/Button'
+import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 interface ReportDetailModalProps {
   report: {
@@ -100,58 +103,51 @@ ${displayMarkdown.replace(/\n/g, '<br>')}
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal w-full max-w-4xl max-h-[90vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent className="max-w-4xl overflow-hidden p-4 sm:p-6">
         {/* 弹窗标题 */}
-        <div className="modal-header">
-          <div className="flex-1 pr-4">
-            <h2 className="text-lg font-medium text-gray-900">{report.title}</h2>
-            <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                {formatDate(report.created_at)}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5" />
-                {eventCount} 个事件
-              </span>
-              {criticalCount > 0 && (
-                <span className="text-red-600 font-medium">{criticalCount} 严重</span>
-              )}
-              {highCount > 0 && (
-                <span className="text-orange-600 font-medium">{highCount} 高危</span>
-              )}
-            </div>
+        <DialogHeader className="flex items-start gap-3 space-y-0">
+          <div className="min-w-0 flex-1">
+            <DialogTitle>{report.title}</DialogTitle>
+            <DialogDescription asChild>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {formatDate(report.created_at)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5" />
+                  {eventCount} 个事件
+                </span>
+                {criticalCount > 0 && (
+                  <span className="text-red-600 font-medium">{criticalCount} 严重</span>
+                )}
+                {highCount > 0 && (
+                  <span className="text-orange-600 font-medium">{highCount} 高危</span>
+                )}
+              </div>
+            </DialogDescription>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          <DialogClose asChild>
+            <Button variant="icon" aria-label="关闭报告"><X aria-hidden="true" className="h-5 w-5" /></Button>
+          </DialogClose>
+        </DialogHeader>
 
         {/* 报告内容 */}
-        <div className="modal-body flex-1 overflow-y-auto">
+        <DialogBody>
           {/* 一句话风险概括 */}
           {report.summary && (
-            <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-amber-800 font-medium">{report.summary}</p>
-            </div>
+            <Alert tone="warning" className="mb-4">{report.summary}</Alert>
           )}
           {payload
             ? <ReportViewer data={payload.risk_data} logs={payload.agent_logs} />
             : <MarkdownRenderer content={normalizeMarkdown(displayMarkdown)} variant="report" />
           }
-        </div>
+        </DialogBody>
 
         {/* 底部操作区 */}
-        <div className="modal-footer">
-          <button onClick={handleCopy} className="btn-default">
+        <DialogFooter>
+          <Button onClick={handleCopy}>
             {copied ? (
               <>
                 <Check className="w-4 h-4 text-success-500" />
@@ -163,24 +159,24 @@ ${displayMarkdown.replace(/\n/g, '<br>')}
                 复制内容
               </>
             )}
-          </button>
+          </Button>
           <div className="flex-1" />
-          <div className="flex items-center gap-2">
-            <button onClick={() => handleDownload('md')} className="btn-default">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => handleDownload('md')}>
               <Download className="w-4 h-4" />
               Markdown
-            </button>
-            <button onClick={() => handleDownload('html')} className="btn-default">
+            </Button>
+            <Button onClick={() => handleDownload('html')}>
               <Download className="w-4 h-4" />
               HTML
-            </button>
-            <button onClick={() => handleDownload('json')} className="btn-default">
+            </Button>
+            <Button onClick={() => handleDownload('json')}>
               <Download className="w-4 h-4" />
               JSON
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

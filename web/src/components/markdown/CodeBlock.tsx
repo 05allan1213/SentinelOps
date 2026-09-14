@@ -38,7 +38,7 @@ export default function CodeBlock({ code, language, streaming = false, children 
       data-testid="code-block"
       data-language={normalizedLanguage}
       data-highlight-skipped={skipReason}
-      className="my-3 min-w-0 max-w-full overflow-hidden rounded-md border border-gray-200 bg-gray-950 text-gray-100 dark:border-gray-700"
+      className="my-3 min-w-0 max-w-full overflow-hidden rounded-md border border-gray-200 bg-gray-950 text-gray-100"
     >
       <div className="flex min-h-9 items-center justify-between gap-3 border-b border-gray-800 px-3 py-1.5 text-xs text-gray-400">
         <span>{normalizedLanguage}</span>
