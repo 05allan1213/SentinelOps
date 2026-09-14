@@ -151,12 +151,14 @@ export function useRuntimeOperationPolling(operationId: string, options?: Runtim
 }
 
 export function useRuntimeCapabilities(params: PageParams = {}, options?: RuntimeHookOptions) {
-  return useQuery({
+  const query = useQuery({
     queryKey: runtimeQueryKeys.capabilities(params),
     queryFn: ({ signal }) => runtimeService.getCapabilities(params, { signal }),
     enabled: enabledOr(options, true),
     refetchInterval: options?.refetchInterval,
+    placeholderData: keepPreviousData,
   })
+  return query
 }
 
 export function useRuntimeSafety(options?: RuntimeHookOptions) {
@@ -169,12 +171,14 @@ export function useRuntimeSafety(options?: RuntimeHookOptions) {
 }
 
 export function useRuntimeWorkerHealth(params: PageParams = {}, options?: RuntimeHookOptions) {
-  return useQuery({
+  const query = useQuery({
     queryKey: runtimeQueryKeys.workerHealth(params),
     queryFn: ({ signal }) => runtimeService.getWorkerHealth(params, { signal }),
     enabled: enabledOr(options, true),
     refetchInterval: options?.refetchInterval,
+    placeholderData: keepPreviousData,
   })
+  return query
 }
 
 export function useRuntimeEval(params: EvalParams = {}, options?: RuntimeHookOptions) {

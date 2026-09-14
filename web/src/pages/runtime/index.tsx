@@ -1,6 +1,8 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Activity, AlertTriangle, Inbox, RefreshCw, ServerCrash } from 'lucide-react'
+import PaginationBar from '@/components/common/PaginationBar'
+import StatePanel from '@/components/common/StatePanel'
 import Pagination from '@/components/common/Pagination'
 import StatCard from '@/components/common/StatCard'
 import { useRuntimeRuns } from '@/hooks/useRuntimeQueries'
@@ -123,6 +125,7 @@ export default function RuntimeRunsPage() {
         />
       </div>
 
+      {query.isPlaceholderData && <StatePanel kind="loading" title={`正在加载第 ${page} 页`} description={`下方保留上次成功加载的第 ${data?.page?.page ?? '—'} 页数据。`} />}
       <RuntimeRunFilters filters={filters} onChange={onFilterChange} onReset={onReset} disabled={query.isFetching} />
 
       {failed && (
@@ -154,7 +157,7 @@ export default function RuntimeRunsPage() {
         <RuntimeRunsTable data={data ?? { items: [], availability: 'unavailable', data_quality: 'unknown' }} loading={query.isLoading || (query.isFetching && !data)} />
       )}
 
-      <div className="flex items-center justify-between gap-4">
+      <PaginationBar>
         <p className="text-xs text-gray-500">
           {filters.include_legacy ? '包含历史记录（只读）' : '默认仅 durable_v1 Run'}；每页 {pageSize} 条
         </p>
@@ -163,7 +166,8 @@ export default function RuntimeRunsPage() {
           totalPages={totalPages}
           total={total}
           pageSize={pageSize}
-          onChange={nextPage => update(next => {
+          isFetching={query.isFetching}
+          onPageChange={nextPage => update(next => {
             if (nextPage <= 1) next.delete('page')
             else next.set('page', String(nextPage))
           })}
@@ -172,7 +176,7 @@ export default function RuntimeRunsPage() {
             next.delete('page')
           })}
         />
-      </div>
+      </PaginationBar>
 
       <p className="sr-only" data-testid="runtime-runs-filters">{JSON.stringify(filters)}</p>
     </div>

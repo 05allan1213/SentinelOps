@@ -1,7 +1,7 @@
 import { runtimeLocalTimestamp } from '@/services/runtime'
 import { Search, RotateCcw } from 'lucide-react'
 function RuntimeFilterSelect({ value, onChange, options, placeholder, className }: { value: string; onChange: (value: string) => void; options: { value: string | number; label: string }[]; placeholder: string; className?: string }) {
-  return <select aria-label={placeholder} name={placeholder} value={value} onChange={event => onChange(event.target.value)} className={cn('h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700', className)}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+  return <select aria-label={placeholder} name={placeholder} value={value} onChange={event => onChange(event.target.value)} className={cn('h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2', className)}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
 }
 import { cn } from '@/utils'
 import type { RuntimeStatus } from '@/types/runtime'
@@ -54,7 +54,7 @@ interface Props {
   disabled?: boolean
 }
 
-const inputClass = 'h-9 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-colors duration-150'
+const inputClass = 'h-9 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 transition-colors duration-150'
 
 export default function RuntimeRunFilters({ filters, onChange, onReset, disabled }: Props) {
   return (
@@ -69,26 +69,26 @@ export default function RuntimeRunFilters({ filters, onChange, onReset, disabled
           onChange={value => onChange({ status: value as RuntimeStatus | '' })}
           options={STATUS_OPTIONS}
           placeholder="状态"
-          className="w-[150px]"
+          className="min-w-[140px] flex-1 basis-[150px]"
         />
       </div>
       <input
         name="Session ID" autoComplete="off" aria-label="Session ID"
-        className={cn(inputClass, 'w-[190px]')}
+        className={cn(inputClass, 'min-w-[165px] flex-1 basis-[190px]')}
         placeholder="Session ID"
         value={filters.session_id}
         onChange={event => onChange({ session_id: event.target.value })}
       />
       <input
         name="Agent" autoComplete="off" aria-label="Agent"
-        className={cn(inputClass, 'w-[150px]')}
+        className={cn(inputClass, 'min-w-[140px] flex-1 basis-[150px]')}
         placeholder="Agent"
         value={filters.agent}
         onChange={event => onChange({ agent: event.target.value })}
       />
       <input
         name="Scope" autoComplete="off" aria-label="Scope"
-        className={cn(inputClass, 'w-[130px]')}
+        className={cn(inputClass, 'min-w-[110px] flex-1 basis-[130px]')}
         placeholder="Scope"
         value={filters.scope}
         onChange={event => onChange({ scope: event.target.value })}
@@ -96,14 +96,14 @@ export default function RuntimeRunFilters({ filters, onChange, onReset, disabled
       <input
         name="开始时间" autoComplete="off" aria-label="开始时间"
         type="datetime-local"
-        className={cn(inputClass, 'w-[190px]')}
+        className={cn(inputClass, 'min-w-[165px] flex-1 basis-[190px]')}
         value={runtimeLocalTimestamp(filters.from)}
         onChange={event => onChange({ from: event.target.value })}
       />
       <input
         name="结束时间" autoComplete="off" aria-label="结束时间"
         type="datetime-local"
-        className={cn(inputClass, 'w-[190px]')}
+        className={cn(inputClass, 'min-w-[165px] flex-1 basis-[190px]')}
         value={runtimeLocalTimestamp(filters.to)}
         onChange={event => onChange({ to: event.target.value })}
       />
@@ -112,14 +112,14 @@ export default function RuntimeRunFilters({ filters, onChange, onReset, disabled
         onChange={value => onChange({ sort: value })}
         options={SORT_OPTIONS}
         placeholder="排序"
-        className="w-[130px]"
+        className="min-w-[110px] flex-1 basis-[130px]"
       />
       <RuntimeFilterSelect
         value={filters.direction}
         onChange={value => onChange({ direction: value })}
         options={DIRECTION_OPTIONS}
         placeholder="方向"
-        className="w-[100px]"
+        className="min-w-[90px] flex-1 basis-[100px]"
       />
       <label className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 cursor-pointer select-none">
         <input

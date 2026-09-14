@@ -252,19 +252,21 @@ for (const width of [1280, 1440]) {
       return route.fulfill({ contentType: 'application/json', body: envelope({ items, page: { page: currentPage, page_size: size, total: size + 1, has_next: currentPage === 1 }, ...meta() }) })
     })
     const cases = [
-      ['timeline', 'Timeline', 'runtime-timeline-row'], ['attempts', 'Attempts', 'runtime-attempt-row'],
-      ['attempts', 'Checkpoint', 'runtime-checkpoint-row'], ['effects', 'Effects', 'runtime-effect-row'],
-      ['evidence', 'Evidence', 'runtime-evidence-row'], ['trace', 'Trace', 'runtime-trace-row'],
+      ['timeline', 'Timeline', 'runtime-timeline-row', 'timeline'], ['attempts', 'Attempts', 'runtime-attempt-row', 'attempts'],
+      ['attempts', 'Checkpoint', 'runtime-checkpoint-row', 'checkpoints'], ['effects', 'Effects', 'runtime-effect-row', 'effects'],
+      ['evidence', 'Evidence', 'runtime-evidence-row', 'evidence'], ['trace', 'Trace', 'runtime-trace-row', 'traces'],
     ]
-    for (const [tab, label, row] of cases) {
+    for (const [tab, label, row, resource] of cases) {
       await page.goto(`/runtime/runs/run-1?tab=${tab}`)
       const navigation = page.getByRole('navigation', { name: `${label} 分页` })
       await navigation.getByRole('button', { name: '下一页' }).click()
       await expect(page.getByTestId(row)).toHaveCount(1)
-      await expect(navigation).toContainText('第 2 页')
+      // Shared Pagination contract: total from PageMeta plus a page / totalPages indicator.
+      await expect(navigation).toContainText(`共 ${sizes[resource] + 1} 条`)
+      await expect(navigation.locator('[aria-live="polite"]')).toHaveText('2 / 2')
       await expect(navigation.getByRole('button', { name: '下一页' })).toBeDisabled()
       await navigation.getByRole('button', { name: '上一页' }).click()
-      await expect(navigation).toContainText('第 1 页')
+      await expect(navigation.locator('[aria-live="polite"]')).toHaveText('1 / 2')
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
     }
   })

@@ -2,6 +2,21 @@ import { expect, test, type Page } from '@playwright/test'
 
 const envelope = (data: unknown) => JSON.stringify({ message: 'OK', data })
 
+// Read-only surfaces may expose refresh + pagination navigation, never a business mutation affordance.
+const MUTATION_NAMES = ['Edit', 'Enable', 'Disable', 'Delete', 'Save', 'Create', 'Switch', '编辑', '启用', '停用', '删除', '保存', '创建']
+const NAVIGATION_CONTROL = /^(刷新|上一页|下一页|确定|跳转页码|每页条数)$/
+
+async function expectReadOnlySurface(page: Page) {
+  for (const name of MUTATION_NAMES) {
+    await expect(page.getByRole('button', { name, exact: false })).toHaveCount(0)
+  }
+  await expect(page.locator('main [role="switch"], main input[type="checkbox"], main textarea')).toHaveCount(0)
+  const controls = await page.locator('main button, main select').evaluateAll(elements =>
+    elements.map(element => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''))
+  expect(controls.length).toBeGreaterThan(0)
+  for (const control of controls) expect(control, `unexpected runtime control: ${control}`).toMatch(NAVIGATION_CONTROL)
+}
+
 async function installAuth(page: Page) {
   await page.addInitScript(() => localStorage.setItem('token', 'controlled-runtime-token'))
 }
@@ -107,9 +122,8 @@ for (const width of [1280, 1440]) {
     await expect(rows.nth(1).getByTestId('runtime-capability-observed')).toHaveAttribute('data-state', 'not_observed')
     await expect(rows.nth(1).getByTestId('runtime-capability-observed')).toHaveText('not_observed')
 
-    // Read-only surface: only the refresh button exists, no form controls.
-    expect(await page.locator('main input, main select, main textarea, main [role="switch"]').count()).toBe(0)
-    expect(await page.locator('main button').count()).toBe(1)
+    // Read-only surface: refresh + pagination navigation only, no business mutation control.
+    await expectReadOnlySurface(page)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
 
     await page.getByRole('link', { name: 'Safety' }).click()
@@ -118,7 +132,7 @@ for (const width of [1280, 1440]) {
     await expect(page.getByTestId('runtime-safety-l1')).toHaveText('阻止')
     await expect(page.getByTestId('runtime-safety-l2')).toHaveText('阻止')
     await expect(page.getByTestId('runtime-safety-audit')).toHaveText('不可用')
-    expect(await page.locator('main input, main select, main textarea, main [role="switch"]').count()).toBe(0)
+    await expectReadOnlySurface(page)
 
     await page.getByRole('link', { name: 'Worker Health' }).click()
     await expect.poll(() => new URL(page.url()).pathname).toBe('/runtime/worker-health')
@@ -134,7 +148,7 @@ for (const width of [1280, 1440]) {
     await expect(page.getByTestId('runtime-retention-section')).toContainText('30')
     await expect(page.getByTestId('runtime-retention-section')).toContainText('cleanup_evidence_missing')
     // No release/rollback/cleanup control exists on the read-only surface.
-    expect(await page.locator('main input, main select, main textarea, main [role="switch"]').count()).toBe(0)
+    await expectReadOnlySurface(page)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
   })
 }

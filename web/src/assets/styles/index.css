@@ -1135,10 +1135,14 @@ main[data-surface="runtime"] {
   --color-gray-500: #667085;
   --color-gray-400: #687585;
 }
-main[data-surface="runtime"] :focus-visible,
-[data-testid="runtime-recovery-dialog"] :focus-visible {
-  outline: 2px solid #4f46e5;
-  outline-offset: 2px;
+/* Layered so shared control utilities (focus outline-none + ring) win wherever a control defines
+   its own focus treatment; elements without one keep this runtime outline. */
+@layer base {
+  main[data-surface="runtime"] :focus-visible,
+  [data-testid="runtime-recovery-dialog"] :focus-visible {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   main[data-surface="runtime"] *,
