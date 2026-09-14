@@ -19,23 +19,23 @@ export default function EvidenceLab({ logs, selected }: Props) {
 
   if (!selected || agentLogs.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#010409] text-[#8B949E] text-sm">
+      <div className="flex-1 flex items-center justify-center bg-gray-50 text-gray-500 text-sm">
         选择左侧节点查看详情
       </div>
     )
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#010409] overflow-hidden">
+    <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
       {/* 标签页导航 */}
-      <div className="flex border-b border-[#30363D] px-3">
+      <div className="flex border-b border-gray-200 px-3">
         {(['overview', 'ioc', 'cvss'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={cn(
               'px-3 py-2 text-xs border-b-2 -mb-px transition-colors',
-              tab === t ? 'border-[#58A6FF] text-[#E6EDF3]' : 'border-transparent text-[#8B949E] hover:text-[#E6EDF3]'
+              tab === t ? 'border-[#58A6FF] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900'
             )}
           >
             {t === 'overview' ? '概览' : t === 'ioc' ? 'IOC提取' : 'CVSS详情'}
@@ -54,7 +54,7 @@ export default function EvidenceLab({ logs, selected }: Props) {
 }
 
 function OverviewTab({ agent, data }: { agent: string; data?: AgentLog['data'] }) {
-  if (!data) return <div className="text-[#8B949E] text-sm">暂无数据</div>
+  if (!data) return <div className="text-gray-500 text-sm">暂无数据</div>
 
   if (agent === '数据采集Agent') {
     return (
@@ -88,17 +88,17 @@ function OverviewTab({ agent, data }: { agent: string; data?: AgentLog['data'] }
         </div>
         {data.events && data.events.length > 0 && (
           <div className="mt-4">
-            <div className="text-xs text-[#8B949E] mb-2">高危事件列表</div>
+            <div className="text-xs text-gray-500 mb-2">高危事件列表</div>
             <div className="space-y-2 max-h-[300px] overflow-auto">
               {data.events.slice(0, 5).map(e => (
-                <div key={e.id} className="p-2 bg-[#0D1117] border border-[#30363D] rounded">
+                <div key={e.id} className="p-2 bg-white border border-gray-200 rounded">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-mono text-[#58A6FF]">{e.cve_id}</span>
-                    <span className={cn('text-[10px] px-1 rounded', e.severity === 'critical' ? 'bg-[#F85149]/20 text-[#F85149]' : 'bg-[#F0883E]/20 text-[#F0883E]')}>
+                    <span className="text-xs font-mono text-blue-600">{e.cve_id}</span>
+                    <span className={cn('text-[10px] px-1 rounded', e.severity === 'critical' ? 'bg-red-600/20 text-red-600' : 'bg-orange-600/20 text-orange-600')}>
                       CVSS {e.cvss}
                     </span>
                   </div>
-                  <div className="text-xs text-[#E6EDF3] truncate">{e.title}</div>
+                  <div className="text-xs text-gray-900 truncate">{e.title}</div>
                 </div>
               ))}
             </div>
@@ -108,11 +108,11 @@ function OverviewTab({ agent, data }: { agent: string; data?: AgentLog['data'] }
     )
   }
 
-  return <div className="text-[#8B949E] text-sm">暂无数据</div>
+  return <div className="text-gray-500 text-sm">暂无数据</div>
 }
 
 function IOCTab({ data }: { data?: AgentLog['data'] }) {
-  if (!data?.events) return <div className="text-[#8B949E] text-sm">暂无IOC数据</div>
+  if (!data?.events) return <div className="text-gray-500 text-sm">暂无IOC数据</div>
 
   const iocs = data.events.flatMap(e => [
     { type: 'CVE', value: e.cve_id, source: e.vendor },
@@ -128,14 +128,14 @@ function IOCTab({ data }: { data?: AgentLog['data'] }) {
 }
 
 function CVSSTab({ data }: { data?: AgentLog['data'] }) {
-  if (!data?.events?.[0]) return <div className="text-[#8B949E] text-sm">暂无CVSS数据</div>
+  if (!data?.events?.[0]) return <div className="text-gray-500 text-sm">暂无CVSS数据</div>
 
   const e = data.events[0]
   return (
     <div className="space-y-3">
-      <div className="text-center p-4 bg-[#0D1117] border border-[#30363D] rounded">
-        <div className="text-4xl font-mono font-bold text-[#F85149]">{e.cvss}</div>
-        <div className="text-xs text-[#8B949E] mt-1">CVSS 3.1 评分</div>
+      <div className="text-center p-4 bg-white border border-gray-200 rounded">
+        <div className="text-4xl font-mono font-bold text-red-600">{e.cvss}</div>
+        <div className="text-xs text-gray-500 mt-1">CVSS 3.1 评分</div>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <DataBlock label="厂商" value={e.vendor || '-'} />

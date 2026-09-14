@@ -283,7 +283,7 @@ export default function EventAnalysis() {
     terminateRunningLogs()
   }
 
-  return (    <div className="relative flex flex-col bg-white -m-8 min-h-full">
+  return (    <div data-surface="analysis" className="relative flex flex-col min-h-full">
       {/* 顶部操作栏 */}
       <div className="px-6 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">

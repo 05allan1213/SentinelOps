@@ -24,28 +24,28 @@ ${events.slice(0, 3).map(e => `  - id: block_${e.cve_id}
   }
 
   return (
-    <div className="w-[320px] border-l border-[#30363D] bg-[#0D1117] flex flex-col">
-      <div className="p-3 border-b border-[#30363D]">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-[#E6EDF3]"><Eye className="w-3.5 h-3.5" />Proposal Preview</div>
+    <div className="w-[320px] border-l border-gray-200 bg-white flex flex-col">
+      <div className="p-3 border-b border-gray-200">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900"><Eye className="w-3.5 h-3.5" />Proposal Preview</div>
       </div>
 
       <div className="flex-1 p-3 overflow-auto">
         {ruleYaml ? (
           <div className="relative">
-            <button onClick={copyRule} className="absolute top-2 right-2 p-1 hover:bg-[#30363D] rounded">
-              <Copy className="w-3 h-3 text-[#8B949E]" />
+            <button onClick={copyRule} className="absolute top-2 right-2 p-1 hover:bg-gray-100 rounded">
+              <Copy className="w-3 h-3 text-gray-500" />
             </button>
-            <pre className="text-[11px] font-mono text-[#8B949E] bg-[#010409] p-3 rounded border border-[#30363D] overflow-x-auto">
+            <pre className="text-[11px] font-mono text-gray-500 bg-gray-50 p-3 rounded border border-gray-200 overflow-x-auto">
               {ruleYaml}
             </pre>
           </div>
         ) : (
-          <div className="text-[#8B949E] text-xs text-center py-8">完成分析后生成防御规则</div>
+          <div className="text-gray-500 text-xs text-center py-8">完成分析后生成防御规则</div>
         )}
       </div>
 
-      <div className="p-3 border-t border-[#30363D]">
-        <div className="rounded border border-[#30363D] bg-[#161B22] px-3 py-2 text-center text-[10px] text-[#8B949E]">仅 Proposal Preview；未连接 Effect 执行，也不会显示成功。</div>
+      <div className="p-3 border-t border-gray-200">
+        <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-center text-[10px] text-gray-500">仅 Proposal Preview；未连接 Effect 执行，也不会显示成功。</div>
       </div>
     </div>
   )

@@ -65,7 +65,7 @@ export default function StatsBar({ data, isProcessing }: Props) {
       label: '分析总数',
       value: data?.count ?? 0,
       icon: TrendingUp,
-      color: '#00F0E0',
+      color: '#1677FF',
     },
   ]
 
@@ -79,9 +79,9 @@ export default function StatsBar({ data, isProcessing }: Props) {
             key={idx}
             className={cn(
               'relative p-4 rounded-2xl border transition-all duration-300 overflow-hidden',
-              'bg-white dark:from-[#0D1117] dark:via-[#0D1117] dark:to-[#161B22]',
-              'border-gray-200 dark:border-[#30363D]/60 shadow-sm hover:shadow-md',
-              stat.glow && 'border-red-200 dark:border-[#EF4444]/40 shadow-red-100 dark:shadow-[#EF4444]/20'
+              'bg-white from-[#0D1117] via-[#0D1117] to-[#161B22]',
+              'border-gray-200 border-gray-200/60 shadow-sm hover:shadow-md',
+              stat.glow && 'border-red-200 border-[#EF4444]/40 shadow-red-100 shadow-[#EF4444]/20'
             )}
           >
             {/* 背景渐变装饰 */}
@@ -94,7 +94,7 @@ export default function StatsBar({ data, isProcessing }: Props) {
 
             {/* 严重时的脉冲背景 */}
             {stat.glow && (
-              <div className="absolute inset-0 rounded-2xl bg-[#EF4444]/5 animate-pulse" />
+              <div className="absolute inset-0 rounded-2xl bg-[#EF4444]/5" />
             )}
 
             <div className="relative flex items-center gap-4">
@@ -116,12 +116,12 @@ export default function StatsBar({ data, isProcessing }: Props) {
                     />
                   ) : (
                     <span className={cn(
-                      'text-gray-300 dark:text-[#30363D]',
+                      'text-gray-300 text-[#30363D]',
                       isProcessing && 'animate-pulse'
                     )}>--</span>
                   )}
                 </div>
-                <div className="text-xs text-gray-600 dark:text-[#8B949E] tracking-wide mt-1 font-medium">
+                <div className="text-xs text-gray-600 text-gray-500 tracking-wide mt-1 font-medium">
                   {stat.label}
                 </div>
               </div>

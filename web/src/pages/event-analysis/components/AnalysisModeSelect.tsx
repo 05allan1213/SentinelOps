@@ -38,22 +38,22 @@ export default function AnalysisModeSelect({ value, onChange, disabled, selected
         disabled={disabled}
         className={cn(
           'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
-          'border border-gray-200 dark:border-[#30363D] bg-white dark:bg-[#161B22] text-gray-700 dark:text-[#C9D1D9] hover:border-gray-300 dark:hover:border-[#8B949E]',
+          'border border-gray-200 border-gray-200 bg-white bg-gray-50 text-gray-700 text-gray-700 hover:border-gray-300 hover:border-[#8B949E]',
           disabled && 'opacity-50 cursor-not-allowed',
         )}
       >
-        <Icon className="w-4 h-4 text-[#00F0E0]" />
+        <Icon className="w-4 h-4 text-teal-600" />
         <span>{current.label}</span>
         {value === 'specific' && selectedCount !== undefined && selectedCount > 0 && (
-          <span className="px-1.5 py-0.5 rounded bg-[#00F0E0]/15 text-[#00F0E0] text-xs font-mono">
+          <span className="px-1.5 py-0.5 rounded bg-teal-600/15 text-teal-600 text-xs font-mono">
             {selectedCount}
           </span>
         )}
-        <ChevronDown className={cn('w-3.5 h-3.5 text-gray-500 dark:text-[#8B949E] transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('w-3.5 h-3.5 text-gray-500 text-gray-500 transition-transform', open && 'rotate-180')} />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-52 rounded-xl border border-gray-200 dark:border-[#30363D] bg-white dark:bg-[#161B22] shadow-xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-1 w-52 rounded-xl border border-gray-200 border-gray-200 bg-white bg-gray-50 shadow-xl z-50 overflow-hidden">
           {options.map(opt => {
             const OptIcon = opt.icon
             const active = opt.value === value
@@ -63,13 +63,13 @@ export default function AnalysisModeSelect({ value, onChange, disabled, selected
                 onClick={() => { onChange(opt.value); setOpen(false) }}
                 className={cn(
                   'w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors',
-                  active ? 'bg-[#00F0E0]/10 text-[#00F0E0]' : 'text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]',
+                  active ? 'bg-teal-600/10 text-teal-600' : 'text-gray-700 text-gray-700 hover:bg-gray-100 hover:bg-gray-100',
                 )}
               >
                 <OptIcon className="w-4 h-4 shrink-0" />
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">{opt.label}</span>
-                  <span className="text-xs text-gray-500 dark:text-[#8B949E]">{opt.desc}</span>
+                  <span className="text-xs text-gray-500 text-gray-500">{opt.desc}</span>
                 </div>
               </button>
             )

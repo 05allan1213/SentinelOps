@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-for (const width of [1280, 1440]) {
+for (const width of [1280, 1440, 1920]) {
   test(`analysis columns stay local at ${width}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 })
     await page.addInitScript(() => localStorage.setItem('token', 'fixture'))

@@ -97,6 +97,9 @@ export default function AgentFlowGraph({ logs, isProcessing }: Props) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    // Decorative particle flow: keep a single static frame when the user asks for reduced motion.
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
     const inactiveLineColor = 'rgba(148,163,184,0.4)'
 
     const resize = () => {
@@ -199,7 +202,7 @@ export default function AgentFlowGraph({ logs, isProcessing }: Props) {
         ctx.fill()
       }
 
-      animationId = requestAnimationFrame(animate)
+      if (!reduceMotion) animationId = requestAnimationFrame(animate)
     }
 
     animate()

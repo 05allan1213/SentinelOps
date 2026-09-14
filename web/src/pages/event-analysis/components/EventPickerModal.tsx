@@ -56,33 +56,33 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-[700px] max-h-[70vh] rounded-2xl border border-gray-200 dark:border-[#30363D] bg-white dark:bg-[#0D1117] flex flex-col overflow-hidden shadow-2xl"
+        className="w-[700px] max-h-[70vh] rounded-2xl border border-gray-200 border-gray-200 bg-white bg-white flex flex-col overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* 弹窗标题 */}
-        <div className="px-5 py-4 border-b border-gray-200 dark:border-[#30363D]/50 flex items-center justify-between">
-          <span className="text-base font-semibold text-gray-900 dark:text-[#E6EDF3]">选择要分析的事件</span>
-          <button onClick={onClose} className="text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] transition-colors">
+        <div className="px-5 py-4 border-b border-gray-200 border-gray-200/50 flex items-center justify-between">
+          <span className="text-base font-semibold text-gray-900 text-gray-900">选择要分析的事件</span>
+          <button onClick={onClose} aria-label="关闭" className="text-gray-500 text-gray-500 hover:text-gray-900 hover:text-gray-900 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* 事件搜索 */}
-        <div className="px-5 py-3 border-b border-gray-200 dark:border-[#30363D]/30">
+        <div className="px-5 py-3 border-b border-gray-200 border-gray-200/30">
           <div className="flex items-center gap-2">
-            <div className="flex-1 flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-50 dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D]">
-              <Search className="w-4 h-4 text-gray-500 dark:text-[#8B949E]" />
+            <div className="flex-1 flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-50 bg-gray-50 border border-gray-200 border-gray-200">
+              <Search className="w-4 h-4 text-gray-500 text-gray-500" />
               <input
                 value={keyword}
                 onChange={e => setKeyword(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 placeholder="搜索事件标题、CVE..."
-                className="flex-1 bg-transparent text-sm text-gray-900 dark:text-[#E6EDF3] outline-none placeholder:text-gray-500 dark:placeholder:text-[#8B949E]"
+                className="flex-1 bg-transparent text-sm text-gray-900 text-gray-900 outline-none placeholder:text-gray-500 placeholder:text-gray-500"
               />
             </div>
             <button
               onClick={handleSearch}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] border border-gray-200 dark:border-[#30363D] hover:border-gray-300 dark:hover:border-[#8B949E]"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 bg-gray-100 text-gray-700 text-gray-700 border border-gray-200 border-gray-200 hover:border-gray-300 hover:border-[#8B949E]"
             >
               搜索
             </button>
@@ -93,10 +93,10 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
         <div className="flex-1 overflow-y-auto min-h-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 text-gray-500 dark:text-[#8B949E] animate-spin" />
+              <Loader2 className="w-6 h-6 text-gray-500 text-gray-500 animate-spin" />
             </div>
           ) : events.length === 0 ? (
-            <div className="text-center py-12 text-sm text-gray-500 dark:text-[#8B949E]">暂无事件数据</div>
+            <div className="text-center py-12 text-sm text-gray-500 text-gray-500">暂无事件数据</div>
           ) : (
             events.map(ev => {
               const isSelected = selected.has(ev.id)
@@ -106,13 +106,13 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
                   key={ev.id}
                   onClick={() => toggle(ev.id)}
                   className={cn(
-                    'w-full flex items-center gap-3 px-5 py-3 text-left transition-colors border-b border-gray-200 dark:border-[#30363D]/20',
-                    isSelected ? 'bg-[#00F0E0]/5' : 'hover:bg-gray-50 dark:hover:bg-[#161B22]',
+                    'w-full flex items-center gap-3 px-5 py-3 text-left transition-colors border-b border-gray-200 border-gray-200/20',
+                    isSelected ? 'bg-teal-600/5' : 'hover:bg-gray-50 hover:bg-gray-50',
                   )}
                 >
                   <div className={cn(
                     'w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors',
-                    isSelected ? 'bg-[#00F0E0] border-[#00F0E0]' : 'border-gray-300 dark:border-[#30363D]',
+                    isSelected ? 'bg-teal-600 border-[#00F0E0]' : 'border-gray-300 border-gray-200',
                   )}>
                     {isSelected && <Check className="w-3.5 h-3.5 text-[#010409]" />}
                   </div>
@@ -124,11 +124,11 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
                       >
                         {sev.label}
                       </span>
-                      <span className="text-sm text-gray-900 dark:text-[#E6EDF3] truncate">{ev.title}</span>
+                      <span className="text-sm text-gray-900 text-gray-900 truncate">{ev.title}</span>
                     </div>
                     <div className="flex items-center gap-3 mt-0.5">
-                      {ev.cve_id && <span className="text-xs text-[#00F0E0] font-mono">{ev.cve_id}</span>}
-                      <span className="text-xs text-gray-500 dark:text-[#8B949E]">{formatDate(ev.event_time)}</span>
+                      {ev.cve_id && <span className="text-xs text-teal-600 font-mono">{ev.cve_id}</span>}
+                      <span className="text-xs text-gray-500 text-gray-500">{formatDate(ev.event_time)}</span>
                     </div>
                   </div>
                 </button>
@@ -138,14 +138,14 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
         </div>
 
         {/* 底部操作区 */}
-        <div className="px-5 py-4 border-t border-gray-200 dark:border-[#30363D]/50 flex items-center justify-between">
-          <span className="text-sm text-gray-500 dark:text-[#8B949E]">
-            已选择 <span className="text-[#00F0E0] font-mono">{selected.size}</span> 个事件
+        <div className="px-5 py-4 border-t border-gray-200 border-gray-200/50 flex items-center justify-between">
+          <span className="text-sm text-gray-500 text-gray-500">
+            已选择 <span className="text-teal-600 font-mono">{selected.size}</span> 个事件
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-[#C9D1D9] border border-gray-200 dark:border-[#30363D] hover:border-gray-300 dark:hover:border-[#8B949E]"
+              className="px-5 py-2 rounded-lg text-sm font-medium text-gray-700 text-gray-700 border border-gray-200 border-gray-200 hover:border-gray-300 hover:border-[#8B949E]"
             >
               取消
             </button>
@@ -155,8 +155,8 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
               className={cn(
                 'px-5 py-2 rounded-lg text-sm font-bold transition-all',
                 selected.size > 0
-                  ? 'bg-[#00F0E0] text-[#010409] hover:shadow-lg hover:shadow-[#00F0E0]/20'
-                  : 'bg-gray-200 dark:bg-[#21262D] text-gray-500 dark:text-[#8B949E] cursor-not-allowed',
+                  ? 'bg-teal-600 text-[#010409] hover:shadow-lg hover:shadow-[#00F0E0]/20'
+                  : 'bg-gray-200 bg-gray-100 text-gray-500 text-gray-500 cursor-not-allowed',
               )}
             >
               确认选择
