@@ -10,15 +10,18 @@ import {
   ChevronsRight,
   Shield,
   MessageSquare,
-  Cpu,
+  Boxes,
+  BrainCircuit,
+  Wrench,
   BookMarked,
-  Activity,
+  Workflow,
+  Route,
   LibraryBig,
   FlaskConical,
   ChevronDown,
   Plug,
   ShieldCheck,
-  ServerCog,
+  HeartPulse,
 } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -46,27 +49,27 @@ interface NavGroup {
 const navGroups: NavGroup[] = [
   {
     title: 'Agent Runtime',
-    accent: '#818CF8',
+    accent: 'var(--color-primary-300)',
     items: [
-      { path: '/runtime/runs', icon: Activity, label: 'Runs' },
-      { path: '/runtime/capabilities', icon: Cpu, label: 'Capabilities' },
+      { path: '/runtime/runs', icon: Workflow, label: 'Runs' },
+      { path: '/runtime/capabilities', icon: Boxes, label: 'Capabilities' },
       { path: '/runtime/safety', icon: ShieldCheck, label: 'Safety' },
-      { path: '/runtime/worker-health', icon: ServerCog, label: 'Worker Health' },
+      { path: '/runtime/worker-health', icon: HeartPulse, label: 'Worker Health' },
     ],
   },
   {
     title: 'AI 能力',
-    accent: '#818CF8',
+    accent: 'var(--color-primary-300)',
     items: [
       { path: '/chat', icon: MessageSquare, label: 'RAG 智能对话' },
-      { path: '/events/analysis', icon: Cpu, label: 'Agent 分析' },
+      { path: '/events/analysis', icon: BrainCircuit, label: 'Agent 分析' },
       { path: '/knowledge', icon: LibraryBig, label: 'AI 知识库' },
-      { path: '/ops', icon: Cpu, label: 'AI 智能运维' },
+      { path: '/ops', icon: Wrench, label: 'AI 智能运维' },
     ],
   },
   {
     title: '数据管理',
-    accent: '#60A5FA',
+    accent: 'var(--color-primary-300)',
     items: [
       { path: '/subscriptions', icon: Rss, label: '情报订阅' },
       { path: '/events', icon: ShieldAlert, label: '安全事件', exact: true },
@@ -77,10 +80,10 @@ const navGroups: NavGroup[] = [
   },
   {
     title: '系统监控',
-    accent: '#34D399',
+    accent: 'var(--color-primary-300)',
     items: [
       { path: '/dashboard', icon: LayoutDashboard, label: '系统概览', exact: true },
-      { path: '/traces', icon: Activity, label: '链路追踪' },
+      { path: '/traces', icon: Route, label: '链路追踪' },
       { path: '/rag-eval', icon: FlaskConical, label: 'RAG 评估' },
       { path: '/settings', icon: Settings, label: '系统设置' },
     ],
@@ -88,8 +91,10 @@ const navGroups: NavGroup[] = [
 ]
 
 export default function Sidebar() {
-  // @ts-ignore
-  const { sidebarCollapsed, sidebarWidth, toggleSidebar, setSidebarWidth } = useAppStore()
+  const sidebarCollapsed = useAppStore(s => s.sidebarCollapsed)
+  const sidebarWidth = useAppStore(s => s.sidebarWidth)
+  const toggleSidebar = useAppStore(s => s.toggleSidebar)
+  const setSidebarWidth = useAppStore(s => s.setSidebarWidth)
   const siteName = useSettingsStore(s => s.siteName)
   const location = useLocation()
   const isResizing = useRef(false)
@@ -152,7 +157,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-screen z-50 flex flex-col transition-[width] duration-200"
+      className="fixed left-0 top-0 h-screen z-50 flex flex-col transition-[width] duration-200 motion-reduce:transition-none"
       style={{
         width: sidebarCollapsed ? '72px' : `${sidebarWidth}px`,
         background: 'linear-gradient(180deg, #12172a 0%, #1a2035 50%, #1e2540 100%)',
@@ -202,7 +207,7 @@ export default function Sidebar() {
       )}
 
       {/* 导航 */}
-      <nav className="flex-1 overflow-y-auto py-1 px-2 space-y-1 sidebar-scroll">
+      <nav aria-label="主导航" className="flex-1 overflow-y-auto py-1 px-2 space-y-1 sidebar-scroll">
         {navGroups.map((group, groupIdx) => {
           const isGroupCollapsed = !!collapsedGroups[group.title]
           const groupHasActive = isGroupActive(group)
@@ -218,47 +223,31 @@ export default function Sidebar() {
               {/* 分组标题（展开状态） */}
               {!sidebarCollapsed && (
                 <button
+                  type="button"
+                  aria-expanded={!isGroupCollapsed}
+                  aria-controls={`sidebar-group-${groupIdx}`}
                   onClick={() => toggleGroup(group.title)}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg mb-1 transition-colors hover:bg-white/5 group"
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg mb-1 transition-colors hover:bg-white/5 group focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary-300 motion-reduce:transition-none"
                 >
                   <div className="flex items-center gap-2.5">
-                    <div
-                      className="relative w-2 h-2 flex-shrink-0 transition-colors duration-300"
-                      style={{
-                        opacity: groupHasActive ? 1 : 0.5,
-                      }}
-                    >
-                      <span
-                        className="absolute inset-0 rounded-sm"
-                        style={{
-                          background: `linear-gradient(135deg, ${group.accent}, ${group.accent}dd)`,
-                          boxShadow: groupHasActive ? `0 0 12px ${group.accent}88, 0 0 4px ${group.accent}` : 'none',
-                        }}
-                      />
-                      {groupHasActive && (
-                        <span
-                          className="absolute inset-0 rounded-sm animate-pulse"
-                          style={{
-                            background: group.accent,
-                            opacity: 0.4,
-                          }}
-                        />
-                      )}
-                    </div>
                     <span
-                      className="text-[11px] font-bold tracking-wide uppercase transition-colors"
+                      aria-hidden="true"
+                      className="h-2 w-2 shrink-0 rounded-sm"
+                      style={{ background: group.accent, opacity: groupHasActive ? 1 : 0.5 }}
+                    />
+                    <span
+                      className="text-xs font-semibold tracking-wide transition-colors motion-reduce:transition-none"
                       style={{
                         color: groupHasActive && isGroupCollapsed
                           ? group.accent
-                          : 'rgba(255,255,255,0.45)',
-                        letterSpacing: '0.08em',
+                          : 'rgba(255,255,255,0.65)',
                       }}
                     >
                       {group.title}
                     </span>
                   </div>
                   <ChevronDown
-                    className="w-3.5 h-3.5 transition-transform duration-200"
+                    className="w-3.5 h-3.5 transition-transform duration-200 motion-reduce:transition-none"
                     style={{
                       color: 'rgba(255,255,255,0.3)',
                       transform: isGroupCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
@@ -268,64 +257,65 @@ export default function Sidebar() {
               )}
 
               {/* 导航项列表（折叠时隐藏） */}
-              {(!isGroupCollapsed || sidebarCollapsed) && (
-                <div className="space-y-0.5">
-                  {group.items.map(item => {
-                    const active = isItemActive(item)
-                    return (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        title={sidebarCollapsed ? item.label : undefined}
-                        className={cn(
-                          'relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150',
-                          sidebarCollapsed && 'justify-center px-0',
-                          active
-                            ? 'text-white'
-                            : 'hover:bg-white/[0.07] hover:text-white/90',
-                        )}
-                        style={{
-                          background: active
-                            ? `linear-gradient(90deg, rgba(99,102,241,0.22) 0%, rgba(99,102,241,0.08) 100%)`
-                            : undefined,
-                          color: active ? 'white' : 'rgba(255,255,255,0.58)',
-                        }}
-                      >
-                        {/* 左侧激活指示条（使用分组 accent 色） */}
-                        {active && !sidebarCollapsed && (
-                          <span
-                            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full"
-                            style={{ background: group.accent }}
-                          />
-                        )}
-
-                        <item.icon
-                          className={cn('flex-shrink-0', sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4')}
-                          style={{ color: active ? group.accent : 'rgba(255,255,255,0.38)' }}
+              <div id={`sidebar-group-${groupIdx}`} hidden={isGroupCollapsed && !sidebarCollapsed} className="space-y-0.5">
+                {group.items.map(item => {
+                  const active = isItemActive(item)
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      end={item.exact}
+                      aria-label={item.label}
+                      title={sidebarCollapsed ? item.label : undefined}
+                      className={cn(
+                        'relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary-300',
+                        sidebarCollapsed && 'justify-center px-0',
+                        active
+                          ? 'text-white'
+                          : 'hover:bg-white/[0.07] hover:text-white/90',
+                      )}
+                      style={{
+                        background: active
+                          ? 'rgba(22,119,255,0.18)'
+                          : undefined,
+                        color: active ? 'white' : 'rgba(255,255,255,0.58)',
+                      }}
+                    >
+                      {/* 左侧激活指示条（使用分组 accent 色） */}
+                      {active && (
+                        <span
+                          className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full"
+                          style={{ background: group.accent }}
                         />
+                      )}
 
-                        {!sidebarCollapsed && (
-                          <>
-                            <span className="flex-1 truncate">{item.label}</span>
-                            {item.badge && (
-                              <span
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none"
-                                style={{
-                                  background: 'rgba(99,102,241,0.25)',
-                                  color: '#A5B4FC',
-                                  border: '1px solid rgba(99,102,241,0.3)',
-                                }}
-                              >
-                                {item.badge}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </NavLink>
-                    )
-                  })}
-                </div>
-              )}
+                      <item.icon
+                        aria-hidden="true"
+                        className={cn('flex-shrink-0', sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4')}
+                        style={{ color: active ? group.accent : 'rgba(255,255,255,0.38)' }}
+                      />
+
+                      {!sidebarCollapsed && (
+                        <>
+                          <span className="flex-1 truncate">{item.label}</span>
+                          {item.badge && (
+                            <span
+                              className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none"
+                              style={{
+                                background: 'rgba(99,102,241,0.25)',
+                                color: '#A5B4FC',
+                                border: '1px solid rgba(99,102,241,0.3)',
+                              }}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  )
+                })}
+              </div>
             </div>
           )
         })}
@@ -342,11 +332,12 @@ export default function Sidebar() {
           </p>
         )}
         <button
+          type="button"
           aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'} onClick={toggleSidebar}
-          className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs transition-colors hover:bg-white/[0.08]"
+          className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300 motion-reduce:transition-none"
           style={{
             border: '1px solid rgba(255,255,255,0.09)',
-            color: 'rgba(255,255,255,0.45)',
+            color: 'rgba(255,255,255,0.65)',
           }}
           title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
         >
@@ -364,11 +355,26 @@ export default function Sidebar() {
       {/* 拖拽手柄 */}
       {!sidebarCollapsed && (
         <div
-          className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize group z-10"
+          className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize group z-10 focus-visible:outline-2 focus-visible:outline-primary-300 focus-visible:outline-offset-[-2px]"
+          role="separator"
+          aria-label="调整侧边栏宽度"
+          aria-orientation="vertical"
+          aria-valuemin={200}
+          aria-valuemax={370}
+          aria-valuenow={sidebarWidth}
+          tabIndex={0}
+          onKeyDown={event => {
+            const width = event.key === 'Home' ? 200 : event.key === 'End' ? 370
+              : event.key === 'ArrowLeft' ? sidebarWidth - 10
+                : event.key === 'ArrowRight' ? sidebarWidth + 10 : undefined
+            if (width === undefined) return
+            event.preventDefault()
+            setSidebarWidth(Math.max(200, Math.min(370, width)))
+          }}
           onMouseDown={handleMouseDown}
         >
           <div
-            className="absolute right-0 top-0 h-full w-px transition-colors duration-150 group-hover:w-[2px]"
+            className="absolute right-0 top-0 h-full w-px transition-colors duration-150 motion-reduce:transition-none group-hover:w-[2px]"
             style={{ background: 'rgba(255,255,255,0.06)' }}
           />
         </div>
