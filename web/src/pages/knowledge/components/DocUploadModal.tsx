@@ -1,5 +1,6 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import { useState, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { X, Upload, Loader2, CheckCircle2, XCircle, Plus } from 'lucide-react'
 import { cn } from '@/utils'
 import { knowledgeService } from '@/services/knowledge'
@@ -119,30 +120,39 @@ export default function DocUploadModal({ baseID, baseName, onClose, onSuccess }:
   const pendingCount = files.filter(f => f.status === 'pending' || f.status === 'error').length
   const allDone = files.length > 0 && files.every(f => f.status === 'success')
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[85vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+  return (
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent aria-describedby={undefined} className="max-w-lg overflow-hidden p-4 sm:p-6">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">上传文档</h3>
-            <p className="text-xs text-gray-500 mt-0.5">上传到：{baseName}</p>
+            <DialogTitle>上传文档</DialogTitle>
+            <p className="text-xs text-gray-600 mt-0.5">上传到：{baseName}</p>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
+          <Button variant="icon" aria-label="关闭" onClick={onClose}>
+            <X className="w-4 h-4 text-gray-600" />
+          </Button>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-y-auto space-y-4">
+          <DialogBody className="space-y-4">
             {/* 拖拽上传区 */}
             <div
               className={cn(
-                'relative border-2 border-dashed rounded-xl p-5 text-center transition-colors cursor-pointer',
+                'relative border-2 border-dashed rounded-xl p-5 text-center transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
                 dragging ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300',
               )}
               onDragOver={e => { e.preventDefault(); setDragging(true) }}
               onDragLeave={() => setDragging(false)}
               onDrop={handleDrop}
+              role="button"
+              tabIndex={0}
+              aria-label="选择上传文档"
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  inputRef.current?.click()
+                }
+              }}
               onClick={() => inputRef.current?.click()}
             >
               <input
@@ -155,10 +165,10 @@ export default function DocUploadModal({ baseID, baseName, onClose, onSuccess }:
               />
               <div className="space-y-2">
                 <Upload className="w-7 h-7 mx-auto text-gray-300" />
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-600">
                   拖拽文件到此处，或 <span className="text-indigo-600 font-medium">点击选择</span>
                 </p>
-                <p className="text-xs text-gray-400">支持 PDF、Docx、Markdown、Go、Python、Java，单文件最大 50MB，最多 3 个</p>
+                <p className="text-xs text-gray-600">支持 PDF、Docx、Markdown、Go、Python、Java，单文件最大 50MB，最多 3 个</p>
               </div>
             </div>
 
@@ -197,7 +207,7 @@ export default function DocUploadModal({ baseID, baseName, onClose, onSuccess }:
 
                         <span className="flex-1 truncate text-gray-700 min-w-0" title={entry.file.name}>{entry.file.name}</span>
                       </div>
-                      <span className="text-gray-400 flex-shrink-0">{formatSize(entry.file.size)}</span>
+                      <span className="text-gray-600 flex-shrink-0">{formatSize(entry.file.size)}</span>
                       {entry.status === 'error' && entry.error && (
                         <span className="text-red-500 truncate max-w-[100px] flex-shrink-0" title={entry.error}>{entry.error}</span>
                       )}
@@ -205,7 +215,7 @@ export default function DocUploadModal({ baseID, baseName, onClose, onSuccess }:
                         <button
                           type="button"
                           onClick={() => removeFile(i)}
-                          className="text-gray-400 hover:text-red-500 flex-shrink-0"
+                          className="text-gray-600 hover:text-red-500 flex-shrink-0"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -215,9 +225,9 @@ export default function DocUploadModal({ baseID, baseName, onClose, onSuccess }:
                 </div>
               </div>
             )}
-          </div>
+          </DialogBody>
 
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
+          <DialogFooter>
             <button
               type="button"
               onClick={onClose}
@@ -246,9 +256,9 @@ export default function DocUploadModal({ baseID, baseName, onClose, onSuccess }:
                 )}
               </div>
             )}
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
-  , document.body)
+      </DialogContent>
+    </Dialog>
+  )
 }

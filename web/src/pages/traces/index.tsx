@@ -1,3 +1,5 @@
+import PageHeader from '@/components/common/PageHeader'
+import Button from '@/components/common/Button'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
@@ -663,23 +665,20 @@ export default function Traces() {
     <div className="flex flex-col gap-5 h-full overflow-auto">
 
       {/* 标题栏 */}
-      <div className="flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Agent 全链路观测</h1>
-          <p className="text-sm text-gray-500 mt-1">全链路追踪 · Token 消耗 · AI 调用成本分析</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
+        <PageHeader title="Agent 全链路观测" subtitle="全链路追踪 · Token 消耗 · AI 调用成本分析" />
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => {
               loadStats(); loadRuns()
               if (activeTab === 'overview') { loadCostOverview(costRange); loadTokenTrend(costRange) }
             }}
             disabled={loading || costLoading}
-            className="btn-default"
+            variant="secondary"
           >
             <RefreshCw className={cn('w-4 h-4', (loading || costLoading) && 'animate-spin')} />
             刷新
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -773,7 +772,7 @@ export default function Traces() {
                       onChange={e => setSessionInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleSessionSearch()}
                       placeholder="筛选会话 ID..."
-                      className="input w-44 text-xs"
+                      className="control w-44 text-xs"
                     />
                   </div>
                   <button onClick={handleSessionSearch} className="btn-default text-xs px-2">筛选</button>
@@ -794,10 +793,10 @@ export default function Traces() {
                   onChange={e => setSearchInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSearch()}
                   placeholder="搜索 TraceId..."
-                  className="input pl-9 w-52"
+                  className="control pl-9 w-52"
                 />
               </div>
-              <button onClick={handleSearch} className="btn-default">搜索</button>
+              <Button onClick={handleSearch} variant="secondary">搜索</Button>
             </div>
           </div>
 
@@ -832,7 +831,7 @@ export default function Traces() {
                         checked={pageAllSelected}
                         ref={el => { if (el) el.indeterminate = pagePartialSelected }}
                         onChange={toggleSelectAll}
-                        className="w-4 h-4 rounded border-gray-300 text-gray-900 cursor-pointer"
+                        className="control-checkbox"
                       />
                     </th>
                     {['TraceID', moduleFilter === 'chat' ? '会话 ID' : moduleFilter === 'event' ? '事件 ID' : '功能模块', '查询内容', '状态', '耗时', 'Token', '成本', '时间'].map(h => (
@@ -874,7 +873,7 @@ export default function Traces() {
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleSelect(run.traceId)}
-                              className="w-4 h-4 rounded border-gray-300 text-gray-900 cursor-pointer"
+                              className="control-checkbox"
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -1002,7 +1001,7 @@ export default function Traces() {
       {activeTab === 'overview' && (
         <>
           {/* 时间范围 + KPI 成本卡片 */}
-          <div className="flex items-center justify-between flex-shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
             <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-0.5">
               {COST_RANGES.map(r => (
                 <button
@@ -1195,10 +1194,10 @@ export default function Traces() {
                 onChange={e => setSessionInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSessionSearch()}
                 placeholder="输入会话 ID 查看时间线..."
-                className="input w-full text-sm"
+                className="control w-full text-sm"
               />
             </div>
-            <button onClick={handleSessionSearch} className="btn-default">查询</button>
+            <Button onClick={handleSessionSearch} variant="secondary">查询</Button>
             {sessionFilter && (
               <button
                 onClick={() => { setSessionFilter(''); setSessionInput('') }}

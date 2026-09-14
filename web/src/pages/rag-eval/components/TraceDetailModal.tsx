@@ -1,4 +1,5 @@
-import { createPortal } from 'react-dom'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import { X, Loader2, ChevronRight, ChevronDown, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/utils'
@@ -109,23 +110,23 @@ function NodeRow({ node, depth = 0 }: { node: TraceNodeItem; depth?: number }) {
 }
 
 export default function TraceDetailModal({ detail, loading, onClose }: Props) {
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+  return (
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+
+      <DialogContent aria-describedby={undefined} className="max-w-2xl overflow-y-auto p-4 sm:p-6">
 
         {/* 头部 */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
           <div>
-            <p className="text-sm font-semibold text-gray-900">链路详情</p>
+            <DialogTitle>链路详情</DialogTitle>
             {detail && (
               <p className="text-xs text-gray-400 mt-0.5 font-mono">{detail.trace_id}</p>
             )}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+          <Button variant="icon" aria-label="关闭" onClick={onClose}>
             <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
         {loading ? (
           <div className="flex-1 flex items-center justify-center py-16">
@@ -190,8 +191,7 @@ export default function TraceDetailModal({ detail, loading, onClose }: Props) {
             </div>
           </div>
         ) : null}
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   )
 }

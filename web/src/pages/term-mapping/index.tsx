@@ -1,3 +1,6 @@
+import PageHeader from '@/components/common/PageHeader'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import { useState, useEffect, useMemo } from 'react'
 import {
   Plus,
@@ -87,14 +90,14 @@ function RuleModal({ item, onClose, onSuccess }: ModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-semibold text-gray-900">{isEdit ? '编辑规则' : '新增规则'}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
-        </div>
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent aria-describedby={undefined} className="max-w-md overflow-hidden p-4 sm:p-6">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
+          <DialogTitle>{isEdit ? '编辑规则' : '新增规则'}</DialogTitle>
+          <Button variant="icon" aria-label="关闭" onClick={onClose}><X className="w-5 h-5" /></Button>
+        </DialogHeader>
 
-        <div className="space-y-4">
+        <DialogBody className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               原始词 <span className="text-red-500">*</span>
@@ -105,7 +108,7 @@ function RuleModal({ item, onClose, onSuccess }: ModalProps) {
               value={sourceTerm}
               onChange={(e) => setSourceTerm(e.target.value)}
               disabled={isEdit}
-              className={cn('input w-full', isEdit && 'bg-gray-50 cursor-not-allowed text-gray-500')}
+              className={cn('control w-full', isEdit && 'bg-gray-50 cursor-not-allowed text-gray-500')}
               placeholder="输入需要归一化的原始写法"
               maxLength={128}
             />
@@ -120,7 +123,7 @@ function RuleModal({ item, onClose, onSuccess }: ModalProps) {
               type="text"
               value={targetTerm}
               onChange={(e) => setTargetTerm(e.target.value)}
-              className="input w-full"
+              className="control w-full"
               placeholder="输入标准/展开写法"
               maxLength={256}
             />
@@ -136,7 +139,7 @@ function RuleModal({ item, onClose, onSuccess }: ModalProps) {
                 type="number"
                 value={priority}
                 onChange={(e) => setPriority(Math.max(0, Math.min(100, Number(e.target.value))))}
-                className="input w-full"
+                className="control w-full"
                 min={0}
                 max={100}
               />
@@ -152,17 +155,17 @@ function RuleModal({ item, onClose, onSuccess }: ModalProps) {
               </button>
             </div>
           </div>
-        </div>
+        </DialogBody>
 
-        <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onClose} className="btn-default">取消</button>
-          <button onClick={handleSave} disabled={saving} className="btn-primary">
+        <DialogFooter>
+          <Button onClick={onClose} variant="secondary">取消</Button>
+          <Button onClick={handleSave} disabled={saving} variant="primary">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             保存
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -319,11 +322,8 @@ export default function TermMappingPage() {
     <div className="flex flex-col gap-5 h-full">
 
       {/* 页面标题栏 */}
-      <div className="flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">术语规则管理</h1>
-          <p className="text-sm text-gray-500 mt-1">管理检索安全域术语的归一化规则</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
+        <PageHeader title="术语规则管理" subtitle="管理检索安全域术语的归一化规则" />
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -332,7 +332,7 @@ export default function TermMappingPage() {
               placeholder="搜索原始词或目标词..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="input pl-9 w-52"
+              className="control pl-9 w-52"
             />
           </div>
           <CustomSelect value={filterEnabled} onChange={v => setFilterEnabled(v)} className="w-28" options={[
@@ -341,16 +341,16 @@ export default function TermMappingPage() {
             { value: 'disabled', label: '仅禁用' },
           ] satisfies SelectOption[]} />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="btn-default"><X className="w-4 h-4" /></button>
+            <Button onClick={() => setSearchQuery('')} variant="secondary"><X className="w-4 h-4" /></Button>
           )}
-          <button onClick={handleReload} disabled={reloading} className="btn-default" title="将数据库规则热重载到进程内存">
+          <Button onClick={handleReload} disabled={reloading} variant="secondary" title="将数据库规则热重载到进程内存">
             <RefreshCw className={cn('w-4 h-4', reloading && 'animate-spin')} />
             重载规则
-          </button>
-          <button onClick={() => { setEditingItem(null); setShowModal(true) }} className="btn-primary">
+          </Button>
+          <Button onClick={() => { setEditingItem(null); setShowModal(true) }} variant="primary">
             <Plus className="w-4 h-4" />
             新增规则
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -412,7 +412,7 @@ export default function TermMappingPage() {
                         checked={pageAllSelected}
                         ref={(el) => { if (el) el.indeterminate = pagePartialSelected }}
                         onChange={toggleSelectAll}
-                        className="rounded border-gray-300"
+                        className="control-checkbox"
                       />
                     </th>
                     <th className="text-left px-3">原始词</th>
@@ -445,7 +445,7 @@ export default function TermMappingPage() {
                           type="checkbox"
                           checked={selected.has(item.id)}
                           onChange={() => toggleSelect(item.id)}
-                          className="rounded border-gray-300"
+                          className="control-checkbox"
                         />
                       </td>
                       <td className="py-3.5 px-3">

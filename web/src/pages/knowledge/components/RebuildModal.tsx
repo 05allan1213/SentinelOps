@@ -1,5 +1,6 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { X, RotateCcw, Loader2 } from 'lucide-react'
 import { cn } from '@/utils'
 import { knowledgeService } from '@/services/knowledge'
@@ -65,29 +66,29 @@ export default function RebuildModal({ docId, docIds, currentStrategy, onClose, 
     }
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+  return (
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent aria-describedby={undefined} className="max-w-md overflow-hidden p-4 sm:p-6">
         {/* 标题 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
           <div>
-            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <DialogTitle>
               <RotateCcw className="w-4 h-4 text-indigo-500" />
               重建索引{isBatch ? `（${count} 个文档）` : ''}
-            </h3>
+            </DialogTitle>
             {!isBatch && currentStrategy && (
               <p className="text-xs text-gray-500 mt-0.5">
                 当前策略：{STRATEGY_LABEL[currentStrategy] ?? currentStrategy}
               </p>
             )}
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+          <Button variant="icon" aria-label="关闭" onClick={onClose}>
             <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
         {/* 策略选择 */}
-        <div className="px-6 py-4 space-y-2">
+        <DialogBody className="space-y-4">
           <p className="text-sm text-gray-600 mb-3">
             选择分块策略后，旧向量将被清除并按新策略重新索引。
           </p>
@@ -125,10 +126,10 @@ export default function RebuildModal({ docId, docIds, currentStrategy, onClose, 
               </label>
             )
           })}
-        </div>
+        </DialogBody>
 
         {/* 操作按钮 */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+        <DialogFooter>
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
@@ -146,9 +147,8 @@ export default function RebuildModal({ docId, docIds, currentStrategy, onClose, 
             {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             确认重建
           </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

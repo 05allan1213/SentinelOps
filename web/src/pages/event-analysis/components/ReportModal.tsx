@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import { X, Download, Copy, Loader2, Save } from 'lucide-react'
 import ReportViewer from '@/components/report/ReportViewer'
 import type { ReportViewerData, ReportViewerLog } from '@/components/report/ReportViewer'
@@ -205,21 +207,18 @@ export default function ReportModal({ visible, onClose, data, logs, onSave, savi
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl border border-gray-200 shadow-xl w-[900px] max-h-[90vh] flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent aria-describedby={undefined} className="max-w-4xl overflow-y-auto p-4 sm:p-6">
         {/* 头部 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">安全事件分析报告</h2>
+            <DialogTitle>安全事件分析报告</DialogTitle>
             <p className="text-xs text-gray-400 mt-0.5">{reportId} · 共分析 {data.count} 个事件 · 报告有效期 30 天</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <Button variant="icon" aria-label="关闭" onClick={onClose}>
             <X className="w-5 h-5" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
         {/* 内容区 */}
         <div className="flex-1 overflow-auto px-6 py-4">
@@ -246,7 +245,7 @@ export default function ReportModal({ visible, onClose, data, logs, onSave, savi
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

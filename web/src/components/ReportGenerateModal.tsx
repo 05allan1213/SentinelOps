@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useState, useEffect, useRef } from 'react'
 import { FileText, Loader2 } from 'lucide-react'
 import { useAnalyzeStore } from '@/stores/analyzeStore'
@@ -88,13 +89,13 @@ export default function ReportGenerateModal() {
     <>
       {/* 进度弹窗：fixed 定位，覆盖全屏，切换页面后依然可见 */}
       {reportGenerating && riskData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="w-[440px] rounded-2xl bg-white border border-gray-200 shadow-xl overflow-hidden">
+        <Dialog open>
+          <DialogContent aria-describedby={undefined} onEscapeKeyDown={event => event.preventDefault()} onInteractOutside={event => event.preventDefault()} className="max-w-lg overflow-y-auto p-4 sm:p-6">
             {/* 头部 */}
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2.5">
+            <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
               <FileText className="w-5 h-5 text-primary-500" />
-              <span className="text-base font-semibold text-gray-900">安全分析报告生成</span>
-            </div>
+              <DialogTitle>安全分析报告生成</DialogTitle>
+            </DialogHeader>
 
             {/* 主体 */}
             <div className="px-6 py-5">
@@ -166,8 +167,8 @@ export default function ReportGenerateModal() {
                 </button>
               </div>
             )}
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* 报告预览弹窗 */}

@@ -1,5 +1,9 @@
+import Alert from '@/components/common/Alert'
+import StatePanel from '@/components/common/StatePanel'
+import PageHeader from '@/components/common/PageHeader'
+import Button from '@/components/common/Button'
 import { useState, useEffect } from 'react'
-import { Plug, Send, CheckCircle2, XCircle, Copy, ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, Key, History } from 'lucide-react'
+import { Plug, Send, Copy, ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, Key, History } from 'lucide-react'
 import { ingestService, cacheIngestKey, type IngestResult } from '@/services/ingest'
 import { settingsService } from '@/services/settings'
 import { eventService } from '@/services/event'
@@ -153,15 +157,12 @@ export default function IngestPage() {
   return (
     <div className="flex flex-col gap-5 pb-8">
       {/* 页头 */}
-      <div className="flex items-center justify-between flex-shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-indigo-50">
             <Plug className="w-5 h-5 text-indigo-600" />
           </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">多源告警接入</h1>
-            <p className="text-sm text-gray-500 mt-0.5">支持 Webhook / CEF / LEEF / API Push，统一归一化后写入事件库</p>
-          </div>
+          <PageHeader title="多源告警接入" subtitle="支持 Webhook / CEF / LEEF / API Push，统一归一化后写入事件库" />
         </div>
       </div>
 
@@ -267,7 +268,7 @@ export default function IngestPage() {
                 value={sourceName}
                 onChange={e => setSourceName(e.target.value)}
                 placeholder="如：Splunk-Prod"
-                className="input w-64"
+                className="control w-64"
               />
             </div>
           )}
@@ -280,14 +281,14 @@ export default function IngestPage() {
               value={payload}
               onChange={e => setPayload(e.target.value)}
               rows={activeTab === 'cef' || activeTab === 'leef' ? 3 : 10}
-              className="w-full rounded-lg border border-slate-200 bg-slate-900 px-3 py-2.5 text-sm text-emerald-400 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 resize-none"
+              className="control h-auto py-2 w-full text-sm font-mono resize-none"
             />
           </div>
 
-          <button
+          <Button
             onClick={handleSubmit}
             disabled={loading || !payload.trim()}
-            className="btn-primary"
+            variant="primary"
           >
             {loading ? (
               <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -295,18 +296,11 @@ export default function IngestPage() {
               <Send className="w-4 h-4" />
             )}
             {loading ? '接入中...' : '发送告警'}
-          </button>
+          </Button>
         </div>
 
         {(result || error) && (
-          <div className={cn(
-            'mx-4 mb-4 rounded-lg p-3 flex items-start gap-3 border',
-            result ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
-          )}>
-            {result
-              ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
-              : <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-            }
+          <Alert tone={result ? 'success' : 'danger'} className="mx-4 mb-4">
             <div className="text-sm space-y-1">
               {result ? (
                 <>
@@ -320,7 +314,7 @@ export default function IngestPage() {
                 <p className="text-red-600">{error}</p>
               )}
             </div>
-          </div>
+          </Alert>
         )}
       </div>
 
@@ -341,7 +335,7 @@ export default function IngestPage() {
             <RefreshCw className="w-5 h-5 animate-spin text-gray-300" />
           </div>
         ) : history.length === 0 ? (
-          <div className="py-8 text-center text-sm text-gray-400">暂无接入记录</div>
+          <div className="px-4"><StatePanel kind="empty" title="暂无接入记录" /></div>
         ) : (
           <table className="w-full text-sm">
             <thead>

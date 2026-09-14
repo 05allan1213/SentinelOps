@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
+import { useRef, useState } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { cn } from '@/utils'
 import { knowledgeService, type KnowledgeBase } from '@/services/knowledge'
@@ -10,6 +12,7 @@ interface Props {
 }
 
 export default function BaseCreateModal({ onClose, onSuccess }: Props) {
+  const nameInput = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
@@ -30,15 +33,15 @@ export default function BaseCreateModal({ onClose, onSuccess }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="text-base font-semibold text-gray-900">新建知识库</h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent onOpenAutoFocus={event => { event.preventDefault(); nameInput.current?.focus() }} aria-describedby={undefined} className="max-w-md overflow-hidden p-4 sm:p-6">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
+          <DialogTitle>新建知识库</DialogTitle>
+          <Button variant="icon" aria-label="关闭" onClick={onClose}>
             <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          </Button>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-y-auto space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               名称 <span className="text-red-500">*</span>
@@ -48,8 +51,8 @@ export default function BaseCreateModal({ onClose, onSuccess }: Props) {
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="如：CVE 漏洞处置手册"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
-              autoFocus
+              className="control w-full text-sm"
+              ref={nameInput}
             />
           </div>
           <div>
@@ -59,7 +62,7 @@ export default function BaseCreateModal({ onClose, onSuccess }: Props) {
               onChange={e => setDescription(e.target.value)}
               placeholder="知识库用途说明（可选）"
               rows={3}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 resize-none"
+              className="control h-auto py-2 w-full text-sm resize-none"
             />
           </div>
           <div className="flex justify-end gap-3 pt-1">
@@ -83,7 +86,7 @@ export default function BaseCreateModal({ onClose, onSuccess }: Props) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -62,13 +62,8 @@ export default function SessionList({
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-[280px] flex-shrink-0 flex-col bg-[#FAFAFA] p-3 lg:static lg:h-screen">
       <div className="py-3 space-y-4">
-        {/* 快速开始卡片 — 对角渐变 + 双色光晕 */}
-        <div className="relative overflow-hidden rounded-2xl border border-[#E6EEF6] bg-gradient-to-br from-[#F0F9FF] via-white to-[#FEF3C7] p-3 shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
-          {/* 右上角蓝色光晕 */}
-          <span aria-hidden="true" className="absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[#BAE6FD]/70 blur-2xl" />
-          {/* 左下角黄色光晕 */}
-          <span aria-hidden="true" className="absolute -left-12 -bottom-10 h-28 w-28 rounded-full bg-[#FDE68A]/70 blur-2xl" />
-
+        {/* 快速开始卡片 */}
+        <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-3">
           <div className="relative">
             {/* 标题行 */}
             <div className="flex items-center justify-between px-1">
@@ -81,10 +76,10 @@ export default function SessionList({
             {/* 新建对话按钮 */}
             <button
               type="button"
-              className="mt-2 flex w-full items-center gap-3 rounded-2xl bg-white/90 px-4 py-3 text-left shadow-[0_10px_20px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-[1px] hover:shadow-[0_16px_30px_rgba(15,23,42,0.12)]"
+              className="mt-2 flex w-full items-center gap-3 rounded-lg bg-gray-50 px-4 py-3 text-left transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
               onClick={onNewSession}
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#60A5FA] to-[#2563EB] text-white shadow-[0_6px_14px_rgba(37,99,235,0.3)]">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-600 text-white">
                 <Plus className="h-4 w-4" />
               </span>
               <span className="flex-1">
@@ -109,7 +104,7 @@ export default function SessionList({
               placeholder="搜索对话..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="h-10 w-full rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] pl-9 pr-8 text-sm text-[#1F2937] placeholder:text-[#9CA3AF] focus:border-[#93C5FD] focus:outline-none transition-colors"
+              className="control w-full pl-9 pr-8 text-sm"
             />
             {query && (
               <button

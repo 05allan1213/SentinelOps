@@ -632,18 +632,7 @@ export default function Chat() {
 
       {/* 右侧主区域 */}
       <div className="relative flex flex-1 flex-col min-h-0 overflow-hidden">
-        {/* 渐变背景层（欢迎屏与对话区共用） */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#F8FAFC] via-white to-[#EFF6FF]" />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.35]"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, rgba(59,130,246,0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(59,130,246,0.07) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
-        <div className="pointer-events-none absolute -top-32 right-[-40px] h-72 w-72 rounded-full bg-[#BFDBFE]/50 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-36 left-[-80px] h-80 w-80 rounded-full bg-[#FDE68A]/30 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gray-50" />
 
         {messages.length === 0 ? (
           /* ── 欢迎屏：标题 + 居中输入框 + 预设卡片 ── */
@@ -802,7 +791,7 @@ function MessageBubble({ message, messageIndex, vote, onVote, onRetry, isEditing
                 ref={editTextareaRef}
                 value={editingContent}
                 onChange={(e) => { onEditingContentChange(e.target.value); adjustEditHeight() }}
-                className="w-full min-w-0 bg-transparent text-white text-sm leading-relaxed placeholder-white/60 focus:outline-none resize-none py-0.5 overflow-y-auto"
+                className="control h-auto py-2 w-full min-w-0 text-sm leading-relaxed resize-none overflow-y-auto"
                 rows={1}
                 placeholder="输入消息..."
                 autoFocus

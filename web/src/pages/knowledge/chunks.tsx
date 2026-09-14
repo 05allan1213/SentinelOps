@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -41,23 +43,23 @@ function SearchModal({ baseID, onClose }: SearchModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent aria-describedby={undefined} className="max-w-2xl overflow-hidden p-4 sm:p-6">
         {/* 标题栏 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
           <div>
-            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <DialogTitle>
               <FlaskConical className="w-4 h-4 text-indigo-500" />
               RAG 检索测试
-            </h3>
+            </DialogTitle>
             <p className="text-xs text-gray-500 mt-0.5">直接查询向量库，验证召回效果</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors" aria-label="关闭">
+          <Button variant="icon" aria-label="关闭" onClick={onClose}>
             <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
         {/* 查询输入区 */}
-        <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0 space-y-3">
+        <DialogBody className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">查询词</label>
             <textarea
@@ -66,7 +68,7 @@ function SearchModal({ baseID, onClose }: SearchModalProps) {
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSearch() } }}
               rows={2}
               placeholder="输入查询词，按 Enter 搜索…"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+              className="control h-auto py-2 w-full text-sm resize-none"
             />
           </div>
           <div className="flex items-center gap-4">
@@ -91,10 +93,10 @@ function SearchModal({ baseID, onClose }: SearchModalProps) {
               检索
             </button>
           </div>
-        </div>
+        </DialogBody>
 
         {/* 结果区 */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+        <DialogBody className="space-y-4">
           {results === null ? (
             <div className="text-center py-12 text-gray-400">
               <FlaskConical className="w-12 h-12 mx-auto mb-3 text-gray-200" />
@@ -138,9 +140,9 @@ function SearchModal({ baseID, onClose }: SearchModalProps) {
               ))}
             </>
           )}
-        </div>
-      </div>
-    </div>
+        </DialogBody>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -289,7 +291,7 @@ export default function KnowledgeChunks() {
               value={keywordInput}
               onChange={e => setKeywordInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleKeywordSearch()}
-              className="input pl-9 w-44"
+              className="control pl-9 w-44"
             />
             {keywordInput && (
               <button
@@ -324,10 +326,10 @@ export default function KnowledgeChunks() {
           >
             全量禁用
           </button>
-          <button onClick={fetchData} disabled={loading} className="btn-default">
+          <Button onClick={fetchData} disabled={loading} variant="secondary">
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
             刷新
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -386,7 +388,7 @@ export default function KnowledgeChunks() {
                   <th className="w-10 pl-6">
                     <input
                       type="checkbox"
-                      className="rounded border-gray-300"
+                      className="control-checkbox"
                       checked={pageAllSelected}
                       ref={el => { if (el) el.indeterminate = pagePartialSelected }}
                       onChange={toggleAll}
@@ -421,7 +423,7 @@ export default function KnowledgeChunks() {
                         <td className="pl-6 py-4">
                           <input
                             type="checkbox"
-                            className="rounded border-gray-300"
+                            className="control-checkbox"
                             checked={selected.has(chunk.id)}
                             onChange={() => toggleSelect(chunk.id)}
                           />
@@ -451,7 +453,7 @@ export default function KnowledgeChunks() {
                             type="button"
                             onClick={() => handleToggleChunk(chunk)}
                             className={cn(
-                              'inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none',
+                              'inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
                               chunk.enabled ? 'bg-emerald-500' : 'bg-gray-200',
                             )}
                             title={chunk.enabled ? '点击禁用' : '点击启用'}

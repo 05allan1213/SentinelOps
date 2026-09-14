@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import { useState, useEffect } from 'react'
 import { X, Search, Check, Loader2 } from 'lucide-react'
 import { eventService } from '@/services/event'
@@ -54,18 +56,15 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
   if (!visible) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="w-[700px] max-h-[70vh] rounded-2xl border border-gray-200 border-gray-200 bg-white bg-white flex flex-col overflow-hidden shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent aria-describedby={undefined} className="max-w-2xl overflow-y-auto p-4 sm:p-6">
         {/* 弹窗标题 */}
-        <div className="px-5 py-4 border-b border-gray-200 border-gray-200/50 flex items-center justify-between">
-          <span className="text-base font-semibold text-gray-900 text-gray-900">选择要分析的事件</span>
-          <button onClick={onClose} aria-label="关闭" className="text-gray-500 text-gray-500 hover:text-gray-900 hover:text-gray-900 transition-colors">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
+          <DialogTitle>选择要分析的事件</DialogTitle>
+          <Button variant="icon" aria-label="关闭" onClick={onClose}>
             <X className="w-5 h-5" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
         {/* 事件搜索 */}
         <div className="px-5 py-3 border-b border-gray-200 border-gray-200/30">
@@ -163,7 +162,7 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -76,13 +76,8 @@ export default function WelcomeScreen({ onPresetSelect, isLoading, inputSlot }: 
           <h1 className="mt-4 text-5xl font-bold leading-tight tracking-tight text-[#111827] sm:text-6xl">
             把威胁变成
             <span
-              className="ml-2"
-              style={{
-                background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #2563EB 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}
+              className="ml-2 text-primary-600"
+
             >
               清晰洞察
             </span>
@@ -155,12 +150,12 @@ export default function WelcomeScreen({ onPresetSelect, isLoading, inputSlot }: 
             className={cn(
               'group relative mt-3 w-full flex items-center gap-4 rounded-2xl border p-4 text-left',
               'transition-all duration-200',
-              'border-[#DDD6FE] bg-gradient-to-r from-[#F5F3FF] to-[#EFF6FF]',
+              'border-gray-200 bg-white',
               'hover:border-[#A78BFA] hover:shadow-[0_2px_12px_rgba(167,139,250,0.20)] hover:from-[#EDE9FE] hover:to-[#EFF6FF]',
               isLoading && 'cursor-not-allowed opacity-60',
             )}
           >
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#6366F1] shadow-[0_2px_8px_rgba(124,58,237,0.35)]">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary-600">
               <Lightbulb className="h-5 w-5 text-white" />
             </div>
             <div className="min-w-0 flex-1">

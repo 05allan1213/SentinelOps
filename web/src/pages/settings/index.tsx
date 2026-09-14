@@ -1,3 +1,5 @@
+import PageHeader from '@/components/common/PageHeader'
+import Button from '@/components/common/Button'
 import { useState, useEffect } from 'react'
 import { Settings as SettingsIcon, Save, Loader2, User, LogOut, UserPlus } from 'lucide-react'
 import { cn } from '@/utils'
@@ -96,23 +98,20 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       {/* 页面标题 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">系统设置</h1>
-          <p className="text-sm text-gray-500 mt-1">配置系统参数</p>
-        </div>
-        <button onClick={handleSave} disabled={isSaving} className="btn-primary">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <PageHeader title="系统设置" subtitle="配置系统参数" />
+        <Button onClick={handleSave} disabled={isSaving} variant="primary">
           {isSaving ? (
             <><Loader2 className="w-4 h-4 animate-spin" />保存中...</>
           ) : (
             <><Save className="w-4 h-4" />保存设置</>
           )}
-        </button>
+        </Button>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-6 lg:flex-row">
         {/* 侧边导航 */}
-        <div className="w-48 flex-shrink-0">
+        <div className="w-full lg:w-48 flex-shrink-0">
           <nav className="card p-2">
             <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-primary-50 text-primary-600 shadow-sm text-left text-sm font-medium">
               <SettingsIcon className="w-4 h-4 flex-shrink-0" />
@@ -128,7 +127,7 @@ export default function Settings() {
             <div className="card-body">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-600">
                     <User className="h-6 w-6 text-white" />
                   </div>
                   <div>
@@ -161,7 +160,7 @@ export default function Settings() {
                       type="text"
                       value={draftName}
                       onChange={handleSiteNameChange}
-                      className="input"
+                      className="control w-full"
                     />
                   </div>
                 </div>
@@ -175,9 +174,12 @@ export default function Settings() {
                     <p className="text-xs text-gray-500 mt-1">查看事件详情后自动标记为已读</p>
                   </div>
                   <button
+                    role="switch"
+                    aria-label="自动标记已读"
+                    aria-checked={autoMarkRead}
                     onClick={() => setSettings({ autoMarkRead: !autoMarkRead })}
                     className={cn(
-                      'w-11 h-6 rounded-full transition-colors relative flex-shrink-0',
+                      'w-11 h-6 rounded-full transition-colors relative flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
                       autoMarkRead ? 'bg-primary-500' : 'bg-gray-300'
                     )}
                   >
@@ -203,20 +205,22 @@ export default function Settings() {
 
                 <div className="grid gap-3 sm:grid-cols-[1fr_1fr_150px_auto]">
                   <input
-                    className="input"
+                    className="control w-full"
+                    aria-label="用户名"
                     placeholder="用户名（3-32 字符）"
                     value={userDraft.username}
                     onChange={(e) => setUserDraft((draft) => ({ ...draft, username: e.target.value }))}
                   />
                   <input
-                    className="input"
+                    className="control w-full"
                     type="password"
+                    aria-label="密码"
                     placeholder="密码（至少 6 位）"
                     value={userDraft.password}
                     onChange={(e) => setUserDraft((draft) => ({ ...draft, password: e.target.value }))}
                   />
-                  <select
-                    className="input"
+                  <select aria-label="用户角色"
+                    className="control w-full"
                     value={userDraft.role}
                     onChange={(e) => setUserDraft((draft) => ({ ...draft, role: e.target.value as UserRole }))}
                   >
@@ -225,18 +229,18 @@ export default function Settings() {
                     <option value="approver">审批人</option>
                     <option value="admin">管理员</option>
                   </select>
-                  <button
+                  <Button
                     type="button"
                     onClick={handleCreateUser}
                     disabled={creatingUser}
-                    className="btn-primary"
+                    variant="primary"
                   >
                     {creatingUser ? (
                       <><Loader2 className="w-4 h-4 animate-spin" />创建中...</>
                     ) : (
                       <><UserPlus className="w-4 h-4" />创建用户</>
                     )}
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">

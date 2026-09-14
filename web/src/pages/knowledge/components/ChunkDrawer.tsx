@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import { useState, useEffect } from 'react'
 import { X, Loader2, Hash, AlignLeft, BookOpen } from 'lucide-react'
 import { knowledgeService, type ChunkItem } from '@/services/knowledge'
@@ -34,22 +36,22 @@ export default function ChunkDrawer({ docID, docName, onClose }: Props) {
   }, [docID, page])
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
       {/* 遮罩 */}
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+
 
       {/* 抽屉面板 */}
-      <div className="relative w-full max-w-xl bg-white h-full flex flex-col shadow-2xl">
+      <DialogContent aria-describedby={undefined} className="max-w-xl overflow-hidden p-4 sm:p-6 left-auto right-0 top-0 h-dvh max-h-dvh w-full translate-x-0 translate-y-0 rounded-none">
         {/* 头部 */}
-        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
           <div className="min-w-0 pr-4">
-            <h3 className="text-base font-semibold text-gray-900">文档分块详情</h3>
+            <DialogTitle>文档分块详情</DialogTitle>
             <p className="text-xs text-gray-500 mt-0.5 truncate" title={docName}>{docName}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0">
+          <Button variant="icon" aria-label="关闭" onClick={onClose}>
             <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
         {/* 统计栏 */}
         <div className="px-6 py-2.5 bg-gray-50/80 border-b border-gray-100 flex items-center gap-4 text-sm text-gray-600 flex-shrink-0">
@@ -64,7 +66,7 @@ export default function ChunkDrawer({ docID, docName, onClose }: Props) {
         </div>
 
         {/* 内容区 */}
-        <div className="flex-1 overflow-y-auto">
+        <DialogBody className="">
           {loading ? (
             <div className="flex items-center justify-center py-12 text-gray-400">
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -100,7 +102,7 @@ export default function ChunkDrawer({ docID, docName, onClose }: Props) {
               ))}
             </div>
           )}
-        </div>
+        </DialogBody>
 
         {/* 分页 */}
         {total > PAGE_SIZE && (
@@ -122,7 +124,7 @@ export default function ChunkDrawer({ docID, docName, onClose }: Props) {
             </button>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

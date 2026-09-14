@@ -1,3 +1,4 @@
+import Button from '@/components/common/Button'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -249,7 +250,7 @@ export default function KnowledgeDocs() {
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearchSubmit()}
-              className="input pl-9 w-48"
+              className="control pl-9 w-48"
             />
             {searchInput && (
               <button
@@ -288,10 +289,10 @@ export default function KnowledgeDocs() {
             </button>
           )}
 
-          <button onClick={fetchDocs} disabled={loading} className="btn-default">
+          <Button onClick={fetchDocs} disabled={loading} variant="secondary">
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
             刷新
-          </button>
+          </Button>
           <button onClick={() => setShowUpload(true)} className="btn btn-primary">
             <Upload className="w-4 h-4" />
             上传文档
@@ -359,7 +360,7 @@ export default function KnowledgeDocs() {
                   <th className="pl-4 w-11">
                     <input
                       type="checkbox"
-                      className="rounded border-gray-300"
+                      className="control-checkbox"
                       checked={pageAllSelected}
                       ref={el => { if (el) el.indeterminate = pagePartialSelected }}
                       onChange={toggleAll}
@@ -399,7 +400,7 @@ export default function KnowledgeDocs() {
                       <td className="pl-4 py-3">
                         <input
                           type="checkbox"
-                          className="rounded border-gray-300"
+                          className="control-checkbox"
                           checked={selected.has(doc.id)}
                           onChange={() => toggleSelect(doc.id)}
                         />
@@ -452,7 +453,7 @@ export default function KnowledgeDocs() {
                           type="button"
                           onClick={() => handleToggleEnabled(doc)}
                           className={cn(
-                            'inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none',
+                            'inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
                             doc.enabled ? 'bg-emerald-500' : 'bg-gray-200',
                           )}
                           title={doc.enabled ? '点击禁用' : '点击启用'}

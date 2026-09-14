@@ -54,14 +54,8 @@ export default function ChatInput({
     <div className="relative">
       <div
         className={cn(
-          'relative rounded-2xl border bg-white transition-colors duration-200',
-          isFocused
-            ? deepThinking
-              ? 'border-[#A78BFA] shadow-[0_0_0_3px_rgba(167,139,250,0.25)]'
-              : 'border-[#93C5FD] shadow-[0_0_0_3px_rgba(147,197,253,0.3)]'
-            : deepThinking
-              ? 'border-[#DDD6FE] shadow-sm hover:border-[#C4B5FD]'
-              : 'border-[#E5E7EB] shadow-sm hover:border-[#D1D5DB]',
+          'relative rounded-xl border bg-white transition-colors duration-200',
+          isFocused ? 'border-gray-300' : 'border-gray-200',
         )}
       >
         <textarea
@@ -82,7 +76,7 @@ export default function ChatInput({
           }
           rows={1}
           disabled={isLoading}
-          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-14 text-base text-[#1F2937] placeholder-[#9CA3AF] focus:outline-none disabled:opacity-60"
+          className="control h-auto py-2 w-full resize-none pt-3.5 pb-14 text-base"
           style={{ minHeight: 56 }}
         />
 
@@ -99,7 +93,7 @@ export default function ChatInput({
                 className={cn(
                   'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-200 active:scale-95',
                   deepThinking
-                    ? 'bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white shadow-[0_2px_10px_rgba(99,102,241,0.40)]'
+                    ? 'bg-primary-600 text-white'
                     : 'bg-[#F3F4F6] text-[#9CA3AF] hover:bg-[#E9EAEC] hover:text-[#6B7280]',
                 )}
               >
@@ -120,7 +114,7 @@ export default function ChatInput({
                 className={cn(
                   'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-200 active:scale-95',
                   webSearch
-                    ? 'bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white shadow-[0_2px_10px_rgba(99,102,241,0.40)]'
+                    ? 'bg-primary-600 text-white'
                     : 'bg-[#F3F4F6] text-[#9CA3AF] hover:bg-[#E9EAEC] hover:text-[#6B7280]',
                 )}
               >

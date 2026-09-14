@@ -1,3 +1,4 @@
+import PageHeader from '@/components/common/PageHeader'
 import { useState, useEffect } from 'react'
 import { Bot, Play, CheckCircle2, XCircle, TrendingUp } from 'lucide-react'
 import { opsService, type OpsStats } from '@/services/ops'
@@ -18,10 +19,7 @@ export default function SoarPage() {
         <div className="p-2 rounded-lg bg-violet-50">
           <Bot className="w-5 h-5 text-violet-600" />
         </div>
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">AI 智能运维</h1>
-          <p className="text-sm text-gray-500 mt-0.5">在安全事件列表点击 ⚡ 触发，AI 自动分析事件并执行通知、封禁等响应动作</p>
-        </div>
+        <PageHeader title="AI 智能运维" subtitle="在安全事件列表点击 ⚡ 触发，AI 自动分析事件并执行通知、封禁等响应动作" />
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0">

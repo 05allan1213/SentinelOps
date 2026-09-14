@@ -376,7 +376,7 @@ test.describe('Event Analysis Batch 6 verification', () => {
     await expect(picker).toBeVisible()
     expect(await fixture.pipelineQueries()).toHaveLength(0)
 
-    const pickerSample = await sampleSurface('event picker modal', page.locator('.fixed.inset-0.z-50 > div').first())
+    const pickerSample = await sampleSurface('event picker modal', page.getByRole('dialog', { name: '选择要分析的事件' }))
     expect(pickerSample.classification).toBe('light')
 
     await page.getByRole('button', { name: new RegExp(CRITICAL_EVENT.title) }).click()
@@ -427,7 +427,7 @@ test.describe('Event Analysis Batch 6 verification', () => {
     await page.keyboard.press('Enter')
     await expect(page.getByText('选择要分析的事件', { exact: true })).toBeVisible()
 
-    const closeButton = page.locator('.fixed.inset-0.z-50 > div > div').first().locator('button').first()
+    const closeButton = page.getByRole('dialog', { name: '选择要分析的事件' }).getByRole('button', { name: '关闭', exact: true })
     await expect(closeButton).toBeVisible()
     const closeName = await closeButton.evaluate((el) => ({
       ariaLabel: el.getAttribute('aria-label'),
@@ -523,7 +523,7 @@ test.describe('Event Analysis Batch 6 verification', () => {
     await expect(page.getByText('安全事件分析报告', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: /复制内容/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /下载 Markdown/ })).toBeVisible()
-    await page.getByRole('button', { name: '关闭', exact: true }).click()
+    await page.getByRole('dialog', { name: '安全事件分析报告' }).getByRole('button', { name: '关闭', exact: true }).last().click()
 
     // Event detail keeps CVSS and summary information on a light surface.
     await page.getByText(CRITICAL_EVENT.title, { exact: true }).click()
@@ -637,7 +637,7 @@ test.describe('Event Analysis Batch 6 verification', () => {
       // Event Picker is opened while the page is idle: the mode select is disabled during processing.
       await page.getByRole('button', { name: '最近10条' }).click()
       await page.getByRole('button', { name: /指定事件/ }).click()
-      const modal = page.locator('.fixed.inset-0.z-50 > div').first()
+      const modal = page.getByRole('dialog', { name: '选择要分析的事件' })
       await expect(modal).toBeVisible()
       const box = await modal.boundingBox()
       expect(box, `picker box at ${width}`).not.toBeNull()

@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import { useState } from 'react'
 import { X, Github, Rss, Loader2, Zap } from 'lucide-react'
 import { subscriptionService } from '@/services/subscription'
@@ -160,26 +162,23 @@ export default function AddSubscriptionModal({
   return (
     <>
       {/* 遮罩层 */}
-      <div className="modal-overlay" onClick={handleClose}>
+      <Dialog open onOpenChange={open => { if (!open) handleClose() }}>
         {/* 弹窗主体 */}
-        <div className="modal w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <DialogContent aria-describedby={undefined} className="max-w-lg overflow-hidden p-4 sm:p-6">
           {/* 弹窗标题 */}
-          <div className="modal-header">
+          <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
             <div>
-              <h2 className="modal-title">{editMode ? '编辑订阅' : '添加订阅'}</h2>
+              <DialogTitle>{editMode ? '编辑订阅' : '添加订阅'}</DialogTitle>
               <p className="text-sm text-gray-500 mt-0.5">
                 {step === 1 ? '选择数据源类型' : '配置订阅信息'}
               </p>
             </div>
-            <button
-              onClick={handleClose}
-              className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            >
+            <Button variant="icon" aria-label="关闭" onClick={handleClose}>
               <X className="w-5 h-5" />
-            </button>
-          </div>
+            </Button>
+          </DialogHeader>
 
-          <div className="modal-body max-h-[60vh]">
+          <DialogBody className="max-h-[60vh]">
             {/* 第一步：选择数据源类型 */}
             {step === 1 && (
               <div className="flex flex-col gap-3">
@@ -230,7 +229,7 @@ export default function AddSubscriptionModal({
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="输入订阅名称"
-                    className="input"
+                    className="control w-full"
                   />
                 </div>
 
@@ -244,7 +243,7 @@ export default function AddSubscriptionModal({
                     value={formData.url}
                     onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                     placeholder={selectedSource.placeholder}
-                    className="input"
+                    className="control w-full"
                   />
                 </div>
 
@@ -293,18 +292,18 @@ export default function AddSubscriptionModal({
                   </button>
               </div>
             )}
-          </div>
+          </DialogBody>
 
           {/* 底部操作区 */}
           {step === 2 && (
-            <div className="modal-footer">
-              <button onClick={handleClose} className="btn-default">
+            <DialogFooter>
+              <Button onClick={handleClose} variant="secondary">
                 取消
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleSubmit}
                 disabled={!formData.name || !formData.url || isSubmitting}
-                className="btn-primary"
+                variant="primary"
               >
                 {isSubmitting ? (
                   <>
@@ -314,11 +313,11 @@ export default function AddSubscriptionModal({
                 ) : (
                   editMode ? '更新订阅' : '创建订阅'
                 )}
-              </button>
-            </div>
+              </Button>
+            </DialogFooter>
           )}
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import { useState, useEffect } from 'react'
 import {
   X,
@@ -55,13 +57,10 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal w-full max-w-2xl max-h-[90vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent aria-describedby={undefined} className="max-w-2xl overflow-hidden p-4 sm:p-6">
         {/* 弹窗标题 */}
-        <div className="modal-header">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
           <div className="flex-1 pr-4">
             <div className="flex items-center gap-2 mb-2">
               <span className={severity.class}>{severity.label}</span>
@@ -69,20 +68,17 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
                 <span className="text-sm font-mono text-blue-600">{event.cve_id}</span>
               )}
             </div>
-            <h2 className="text-lg font-medium text-gray-900 leading-tight">
+            <DialogTitle>
               {event.title}
-            </h2>
+            </DialogTitle>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-          >
+          <Button variant="icon" aria-label="关闭" onClick={onClose}>
             <X className="w-5 h-5" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
         {/* 事件详情 */}
-        <div className="modal-body flex-1 overflow-y-auto space-y-4">
+        <DialogBody className="flex-1 overflow-y-auto space-y-4">
           {/* 事件元信息 */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
@@ -177,14 +173,14 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
               </div>
             </div>
           )}
-        </div>
+        </DialogBody>
 
         {/* 底部操作区 */}
-        <div className={cn('modal-footer', updatingStatus && 'opacity-60 pointer-events-none')}>
+        <DialogFooter className={cn(updatingStatus && 'opacity-60 pointer-events-none')}>
           <CustomSelect
             value={currentStatus}
             onChange={v => handleUpdateStatus(v)}
-            className="w-32"
+            className="w-32 [&>[role=listbox]]:bottom-full [&>[role=listbox]]:mb-1 [&>[role=listbox]]:mt-0"
             options={[
               { value: 'new', label: '新建' },
               { value: 'processing', label: '处理中' },
@@ -193,11 +189,11 @@ export default function EventDetailModal({ event, onClose, onUpdate }: EventDeta
             ] satisfies SelectOption[]}
           />
           <div className="flex-1" />
-          <button onClick={onClose} className="btn-default">
+          <Button onClick={onClose} variant="secondary">
             关闭
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

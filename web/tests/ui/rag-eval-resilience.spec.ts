@@ -143,7 +143,7 @@ test('renders zero trace and node durations as 0ms in the detail modal', async (
   await page.goto('/rag-eval')
 
   await page.locator('table').getByTitle('查看链路详情').click()
-  const modal = page.locator('div.fixed.inset-0.z-50')
+  const modal = page.getByRole('dialog', { name: '链路详情' })
   await expect(modal.getByText('链路详情', { exact: true })).toBeVisible()
   await expect(modal.getByText('总耗时').locator('..')).toContainText('0ms')
   await expect(modal.getByText('zero retriever', { exact: true }).locator('..')).toContainText('0ms')

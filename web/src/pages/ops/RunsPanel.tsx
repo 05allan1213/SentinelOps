@@ -1,3 +1,5 @@
+import Card from '@/components/common/Card'
+import StatePanel from '@/components/common/StatePanel'
 import React, { useState, useEffect, useRef } from 'react'
 import { RefreshCw, ChevronDown, ChevronRight, Trash2, Loader2, CheckCircle2, XCircle, Clock, Zap, X } from 'lucide-react'
 import { opsService, type OpsRun } from '@/services/ops'
@@ -112,7 +114,7 @@ export default function RunsPanel() {
   const activeRuns = runs.filter(r => isActive(r.status))
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" data-testid="runs-panel">
+    <Card className="overflow-hidden [&>div]:p-0" testId="runs-panel">
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCollapsed(p => !p)}>
           <Zap className="w-4 h-4 text-violet-500" />
@@ -138,10 +140,7 @@ export default function RunsPanel() {
       </div>
 
       {!collapsed && (runs.length === 0 ? (
-        <div className="py-16 text-center text-sm text-gray-400">
-          <Clock className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          暂无运维任务，在安全事件列表点击 ⚡ 触发 AI 运维
-        </div>
+        <div className="px-4"><StatePanel kind="empty" title="暂无运维任务，在安全事件列表点击 ⚡ 触发 AI 运维" /></div>
       ) : (
         <div className="divide-y divide-slate-100">
           {runs.map(r => {
@@ -172,7 +171,7 @@ export default function RunsPanel() {
                           {severityLabel[r.event_severity] || r.event_severity}
                         </span>
                       )}
-                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border flex-shrink-0',
+                      <span className={cn('text-xs px-2 py-0.5 rounded-md border flex-shrink-0',
                         active ? 'text-blue-500 bg-blue-50 border-blue-100' :
                         isSuccess(r.status) ? 'text-emerald-600 bg-emerald-50 border-emerald-100' :
                         r.status === 'parked' || r.status === 'reconciling' ? 'text-orange-600 bg-orange-50 border-orange-100' :
@@ -313,6 +312,6 @@ export default function RunsPanel() {
           })}
         </div>
       ))}
-    </div>
+    </Card>
   )
 }

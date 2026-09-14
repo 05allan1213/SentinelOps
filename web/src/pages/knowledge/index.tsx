@@ -1,3 +1,6 @@
+import PageHeader from '@/components/common/PageHeader'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -109,21 +112,21 @@ function SearchModal({ baseID, onClose }: { baseID: string; onClose: () => void 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent aria-describedby={undefined} className="max-w-2xl overflow-hidden p-4 sm:p-6">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
           <div>
-            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <DialogTitle>
               <FlaskConical className="w-4 h-4 text-indigo-500" />
               RAG 检索测试
-            </h3>
+            </DialogTitle>
             <p className="text-xs text-gray-500 mt-0.5">直接查询向量库，验证召回效果</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors" aria-label="关闭">
+          <Button variant="icon" aria-label="关闭" onClick={onClose}>
             <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
-        <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0 space-y-3">
+          </Button>
+        </DialogHeader>
+        <DialogBody className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">查询词</label>
             <textarea
@@ -132,7 +135,7 @@ function SearchModal({ baseID, onClose }: { baseID: string; onClose: () => void 
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSearch() } }}
               rows={2}
               placeholder="输入查询词，按 Enter 搜索…"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+              className="control h-auto py-2 w-full text-sm resize-none"
             />
           </div>
           <div className="flex items-center gap-4">
@@ -155,8 +158,8 @@ function SearchModal({ baseID, onClose }: { baseID: string; onClose: () => void 
               检索
             </button>
           </div>
-        </div>
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+        </DialogBody>
+        <DialogBody className="space-y-4">
           {results === null ? (
             <div className="text-center py-12 text-gray-400">
               <FlaskConical className="w-12 h-12 mx-auto mb-3 text-gray-200" />
@@ -197,9 +200,9 @@ function SearchModal({ baseID, onClose }: { baseID: string; onClose: () => void 
               ))}
             </>
           )}
-        </div>
-      </div>
-    </div>
+        </DialogBody>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -507,15 +510,12 @@ export default function Knowledge() {
     <div className="flex flex-col gap-5 h-full overflow-auto">
 
       {/* 标题栏 */}
-      <div className="flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">AI 知识库</h1>
-          <p className="text-sm text-gray-500 mt-1">
+      <div className="flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
+        <PageHeader title="AI 知识库" subtitle={<>
             {activeTab === 'bases' && `共 ${bases.length} 个知识库`}
-            {activeTab === 'docs'  && (currentBase ? `${currentBase.name} · 共 ${docsTotal} 个文档` : '文档管理')}
+            {activeTab === 'docs' && (currentBase ? `${currentBase.name} · 共 ${docsTotal} 个文档` : '文档管理')}
             {activeTab === 'chunks' && (currentDoc ? `${currentDoc.name} · 共 ${chunksTotal} 个分块` : '分块管理')}
-          </p>
-        </div>
+          </>} />
         <div className="flex items-center gap-2">
           {queueLen > 0 && (
             <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 h-9 rounded-lg font-medium">
@@ -523,18 +523,18 @@ export default function Knowledge() {
               队列 {queueLen} 个任务
             </span>
           )}
-          <button
+          <Button
             onClick={() => {
               fetchBases()
               if (activeTab === 'docs') fetchDocs()
               if (activeTab === 'chunks') fetchChunks()
             }}
             disabled={basesLoading || docsLoading || chunksLoading}
-            className="btn-default"
+            variant="secondary"
           >
             <RefreshCw className={cn('w-4 h-4', (basesLoading || docsLoading || chunksLoading) && 'animate-spin')} />
             刷新
-          </button>
+          </Button>
           {activeTab === 'bases' && (
             <button onClick={() => setShowCreate(true)} className="btn btn-primary">
               <Plus className="w-4 h-4" />
@@ -613,7 +613,7 @@ export default function Knowledge() {
                 placeholder="搜索知识库…"
                 value={baseSearch}
                 onChange={e => { setBaseSearch(e.target.value); setBasePage(1) }}
-                className="input pl-9 w-52"
+                className="control pl-9 w-52"
               />
             </div>
             {baseSelected.size > 0 && (
@@ -657,7 +657,7 @@ export default function Knowledge() {
                   <thead>
                     <tr>
                       <th className="pl-4 w-11">
-                        <input type="checkbox" className="rounded border-gray-300"
+                        <input type="checkbox" className="control-checkbox"
                           checked={basePageAllSelected}
                           ref={el => { if (el) el.indeterminate = basePagePartialSelected }}
                           onChange={toggleBaseAll}
@@ -691,7 +691,7 @@ export default function Knowledge() {
                       >
                         <td className="pl-4 py-3.5" onClick={e => e.stopPropagation()}>
                           {base.id !== 'default' ? (
-                            <input type="checkbox" className="rounded border-gray-300"
+                            <input type="checkbox" className="control-checkbox"
                               checked={baseSelected.has(base.id)}
                               onChange={() => toggleBaseSelect(base.id)}
                             />
@@ -773,7 +773,7 @@ export default function Knowledge() {
                 value={docSearchInput}
                 onChange={e => setDocSearchInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && (setDocSearch(docSearchInput), setDocPage(1))}
-                className="input pl-9 w-48"
+                className="control pl-9 w-48"
               />
               {docSearchInput && (
                 <button onClick={() => { setDocSearchInput(''); setDocSearch(''); setDocPage(1) }}
@@ -841,7 +841,7 @@ export default function Knowledge() {
                   <thead>
                     <tr>
                       <th className="pl-4 w-11">
-                        <input type="checkbox" className="rounded border-gray-300"
+                        <input type="checkbox" className="control-checkbox"
                           checked={docPageAllSelected}
                           ref={el => { if (el) el.indeterminate = docPagePartialSelected }}
                           onChange={toggleDocAll}
@@ -879,7 +879,7 @@ export default function Knowledge() {
                       return (
                         <tr key={doc.id} className={cn('group', docSelected.has(doc.id) && 'bg-blue-50/60')}>
                           <td className="pl-4 py-3">
-                            <input type="checkbox" className="rounded border-gray-300"
+                            <input type="checkbox" className="control-checkbox"
                               checked={docSelected.has(doc.id)} onChange={() => toggleDocSelect(doc.id)} />
                           </td>
                           <td className="py-3 px-3 min-w-0">
@@ -922,7 +922,7 @@ export default function Knowledge() {
                           </td>
                           <td className="py-3 px-2">
                             <button type="button" onClick={() => handleToggleDocEnabled(doc)}
-                              className={cn('inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none',
+                              className={cn('inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
                                 doc.enabled ? 'bg-emerald-500' : 'bg-gray-200')}
                               title={doc.enabled ? '点击禁用' : '点击启用'}>
                               <span className={cn('inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200',
@@ -995,7 +995,7 @@ export default function Knowledge() {
                 value={chunkKeywordInput}
                 onChange={e => setChunkKeywordInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && (setChunkKeyword(chunkKeywordInput), setChunkPage(1))}
-                className="input pl-9 w-44"
+                className="control pl-9 w-44"
               />
               {chunkKeywordInput && (
                 <button onClick={() => { setChunkKeywordInput(''); setChunkKeyword(''); setChunkPage(1) }}
@@ -1054,7 +1054,7 @@ export default function Knowledge() {
                   <thead>
                     <tr>
                       <th className="w-10 pl-6">
-                        <input type="checkbox" className="rounded border-gray-300"
+                        <input type="checkbox" className="control-checkbox"
                           checked={chunkPageAllSelected}
                           ref={el => { if (el) el.indeterminate = chunkPagePartialSelected }}
                           onChange={toggleChunkAll}
@@ -1087,7 +1087,7 @@ export default function Knowledge() {
                         <React.Fragment key={chunk.id}>
                           <tr className={cn('group', chunkSelected.has(chunk.id) && 'bg-blue-50/60')}>
                             <td className="pl-6 py-4">
-                              <input type="checkbox" className="rounded border-gray-300"
+                              <input type="checkbox" className="control-checkbox"
                                 checked={chunkSelected.has(chunk.id)} onChange={() => toggleChunkSelect(chunk.id)} />
                             </td>
                             <td className="pl-2 py-4 text-gray-400 font-mono text-xs">{chunk.chunk_index + 1}</td>
@@ -1106,7 +1106,7 @@ export default function Knowledge() {
                             <td className="py-4 px-4 text-gray-500 text-sm tabular-nums">{chunk.char_count}</td>
                             <td className="py-4 px-4">
                               <button type="button" onClick={() => handleToggleChunk(chunk)}
-                                className={cn('inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none',
+                                className={cn('inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
                                   chunk.enabled ? 'bg-emerald-500' : 'bg-gray-200')}
                                 title={chunk.enabled ? '点击禁用' : '点击启用'}>
                                 <span className={cn('inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200',

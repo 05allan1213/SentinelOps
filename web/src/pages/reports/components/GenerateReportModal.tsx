@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
+import Button from '@/components/common/Button'
 import { useState } from 'react'
 import { X, Sparkles, Loader2, CheckCircle } from 'lucide-react'
 import { reportService } from '@/services/report'
@@ -176,16 +178,16 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
   if (!isOpen) return null
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={open => { if (!open) handleClose() }}>
+      <DialogContent aria-describedby={undefined} className="max-w-lg overflow-hidden p-4 sm:p-6">
         {/* 弹窗标题 */}
-        <div className="modal-header">
+        <DialogHeader className="flex items-start justify-between gap-3 space-y-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-primary-500/20 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-primary-400" />
             </div>
             <div>
-              <h2 className="modal-title">AI 生成报告</h2>
+              <DialogTitle>AI 生成报告</DialogTitle>
               <p className="text-xs text-gray-500 mt-0.5">
                 {step === 1 && '选择报告类型'}
                 {step === 2 && '配置报告信息'}
@@ -193,15 +195,12 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
               </p>
             </div>
           </div>
-          <button
-            onClick={handleClose}
-            className="p-1.5 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
-          >
+          <Button variant="icon" aria-label="关闭" onClick={handleClose}>
             <X className="w-5 h-5" />
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
-        <div className="modal-body">
+        <DialogBody className="">
           {/* 第一步：选择报告类型 */}
           {step === 1 && (
             <div className="grid grid-cols-2 gap-3">
@@ -212,9 +211,9 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
                     setReportType(type.value)
                     setStep(2)
                   }}
-                  className="flex flex-col items-start gap-1 p-3 rounded-lg border border-gray-700 hover:border-primary-500 hover:bg-gray-800/50 transition-colors text-left"
+                  className="flex flex-col items-start gap-1 p-3 rounded-lg border border-gray-200 hover:border-primary-500 hover:bg-gray-50 transition-colors text-left"
                 >
-                  <p className="text-sm font-medium text-gray-200">{type.label}</p>
+                  <p className="text-sm font-medium text-gray-900">{type.label}</p>
                   <p className="text-xs text-gray-500">{type.description}</p>
                 </button>
               ))}
@@ -231,13 +230,13 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="输入报告标题"
-                  className="input"
+                  className="control w-full"
                 />
               </div>
 
               <div className="form-item">
                 <label className="label">报告类型</label>
-                <p className="text-sm text-gray-300">
+                <p className="text-sm text-gray-700">
                   {reportTypes.find((t) => t.value === reportType)?.label} - {reportTypes.find((t) => t.value === reportType)?.description}
                 </p>
               </div>
@@ -249,20 +248,20 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
             <div className="space-y-4">
               {!isGenerating ? (
                 <div className="space-y-3">
-                  <div className="p-3 rounded-lg bg-gray-800/50 space-y-2">
+                  <div className="p-3 rounded-lg bg-gray-50 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">报告类型</span>
-                      <span className="text-gray-200">
+                      <span className="text-gray-900">
                         {reportTypes.find((t) => t.value === reportType)?.label}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">报告标题</span>
-                      <span className="text-gray-200">{title}</span>
+                      <span className="text-gray-900">{title}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">时间范围</span>
-                      <span className="text-gray-200">
+                      <span className="text-gray-900">
                         {(() => {
                           const { start, end } = getTimeRange(reportType)
                           return `${start} ~ ${end}`
@@ -270,7 +269,7 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
                       </span>
                     </div>
                   </div>
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800">
                     报告入库属于 L1 变更：Agent 生成内容后会提交审批，审批通过后自动写入报告库。
                   </div>
                 </div>
@@ -283,10 +282,10 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
                       <Loader2 className="w-6 h-6 text-primary-400 animate-spin" />
                     )}
                   </div>
-                  <p className="text-sm text-gray-200 font-medium mb-3">
+                  <p className="text-sm text-gray-900 font-medium mb-3">
                     {progress >= 100 ? '报告生成完成！' : 'AI 正在分析并生成报告...'}
                   </p>
-                  <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-primary-500 transition-all duration-300"
                       style={{ width: `${Math.min(progress, 100)}%` }}
@@ -299,31 +298,31 @@ export default function GenerateReportModal({ isOpen, onClose, onSuccess }: Gene
               )}
             </div>
           )}
-        </div>
+        </DialogBody>
 
         {/* 底部操作区 */}
         {step > 1 && !isGenerating && (
-          <div className="modal-footer">
-            <button onClick={() => setStep(step - 1)} className="btn-default">
+          <DialogFooter>
+            <Button onClick={() => setStep(step - 1)} variant="secondary">
               上一步
-            </button>
+            </Button>
             {step === 2 ? (
-              <button
+              <Button
                 onClick={() => setStep(3)}
                 disabled={!title}
-                className="btn-primary"
+                variant="primary"
               >
                 下一步
-              </button>
+              </Button>
             ) : (
-              <button onClick={handleGenerate} className="btn-primary">
+              <Button onClick={handleGenerate} variant="primary">
                 <Sparkles className="w-4 h-4" />
                 开始生成
-              </button>
+              </Button>
             )}
-          </div>
+          </DialogFooter>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
