@@ -11,7 +11,7 @@ import {
   Lightbulb,
   Activity,
 } from 'lucide-react'
-import ReactECharts from 'echarts-for-react'
+import ReactECharts from '@/components/charts/EChart'
 import { cn } from '@/utils'
 import EventTrendChart from './components/EventTrendChart'
 import SeverityDistribution from './components/SeverityDistribution'
@@ -252,11 +252,12 @@ const FLOW_TIME_OPTIONS: Array<{ value: FlowTimeWindow; label: string }> = [
 function EventFlowSection({ loading }: { loading?: boolean }) {
   const [timeWindow, setTimeWindow] = useState<FlowTimeWindow>('7d')
   const [flowData, setFlowData] = useState<{ date: string; total: number }[]>([])
-  const [flowLoading, setFlowLoading] = useState(true)
+  const [resolvedWindow, setResolvedWindow] = useState<FlowTimeWindow | null>(null)
+  // 当前时间窗尚未取回数据即视为加载中。
+  const flowLoading = resolvedWindow !== timeWindow
 
   useEffect(() => {
     const days = timeWindow === '30d' ? 30 : 7
-    setFlowLoading(true)
     eventService
       .getTrend(days)
       .then(items => {
@@ -273,7 +274,7 @@ function EventFlowSection({ loading }: { loading?: boolean }) {
         setFlowData(filled)
       })
       .catch(console.error)
-      .finally(() => setFlowLoading(false))
+      .finally(() => setResolvedWindow(timeWindow))
   }, [timeWindow])
 
   const option = useMemo(
@@ -720,7 +721,7 @@ function InsightPanel({
 // ============================================================================
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true)
+  const [resolvedStatsKey, setResolvedStatsKey] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -735,62 +736,68 @@ export default function Dashboard() {
     weekDelta: null,
   })
 
-  const fetchStats = async () => {
-    try {
-      const [subscriptionsRes, reportsRes, eventStats, trendItems] =
-        await Promise.all([
-          subscriptionService.list(1, 1),
-          reportService.list(1, 1),
-          eventService.getStats(),
-          eventService.getTrend(14),
-        ])
-
-      // 计算近7天 vs 前7天 事件总量 delta
-      let weekDelta: number | null = null
-      if (trendItems && trendItems.length >= 2) {
-        const sorted = [...trendItems].sort((a, b) => a.date.localeCompare(b.date))
-        const recent7 = sorted.slice(-7)
-        const prev7 = sorted.slice(0, Math.min(7, sorted.length - recent7.length))
-        const recentTotal = recent7.reduce(
-          (s, i) => s + i.critical + i.high + i.medium + i.low,
-          0,
-        )
-        const prevTotal = prev7.reduce(
-          (s, i) => s + i.critical + i.high + i.medium + i.low,
-          0,
-        )
-        weekDelta = recentTotal - prevTotal
-      }
-
-      const bySeverity = eventStats.by_severity || {}
-      setStats({
-        eventCount: eventStats.total || 0,
-        subscriptionCount: subscriptionsRes.total || 0,
-        reportCount: reportsRes.total || 0,
-        todayCount: eventStats.today_count || 0,
-        // criticalCount 仅取 critical 级别，避免与 highCount 重复计算安全评分
-        criticalCount: bySeverity['critical'] || 0,
-        highCount: bySeverity['high'] || 0,
-        mediumCount: bySeverity['medium'] || 0,
-        weekDelta,
-      })
-      setLastUpdated(new Date())
-    } catch (error) {
-      console.error('获取统计数据失败:', error)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
+  const statsRequestKey = `stats|${refreshKey}`
+  // 请求身份未落地即视为加载中：首次挂载与手动刷新都会自动置位。
+  const loading = resolvedStatsKey !== statsRequestKey
 
   useEffect(() => {
-    fetchStats()
-  }, [])
+    let cancelled = false
+    void (async () => {
+      try {
+        const [subscriptionsRes, reportsRes, eventStats, trendItems] =
+          await Promise.all([
+            subscriptionService.list(1, 1),
+            reportService.list(1, 1),
+            eventService.getStats(),
+            eventService.getTrend(14),
+          ])
+
+        // 计算近7天 vs 前7天 事件总量 delta
+        let weekDelta: number | null = null
+        if (trendItems && trendItems.length >= 2) {
+          const sorted = [...trendItems].sort((a, b) => a.date.localeCompare(b.date))
+          const recent7 = sorted.slice(-7)
+          const prev7 = sorted.slice(0, Math.min(7, sorted.length - recent7.length))
+          const recentTotal = recent7.reduce(
+            (s, i) => s + i.critical + i.high + i.medium + i.low,
+            0,
+          )
+          const prevTotal = prev7.reduce(
+            (s, i) => s + i.critical + i.high + i.medium + i.low,
+            0,
+          )
+          weekDelta = recentTotal - prevTotal
+        }
+
+        if (cancelled) return
+        const bySeverity = eventStats.by_severity || {}
+        setStats({
+          eventCount: eventStats.total || 0,
+          subscriptionCount: subscriptionsRes.total || 0,
+          reportCount: reportsRes.total || 0,
+          todayCount: eventStats.today_count || 0,
+          // criticalCount 仅取 critical 级别，避免与 highCount 重复计算安全评分
+          criticalCount: bySeverity['critical'] || 0,
+          highCount: bySeverity['high'] || 0,
+          mediumCount: bySeverity['medium'] || 0,
+          weekDelta,
+        })
+        setLastUpdated(new Date())
+      } catch (error) {
+        if (!cancelled) console.error('获取统计数据失败:', error)
+      } finally {
+        if (!cancelled) {
+          setResolvedStatsKey(statsRequestKey)
+          setRefreshing(false)
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [statsRequestKey])
 
   const handleRefresh = () => {
     setRefreshing(true)
     setRefreshKey(k => k + 1)
-    fetchStats()
   }
 
   const formatLastUpdated = () => {

@@ -172,7 +172,8 @@ function RuleModal({ item, onClose, onSuccess }: ModalProps) {
 // ── 主页面 ────────────────────────────────────────────────────────────────────
 export default function TermMappingPage() {
   const [items, setItems] = useState<TermMappingItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [itemsNonce, setItemsNonce] = useState(0)
+  const [resolvedItemsKey, setResolvedItemsKey] = useState<string | null>(null)
   const [reloading, setReloading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterEnabled, setFilterEnabled] = useState<string>('all')
@@ -185,20 +186,27 @@ export default function TermMappingPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  const fetchItems = async () => {
-    try {
-      setLoading(true)
-      const data = await termMappingService.list()
-      setItems(data)
-    } catch (e) {
-      console.error('[TermMapping] 获取规则失败:', e)
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
-  }
+  const itemsRequestKey = `items|${itemsNonce}`
+  // 请求身份未落地即视为加载中；增删改成功后通过 itemsNonce 重新拉取。
+  const loading = resolvedItemsKey !== itemsRequestKey
 
-  useEffect(() => { fetchItems() }, [])
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const data = await termMappingService.list()
+        if (!cancelled) setItems(data)
+      } catch (e) {
+        if (!cancelled) {
+          console.error('[TermMapping] 获取规则失败:', e)
+          setItems([])
+        }
+      } finally {
+        if (!cancelled) setResolvedItemsKey(itemsRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [itemsRequestKey])
 
   // 过滤结果
   const filtered = useMemo(() => {
@@ -215,8 +223,9 @@ export default function TermMappingPage() {
     })
   }, [items, searchQuery, filterEnabled])
 
-  // 过滤条件变化时重置到第 1 页
-  useEffect(() => { setPage(1) }, [searchQuery, filterEnabled])
+  // 过滤条件变化时重置到第 1 页（在输入/切换事件里完成，避免额外一次渲染）
+  const applySearchQuery = (value: string) => { setSearchQuery(value); setPage(1) }
+  const applyFilterEnabled = (value: string) => { setFilterEnabled(value); setPage(1) }
 
   // 当前页数据
   const pagedItems = useMemo(
@@ -232,7 +241,7 @@ export default function TermMappingPage() {
   const handleToggleEnabled = async (item: TermMappingItem) => {
     try {
       await termMappingService.update({ id: item.id, target_term: item.target_term, priority: item.priority, enabled: !item.enabled })
-      fetchItems()
+      setItemsNonce(n => n + 1)
     } catch (e: any) {
       toast.error(e?.message || '状态切换失败')
     }
@@ -242,7 +251,7 @@ export default function TermMappingPage() {
     try {
       await termMappingService.delete(id)
       toast.success('规则已删除')
-      fetchItems()
+      setItemsNonce(n => n + 1)
     } catch (e: any) {
       toast.error(e?.message || '删除失败')
     }
@@ -273,7 +282,7 @@ export default function TermMappingPage() {
       )
       toast.success(`已批量${enable ? '启用' : '禁用'} ${ids.length} 条规则`)
       setSelected(new Set())
-      fetchItems()
+      setItemsNonce(n => n + 1)
     } catch {
       toast.error('批量操作失败')
     }
@@ -285,7 +294,7 @@ export default function TermMappingPage() {
       await Promise.all(ids.map((id) => termMappingService.delete(id)))
       toast.success(`已删除 ${ids.length} 条规则`)
       setSelected(new Set())
-      fetchItems()
+      setItemsNonce(n => n + 1)
     } catch {
       toast.error('批量删除失败')
     }
@@ -331,17 +340,17 @@ export default function TermMappingPage() {
               type="text"
               placeholder="搜索原始词或目标词..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => applySearchQuery(e.target.value)}
               className="control pl-9 w-52"
             />
           </div>
-          <CustomSelect value={filterEnabled} onChange={v => setFilterEnabled(v)} className="w-28" options={[
+          <CustomSelect value={filterEnabled} onChange={v => applyFilterEnabled(v)} className="w-28" options={[
             { value: 'all', label: '全部状态' },
             { value: 'enabled', label: '仅启用' },
             { value: 'disabled', label: '仅禁用' },
           ] satisfies SelectOption[]} />
           {searchQuery && (
-            <Button onClick={() => setSearchQuery('')} variant="secondary"><X className="w-4 h-4" /></Button>
+            <Button onClick={() => applySearchQuery('')} variant="secondary"><X className="w-4 h-4" /></Button>
           )}
           <Button onClick={handleReload} disabled={reloading} variant="secondary" title="将数据库规则热重载到进程内存">
             <RefreshCw className={cn('w-4 h-4', reloading && 'animate-spin')} />
@@ -510,7 +519,7 @@ export default function TermMappingPage() {
           key={editingItem ? `edit-${editingItem.id}` : 'new'}
           item={editingItem}
           onClose={() => { setShowModal(false); setEditingItem(null) }}
-          onSuccess={fetchItems}
+          onSuccess={() => setItemsNonce(n => n + 1)}
         />
       )}
 

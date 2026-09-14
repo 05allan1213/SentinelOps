@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { cn, normalizeMarkdown } from '@/utils'
 import { ExternalLink, Shield, ChevronRight, AlertTriangle, Scan, X, Loader2 } from 'lucide-react'
 import { MarkdownRenderer } from '@/components/markdown'
@@ -198,11 +198,29 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const selectedEvent = data?.events?.find(e => e.event_id === selectedEventId) ?? null
 
+  // 异步流程（stream 回调 / finally 队列推进）读取 ref 作为权威状态，渲染读取
+  // 下面这两个不可变快照，因此不会在渲染期访问 ref。
   const solutionCache = useRef<Map<string, SolutionEntry>>(new Map())
   const activeStreams = useRef<Set<string>>(new Set())
-  const [cacheVersion, setCacheVersion] = useState(0)
+  const [cacheSnapshot, setCacheSnapshot] = useState<Map<string, SolutionEntry>>(() => new Map())
+  const [activeSnapshot, setActiveSnapshot] = useState<Set<string>>(() => new Set())
   const onSolutionUpdateRef = useRef(onSolutionUpdate)
   useEffect(() => { onSolutionUpdateRef.current = onSolutionUpdate }, [onSolutionUpdate])
+
+  // 渲染期只读取不可变快照：持久化方案与分析期间流式写入的缓存合并展示。
+  const persistedSolutions = useMemo(() => {
+    const entries = new Map<string, SolutionEntry>()
+    for (const ev of data?.events || []) {
+      if (ev.recommendationComplete && ev.recommendation) entries.set(ev.event_id, { content: ev.recommendation, complete: true })
+    }
+    return entries
+  }, [data])
+  const visibleSolutions = useMemo(
+    () => new Map([...persistedSolutions, ...cacheSnapshot]),
+    [persistedSolutions, cacheSnapshot],
+  )
+  const selectedSolution = selectedEvent ? visibleSolutions.get(selectedEvent.event_id) : undefined
+  const isSelectedStreaming = selectedEvent ? activeSnapshot.has(selectedEvent.event_id) : false
 
   // 并发队列
   const pendingQueue = useRef<EventData[]>([])
@@ -211,9 +229,10 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
   // launchFetch：真正执行 fetch，带超时控制，完成后自动从队列取下一条
   // 用 ref 存储以避免 useCallback 的循环依赖（finally 中调用自身）
   const launchFetchRef = useRef<(event: EventData) => void>(() => {})
-  launchFetchRef.current = (event: EventData) => {
+  function launchFetch(event: EventData) {
     const { event_id } = event
     activeStreams.current.add(event_id)
+    setActiveSnapshot(new Set(activeStreams.current))
     activeCount.current++
 
     const controller = new AbortController()
@@ -257,7 +276,7 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
               if (msg.type === 'content' && msg.content) {
                 accumulated += msg.content
                 solutionCache.current.set(event_id, { content: accumulated, complete: false })
-                setCacheVersion(v => v + 1)
+                setCacheSnapshot(new Map(solutionCache.current))
               }
             } catch { /* 忽略无法解析的事件 */ }
           }
@@ -267,6 +286,7 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
       .finally(() => {
         clearTimeout(timeoutId)
         activeStreams.current.delete(event_id)
+        setActiveSnapshot(new Set(activeStreams.current))
         activeCount.current--
         // 无论成功/失败/超时，都标记为 complete 让 spinner 停止
         if (!solutionCache.current.get(event_id)?.complete) {
@@ -275,7 +295,7 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
             onSolutionUpdateRef.current?.(event_id, accumulated, true)
           }
         }
-        setCacheVersion(v => v + 1)
+        setCacheSnapshot(new Map(solutionCache.current))
         // 从队列取下一条继续处理
         if (pendingQueue.current.length > 0) {
           const next = pendingQueue.current.shift()!
@@ -283,6 +303,9 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
         }
       })
   }
+
+  // 每次渲染同步队列推进入口；只写 ref，不触发额外渲染。
+  useEffect(() => { launchFetchRef.current = launchFetch })
 
   // startFetch：幂等入口，检查去重后决定立即启动或入队
   const startFetch = useCallback((event: EventData) => {
@@ -309,7 +332,6 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
         solutionCache.current.set(ev.event_id, { content: ev.recommendation, complete: true })
       }
     }
-    setCacheVersion(v => v + 1)
   }, [data])
 
   // 分析结果到来后，自动预加载所有事件的解决方案（受并发限制，超出部分入队）
@@ -352,12 +374,6 @@ export default function ResultPanel({ data, isProcessing, onSolutionUpdate }: Pr
       </div>
     )
   }
-
-  // cacheVersion 变化时重新读取，确保 EventDetail 拿到最新内容
-  const selectedSolution = selectedEvent ? solutionCache.current.get(selectedEvent.event_id) : undefined
-  const isSelectedStreaming = selectedEvent ? activeStreams.current.has(selectedEvent.event_id) : false
-  // 标注 cacheVersion 依赖（防止 linter 警告，实际读取在上方 Map.get 中）
-  void cacheVersion
 
   return (
     <div className="relative min-w-0 h-full flex flex-col bg-white bg-[#080C13]/95">

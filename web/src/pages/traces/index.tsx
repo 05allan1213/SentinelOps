@@ -1,6 +1,6 @@
 import PageHeader from '@/components/common/PageHeader'
 import Button from '@/components/common/Button'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Activity,
@@ -22,7 +22,7 @@ import {
   TrendingUp,
   Banknote,
 } from 'lucide-react'
-import ReactECharts from 'echarts-for-react'
+import ReactECharts from '@/components/charts/EChart'
 import { cn } from '@/utils'
 import StatCard from '@/components/common/StatCard'
 import CustomSelect from '@/components/common/CustomSelect'
@@ -483,8 +483,17 @@ export default function Traces() {
   const [runs, setRuns] = useState<TraceRun[]>([])
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState<TraceStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [statsLoading, setStatsLoading] = useState(true)
+  // 加载态由「请求身份 vs 已落地请求身份」推导，effect 内不再同步 setState。
+  const [runsNonce, setRunsNonce] = useState(0)
+  const [resolvedRunsKey, setResolvedRunsKey] = useState<string | null>(null)
+  const [statsNonce, setStatsNonce] = useState(0)
+  const [resolvedStatsKey, setResolvedStatsKey] = useState<string | null>(null)
+  const [overviewNonce, setOverviewNonce] = useState(0)
+  const [resolvedCostKey, setResolvedCostKey] = useState<string | null>(null)
+  const [trendNonce, setTrendNonce] = useState(0)
+  const [resolvedTrendKey, setResolvedTrendKey] = useState<string | null>(null)
+  const [sessionNonce, setSessionNonce] = useState(0)
+  const [resolvedSessionKey, setResolvedSessionKey] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [statusFilter, setStatusFilter] = useState('')
@@ -498,122 +507,148 @@ export default function Traces() {
 
   // ── 会话时间线状态 ──────────────────────────────────────────────────────────
   const [sessionTimeline, setSessionTimeline] = useState<SessionTimelineSummary[]>([])
-  const [sessionTimelineLoading, setSessionTimelineLoading] = useState(false)
 
   // ── 成本概览状态 ────────────────────────────────────────────────────────────
   const [costRange, setCostRange] = useState<CostRange>('7d')
   const [overview, setOverview] = useState<CostOverview | null>(null)
   const [trendPoints, setTrendPoints] = useState<TokenTrendPoint[]>([])
-  const [costLoading, setCostLoading] = useState(false)
-  const [trendLoading, setTrendLoading] = useState(false)
   const costTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── 数据加载 ────────────────────────────────────────────────────────────────
 
-  const loadStats = useCallback(async () => {
-    setStatsLoading(true)
-    try { setStats(await traceService.stats(7)) }
-    catch (e) { console.error('加载统计数据失败', e) }
-    finally { setStatsLoading(false) }
-  }, [])
+  const runsRequestKey = `${page}|${pageSize}|${statusFilter}|${traceIdFilter}|${sessionFilter}|${moduleFilter}|${runsNonce}`
+  const statsRequestKey = `stats|${statsNonce}`
+  const costRequestKey = `cost|${costRange}|${overviewNonce}`
+  const trendRequestKey = `trend|${costRange}|${overviewNonce}|${trendNonce}`
+  const sessionRequestKey = `session|${sessionFilter}|${sessionNonce}`
+  const loading = resolvedRunsKey !== runsRequestKey
+  const statsLoading = resolvedStatsKey !== statsRequestKey
+  const costLoading = activeTab === 'overview' && resolvedCostKey !== costRequestKey
+  const trendLoading = activeTab === 'overview' && resolvedTrendKey !== trendRequestKey
+  const sessionTimelineLoading = !!sessionFilter && resolvedSessionKey !== sessionRequestKey
+  const runsActive = runs.some(r => r.status === 'running')
 
-  const loadRuns = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await traceService.list({
-        page, pageSize,
-        status: statusFilter || undefined,
-        traceId: traceIdFilter || undefined,
-        sessionId: sessionFilter || undefined,
-      })
-      let list = res.list || []
-
-      // 客户端模块筛选
-      if (moduleFilter === 'chat') {
-        list = list.filter(r => r.traceName?.startsWith('chat.'))
-      } else if (moduleFilter === 'event') {
-        list = list.filter(r => r.traceName?.startsWith('event.'))
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const result = await traceService.stats(7)
+        if (!cancelled) setStats(result)
+      } catch (e) {
+        if (!cancelled) console.error('加载统计数据失败', e)
+      } finally {
+        if (!cancelled) setResolvedStatsKey(statsRequestKey)
       }
+    })()
+    return () => { cancelled = true }
+  }, [statsRequestKey])
 
-      setRuns(list)
-      setTotal(res.total || 0)
-    } catch (e) { console.error('加载链路数据失败', e) }
-    finally { setLoading(false) }
-  }, [page, pageSize, statusFilter, traceIdFilter, sessionFilter, moduleFilter])
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await traceService.list({
+          page, pageSize,
+          status: statusFilter || undefined,
+          traceId: traceIdFilter || undefined,
+          sessionId: sessionFilter || undefined,
+        })
+        let list = res.list || []
 
-  const loadCostOverview = useCallback(async (r: CostRange) => {
-    const cfg = COST_RANGES.find(x => x.value === r)!
-    setCostLoading(true)
-    try { setOverview(await traceService.costOverview({ days: cfg.days })) }
-    catch { /* 忽略筛选项加载失败 */ }
-    finally { setCostLoading(false) }
-  }, [])
+        // 客户端模块筛选
+        if (moduleFilter === 'chat') {
+          list = list.filter(r => r.traceName?.startsWith('chat.'))
+        } else if (moduleFilter === 'event') {
+          list = list.filter(r => r.traceName?.startsWith('event.'))
+        }
 
-  const loadTokenTrend = useCallback(async (r: CostRange) => {
-    const cfg = COST_RANGES.find(x => x.value === r)!
-    const hours = cfg.hours ?? cfg.days * 24
-    setTrendLoading(true)
-    try {
-      const data = await traceService.tokenTrend(Math.min(hours, 72))
-      setTrendPoints(data.points || [])
-    } catch { /* 忽略 Token 趋势加载失败 */ }
-    finally { setTrendLoading(false) }
-  }, [])
-
-  const loadSessionTimeline = async (sid: string) => {
-    if (!sid) return
-    setSessionTimelineLoading(true)
-    try {
-      const res = await traceService.sessionTimeline(sid)
-      setSessionTimeline(res.runs || [])
-    } catch { setSessionTimeline([]) }
-    finally { setSessionTimelineLoading(false) }
-  }
-
-  useEffect(() => { loadStats() }, [loadStats])
-  useEffect(() => { loadRuns() }, [loadRuns])
+        if (cancelled) return
+        setRuns(list)
+        setTotal(res.total || 0)
+      } catch (e) {
+        if (!cancelled) console.error('加载链路数据失败', e)
+      } finally {
+        if (!cancelled) setResolvedRunsKey(runsRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [page, pageSize, statusFilter, traceIdFilter, sessionFilter, moduleFilter, runsRequestKey])
 
   // 成本概览：仅在概览 Tab 激活时加载
   useEffect(() => {
-    if (activeTab === 'overview') {
-      loadCostOverview(costRange)
-      loadTokenTrend(costRange)
-    }
-  }, [activeTab, costRange, loadCostOverview, loadTokenTrend])
+    if (activeTab !== 'overview') return
+    let cancelled = false
+    void (async () => {
+      const cfg = COST_RANGES.find(x => x.value === costRange)!
+      try {
+        const result = await traceService.costOverview({ days: cfg.days })
+        if (!cancelled) setOverview(result)
+      } catch { /* 忽略筛选项加载失败 */ }
+      finally {
+        if (!cancelled) setResolvedCostKey(costRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [activeTab, costRange, costRequestKey])
+
+  useEffect(() => {
+    if (activeTab !== 'overview') return
+    let cancelled = false
+    void (async () => {
+      const cfg = COST_RANGES.find(x => x.value === costRange)!
+      const hours = cfg.hours ?? cfg.days * 24
+      try {
+        const data = await traceService.tokenTrend(Math.min(hours, 72))
+        if (!cancelled) setTrendPoints(data.points || [])
+      } catch { /* 忽略 Token 趋势加载失败 */ }
+      finally {
+        if (!cancelled) setResolvedTrendKey(trendRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [activeTab, costRange, trendRequestKey])
+
+  // 会话时间线：切到 session Tab 或输入新的会话 ID 时加载
+  useEffect(() => {
+    if (activeTab !== 'session' || !sessionFilter) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await traceService.sessionTimeline(sessionFilter)
+        if (!cancelled) setSessionTimeline(res.runs || [])
+      } catch {
+        if (!cancelled) setSessionTimeline([])
+      } finally {
+        if (!cancelled) setResolvedSessionKey(sessionRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [activeTab, sessionFilter, sessionRequestKey])
 
   // 24h 时每 5min 自动刷新 Token 趋势
   useEffect(() => {
     if (activeTab !== 'overview' || costRange !== '24h') return
-    costTimerRef.current = setInterval(() => loadTokenTrend('24h'), 5 * 60 * 1000)
+    costTimerRef.current = setInterval(() => setTrendNonce(n => n + 1), 5 * 60 * 1000)
     return () => { if (costTimerRef.current) clearInterval(costTimerRef.current) }
-  }, [activeTab, costRange, loadTokenTrend])
+  }, [activeTab, costRange])
 
   // 链路自动轮询（有 running 时）
   useEffect(() => {
-    const hasRunning = runs.some(r => r.status === 'running')
-    if (!hasRunning) return
-    const timer = setInterval(() => { loadRuns() }, 5000)
+    if (!runsActive) return
+    const timer = setInterval(() => setRunsNonce(n => n + 1), 5000)
     return () => clearInterval(timer)
-  }, [runs, loadRuns])
-
-  // 会话时间线自动加载
-  useEffect(() => {
-    if (activeTab === 'session' && sessionFilter) {
-      setSessionInput(sessionFilter)
-      loadSessionTimeline(sessionFilter)
-    }
-  }, [activeTab, sessionFilter])
+  }, [runsActive])
 
   // ── 事件处理 ────────────────────────────────────────────────────────────────
 
   const handleSearch = () => { setTraceIdFilter(searchInput.trim()); setPage(1) }
 
   const handleSessionSearch = () => {
+    setSessionInput(sessionInput.trim())
     setSessionFilter(sessionInput.trim())
     setPage(1)
-    if (activeTab === 'session' && sessionInput.trim()) {
-      loadSessionTimeline(sessionInput.trim())
-    }
+    // 相同会话再次点击搜索也要刷新一次时间线。
+    setSessionNonce(n => n + 1)
   }
 
   const toggleSelect = (id: string) => {
@@ -644,7 +679,7 @@ export default function Traces() {
       const res = await traceService.batchDelete(ids)
       toast.success(`已删除 ${res.deleted} 条链路记录`)
       setSelected(new Set())
-      loadRuns(); loadStats()
+      setRunsNonce(n => n + 1); setStatsNonce(n => n + 1)
     } catch { toast.error('删除失败') }
   }
 
@@ -652,7 +687,7 @@ export default function Traces() {
     try {
       const res = await traceService.batchDelete([traceId])
       toast.success(`已删除 ${res.deleted} 条链路记录`)
-      loadRuns(); loadStats()
+      setRunsNonce(n => n + 1); setStatsNonce(n => n + 1)
     } catch { toast.error('删除失败') }
   }
 
@@ -670,8 +705,8 @@ export default function Traces() {
         <div className="flex items-center gap-2">
           <Button
             onClick={() => {
-              loadStats(); loadRuns()
-              if (activeTab === 'overview') { loadCostOverview(costRange); loadTokenTrend(costRange) }
+              setStatsNonce(n => n + 1); setRunsNonce(n => n + 1)
+              setOverviewNonce(n => n + 1); setTrendNonce(n => n + 1)
             }}
             disabled={loading || costLoading}
             variant="secondary"
@@ -928,7 +963,7 @@ export default function Traces() {
                                       </button>
                                     )
                                   }
-                                } catch {}
+                                } catch { /* 标签不是 JSON，按无标签渲染 */ }
                                 return <span className="text-gray-300 text-xs">-</span>
                               })()
                             )}

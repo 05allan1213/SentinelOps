@@ -1,5 +1,5 @@
 import Button from '@/components/common/Button'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Upload, Trash2, RefreshCw, Loader2, FileText, Layers,
@@ -87,7 +87,7 @@ export default function KnowledgeDocs() {
   const [base, setBase] = useState<KnowledgeBase | null>(null)
   const [docs, setDocs] = useState<DocItem[]>([])
   const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [resolvedDocsKey, setResolvedDocsKey] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -103,42 +103,49 @@ export default function KnowledgeDocs() {
   const [rebuildTarget, setRebuildTarget] = useState<{ docId?: string; docIds?: string[]; currentStrategy?: string } | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const fetchDocs = useCallback(async () => {
-    if (!baseId) return
-    try {
-      setLoading(true)
-      const [baseInfo, { list, total }] = await Promise.all([
-        knowledgeService.getBase(baseId),
-        knowledgeService.listDoc(baseId, {
-          page,
-          pageSize,
-          keyword:  search     || undefined,
-          status:   statusFilter   || undefined,
-          fileType: fileTypeFilter || undefined,
-        }),
-      ])
-      setBase(baseInfo)
-      setDocs(list)
-      setTotal(total)
-    } catch {
-      toast.error('获取文档列表失败')
-    } finally {
-      setLoading(false)
-    }
-  }, [baseId, page, pageSize, search, statusFilter, fileTypeFilter])
+  const [reloadNonce, setReloadNonce] = useState(0)
+  const docsRequestKey = `${baseId}|${page}|${pageSize}|${search}|${statusFilter}|${fileTypeFilter}|${reloadNonce}`
+  // 请求身份未落地即视为加载中。
+  const loading = !!baseId && resolvedDocsKey !== docsRequestKey
 
-  useEffect(() => { fetchDocs() }, [fetchDocs])
+  useEffect(() => {
+    if (!baseId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const [baseInfo, { list, total }] = await Promise.all([
+          knowledgeService.getBase(baseId),
+          knowledgeService.listDoc(baseId, {
+            page,
+            pageSize,
+            keyword:  search     || undefined,
+            status:   statusFilter   || undefined,
+            fileType: fileTypeFilter || undefined,
+          }),
+        ])
+        if (cancelled) return
+        setBase(baseInfo)
+        setDocs(list)
+        setTotal(total)
+      } catch {
+        if (!cancelled) toast.error('获取文档列表失败')
+      } finally {
+        if (!cancelled) setResolvedDocsKey(docsRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [baseId, page, pageSize, search, statusFilter, fileTypeFilter, docsRequestKey])
 
   // 有进行中的索引时，每 3 秒自动轮询
   useEffect(() => {
     const hasActive = docs.some(d => d.index_status === 'pending' || d.index_status === 'indexing')
     if (hasActive) {
-      pollRef.current = setInterval(fetchDocs, 3000)
+      pollRef.current = setInterval(() => setReloadNonce(n => n + 1), 3000)
     } else {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
     }
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [docs, fetchDocs])
+  }, [docs])
 
   // 过滤条件变更时重置到第一页
   const handleSearchSubmit = () => {
@@ -289,7 +296,7 @@ export default function KnowledgeDocs() {
             </button>
           )}
 
-          <Button onClick={fetchDocs} disabled={loading} variant="secondary">
+          <Button onClick={() => setReloadNonce(n => n + 1)} disabled={loading} variant="secondary">
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
             刷新
           </Button>
@@ -521,7 +528,7 @@ export default function KnowledgeDocs() {
           baseID={baseId}
           baseName={base?.name ?? ''}
           onClose={() => setShowUpload(false)}
-          onSuccess={() => { setShowUpload(false); setTimeout(fetchDocs, 500) }}
+          onSuccess={() => { setShowUpload(false); setTimeout(() => setReloadNonce(n => n + 1), 500) }}
         />
       )}
 
@@ -534,7 +541,7 @@ export default function KnowledgeDocs() {
           onSuccess={() => {
             setRebuildTarget(null)
             setSelected(new Set())
-            setTimeout(fetchDocs, 500)
+            setTimeout(() => setReloadNonce(n => n + 1), 500)
           }}
         />
       )}

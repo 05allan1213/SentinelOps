@@ -60,10 +60,8 @@ export default function ThinkingConsole({ logs, isProcessing }: Props) {
     return map
   }, [logs])
 
-  // 分析进行中自动展开
-  useEffect(() => {
-    if (isProcessing && collapsed) setCollapsed(false)
-  }, [isProcessing])
+  // 分析进行中保持展开（用户折叠意图在分析结束后生效）。
+  const expanded = collapsed && !isProcessing
 
   // 新日志出现时自动滚到底部
   useEffect(() => {
@@ -73,13 +71,13 @@ export default function ThinkingConsole({ logs, isProcessing }: Props) {
   }, [logs])
 
   return (
-    <div className={`flex flex-col border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${collapsed ? 'h-[44px]' : 'min-h-[370px] max-h-[395px]'} bg-white bg-white`}>
+    <div className={`flex flex-col border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${expanded ? 'h-[44px]' : 'min-h-[370px] max-h-[395px]'} bg-white bg-white`}>
       {/* 控制台标题 */}
       <div
         className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 border-[#21262D] bg-gray-50 bg-gray-50 cursor-pointer select-none shrink-0"
         onClick={() => setCollapsed(c => !c)}
       >
-        {collapsed
+        {expanded
           ? <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
           : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
         {/* 终端提示符风格图标 */}
@@ -102,7 +100,7 @@ export default function ThinkingConsole({ logs, isProcessing }: Props) {
       </div>
 
       {/* 实时日志流 */}
-      {!collapsed && (
+      {!expanded && (
         <div ref={scrollRef} className="flex-1 overflow-auto px-2 py-1.5 space-y-px scrollbar-thin">
           {logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-gray-500">

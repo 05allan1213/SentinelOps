@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Search,
   FileText,
@@ -45,33 +45,40 @@ export default function Reports() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const [reports, setReports] = useState<Report[]>([])
-  const [loading, setLoading] = useState(true)
+  const [refreshNonce, setRefreshNonce] = useState(0)
+  const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  const fetchReports = async () => {
-    try {
-      setLoading(true)
-      const res = await reportService.list(page, pageSize, typeFilter)
-      setReports(res.list || [])
-      setTotal(res.total || 0)
-    } catch (error) {
-      console.error('[Reports] 获取报告列表失败:', error)
-      setReports([])
-      setTotal(0)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const requestKey = `${page}|${pageSize}|${typeFilter}|${refreshNonce}`
+  const loading = resolvedRequestKey !== requestKey
 
-  useEffect(() => { fetchReports() }, [page, pageSize, typeFilter])
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await reportService.list(page, pageSize, typeFilter)
+        if (cancelled) return
+        setReports(res.list || [])
+        setTotal(res.total || 0)
+      } catch (error) {
+        if (cancelled) return
+        console.error('[Reports] 获取报告列表失败:', error)
+        setReports([])
+        setTotal(0)
+      } finally {
+        if (!cancelled) setResolvedRequestKey(requestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [page, pageSize, typeFilter, requestKey])
 
   // 有生成中的报告时每 5s 自动刷新
   useEffect(() => {
     const hasGenerating = reports.some(r => r.status === 'generating')
     if (!hasGenerating) return
-    const interval = setInterval(() => { fetchReports() }, 5000)
+    const interval = setInterval(() => { setRefreshNonce(n => n + 1) }, 5000)
     return () => clearInterval(interval)
   }, [reports])
 
@@ -80,7 +87,7 @@ export default function Reports() {
       await reportService.delete(id)
       toast.success('已删除报告')
       setSelected(prev => { const n = new Set(prev); n.delete(id); return n })
-      fetchReports()
+      setRefreshNonce(n => n + 1)
     } catch {
       toast.error('删除失败')
     }
@@ -92,7 +99,7 @@ export default function Reports() {
       await reportService.batchDelete(ids)
       toast.success(`已删除 ${ids.length} 份报告`)
       setSelected(new Set())
-      fetchReports()
+      setRefreshNonce(n => n + 1)
     } catch {
       toast.error('批量删除失败')
     }
@@ -137,10 +144,8 @@ export default function Reports() {
     })
   }
 
-  const filteredReports = useMemo(
-    () => reports.filter(r => r.title.toLowerCase().includes(searchQuery.toLowerCase())),
-    [reports, searchQuery]
-  )
+  // 列表是服务端分页后的一页数据，这里只是本地关键字过滤，直接计算即可。
+  const filteredReports = reports.filter(r => r.title.toLowerCase().includes(searchQuery.toLowerCase()))
 
   const pageAllSelected = filteredReports.length > 0 && filteredReports.every(r => selected.has(r.id))
   const pagePartialSelected = !pageAllSelected && filteredReports.some(r => selected.has(r.id))
@@ -186,7 +191,7 @@ export default function Reports() {
             <Sparkles className="w-4 h-4" />
             生成报告
           </button>
-          <button onClick={fetchReports} disabled={loading} className="btn-default">
+          <button onClick={() => setRefreshNonce(n => n + 1)} disabled={loading} className="btn-default">
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
             刷新
           </button>
@@ -365,7 +370,7 @@ export default function Reports() {
       <GenerateReportModal
         isOpen={generateOpen}
         onClose={() => setGenerateOpen(false)}
-        onSuccess={fetchReports}
+        onSuccess={() => setRefreshNonce(n => n + 1)}
       />
 
       {/* 删除确认弹窗 */}

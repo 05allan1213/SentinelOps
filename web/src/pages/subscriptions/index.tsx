@@ -58,27 +58,35 @@ export default function Subscriptions() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
 
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
-  const [loading, setLoading] = useState(true)
+  const [listNonce, setListNonce] = useState(0)
+  const [resolvedListKey, setResolvedListKey] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id?: string; isBatch?: boolean }>({ open: false })
 
-  const fetchSubscriptions = async () => {
-    try {
-      setLoading(true)
-      const res = await subscriptionService.list(1, 200)
-      setSubscriptions(res.list || [])
-    } catch (error) {
-      console.error('[Subscriptions] 获取订阅列表失败:', error)
-      setSubscriptions([])
-    } finally {
-      setLoading(false)
-    }
-  }
+  const listRequestKey = `subscriptions|${listNonce}`
+  // 请求身份未落地即视为加载中；暂停/恢复/删除/新建成功后通过 listNonce 重新拉取。
+  const loading = resolvedListKey !== listRequestKey
 
-  useEffect(() => { fetchSubscriptions() }, [])
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await subscriptionService.list(1, 200)
+        if (!cancelled) setSubscriptions(res.list || [])
+      } catch (error) {
+        if (!cancelled) {
+          console.error('[Subscriptions] 获取订阅列表失败:', error)
+          setSubscriptions([])
+        }
+      } finally {
+        if (!cancelled) setResolvedListKey(listRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [listRequestKey])
 
   const handleToggle = async (sub: Subscription) => {
     try {
@@ -89,7 +97,7 @@ export default function Subscriptions() {
         await subscriptionService.resume(sub.id)
         toast.success('已恢复订阅')
       }
-      fetchSubscriptions()
+      setListNonce(n => n + 1)
     } catch {
       toast.error('操作失败')
     }
@@ -99,7 +107,7 @@ export default function Subscriptions() {
     try {
       await subscriptionService.delete(id)
       toast.success('已删除订阅')
-      fetchSubscriptions()
+      setListNonce(n => n + 1)
     } catch {
       toast.error('删除失败')
     }
@@ -117,7 +125,7 @@ export default function Subscriptions() {
       await Promise.all(ids.map(id => subscriptionService.pause(id)))
       toast.success(`已暂停 ${ids.length} 个订阅`)
       setSelected(new Set())
-      fetchSubscriptions()
+      setListNonce(n => n + 1)
     } catch { toast.error('批量操作失败') }
   }
 
@@ -128,7 +136,7 @@ export default function Subscriptions() {
       await Promise.all(ids.map(id => subscriptionService.resume(id)))
       toast.success(`已恢复 ${ids.length} 个订阅`)
       setSelected(new Set())
-      fetchSubscriptions()
+      setListNonce(n => n + 1)
     } catch { toast.error('批量操作失败') }
   }
 
@@ -138,7 +146,7 @@ export default function Subscriptions() {
       await Promise.all(ids.map(id => subscriptionService.delete(id)))
       toast.success(`已删除 ${ids.length} 个订阅`)
       setSelected(new Set())
-      fetchSubscriptions()
+      setListNonce(n => n + 1)
     } catch { toast.error('批量删除失败') }
   }
 
@@ -207,7 +215,7 @@ export default function Subscriptions() {
             { value: 'active', label: '运行中' },
             { value: 'paused', label: '已暂停' },
           ] satisfies SelectOption[]} />
-          <button onClick={fetchSubscriptions} disabled={loading} className="btn-default" title="刷新">
+          <button onClick={() => setListNonce(n => n + 1)} disabled={loading} className="btn-default" title="刷新">
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
           </button>
           <button onClick={() => setShowAddModal(true)} className="btn-primary">
@@ -396,7 +404,7 @@ export default function Subscriptions() {
         key={editingSubscription ? `edit-${editingSubscription.id}` : 'new'}
         isOpen={showAddModal}
         onClose={() => { setShowAddModal(false); setEditingSubscription(null) }}
-        onSuccess={fetchSubscriptions}
+        onSuccess={() => setListNonce(n => n + 1)}
         editMode={!!editingSubscription}
         initialData={editingSubscription || undefined}
       />

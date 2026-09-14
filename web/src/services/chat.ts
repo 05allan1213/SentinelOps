@@ -277,12 +277,15 @@ export const chatService = {
         onError: (error) => { if (!(error instanceof SSEError && error.code === 'aborted')) onError?.(error) },
         onEvent: (() => {
           // planexecute 会先投影 Executor 的纯文本回答，再由 Replanner 以
-          // {"response": "..."} 复述同一段最终答案。逐字相同的连续回答是同一
-          // 段内容的重复投影，只向前端交付一次，避免气泡内答案出现两遍。
-          let lastAssistantText = ''
+          // {"response": "..."} 复述同一段最终答案。只有「重述当前已交付的全部
+          // 文本」才是同一段内容的重复投影，此时不再交付第二次。
+          // 逐字相同的连续 streaming delta（例如闭合代码围栏的第二个反引号）
+          // 不是重述：它只是恰好与上一段 delta 相同，必须原样保留，否则流式
+          // Markdown 会丢失字符、围栏无法闭合。
+          let deliveredAssistantText = ''
           const emitAssistant = (text: string) => {
-            if (!text || text === lastAssistantText) return
-            lastAssistantText = text
+            if (!text || text === deliveredAssistantText) return
+            deliveredAssistantText += text
             onMessage('assistant', text)
           }
           return (type: string, content: string, seq: number) => {

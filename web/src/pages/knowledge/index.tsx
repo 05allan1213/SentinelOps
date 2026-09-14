@@ -1,7 +1,7 @@
 import PageHeader from '@/components/common/PageHeader'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/dialog'
 import Button from '@/components/common/Button'
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Plus, Database, Trash2, Loader2, FileText, Layers,
@@ -228,7 +228,13 @@ export default function Knowledge() {
 
   // ── 知识库列表状态 ──────────────────────────────────────────────────────────
   const [bases, setBases] = useState<KnowledgeBase[]>([])
-  const [basesLoading, setBasesLoading] = useState(false)
+  // 加载状态由「请求身份 vs 已落地的请求身份」推导：请求身份包含分页/筛选/
+  // 手动刷新序号，因此初次加载、翻页、改筛选和点刷新都会自动显示加载态，
+  // 不再需要在 effect 里同步 setState。
+  const [basesNonce, setBasesNonce] = useState(0)
+  const [docsNonce, setDocsNonce] = useState(0)
+  const [chunksNonce, setChunksNonce] = useState(0)
+  const [basesResolvedKey, setBasesResolvedKey] = useState<string | null>(null)
   const [baseSearch, setBaseSearch] = useState('')
   const [basePage, setBasePage] = useState(1)
   const [basePageSize, setBasePageSize] = useState(10)
@@ -241,7 +247,7 @@ export default function Knowledge() {
   const [currentBase, setCurrentBase] = useState<KnowledgeBase | null>(null)
   const [docs, setDocs] = useState<DocItem[]>([])
   const [docsTotal, setDocsTotal] = useState(0)
-  const [docsLoading, setDocsLoading] = useState(false)
+  const [docsResolvedKey, setDocsResolvedKey] = useState<string | null>(null)
   const [docPage, setDocPage] = useState(1)
   const [docPageSize, setDocPageSize] = useState(10)
   const [docSearch, setDocSearch] = useState('')
@@ -258,7 +264,7 @@ export default function Knowledge() {
   const [currentDoc, setCurrentDoc] = useState<DocItem | null>(null)
   const [chunks, setChunks] = useState<ChunkItem[]>([])
   const [chunksTotal, setChunksTotal] = useState(0)
-  const [chunksLoading, setChunksLoading] = useState(false)
+  const [chunksResolvedKey, setChunksResolvedKey] = useState<string | null>(null)
   const [chunkPage, setChunkPage] = useState(1)
   const [chunkPageSize, setChunkPageSize] = useState(10)
   const [chunkKeyword, setChunkKeyword] = useState('')
@@ -269,54 +275,27 @@ export default function Knowledge() {
 
   // ── 数据加载 ────────────────────────────────────────────────────────────────
 
-  const fetchBases = useCallback(async () => {
-    try {
-      setBasesLoading(true)
-      setBases(await knowledgeService.listBases())
-    } catch {
-      // 静默处理，后端无数据时不显示错误
-    }
-    finally { setBasesLoading(false) }
-  }, [])
+  const basesRequestKey = `bases|${basesNonce}`
+  const docsRequestKey = `docs|${baseIdFromUrl}|${docPage}|${docPageSize}|${docSearch}|${statusFilter}|${fileTypeFilter}|${docsNonce}`
+  const chunksRequestKey = `chunks|${baseIdFromUrl}|${docIdFromUrl}|${chunkPage}|${chunkPageSize}|${chunkKeyword}|${chunksNonce}`
+  const basesLoading = basesResolvedKey !== basesRequestKey
+  const docsLoading = activeTab === 'docs' && !!baseIdFromUrl && docsResolvedKey !== docsRequestKey
+  const chunksLoading = activeTab === 'chunks' && !!docIdFromUrl && chunksResolvedKey !== chunksRequestKey
 
-  const fetchDocs = useCallback(async () => {
-    if (!baseIdFromUrl) return
-    try {
-      setDocsLoading(true)
-      const [baseInfo, { list, total }] = await Promise.all([
-        knowledgeService.getBase(baseIdFromUrl),
-        knowledgeService.listDoc(baseIdFromUrl, {
-          page: docPage, pageSize: docPageSize,
-          keyword: docSearch || undefined,
-          status: statusFilter || undefined,
-          fileType: fileTypeFilter || undefined,
-        }),
-      ])
-      setCurrentBase(baseInfo)
-      setDocs(list)
-      setDocsTotal(total)
-    } catch { toast.error('获取文档列表失败') }
-    finally { setDocsLoading(false) }
-  }, [baseIdFromUrl, docPage, docPageSize, docSearch, statusFilter, fileTypeFilter])
-
-  const fetchChunks = useCallback(async () => {
-    if (!docIdFromUrl) return
-    try {
-      setChunksLoading(true)
-      const [baseInfo, docInfo, { list, total }] = await Promise.all([
-        baseIdFromUrl ? knowledgeService.getBase(baseIdFromUrl) : Promise.resolve(null),
-        knowledgeService.getDoc(docIdFromUrl),
-        knowledgeService.listChunk(docIdFromUrl, { page: chunkPage, pageSize: chunkPageSize, keyword: chunkKeyword || undefined }),
-      ])
-      if (baseInfo) setCurrentBase(baseInfo)
-      setCurrentDoc(docInfo)
-      setChunks(list)
-      setChunksTotal(total)
-    } catch { toast.error('获取分块列表失败') }
-    finally { setChunksLoading(false) }
-  }, [baseIdFromUrl, docIdFromUrl, chunkPage, chunkPageSize, chunkKeyword])
-
-  useEffect(() => { fetchBases() }, [fetchBases])
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const list = await knowledgeService.listBases()
+        if (!cancelled) setBases(list)
+      } catch {
+        // 静默处理，后端无数据时不显示错误
+      } finally {
+        if (!cancelled) setBasesResolvedKey(basesRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [basesRequestKey])
 
   useEffect(() => {
     const poll = async () => {
@@ -328,23 +307,66 @@ export default function Knowledge() {
   }, [])
 
   useEffect(() => {
-    if (activeTab === 'docs' && baseIdFromUrl) fetchDocs()
-  }, [activeTab, baseIdFromUrl, fetchDocs])
+    if (activeTab !== 'docs' || !baseIdFromUrl) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const [baseInfo, { list, total }] = await Promise.all([
+          knowledgeService.getBase(baseIdFromUrl),
+          knowledgeService.listDoc(baseIdFromUrl, {
+            page: docPage, pageSize: docPageSize,
+            keyword: docSearch || undefined,
+            status: statusFilter || undefined,
+            fileType: fileTypeFilter || undefined,
+          }),
+        ])
+        if (cancelled) return
+        setCurrentBase(baseInfo)
+        setDocs(list)
+        setDocsTotal(total)
+      } catch {
+        if (!cancelled) toast.error('获取文档列表失败')
+      } finally {
+        if (!cancelled) setDocsResolvedKey(docsRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [activeTab, baseIdFromUrl, docPage, docPageSize, docSearch, statusFilter, fileTypeFilter, docsRequestKey])
 
   useEffect(() => {
-    if (activeTab === 'chunks' && docIdFromUrl) fetchChunks()
-  }, [activeTab, docIdFromUrl, fetchChunks])
+    if (activeTab !== 'chunks' || !docIdFromUrl) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const [baseInfo, docInfo, { list, total }] = await Promise.all([
+          baseIdFromUrl ? knowledgeService.getBase(baseIdFromUrl) : Promise.resolve(null),
+          knowledgeService.getDoc(docIdFromUrl),
+          knowledgeService.listChunk(docIdFromUrl, { page: chunkPage, pageSize: chunkPageSize, keyword: chunkKeyword || undefined }),
+        ])
+        if (cancelled) return
+        if (baseInfo) setCurrentBase(baseInfo)
+        setCurrentDoc(docInfo)
+        setChunks(list)
+        setChunksTotal(total)
+      } catch {
+        if (!cancelled) toast.error('获取分块列表失败')
+      } finally {
+        if (!cancelled) setChunksResolvedKey(chunksRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [activeTab, baseIdFromUrl, docIdFromUrl, chunkPage, chunkPageSize, chunkKeyword, chunksRequestKey])
 
   // 文档索引中时自动轮询
   useEffect(() => {
     const hasActive = docs.some(d => d.index_status === 'pending' || d.index_status === 'indexing')
     if (hasActive) {
-      pollRef.current = setInterval(fetchDocs, 3000)
+      pollRef.current = setInterval(() => setDocsNonce(n => n + 1), 3000)
     } else {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
     }
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [docs, fetchDocs])
+  }, [docs])
 
   // ── 知识库操作 ──────────────────────────────────────────────────────────────
 
@@ -490,7 +512,7 @@ export default function Knowledge() {
     try {
       const updated = await knowledgeService.enableChunks({ docId: docIdFromUrl, enabled })
       toast.success(`已${enabled ? '启用' : '禁用'} ${updated} 个分块`)
-    } catch { fetchChunks(); toast.error('操作失败') }
+    } catch { setChunksNonce(n => n + 1); toast.error('操作失败') }
   }
 
   const handleToggleChunk = async (chunk: ChunkItem) => {
@@ -525,9 +547,7 @@ export default function Knowledge() {
           )}
           <Button
             onClick={() => {
-              fetchBases()
-              if (activeTab === 'docs') fetchDocs()
-              if (activeTab === 'chunks') fetchChunks()
+              setBasesNonce(n => n + 1); setDocsNonce(n => n + 1); setChunksNonce(n => n + 1)
             }}
             disabled={basesLoading || docsLoading || chunksLoading}
             variant="secondary"
@@ -1165,7 +1185,7 @@ export default function Knowledge() {
           baseID={baseIdFromUrl}
           baseName={currentBase?.name ?? ''}
           onClose={() => setShowUpload(false)}
-          onSuccess={() => { setShowUpload(false); setTimeout(fetchDocs, 500) }}
+          onSuccess={() => { setShowUpload(false); setTimeout(() => setDocsNonce(n => n + 1), 500) }}
         />
       )}
 
@@ -1178,7 +1198,7 @@ export default function Knowledge() {
           onSuccess={() => {
             setRebuildTarget(null)
             setDocSelected(new Set())
-            setTimeout(fetchDocs, 500)
+            setTimeout(() => setDocsNonce(n => n + 1), 500)
           }}
         />
       )}

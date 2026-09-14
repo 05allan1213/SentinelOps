@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/utils'
 import { Database, Filter, Shield, Cpu, CheckCircle, Lightbulb } from 'lucide-react'
 import { AgentLog } from '@/types/agent'
@@ -74,22 +74,26 @@ export default function AgentFlowGraph({ logs, isProcessing }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [elapsed, setElapsed] = useState(0)
 
-  const getStatus = (id: string) => {
+  const getStatus = useCallback((id: string) => {
     const agentLogs = logs.filter(l => l.agent === id)
     if (agentLogs.some(l => l.status === 'success')) return 'completed'
     if (agentLogs.some(l => l.status === 'running')) return 'running'
     return 'pending'
-  }
+  }, [logs])
 
   useEffect(() => {
     if (!isProcessing) return
-    const t = setInterval(() => setElapsed(e => e + 1), 1000)
+    // 新一轮分析从 1 秒重新计时，不再沿用上一轮读数。
+    let first = true
+    const t = setInterval(() => {
+      if (first) { first = false; setElapsed(1); return }
+      setElapsed(e => e + 1)
+    }, 1000)
     return () => clearInterval(t)
   }, [isProcessing])
 
-  useEffect(() => {
-    if (!isProcessing && logs.length === 0) setElapsed(0)
-  }, [isProcessing, logs.length])
+  // 未开始分析或本轮没有任何日志时，计时显示 0。
+  const displayElapsed = !isProcessing && logs.length === 0 ? 0 : elapsed
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -211,7 +215,7 @@ export default function AgentFlowGraph({ logs, isProcessing }: Props) {
       cancelAnimationFrame(animationId)
       window.removeEventListener('resize', resize)
     }
-  }, [logs, isProcessing])
+  }, [logs, isProcessing, getStatus])
 
   const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
 
@@ -288,14 +292,14 @@ export default function AgentFlowGraph({ logs, isProcessing }: Props) {
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-50 border border-primary-200">
               <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
               <span className="text-xs text-primary-600 font-medium">
-                分析中 · {formatTime(elapsed)}
+                分析中 · {formatTime(displayElapsed)}
               </span>
             </div>
           ) : (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-success-50 border border-success-200">
               <CheckCircle className="w-3.5 h-3.5 text-success-500" />
               <span className="text-xs text-success-600 font-medium">
-                分析完成 · {formatTime(elapsed)}
+                分析完成 · {formatTime(displayElapsed)}
               </span>
             </div>
           )}

@@ -11,7 +11,8 @@ import StartButton from './components/StartButton'
 import ResultPanel from './components/ResultPanel'
 import AnalysisModeSelect, { type AnalysisMode } from './components/AnalysisModeSelect'
 import EventPickerModal from './components/EventPickerModal'
-import ReportModal, { buildMarkdown } from './components/ReportModal'
+import ReportModal from './components/ReportModal'
+import { buildMarkdown } from './reportMarkdown'
 import MitigationConsole from './components/MitigationConsole'
 import { eventService } from '@/services/event'
 import { reportService } from '@/services/report'
@@ -43,14 +44,6 @@ export default function EventAnalysis() {
         // 列表请求失败时保留未知状态，避免把网络错误误报成空数据。
       })
     return () => { cancelled = true }
-  }, [])
-
-  // 从事件列表页跳转时，若携带了预选事件则自动读取（仅首次挂载）
-  useEffect(() => {
-    if (location.state?.mode === 'specific' && Array.isArray(location.state?.preSelectedIds) && location.state.preSelectedIds.length > 0) {
-      setAnalysisMode('specific')
-      setSelectedEventIds(location.state.preSelectedIds)
-    }
   }, [])
 
   // ── 模式与选择 ────────────────────────────────────────────────────────────────
@@ -383,6 +376,7 @@ export default function EventAnalysis() {
 
       {/* 事件选择弹窗 */}
       <EventPickerModal
+        key={showEventPicker ? 'picker-open' : 'picker-closed'}
         visible={showEventPicker}
         onClose={() => setShowEventPicker(false)}
         onConfirm={(ids) => setSelectedEventIds(ids)}

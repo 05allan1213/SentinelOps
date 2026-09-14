@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import Button from '@/components/common/Button'
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X, Search, Check, Loader2 } from 'lucide-react'
 import { eventService } from '@/services/event'
 import { SecurityEvent } from '@/types'
@@ -23,25 +23,30 @@ const severityMap: Record<string, { label: string; color: string }> = {
 
 export default function EventPickerModal({ visible, onClose, onConfirm, selectedIds }: Props) {
   const [events, setEvents] = useState<SecurityEvent[]>([])
-  const [loading, setLoading] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set(selectedIds))
+  const [loading, setLoading] = useState(true)
+  // 打开弹窗时由父级 key 重新挂载，草稿选中集直接以 selectedIds 初始化。
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(selectedIds))
   const [keyword, setKeyword] = useState('')
+  const [searchNonce, setSearchNonce] = useState(0)
+  const keywordRef = useRef('')
 
   useEffect(() => {
-    if (visible) {
-      setSelected(new Set(selectedIds))
-      loadEvents()
-    }
-  }, [visible])
-
-  const loadEvents = async (kw?: string) => {
-    setLoading(true)
-    try {
-      const res = await eventService.list({ page: 1, size: 50, keyword: kw })
-      setEvents(res.list)
-    } catch { /* 忽略事件列表加载失败 */ }
-    setLoading(false)
-  }
+    if (!visible) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await eventService.list({ page: 1, size: 50, keyword: keywordRef.current || undefined })
+        if (!cancelled) {
+          setEvents(res.list)
+          setLoading(false)
+        }
+      } catch {
+        // 忽略事件列表加载失败
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [visible, searchNonce])
 
   const toggle = (id: string) => {
     setSelected(prev => {
@@ -51,7 +56,7 @@ export default function EventPickerModal({ visible, onClose, onConfirm, selected
     })
   }
 
-  const handleSearch = () => loadEvents(keyword || undefined)
+  const handleSearch = () => { keywordRef.current = keyword; setSearchNonce(n => n + 1) }
 
   if (!visible) return null
 

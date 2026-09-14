@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Search,
   RefreshCw,
@@ -40,60 +40,61 @@ export default function Logs() {
 
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [logs, setLogs] = useState<FetchLogWithSubscription[]>([])
-  const [_loading, setLoading] = useState(true)
-  const [logsLoading, setLogsLoading] = useState(false)
+  const [subsNonce] = useState(0)
+  const [logsNonce, setLogsNonce] = useState(0)
+  const [resolvedLogsKey, setResolvedLogsKey] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize] = useState(20)
+  // 订阅列表用于给日志补名称，读取最新值但不作为日志请求的触发条件。
+  const subscriptionsRef = useRef(subscriptions)
+
+  const logsRequestKey = `logs|${selectedSubscriptionId}|${page}|${pageSize}|${logsNonce}`
+  const logsLoading = !!selectedSubscriptionId && resolvedLogsKey !== logsRequestKey
 
   // 获取订阅列表
-  const fetchSubscriptions = async () => {
-    try {
-      const res = await subscriptionService.list(1, 100)
-      setSubscriptions(res.list || [])
-    } catch (error) {
-      console.error(error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await subscriptionService.list(1, 100)
+        if (cancelled) return
+        setSubscriptions(res.list || [])
+        subscriptionsRef.current = res.list || []
+      } catch (error) {
+        console.error(error)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [subsNonce])
 
   // 获取日志
-  const fetchLogs = async () => {
-    if (!selectedSubscriptionId) {
-      setLogs([])
-      setTotal(0)
-      return
-    }
-
-    try {
-      setLogsLoading(true)
-      const res = await subscriptionService.getFetchLogs(selectedSubscriptionId, page, pageSize)
-      const subscription = subscriptions.find(s => s.id === selectedSubscriptionId)
-      const logsWithSub = (res.list || []).map(log => ({
-        ...log,
-        subscription_name: subscription?.name,
-        source_type: subscription?.source_type,
-      }))
-      setLogs(logsWithSub)
-      setTotal(res.total || 0)
-    } catch (error) {
-      toast.error('获取日志失败')
-      console.error(error)
-    } finally {
-      setLogsLoading(false)
-    }
-  }
-
   useEffect(() => {
-    fetchSubscriptions()
-  }, [])
-
-  useEffect(() => {
-    if (selectedSubscriptionId) {
-      fetchLogs()
-    }
-  }, [selectedSubscriptionId, page])
+    if (!selectedSubscriptionId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await subscriptionService.getFetchLogs(selectedSubscriptionId, page, pageSize)
+        if (cancelled) return
+        const subscription = subscriptionsRef.current.find(s => s.id === selectedSubscriptionId)
+        const logsWithSub = (res.list || []).map(log => ({
+          ...log,
+          subscription_name: subscription?.name,
+          source_type: subscription?.source_type,
+        }))
+        setLogs(logsWithSub)
+        setTotal(res.total || 0)
+      } catch (error) {
+        if (!cancelled) {
+          toast.error('获取日志失败')
+          console.error(error)
+        }
+      } finally {
+        if (!cancelled) setResolvedLogsKey(logsRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [selectedSubscriptionId, page, pageSize, logsRequestKey])
 
   const filteredLogs = logs.filter((log) => {
     const matchesSearch = log.subscription_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? true
@@ -137,7 +138,7 @@ export default function Logs() {
           />
           {selectedSubscriptionId && (
             <button
-              onClick={fetchLogs}
+              onClick={() => setLogsNonce(n => n + 1)}
               disabled={logsLoading}
               className="btn-default"
             >

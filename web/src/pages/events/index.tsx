@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search,
@@ -66,50 +66,62 @@ export default function Events() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const [events, setEvents] = useState<SecurityEvent[]>([])
-  const [loading, setLoading] = useState(true)
+  const [refreshNonce, setRefreshNonce] = useState(0)
+  const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const setContext = useContextStore((s) => s.setContext)
+  // 搜索框内容按 Enter / 刷新按钮生效；用 ref 保存最新输入，避免把「输入」
+  // 变成 effect 依赖导致每敲一个字就发请求。
+  const searchQueryRef = useRef('')
 
   const [stats, setStats] = useState<EventStats>({ total: 0, critical_count: 0, new_7days: 0, pending: 0 })
 
-  const fetchEvents = async () => {
-    try {
-      setLoading(true)
-      const filter: Record<string, unknown> = {
-        page, size: pageSize,
-        order_by: sortField,
-        order_dir: sortDir,
+  const requestKey = `${page}|${pageSize}|${severityFilter}|${sortField}|${sortDir}|${refreshNonce}`
+  // 请求身份未落地即视为加载中：初次挂载、翻页、改筛选、刷新都会自动显示。
+  const loading = resolvedRequestKey !== requestKey
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const keyword = searchQueryRef.current
+        const filter: Record<string, unknown> = {
+          page, size: pageSize,
+          order_by: sortField,
+          order_dir: sortDir,
+        }
+        if (keyword) filter.keyword = keyword
+        if (severityFilter !== 'all') filter.severity = severityFilter
+
+        // 并行请求列表和统计
+        const [res, statsRes] = await Promise.all([
+          eventService.list(filter),
+          eventService.getStats(),
+        ])
+        if (cancelled) return
+        setEvents(res.list || [])
+        setTotal(res.total || 0)
+        setStats({
+          total: statsRes.total,
+          critical_count: statsRes.critical_count,
+          new_7days: statsRes.new_7days,
+          pending: statsRes.pending,
+        })
+      } catch (error) {
+        if (cancelled) return
+        console.error('[Events] 获取事件列表失败:', error)
+        setEvents([])
+        setTotal(0)
+      } finally {
+        if (!cancelled) setResolvedRequestKey(requestKey)
       }
-      if (searchQuery) filter.keyword = searchQuery
-      if (severityFilter !== 'all') filter.severity = severityFilter
+    })()
+    return () => { cancelled = true }
+  }, [page, pageSize, severityFilter, sortField, sortDir, requestKey])
 
-      // 并行请求列表和统计
-      const [res, statsRes] = await Promise.all([
-        eventService.list(filter),
-        eventService.getStats(),
-      ])
-      setEvents(res.list || [])
-      setTotal(res.total || 0)
-      setStats({
-        total: statsRes.total,
-        critical_count: statsRes.critical_count,
-        new_7days: statsRes.new_7days,
-        pending: statsRes.pending,
-      })
-    } catch (error) {
-      console.error('[Events] 获取事件列表失败:', error)
-      setEvents([])
-      setTotal(0)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { fetchEvents() }, [page, pageSize, severityFilter, sortField, sortDir])
-
-  const handleSearch = () => { setPage(1); fetchEvents() }
+  const handleSearch = () => { setPage(1); setRefreshNonce(n => n + 1) }
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -125,7 +137,7 @@ export default function Events() {
     try {
       await eventService.delete(id)
       toast.success('已删除')
-      fetchEvents()
+      setRefreshNonce(n => n + 1)
     } catch {
       toast.error('删除失败')
     }
@@ -137,7 +149,7 @@ export default function Events() {
       await eventService.batchDelete(ids)
       toast.success(`已删除 ${ids.length} 条事件`)
       setSelected(new Set())
-      fetchEvents()
+      setRefreshNonce(n => n + 1)
     } catch {
       toast.error('批量删除失败')
     }
@@ -149,7 +161,7 @@ export default function Events() {
       await eventService.batchUpdateStatus(ids, status)
       toast.success(`已将 ${ids.length} 条事件标记为${statusOptions.find(o => o.value === status)?.label || status}`)
       setSelected(new Set())
-      fetchEvents()
+      setRefreshNonce(n => n + 1)
     } catch {
       toast.error('批量状态更新失败')
     }
@@ -220,7 +232,7 @@ export default function Events() {
               type="text"
               placeholder="搜索标题、CVE、告警正文..."
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => { setSearchQuery(e.target.value); searchQueryRef.current = e.target.value }}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
               className="input pl-9 w-52"
             />
@@ -237,7 +249,7 @@ export default function Events() {
               { value: 'low', label: '低危' },
             ] satisfies SelectOption[]}
           />
-          <button onClick={fetchEvents} disabled={loading} className="btn-default">
+          <button onClick={() => setRefreshNonce(n => n + 1)} disabled={loading} className="btn-default">
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
             刷新
           </button>

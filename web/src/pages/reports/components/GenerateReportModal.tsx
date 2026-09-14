@@ -26,23 +26,27 @@ const reportTypes = [
 function getTimeRange(type: string): { start: string; end: string } {
   const now = new Date()
   const end = now.toISOString().split('T')[0]
-  let start = end
+  let start: string
 
   switch (type) {
-    case 'daily':
+    case 'daily': {
       start = end
       break
-    case 'weekly':
+    }
+    case 'weekly': {
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       start = weekAgo.toISOString().split('T')[0]
       break
-    case 'monthly':
+    }
+    case 'monthly': {
       const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
       start = monthAgo.toISOString().split('T')[0]
       break
-    default:
+    }
+    default: {
       const defaultStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       start = defaultStart.toISOString().split('T')[0]
+    }
   }
 
   return { start: start + ' 00:00:00', end: end + ' 23:59:59' }

@@ -1,10 +1,11 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { FileText, Loader2 } from 'lucide-react'
 import { useAnalyzeStore } from '@/stores/analyzeStore'
 import { useEventStore } from '@/stores/eventStore'
 import { reportService } from '@/services/report'
-import ReportModal, { buildMarkdown } from '@/pages/event-analysis/components/ReportModal'
+import ReportModal from '@/pages/event-analysis/components/ReportModal'
+import { buildMarkdown } from '@/pages/event-analysis/reportMarkdown'
 import type { ReportPayload } from '@/types'
 import toast from 'react-hot-toast'
 
@@ -29,20 +30,9 @@ export default function ReportGenerateModal() {
   const totalCount = targetEvents.length
   const progressPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 100
 
-  // 监控进度，全部完成后自动触发保存
-  useEffect(() => {
-    if (!reportGenerating) {
-      isSavingRef.current = false
-      return
-    }
-    if (isSavingRef.current) return
-    if (totalCount === 0 || doneCount >= totalCount) {
-      isSavingRef.current = true
-      doSaveReport()
-    }
-  }, [reportGenerating, doneCount, totalCount])
-
-  const doSaveReport = async () => {
+  // Declared before the progress effect so the effect never reads a binding that
+  // is still uninitialised on the first render.
+  const doSaveReport = useCallback(async () => {
     if (!riskData) return
     setReportSaving(true)
     try {
@@ -75,7 +65,20 @@ export default function ReportGenerateModal() {
       setReportGenerating(false)
       setShowReport(true)
     }
-  }
+  }, [agentLogs, analysisText, riskData, setReportGenerating, setReportSaving])
+
+  // 监控进度，全部完成后自动触发保存
+  useEffect(() => {
+    if (!reportGenerating) {
+      isSavingRef.current = false
+      return
+    }
+    if (isSavingRef.current) return
+    if (totalCount === 0 || doneCount >= totalCount) {
+      isSavingRef.current = true
+      void doSaveReport()
+    }
+  }, [doSaveReport, reportGenerating, doneCount, totalCount])
 
   const handleForceGenerate = () => {
     if (isSavingRef.current) return

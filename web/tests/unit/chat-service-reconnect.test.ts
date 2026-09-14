@@ -34,6 +34,25 @@ it('delivers the executor answer once when the replanner repeats the same respon
   expect(call.message.mock.calls.filter(([type]) => type === 'assistant')).toEqual([['assistant', answer]])
 })
 
+it('keeps identical streaming deltas while still suppressing a full replay', async () => {
+  // 两个内容相同的连续 delta 属于不同的 streaming 事件，必须都交付；随后
+  // Replanner 重述整段答案（等于已交付的全部文本）才允许被去重。
+  const body = '# Retained answer\n\n```ts\nconst value = 1\n'
+  const complete = `${body}\`\`\`\n\n`
+  vi.mocked(fetch).mockResolvedValue(response(
+    frame(1, 'agent.plan', JSON.stringify({ response: body })) +
+    frame(2, 'agent.plan', JSON.stringify({ response: '`' })) +
+    frame(3, 'agent.plan', JSON.stringify({ response: '`' })) +
+    frame(4, 'agent.plan', JSON.stringify({ response: '`\n\n' })) +
+    frame(5, 'agent.plan', JSON.stringify({ response: complete })) +
+    frame(6, 'run.completed', '', { to_status: 'succeeded' }),
+  ))
+  const call = chat(); await call.finished
+  const delivered = call.message.mock.calls.filter(([type]) => type === 'assistant').map(([, text]) => text)
+  expect(delivered).toEqual([body, '`', '`', '`\n\n'])
+  expect(delivered.join('')).toBe(complete)
+})
+
 it('replaces a truncated streamed answer with the authoritative Run answer on success', async () => {
   const full = '完整回答：' + 'A'.repeat(600) + '（结尾）'
   vi.mocked(fetch).mockResolvedValue(response(

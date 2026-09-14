@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import ReactECharts from 'echarts-for-react'
+import ReactECharts from '@/components/charts/EChart'
 import { Loader2 } from 'lucide-react'
 import { eventService } from '@/services/event'
 

@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog'
 import Button from '@/components/common/Button'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   X,
   ExternalLink,
@@ -30,12 +30,18 @@ const severityConfig: Record<string, { label: string; class: string; desc: strin
 }
 
 export default function EventDetailModal({ event, onClose, onUpdate }: EventDetailModalProps) {
-  const [currentStatus, setCurrentStatus] = useState<SecurityEvent['status']>(event?.status || 'new')
+  // 本地状态只在「本弹窗内成功更新过状态」时生效；事件变化或服务端状态
+  // 变化后自动回到 props 值，等价于原先的 effect 同步。
+  const [statusOverride, setStatusOverride] = useState<{ id: string; serverStatus: SecurityEvent['status']; status: SecurityEvent['status'] } | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
 
-  useEffect(() => {
-    setCurrentStatus(event?.status || 'new')
-  }, [event?.id, event?.status])
+  const currentStatus = statusOverride && event && statusOverride.id === event.id && statusOverride.serverStatus === event.status
+    ? statusOverride.status
+    : event?.status || 'new'
+  const setCurrentStatus = (status: SecurityEvent['status']) => {
+    if (!event) return
+    setStatusOverride({ id: event.id, serverStatus: event.status, status })
+  }
 
   if (!event) return null
 

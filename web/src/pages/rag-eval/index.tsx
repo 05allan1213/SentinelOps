@@ -6,7 +6,7 @@ import {
   ThumbsUp, ThumbsDown, FlaskConical, Loader2,
   Activity, Filter, BookOpen, Star, Trash2, X,
 } from 'lucide-react'
-import ReactECharts from 'echarts-for-react'
+import ReactECharts from '@/components/charts/EChart'
 import StatCard from '@/components/common/StatCard'
 import Pagination from '@/components/common/Pagination'
 import ConfirmDialog from '@/components/common/ConfirmDialog'

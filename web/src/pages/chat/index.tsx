@@ -51,16 +51,50 @@ const migrateLegacyPending = (m: Message): Message =>
     ? { ...m, createUnconfirmed: true }
     : m
 
+const genId = () => Math.random().toString(36).substring(2, 15)
+
+function saveMessages(sid: string, msgs: Message[]) {
+  localStorage.setItem(`chat_messages_${sid}`, JSON.stringify(msgs))
+}
+
+// 读取会话快照并完成 D-07 迁移：把只有 isStreaming 的遗留 pending 提升为显式
+// createUnconfirmed，或按已接受的身份恢复可重连的 Run。
+function readSessionSnapshot(sid: string): Message[] {
+  const raw = localStorage.getItem(`chat_messages_${sid}`)
+  const saved = ((raw ? JSON.parse(raw) : []) as Message[]).map(migrateLegacyPending)
+  const acceptedMessageId = sessionStorage.getItem(`chat_run_message_${sid}`)
+  const acceptedRunId = sessionStorage.getItem(`chat_run_id_${sid}`)
+  return saved.map(m => {
+    const accepted = m.createUnconfirmed && m.id === acceptedMessageId && acceptedRunId
+    return { ...m, isStreaming: false, isThinking: false, isPlanRunning: false,
+      ...(accepted ? { runId: acceptedRunId, createUnconfirmed: false, streamError: undefined }
+        : m.createUnconfirmed ? { streamError: '创建结果尚未确认，当前消息没有可恢复的工作流身份。请核对会话后再决定是否重新发送。' } : {}),
+    }
+  })
+}
+
+const readSessionVotes = (sid: string): Record<number, 1 | -1> => {
+  const raw = localStorage.getItem(`chat_votes_${sid}`)
+  return raw ? JSON.parse(raw) : {}
+}
+
 export default function Chat() {
-  const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [currentSessionId, setCurrentSessionId] = useState('')
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
+  // 首次挂载即从本地存储引导会话身份：getSessionId 在没有会话时创建一次并
+  // 立即写回，因此 StrictMode 下的重复初始化不会产生第二个会话。
+  const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
+    const sid = chatService.getSessionId()
+    // 存储里只剩 current_session_id 没有会话记录时补建一个，保证列表与身份一致。
+    if (!chatService.listSessions().some(s => s.id === sid)) return chatService.createSession().id
+    return sid
+  })
+  const [sessions, setSessions] = useState<ChatSession[]>(() => chatService.listSessions())
+  const [messages, setMessages] = useState<Message[]>(() => readSessionSnapshot(currentSessionId))
+  const [input, setInput] = useState<string>(() => localStorage.getItem(`chat_draft_${currentSessionId}`) ?? '')
   const [isLoading, setIsLoading] = useState(false)
   const [deepThinking, setDeepThinking] = useState(() => localStorage.getItem('chat_deep_thinking') === 'true')
   const [webSearch, setWebSearch] = useState(() => localStorage.getItem('chat_web_search') === 'true')
   // 记录每条消息的点赞/踩状态（key = message index）
-  const [votes, setVotes] = useState<Record<number, 1 | -1>>({})
+  const [votes, setVotes] = useState<Record<number, 1 | -1>>(() => readSessionVotes(currentSessionId))
   // 编辑状态：记录正在编辑的消息索引和编辑内容
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editingContent, setEditingContent] = useState('')
@@ -79,18 +113,11 @@ export default function Chat() {
   const location = useLocation()
 
   // ── 初始化 ───────────────────────────────────────────────────────────────
+  // 挂载后把归一化过的快照写回本地存储（遗留 pending 迁移落盘）。这里只与
+  // 外部存储同步，不产生新的渲染。
+  const bootstrapRef = useRef({ sid: currentSessionId, messages })
   useEffect(() => {
-    const loaded = chatService.listSessions()
-    if (loaded.length === 0) {
-      const s = chatService.createSession()
-      setSessions([s])
-      setCurrentSessionId(s.id)
-    } else {
-      setSessions(loaded)
-      const sid = chatService.getSessionId()
-      setCurrentSessionId(sid)
-      loadMessages(sid)
-    }
+    saveMessages(bootstrapRef.current.sid, bootstrapRef.current.messages)
   }, [])
 
   useLayoutEffect(() => {
@@ -111,15 +138,6 @@ export default function Chat() {
     return () => observer.disconnect()
   }, [messages.length])
 
-  // 从事件列表跳转：直接发送消息
-  useEffect(() => {
-    const state = location.state as { query?: string } | null
-    if (!state?.query) return
-    navigate(location.pathname, { replace: true, state: null })
-    handleSend(state.query)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state])
-
   // Disconnecting a browser tail never cancels the backend Run.
   useEffect(() => () => {
     abortControllerRef.current?.abort()
@@ -128,30 +146,15 @@ export default function Chat() {
 
 
   // ── 会话管理 ─────────────────────────────────────────────────────────────
-  const loadMessages = (sid: string) => {
-    const raw = localStorage.getItem(`chat_messages_${sid}`)
-    const saved = ((raw ? JSON.parse(raw) : []) as Message[]).map(migrateLegacyPending)
-    const acceptedMessageId = sessionStorage.getItem(`chat_run_message_${sid}`)
-    const acceptedRunId = sessionStorage.getItem(`chat_run_id_${sid}`)
-    const restored = saved.map(m => {
-      const accepted = m.createUnconfirmed && m.id === acceptedMessageId && acceptedRunId
-      return { ...m, isStreaming: false, isThinking: false, isPlanRunning: false,
-        ...(accepted ? { runId: acceptedRunId, createUnconfirmed: false, streamError: undefined }
-          : m.createUnconfirmed ? { streamError: '创建结果尚未确认，当前消息没有可恢复的工作流身份。请核对会话后再决定是否重新发送。' } : {}),
-      }
-    })
+  const loadMessages = useCallback((sid: string) => {
+    const restored = readSessionSnapshot(sid)
     saveMessages(sid, restored)
     setMessages(restored)
     // 恢复输入框草稿
     setInput(localStorage.getItem(`chat_draft_${sid}`) ?? '')
     // 恢复点赞/踩状态
-    const votesRaw = localStorage.getItem(`chat_votes_${sid}`)
-    setVotes(votesRaw ? JSON.parse(votesRaw) : {})
-  }
-
-  const saveMessages = (sid: string, msgs: Message[]) => {
-    localStorage.setItem(`chat_messages_${sid}`, JSON.stringify(msgs))
-  }
+    setVotes(readSessionVotes(sid))
+  }, [])
 
   // 持久化深度思考 / 联网搜索开关（跨会话、跨刷新保持用户选择）
   useEffect(() => {
@@ -338,6 +341,18 @@ export default function Chat() {
     saveMessages(sid, [...history, userMessage, assistantMessage])
     startAssistantStream(sid, assistantMessage, messageContent, history.length + 1, true)
   }
+
+  // 提交入口以 ref 保存，跳转 effect 无需把每轮重建的 handleSend 放进依赖。
+  const handleSendRef = useRef(handleSend)
+  useEffect(() => { handleSendRef.current = handleSend })
+
+  // 从事件列表跳转：直接发送携带的查询（navigate 会清空 state，因此只生效一次）。
+  useEffect(() => {
+    const state = location.state as { query?: string } | null
+    if (!state?.query) return
+    navigate(location.pathname, { replace: true, state: null })
+    void handleSendRef.current(state.query)
+  }, [location.pathname, location.state, navigate])
 
   const startAssistantStream = (sid: string, assistantMessage: Message, messageContent: string, messageIndex: number, newTurn: boolean) => {
     setIsLoading(true)
@@ -614,8 +629,6 @@ export default function Chat() {
       // 静默失败，不打扰用户
     }
   }
-
-  const genId = () => Math.random().toString(36).substring(2, 15)
 
   // ── 渲染 ─────────────────────────────────────────────────────────────────
   return (

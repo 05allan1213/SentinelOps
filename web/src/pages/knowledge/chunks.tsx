@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from '@/components/ui/dialog'
 import Button from '@/components/common/Button'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronRight, Layers, RefreshCw, Loader2,
@@ -156,7 +156,7 @@ export default function KnowledgeChunks() {
   const [doc, setDoc] = useState<DocItem | null>(null)
   const [chunks, setChunks] = useState<ChunkItem[]>([])
   const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [resolvedDataKey, setResolvedDataKey] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -169,27 +169,34 @@ export default function KnowledgeChunks() {
   // RAG 检索测试模态框
   const [showSearch, setShowSearch] = useState(false)
 
-  const fetchData = useCallback(async () => {
-    if (!baseId || !docId) return
-    try {
-      setLoading(true)
-      const [baseInfo, docInfo, { list, total }] = await Promise.all([
-        knowledgeService.getBase(baseId),
-        knowledgeService.getDoc(docId),
-        knowledgeService.listChunk(docId, { page, pageSize, keyword: keyword || undefined }),
-      ])
-      setBase(baseInfo)
-      setDoc(docInfo)
-      setChunks(list)
-      setTotal(total)
-    } catch {
-      toast.error('获取分块列表失败')
-    } finally {
-      setLoading(false)
-    }
-  }, [baseId, docId, page, pageSize, keyword])
+  const [reloadNonce, setReloadNonce] = useState(0)
+  const dataRequestKey = `${baseId}|${docId}|${page}|${pageSize}|${keyword}|${reloadNonce}`
+  // 请求身份未落地即视为加载中。
+  const loading = !!baseId && !!docId && resolvedDataKey !== dataRequestKey
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    if (!baseId || !docId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const [baseInfo, docInfo, { list, total }] = await Promise.all([
+          knowledgeService.getBase(baseId),
+          knowledgeService.getDoc(docId),
+          knowledgeService.listChunk(docId, { page, pageSize, keyword: keyword || undefined }),
+        ])
+        if (cancelled) return
+        setBase(baseInfo)
+        setDoc(docInfo)
+        setChunks(list)
+        setTotal(total)
+      } catch {
+        if (!cancelled) toast.error('获取分块列表失败')
+      } finally {
+        if (!cancelled) setResolvedDataKey(dataRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [baseId, docId, page, pageSize, keyword, dataRequestKey])
 
   const totalPages = Math.ceil(total / pageSize)
   const avgChars = chunks.length > 0
@@ -240,7 +247,7 @@ export default function KnowledgeChunks() {
       const updated = await knowledgeService.enableChunks({ docId, enabled })
       toast.success(`已${enabled ? '启用' : '禁用'} ${updated} 个分块`)
     } catch {
-      fetchData()
+      setReloadNonce(n => n + 1)
       toast.error('操作失败')
     }
   }
@@ -326,7 +333,7 @@ export default function KnowledgeChunks() {
           >
             全量禁用
           </button>
-          <Button onClick={fetchData} disabled={loading} variant="secondary">
+          <Button onClick={() => setReloadNonce(n => n + 1)} disabled={loading} variant="secondary">
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
             刷新
           </Button>

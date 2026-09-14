@@ -71,28 +71,32 @@ export default function IngestPage() {
 
   // 接入历史状态
   const [history, setHistory] = useState<SecurityEvent[]>([])
-  const [histLoading, setHistLoading] = useState(false)
+  const [historyNonce, setHistoryNonce] = useState(0)
+  const [resolvedHistoryKey, setResolvedHistoryKey] = useState<string | null>(null)
+
+  const historyRequestKey = `history|${historyNonce}`
+  const histLoading = resolvedHistoryKey !== historyRequestKey
 
   useEffect(() => {
+    let cancelled = false
     // 加载 API Key
     settingsService.getIngestKey().then(k => { setApiKey(k); cacheIngestKey(k) }).catch(() => {})
     // 加载接入历史
-    loadHistory()
-  }, [])
-
-  const loadHistory = async () => {
-    setHistLoading(true)
-    try {
-      const res = await eventService.list({ size: 10, order_by: 'created_at', order_dir: 'desc' })
-      // 只保留外部接入渠道的事件
-      const ingestTypes = new Set(['webhook', 'cef', 'leef', 'api_push'])
-      setHistory(res.list.filter(e => e.event_type && ingestTypes.has(e.event_type)))
-    } catch {
-      // 静默失败
-    } finally {
-      setHistLoading(false)
-    }
-  }
+    void (async () => {
+      try {
+        const res = await eventService.list({ size: 10, order_by: 'created_at', order_dir: 'desc' })
+        if (cancelled) return
+        // 只保留外部接入渠道的事件
+        const ingestTypes = new Set(['webhook', 'cef', 'leef', 'api_push'])
+        setHistory(res.list.filter(e => e.event_type && ingestTypes.has(e.event_type)))
+      } catch {
+        // 静默失败
+      } finally {
+        if (!cancelled) setResolvedHistoryKey(historyRequestKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [historyRequestKey])
 
   const handleResetKey = async () => {
     if (!resetConfirm) { setResetConfirm(true); return }
@@ -326,7 +330,7 @@ export default function IngestPage() {
             <span className="text-sm font-semibold text-gray-800">接入历史</span>
             <span className="text-xs text-gray-400">最近 10 条外部接入事件</span>
           </div>
-          <button onClick={loadHistory} disabled={histLoading} className="text-gray-400 hover:text-indigo-500 transition-colors">
+          <button onClick={() => setHistoryNonce(n => n + 1)} disabled={histLoading} className="text-gray-400 hover:text-indigo-500 transition-colors">
             <RefreshCw className={cn('w-4 h-4', histLoading && 'animate-spin')} />
           </button>
         </div>

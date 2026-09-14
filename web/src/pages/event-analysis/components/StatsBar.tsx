@@ -17,7 +17,7 @@ function AnimatedNumber({ value, decimals = 0, color }: { value: number; decimal
   const [display, setDisplay] = useState(0)
 
   useEffect(() => {
-    if (value === 0) { setDisplay(0); return }
+    if (value === 0) return
     const duration = 800
     const start = performance.now()
     const from = 0
@@ -34,7 +34,7 @@ function AnimatedNumber({ value, decimals = 0, color }: { value: number; decimal
 
   return (
     <span className="tabular-nums font-mono" style={{ color }}>
-      {decimals > 0 ? display.toFixed(decimals) : Math.round(display)}
+      {decimals > 0 ? (value === 0 ? 0 : display).toFixed(decimals) : Math.round(value === 0 ? 0 : display)}
     </span>
   )
 }

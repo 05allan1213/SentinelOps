@@ -373,18 +373,22 @@ export default function TraceDetail() {
   const { traceId } = useParams<{ traceId: string }>()
   const navigate = useNavigate()
   const [data, setData] = useState<Awaited<ReturnType<typeof traceService.detail>> | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [resolvedTraceId, setResolvedTraceId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'nodes'>('nodes')
   const [exportLoading, setExportLoading] = useState(false)
 
+  // 当前 traceId 尚未落地即视为加载中。
+  const loading = !!traceId && resolvedTraceId !== traceId
+
   useEffect(() => {
     if (!traceId) return
-    setLoading(true)
+    let cancelled = false
     traceService.detail(traceId)
-      .then(d => setData(d))
-      .catch(e => setError(String(e)))
-      .finally(() => setLoading(false))
+      .then(d => { if (!cancelled) setData(d) })
+      .catch(e => { if (!cancelled) setError(String(e)) })
+      .finally(() => { if (!cancelled) setResolvedTraceId(traceId) })
+    return () => { cancelled = true }
   }, [traceId])
 
   // 节点统计（useMemo 必须在条件返回前调用）

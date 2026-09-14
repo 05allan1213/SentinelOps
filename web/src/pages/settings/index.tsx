@@ -36,7 +36,7 @@ export default function Settings() {
       })
       .catch(() => { /* 后端不可用时保留 localStorage 中的值 */ })
       .finally(() => setLoading(false))
-  }, [])
+  }, [setSettings])
 
   useEffect(() => {
     if (!isAdmin) return

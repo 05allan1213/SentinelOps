@@ -37,33 +37,48 @@ const runStatusLabel: Record<string, string> = {
 
 export default function RunsPanel() {
   const [runs, setRuns] = useState<OpsRun[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loadNonce, setLoadNonce] = useState(0)
+  const [resolvedLoadKey, setResolvedLoadKey] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [details, setDetails] = useState<Record<string, OpsRun>>({})
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const expandedRef = useRef(expanded)
+  const runsRef = useRef(runs)
+  useEffect(() => { runsRef.current = runs }, [runs])
 
-  const load = async () => {
-    setLoading(true)
-    try { setRuns(await opsService.listRuns(50)) } catch { /* 忽略轮询失败 */ }
-    finally { setLoading(false) }
-  }
+  const loadKey = `runs|${loadNonce}`
+  // 请求身份尚未落地即视为加载中；刷新按钮通过 loadNonce 重新发起。
+  const loading = resolvedLoadKey !== loadKey
+  // 轮询 effect 只在「活跃状态集合」变化时重建 interval；具体 runs 从 ref 读取。
+  const runsStatusKey = runs.map(r => r.status).join(',')
 
   const loadDetail = (id: string) =>
     opsService.getRun(id).then(r => setDetails(p => ({ ...p, [id]: r }))).catch(() => {})
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const list = await opsService.listRuns(50)
+        if (!cancelled) setRuns(list)
+      } catch { /* 忽略轮询失败 */ }
+      finally {
+        if (!cancelled) setResolvedLoadKey(loadKey)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [loadKey])
 
   // 有活跃任务时自动轮询 + 实时计时
   useEffect(() => {
-    const active = runs.filter(r => isActive(r.status))
+    const active = runsRef.current.filter(r => isActive(r.status))
     if (active.length > 0) {
       if (!pollingRef.current) {
         pollingRef.current = setInterval(async () => {
-          const list = await opsService.listRuns(50).catch(() => runs)
+          const list = await opsService.listRuns(50).catch(() => runsRef.current)
           setRuns(list)
           list.forEach(r => { if (expandedRef.current.has(r.id)) loadDetail(r.id) })
         }, 2000)
@@ -78,12 +93,12 @@ export default function RunsPanel() {
       expandedRef.current.forEach(id => loadDetail(id))
     }
     return () => {
-      if (runs.filter(r => isActive(r.status)).length === 0) {
+      if (runsRef.current.filter(r => isActive(r.status)).length === 0) {
         if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null }
         if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
       }
     }
-  }, [runs.map(r => r.status).join(',')])
+  }, [runsStatusKey])
 
   const toggle = (id: string) => {
     setExpanded(prev => {
@@ -133,7 +148,7 @@ export default function RunsPanel() {
               <Trash2 className="w-3.5 h-3.5" /> 清空
             </button>
           )}
-          <button onClick={load} className="text-gray-400 hover:text-indigo-500 transition-colors">
+          <button onClick={() => setLoadNonce(n => n + 1)} className="text-gray-400 hover:text-indigo-500 transition-colors">
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
           </button>
         </div>
