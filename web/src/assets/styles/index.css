@@ -82,6 +82,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --color-primary: 15 23 42;
     --color-accent: 59 130 246;
     --color-success: 22 163 74;

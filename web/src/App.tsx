@@ -1,5 +1,4 @@
 import { lazy, useLayoutEffect } from 'react'
-import { useAppStore } from './stores/app'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 const Dashboard = lazy(() => import('./pages/dashboard'))
@@ -30,8 +29,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
-  const theme = useAppStore(s => s.theme)
-  useLayoutEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark') }, [theme])
+  useLayoutEffect(() => { document.documentElement.classList.remove('dark') }, [])
   return (
     <BrowserRouter>
       <Routes>
