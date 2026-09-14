@@ -1,8 +1,22 @@
 package runtime
 
 import (
+	appconfig "SentinelOps/internal/config"
+	"SentinelOps/internal/dao/mysql"
+	"SentinelOps/utility/middleware"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/net/ghttp"
+	"github.com/google/uuid"
+	gormmysql "gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"io"
+	"net/http"
+	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -171,4 +185,131 @@ func TestRuntimeControllerSSEEventTypeIsHeaderSafe(t *testing.T) {
 			t.Fatalf("safeSSEEventType(%q)=%q want %q", test.value, got, test.want)
 		}
 	}
+}
+
+func TestReadModelPaginationHTTPBinding(t *testing.T) {
+	server := g.Server("runtime-pages-" + uuid.NewString())
+	server.SetDumpRouterMap(false)
+	server.SetPort(0)
+	server.Group("/api", func(group *ghttp.RouterGroup) {
+		group.Middleware(middleware.ResponseMiddleware)
+		group.Bind(NewV1(nil))
+	})
+	if err := server.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = server.Shutdown() })
+	client := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 5 * time.Second}
+	for _, resource := range []string{"capabilities", "worker-health"} {
+		for _, tc := range []struct {
+			query              string
+			status, page, size int
+		}{
+			{"", 200, 1, 50}, {"?page=2", 200, 2, 50}, {"?page_size=100", 200, 1, 100}, {"?page=3&page_size=1", 200, 3, 1},
+			{"?page=0", 400, 0, 0}, {"?page=-1", 400, 0, 0}, {"?page_size=0", 400, 0, 0}, {"?page_size=-1", 400, 0, 0}, {"?page_size=101", 400, 0, 0},
+			{"?page=abc", 400, 0, 0}, {"?page=1.5", 400, 0, 0}, {"?page_size=abc", 400, 0, 0}, {"?page=999999999999999999999999", 400, 0, 0},
+		} {
+			t.Run(resource+tc.query, func(t *testing.T) {
+				res, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/api/runtime/v1/%s%s", server.GetListenedPort(), resource, tc.query))
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer res.Body.Close()
+				body, err := io.ReadAll(res.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if res.StatusCode != tc.status {
+					t.Fatalf("status=%d want=%d body=%s", res.StatusCode, tc.status, body)
+				}
+				var envelope struct {
+					Message string `json:"message"`
+					Data    struct {
+						Items []json.RawMessage `json:"items"`
+						Page  v1.PageMeta       `json:"page"`
+						v1.ResourceMeta
+					} `json:"data"`
+				}
+				if err := json.Unmarshal(body, &envelope); err != nil {
+					t.Fatal(err)
+				}
+				if tc.status == 200 && (envelope.Data.Page != (v1.PageMeta{Page: tc.page, PageSize: tc.size}) || envelope.Data.Items == nil || envelope.Data.ReasonCode != "not_observed" || !envelope.Data.NotRun) {
+					t.Fatalf("body=%s", body)
+				}
+			})
+		}
+	}
+}
+
+func TestReadModelControllerForwardsPaginationToPersistedService(t *testing.T) {
+	dsn := os.Getenv("SENTINELOPS_TEST_DSN")
+	if dsn == "" {
+		t.Skip("disposable MySQL required")
+	}
+	db, err := gorm.Open(gormmysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&mysql.RuntimeWorkerSnapshot{}); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	observed := "[]"
+	rows := make([]mysql.RuntimeWorkerSnapshot, 0, 53)
+	ids := make([]string, 0, 53)
+	for i := 0; i < 53; i++ {
+		id := fmt.Sprintf("batch3-controller-%02d", i)
+		ids = append(ids, id)
+		row := mysql.RuntimeWorkerSnapshot{WorkerID: id, HeartbeatAt: &now, ObservedMCPJSON: &observed, ObservedSkillJSON: &observed}
+		if i > 50 {
+			row.HeartbeatAt = nil
+		}
+		rows = append(rows, row)
+	}
+	if err := db.Create(&rows).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Where("worker_id IN ?", ids).Delete(&mysql.RuntimeWorkerSnapshot{}) })
+	cfg := &appconfig.Config{MCP: appconfig.MCPConfig{Servers: map[string]appconfig.MCPServer{}}}
+	for i := 0; i < 105; i++ {
+		cfg.MCP.Servers[fmt.Sprintf("server-%03d", i)] = appconfig.MCPServer{Transport: "stdio", Command: "/bin/echo", CWD: "/tmp"}
+	}
+	controller := NewV1(&service.RuntimeService{Store: workflow.NewGORMStore(db), Config: cfg})
+	all, err := controller.GetCapabilities(context.Background(), &v1.GetCapabilitiesReq{})
+	if err != nil || len(all.Items) <= 100 {
+		t.Fatalf("catalog=%+v err=%v", all, err)
+	}
+	workers, err := controller.GetWorkerHealth(context.Background(), &v1.GetWorkerHealthReq{})
+	if err != nil || len(workers.Items) != 53 || *workers.Aggregate.Total != 51 {
+		t.Fatalf("workers=%+v err=%v", workers, err)
+	}
+	for _, page := range []int{1, 2, 9} {
+		size := 50
+		request := v1.OptionalPageRequest{Page: &page, PageSize: &size}
+		got, err := controller.GetCapabilities(context.Background(), &v1.GetCapabilitiesReq{OptionalPageRequest: request})
+		if err != nil || got.Page.Page != page || got.Page.PageSize != size || got.Page.Total != all.Page.Total || got.ResourceMeta != all.ResourceMeta || len(got.Items) > size {
+			t.Fatalf("capabilities=%+v err=%v", got, err)
+		}
+		health, err := controller.GetWorkerHealth(context.Background(), &v1.GetWorkerHealthReq{OptionalPageRequest: request})
+		if err != nil || health.Page.Page != page || health.Page.Total != 53 || health.ResourceMeta != workers.ResourceMeta || !reflect.DeepEqual(health.Aggregate, workers.Aggregate) {
+			t.Fatalf("health=%+v err=%v", health, err)
+		}
+		want := map[int]int{1: 50, 2: 3, 9: 0}[page]
+		if len(health.Items) != want {
+			t.Fatalf("page %d items=%d", page, len(health.Items))
+		}
+	}
+	// A structurally malformed persisted observation must affect even pages
+	// whose catalog items are all locally configured.
+	if err := db.Model(&mysql.RuntimeWorkerSnapshot{}).Where("worker_id = ?", ids[0]).Update("observed_mcp_json", "{}").Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, page := range []int{1, 2, 999} {
+		size := 1
+		got, err := controller.GetCapabilities(context.Background(), &v1.GetCapabilitiesReq{OptionalPageRequest: v1.OptionalPageRequest{Page: &page, PageSize: &size}})
+		if err != nil || got.Availability != v1.AvailabilityUnavailable || got.DataQuality != v1.DataQualityUnknown || got.ReasonCode != "worker_snapshot_malformed" || !got.NotRun || got.Page.Total != all.Page.Total {
+			t.Fatalf("malformed catalog=%+v err=%v", got, err)
+		}
+	}
+
 }

@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,25 +16,48 @@ import (
 )
 
 // GetWorkerHealth projects only persisted runtime_worker_snapshots rows.
-func (s *RuntimeService) GetWorkerHealth(ctx context.Context) (v1.WorkerHealthRes, error) {
+func (s *RuntimeService) GetWorkerHealth(ctx context.Context, pagination ...v1.PageRequest) (v1.WorkerHealthRes, error) {
+	if _, _, _, err := readModelPage(0, pagination); err != nil {
+		return v1.WorkerHealthRes{}, err
+	}
 	if s == nil || s.Store == nil || s.Store.DB() == nil {
 		meta := unavailableObservedMeta()
-		return v1.WorkerHealthRes{Items: []v1.WorkerObservationDTO{}, Page: v1.PageMeta{Page: 1, PageSize: 0}, Aggregate: &v1.WorkerAggregateDTO{ResourceMeta: meta}, ResourceMeta: meta}, nil
+		_, _, page, err := readModelPage(0, pagination)
+		return v1.WorkerHealthRes{Items: []v1.WorkerObservationDTO{}, Page: page, Aggregate: &v1.WorkerAggregateDTO{ResourceMeta: meta}, ResourceMeta: meta}, err
 	}
 	queryStore := mysql.NewGORMStore(s.Store.DB())
 	rows, err := queryStore.ListRuntimeWorkerSnapshots(ctx)
 	if err != nil {
 		return v1.WorkerHealthRes{}, err
 	}
+	return projectWorkerHealth(rows, s.workerLeaseDuration(), time.Now().UTC(), pagination)
+}
+
+func (s *RuntimeService) workerLeaseDuration() time.Duration {
+	if s != nil && s.Config != nil && s.Config.Observability.Retention.LeaseDurationMS > 0 {
+		return time.Duration(s.Config.Observability.Retention.LeaseDurationMS) * time.Millisecond
+	}
+	return 30 * time.Second
+}
+
+func projectWorkerHealth(rows []mysql.RuntimeWorkerSnapshot, lease time.Duration, now time.Time, pagination []v1.PageRequest) (v1.WorkerHealthRes, error) {
 	if len(rows) == 0 {
 		meta := unavailableObservedMeta()
-		return v1.WorkerHealthRes{Items: []v1.WorkerObservationDTO{}, Page: v1.PageMeta{Page: 1, PageSize: 0}, Aggregate: &v1.WorkerAggregateDTO{ResourceMeta: meta}, ResourceMeta: meta}, nil
+		_, _, page, err := readModelPage(0, pagination)
+		return v1.WorkerHealthRes{Items: []v1.WorkerObservationDTO{}, Page: page, Aggregate: &v1.WorkerAggregateDTO{ResourceMeta: meta}, ResourceMeta: meta}, err
 	}
-	lease := 30 * time.Second
-	if s.Config != nil && s.Config.Observability.Retention.LeaseDurationMS > 0 {
-		lease = time.Duration(s.Config.Observability.Retention.LeaseDurationMS) * time.Millisecond
-	}
-	now := time.Now().UTC()
+	// WorkerID is the persisted primary key; heartbeat is a deterministic
+	// tie-breaker for read-model inputs before slicing.
+	rows = append([]mysql.RuntimeWorkerSnapshot(nil), rows...)
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].WorkerID != rows[j].WorkerID {
+			return rows[i].WorkerID < rows[j].WorkerID
+		}
+		if rows[i].HeartbeatAt == nil {
+			return rows[j].HeartbeatAt != nil
+		}
+		return rows[j].HeartbeatAt != nil && rows[i].HeartbeatAt.Before(*rows[j].HeartbeatAt)
+	})
 	items := make([]v1.WorkerObservationDTO, 0, len(rows))
 	meta := v1.ResourceMeta{Availability: v1.AvailabilityAvailable, DataQuality: v1.DataQualityComplete}
 	var total, active, idle, stale int
@@ -71,7 +95,11 @@ func (s *RuntimeService) GetWorkerHealth(ctx context.Context) (v1.WorkerHealthRe
 	} else {
 		aggregate = &v1.WorkerAggregateDTO{ResourceMeta: unavailableObservedMeta()}
 	}
-	return v1.WorkerHealthRes{Items: items, Page: v1.PageMeta{Page: 1, PageSize: len(items), Total: int64(len(items))}, Aggregate: aggregate, ResourceMeta: meta}, nil
+	start, end, page, err := readModelPage(len(items), pagination)
+	if err != nil {
+		return v1.WorkerHealthRes{}, err
+	}
+	return v1.WorkerHealthRes{Items: append([]v1.WorkerObservationDTO{}, items[start:end]...), Page: page, Aggregate: aggregate, ResourceMeta: meta}, nil
 }
 
 func workerObservationDTO(row mysql.RuntimeWorkerSnapshot, now time.Time, lease time.Duration) (v1.WorkerObservationDTO, v1.ResourceMeta) {

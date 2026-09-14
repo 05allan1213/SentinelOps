@@ -163,3 +163,38 @@ func assertSnakeCaseJSONTags(t *testing.T, typ reflect.Type) {
 		}
 	}
 }
+
+func TestOptionalReadModelPagination(t *testing.T) {
+	ptr := func(n int) *int { return &n }
+	for _, tc := range []struct {
+		name    string
+		req     OptionalPageRequest
+		want    *PageRequest
+		invalid bool
+	}{
+		{"legacy", OptionalPageRequest{}, nil, false},
+		{"page only", OptionalPageRequest{Page: ptr(2)}, &PageRequest{2, 50}, false},
+		{"size only", OptionalPageRequest{PageSize: ptr(100)}, &PageRequest{1, 100}, false},
+		{"minimum", OptionalPageRequest{ptr(1), ptr(1)}, &PageRequest{1, 1}, false},
+		{"zero page", OptionalPageRequest{Page: ptr(0)}, nil, true},
+		{"negative page", OptionalPageRequest{Page: ptr(-1)}, nil, true},
+		{"zero size", OptionalPageRequest{PageSize: ptr(0)}, nil, true},
+		{"negative size", OptionalPageRequest{PageSize: ptr(-1)}, nil, true},
+		{"oversize", OptionalPageRequest{PageSize: ptr(101)}, nil, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, req := range []interface{ Valid() error }{GetCapabilitiesReq{OptionalPageRequest: tc.req}, GetWorkerHealthReq{OptionalPageRequest: tc.req}} {
+				err := req.Valid()
+				if (err != nil) != tc.invalid {
+					t.Fatalf("validation=%v", err)
+				}
+				if err != nil && !errors.Is(err, ErrRuntimeRequestValidation) {
+					t.Fatal(err)
+				}
+			}
+			if !tc.invalid && !reflect.DeepEqual(tc.req.Pagination(), tc.want) {
+				t.Fatalf("page=%+v", tc.req.Pagination())
+			}
+		})
+	}
+}

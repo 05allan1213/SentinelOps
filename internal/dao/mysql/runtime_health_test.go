@@ -31,3 +31,21 @@ func TestRuntimeWorkerSnapshotQueryReturnsPersistedRows(t *testing.T) {
 		t.Fatalf("rows=%+v err=%v", rows, err)
 	}
 }
+
+func TestWorkerSnapshotOrderingKeepsUnavailableRecords(t *testing.T) {
+	store, db := runtimeQueryStore(t, "runtime_health_ordering")
+	for _, id := range []string{"z-worker", "", "a-worker"} {
+		if err := db.Create(&RuntimeWorkerSnapshot{WorkerID: id}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows, err := store.ListRuntimeWorkerSnapshots(context.Background())
+	if err != nil || len(rows) != 3 {
+		t.Fatalf("rows=%+v err=%v", rows, err)
+	}
+	for i, want := range []string{"", "a-worker", "z-worker"} {
+		if rows[i].WorkerID != want {
+			t.Fatalf("row %d=%s", i, rows[i].WorkerID)
+		}
+	}
+}

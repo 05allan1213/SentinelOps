@@ -153,6 +153,36 @@ func (r PageRequest) Valid() error {
 	}
 	return nil
 }
+
+// OptionalPageRequest preserves the legacy full-resource response when both
+// parameters are absent. Supplying either opts into bounded pagination.
+// Pointers distinguish omitted values from explicitly invalid zero values.
+type OptionalPageRequest struct {
+	Page     *int `json:"page" form:"page" v:"integer|min:1"`
+	PageSize *int `json:"page_size" form:"page_size" v:"integer|between:1,100"`
+}
+
+func (r OptionalPageRequest) Pagination() *PageRequest {
+	if r.Page == nil && r.PageSize == nil {
+		return nil
+	}
+	page := PageRequest{Page: 1, PageSize: 50}
+	if r.Page != nil {
+		page.Page = *r.Page
+	}
+	if r.PageSize != nil {
+		page.PageSize = *r.PageSize
+	}
+	return &page
+}
+
+func (r OptionalPageRequest) Valid() error {
+	if page := r.Pagination(); page != nil {
+		return page.Valid()
+	}
+	return nil
+}
+
 func validID(s, name string) error {
 	if strings.TrimSpace(s) == "" {
 		return validationErrorf("%s must not be empty", name)
@@ -459,12 +489,14 @@ func (r GetOperationReq) Valid() error { return validID(r.OperationID, "operatio
 
 type GetCapabilitiesReq struct {
 	g.Meta `path:"/runtime/v1/capabilities" method:"GET"`
+	OptionalPageRequest
 }
 type GetSafetyReq struct {
 	g.Meta `path:"/runtime/v1/safety" method:"GET"`
 }
 type GetWorkerHealthReq struct {
 	g.Meta `path:"/runtime/v1/worker-health" method:"GET"`
+	OptionalPageRequest
 }
 type GetEvalReq struct {
 	g.Meta   `path:"/runtime/v1/eval" method:"GET"`

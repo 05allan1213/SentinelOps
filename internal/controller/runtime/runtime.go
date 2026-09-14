@@ -349,14 +349,23 @@ func (c *ControllerV1) GetCapabilities(ctx context.Context, req *v1.GetCapabilit
 	if req == nil {
 		return nil, c.fail(ctx, v1.ErrRuntimeRequestValidation)
 	}
+	if err := req.Valid(); err != nil {
+		return nil, c.fail(ctx, err)
+	}
+	var pagination []v1.PageRequest
+	pageMeta := unavailablePage()
+	if page := req.Pagination(); page != nil {
+		pagination = append(pagination, *page)
+		pageMeta = v1.PageMeta{Page: page.Page, PageSize: page.PageSize}
+	}
 	if c.service == nil {
 		meta := unavailableNotRunMeta()
-		return &v1.CapabilitiesRes{Items: []v1.CapabilityDTO{}, Page: unavailablePage(), ResourceMeta: meta}, nil
+		return &v1.CapabilitiesRes{Items: []v1.CapabilityDTO{}, Page: pageMeta, ResourceMeta: meta}, nil
 	}
 	if err := c.requireService(ctx); err != nil {
 		return nil, err
 	}
-	res, err := c.service.GetCapabilities(ctx)
+	res, err := c.service.GetCapabilities(ctx, pagination...)
 	if err != nil {
 		return nil, c.fail(ctx, err)
 	}
@@ -385,15 +394,24 @@ func (c *ControllerV1) GetWorkerHealth(ctx context.Context, req *v1.GetWorkerHea
 	if req == nil {
 		return nil, c.fail(ctx, v1.ErrRuntimeRequestValidation)
 	}
+	if err := req.Valid(); err != nil {
+		return nil, c.fail(ctx, err)
+	}
+	var pagination []v1.PageRequest
+	pageMeta := unavailablePage()
+	if page := req.Pagination(); page != nil {
+		pagination = append(pagination, *page)
+		pageMeta = v1.PageMeta{Page: page.Page, PageSize: page.PageSize}
+	}
 	if c.service != nil {
-		res, err := c.service.GetWorkerHealth(ctx)
+		res, err := c.service.GetWorkerHealth(ctx, pagination...)
 		if err != nil {
 			return nil, c.fail(ctx, err)
 		}
 		return &res, nil
 	}
 	meta := unavailableNotRunMeta()
-	return &v1.WorkerHealthRes{Items: []v1.WorkerObservationDTO{}, Page: unavailablePage(), ResourceMeta: meta}, nil
+	return &v1.WorkerHealthRes{Items: []v1.WorkerObservationDTO{}, Page: pageMeta, ResourceMeta: meta}, nil
 }
 
 func (c *ControllerV1) GetEval(ctx context.Context, req *v1.GetEvalReq) (*v1.EvalRes, error) {

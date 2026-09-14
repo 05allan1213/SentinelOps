@@ -19,7 +19,10 @@ import (
 // GetCapabilities returns the static, read-only capability catalog. Runtime
 // worker state is joined only from persisted snapshots; process-local handles
 // and configuration secrets never enter this DTO.
-func (s *RuntimeService) GetCapabilities(ctx context.Context) (v1.CapabilitiesRes, error) {
+func (s *RuntimeService) GetCapabilities(ctx context.Context, pagination ...v1.PageRequest) (v1.CapabilitiesRes, error) {
+	if _, _, _, err := readModelPage(0, pagination); err != nil {
+		return v1.CapabilitiesRes{}, err
+	}
 	items := make([]v1.CapabilityDTO, 0)
 	skillValidationErr := false
 	mcpEnabled, skillEnabled := false, false
@@ -115,7 +118,7 @@ func (s *RuntimeService) GetCapabilities(ctx context.Context) (v1.CapabilitiesRe
 			items[i].ResourceMeta = completeSafetyMeta()
 		}
 	}
-	sort.Slice(items, func(i, j int) bool {
+	sort.SliceStable(items, func(i, j int) bool {
 		if items[i].Source != items[j].Source {
 			return items[i].Source < items[j].Source
 		}
@@ -139,7 +142,7 @@ func (s *RuntimeService) GetCapabilities(ctx context.Context) (v1.CapabilitiesRe
 			}
 		}
 	}
-	return v1.CapabilitiesRes{Items: items, Page: v1.PageMeta{Page: 1, PageSize: len(items), Total: int64(len(items))}, ResourceMeta: meta}, nil
+	return paginateCapabilities(items, meta, pagination)
 }
 
 type observedKey struct{ source, name string }
@@ -178,4 +181,32 @@ func (s *RuntimeService) loadWorkerObservations(ctx context.Context) (map[observ
 
 func unavailableObservedMeta() v1.ResourceMeta {
 	return v1.ResourceMeta{Availability: v1.AvailabilityUnavailable, DataQuality: v1.DataQualityUnknown, ReasonCode: "not_observed"}
+}
+
+// readModelPage bounds the slice before multiplying, including MaxInt pages.
+// Omitted pagination preserves the existing full-resource response.
+func readModelPage(total int, pagination []v1.PageRequest) (int, int, v1.PageMeta, error) {
+	if len(pagination) == 0 {
+		return 0, total, v1.PageMeta{Page: 1, PageSize: total, Total: int64(total)}, nil
+	}
+	request := pagination[0]
+	if err := request.Valid(); err != nil {
+		return 0, 0, v1.PageMeta{}, err
+	}
+	meta := v1.PageMeta{Page: request.Page, PageSize: request.PageSize, Total: int64(total)}
+	if total == 0 || request.Page-1 > (total-1)/request.PageSize {
+		return total, total, meta, nil
+	}
+	start := (request.Page - 1) * request.PageSize
+	end := start + min(request.PageSize, total-start)
+	meta.HasNext = end < total
+	return start, end, meta, nil
+}
+
+func paginateCapabilities(items []v1.CapabilityDTO, meta v1.ResourceMeta, pagination []v1.PageRequest) (v1.CapabilitiesRes, error) {
+	start, end, page, err := readModelPage(len(items), pagination)
+	if err != nil {
+		return v1.CapabilitiesRes{}, err
+	}
+	return v1.CapabilitiesRes{Items: append([]v1.CapabilityDTO{}, items[start:end]...), Page: page, ResourceMeta: meta}, nil
 }
