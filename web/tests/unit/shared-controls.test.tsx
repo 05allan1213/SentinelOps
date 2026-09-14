@@ -1,0 +1,78 @@
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, expect, it, vi } from 'vitest'
+import CustomSelect from '@/components/common/CustomSelect'
+
+afterEach(cleanup)
+const options = [{ value: '', label: 'All' }, { value: 1, label: 'Alpha' }, { value: 'b', label: 'Beta' }]
+
+it('preserves numeric/string matching, string callbacks and controlled ownership', () => {
+  const change = vi.fn()
+  render(<CustomSelect value="1" options={options} onChange={change} />)
+  const trigger = screen.getByRole('combobox', { name: 'Alpha' })
+  fireEvent.click(trigger)
+  expect(screen.getByRole('option', { name: 'Alpha' })).toHaveAttribute('aria-selected', 'true')
+  fireEvent.click(screen.getByRole('option', { name: 'All' }))
+  expect(change).toHaveBeenLastCalledWith('')
+  expect(trigger).toHaveTextContent('Alpha')
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('option', { name: 'Alpha' }))
+  expect(change).toHaveBeenLastCalledWith('1')
+  expect(change).toHaveBeenCalledTimes(2)
+})
+
+it('supports arrows, home/end, enter, escape and tab without committing mere navigation', () => {
+  const change = vi.fn()
+  render(<CustomSelect label="Mode" value="" options={options} onChange={change} />)
+  const trigger = screen.getByRole('combobox', { name: 'Mode' })
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+  fireEvent.keyDown(trigger, { key: 'End' })
+  expect(trigger.getAttribute('aria-activedescendant')).toBe(screen.getByRole('option', { name: 'Beta' }).id)
+  expect(change).not.toHaveBeenCalled()
+  fireEvent.keyDown(trigger, { key: 'Home' })
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+  fireEvent.keyDown(trigger, { key: 'Enter' })
+  expect(change).toHaveBeenCalledWith('1')
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.keyDown(trigger, { key: ' ' })
+  fireEvent.keyDown(trigger, { key: 'Escape' })
+  expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  fireEvent.keyDown(trigger, { key: 'ArrowUp' })
+  fireEvent.keyDown(trigger, { key: 'Tab' })
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  expect(change).toHaveBeenCalledTimes(1)
+})
+
+it('exposes label, error and placeholder and prevents disabled re-opening', () => {
+  const change = vi.fn()
+  const props = { label: 'Mode', value: 'missing', options, onChange: change, placeholder: 'Choose mode', error: 'Required' }
+  const { rerender } = render(<CustomSelect {...props} />)
+  const trigger = screen.getByRole('combobox', { name: 'Mode' })
+  expect(trigger).toHaveTextContent('Choose mode')
+  expect(trigger).toHaveAttribute('aria-invalid', 'true')
+  expect(trigger).toHaveAccessibleDescription('Required')
+  fireEvent.click(trigger)
+  rerender(<CustomSelect {...props} disabled />)
+  expect(trigger).toBeDisabled()
+  expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  fireEvent.click(trigger)
+  expect(change).not.toHaveBeenCalled()
+  rerender(<CustomSelect {...props} />)
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+})
+
+it('handles typeahead, outside dismissal and an empty or changed option set', () => {
+  const change = vi.fn()
+  const { rerender } = render(<CustomSelect label="Mode" value="" options={options} onChange={change} />)
+  const trigger = screen.getByRole('combobox')
+  fireEvent.keyDown(trigger, { key: 'b' })
+  expect(trigger.getAttribute('aria-activedescendant')).toBe(screen.getByRole('option', { name: 'Beta' }).id)
+  fireEvent.mouseDown(document.body)
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(trigger)
+  fireEvent.keyDown(trigger, { key: 'End' })
+  rerender(<CustomSelect label="Mode" value="" options={[]} onChange={change} />)
+  expect(trigger).not.toHaveAttribute('aria-activedescendant')
+  expect(screen.getByRole('option', { name: '无可选项' })).toHaveAttribute('aria-disabled', 'true')
+  fireEvent.keyDown(trigger, { key: 'Enter' })
+  expect(change).not.toHaveBeenCalled()
+})
