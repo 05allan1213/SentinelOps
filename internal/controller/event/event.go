@@ -28,6 +28,21 @@ import (
 
 const legacyCompatibilityDisabledMessage = "legacy compatibility is disabled"
 
+// streamEventPayload 与前端解析协议对齐：data 行必须是 JSON envelope。
+// content 帧早已使用该协议，error/done 帧若继续发送纯文本会被前端的
+// JSON.parse 失败分支静默丢弃，让失败的流式分析伪装成“空结果成功”。
+func streamEventPayload(kind, content string) string {
+	payload := map[string]string{"type": kind}
+	if content != "" {
+		payload["content"] = content
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return `{"type":"` + kind + `"}`
+	}
+	return string(encoded)
+}
+
 type streamClient interface {
 	Send(string, string)
 	Done()
@@ -184,7 +199,7 @@ func (c *ControllerV1) PipelineStream(ctx context.Context, req *v1.PipelineStrea
 	runner, err := c.agent(ctx)
 	if err != nil {
 		pipelineErr = err
-		client.Send("error", err.Error())
+		client.Send("error", streamEventPayload("error", err.Error()))
 		client.Done()
 		return nil, nil
 	}
@@ -202,7 +217,7 @@ func (c *ControllerV1) PipelineStream(ctx context.Context, req *v1.PipelineStrea
 	if err != nil {
 		pipelineErr = err
 		trace.FinishSpan(spanCtx, spanID, err, nil)
-		client.Send("error", err.Error())
+		client.Send("error", streamEventPayload("error", err.Error()))
 		client.Done()
 		return nil, nil
 	}
@@ -213,13 +228,13 @@ func (c *ControllerV1) PipelineStream(ctx context.Context, req *v1.PipelineStrea
 		chunk, err := sr.Recv()
 		if errors.Is(err, io.EOF) {
 			// 流式输出结束，通知前端关闭 SSE 连接
-			client.Send("done", "Stream completed")
+			client.Send("done", streamEventPayload("done", "Stream completed"))
 			break
 		}
 		if err != nil {
 			pipelineErr = err
 			spanErr = err
-			client.Send("error", err.Error())
+			client.Send("error", streamEventPayload("error", err.Error()))
 			break
 		}
 		// 过滤纯空白 chunk，避免无意义推送
@@ -248,7 +263,7 @@ func (c *ControllerV1) AnalyzeSingleStream(ctx context.Context, req *v1.AnalyzeS
 	m, err := c.model(ctx)
 	if err != nil {
 		g.Log().Errorf(ctx, "[AnalyzeSingleStream] 模型初始化失败 | err=%v", err)
-		client.Send("error", err.Error())
+		client.Send("error", streamEventPayload("error", err.Error()))
 		client.Done()
 		return nil, nil
 	}
@@ -286,7 +301,7 @@ func (c *ControllerV1) AnalyzeSingleStream(ctx context.Context, req *v1.AnalyzeS
 	sr, err := m.Stream(ctx, messages)
 	if err != nil {
 		g.Log().Errorf(ctx, "[AnalyzeSingleStream] Stream 调用失败 | err=%v", err)
-		client.Send("error", err.Error())
+		client.Send("error", streamEventPayload("error", err.Error()))
 		client.Done()
 		return nil, nil
 	}
@@ -297,7 +312,7 @@ func (c *ControllerV1) AnalyzeSingleStream(ctx context.Context, req *v1.AnalyzeS
 		chunk, err := sr.Recv()
 		if errors.Is(err, io.EOF) {
 			g.Log().Debugf(ctx, "[AnalyzeSingleStream] Stream 结束 | chunks=%d", chunkCount)
-			client.Send("done", "Stream completed")
+			client.Send("done", streamEventPayload("done", "Stream completed"))
 			break
 		}
 		if err != nil {
@@ -306,7 +321,7 @@ func (c *ControllerV1) AnalyzeSingleStream(ctx context.Context, req *v1.AnalyzeS
 				g.Log().Warningf(ctx, "[AnalyzeSingleStream] 客户端主动断开连接 | chunks=%d", chunkCount)
 			} else {
 				g.Log().Errorf(ctx, "[AnalyzeSingleStream] Stream 接收异常 | chunks=%d | err=%v", chunkCount, err)
-				client.Send("error", err.Error())
+				client.Send("error", streamEventPayload("error", err.Error()))
 			}
 			break
 		}
@@ -328,7 +343,7 @@ func (c *ControllerV1) allowLegacyCompatibility(ctx context.Context, client stre
 	if c != nil && c.legacyGate != nil && c.legacyGate.AllowLegacyCompatibility(ctx) {
 		return true
 	}
-	client.Send("error", legacyCompatibilityDisabledMessage)
+	client.Send("error", streamEventPayload("error", legacyCompatibilityDisabledMessage))
 	client.Done()
 	return false
 }

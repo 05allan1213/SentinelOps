@@ -40,6 +40,10 @@ func NewV1(durable ...*chatsvc.DurableService) apichat.IChatV1 {
 // FileUpload 上传知识文档并构建向量索引，单次上限 50 MB。
 // 支持格式：.txt .md .markdown .pdf .docx .pptx
 // 文件解析和保存依赖 GoFrame API，必须保留在 HTTP 层；向量索引构建委托 chatsvc.BuildFileIndex。
+// fileUploadEntryPoint 是 Trace 记录的入口路径，必须与注册的 `/api/upload` 一致：
+// 旧值 `/api/chat/v1/file_upload` 已不存在，会让 Traces 页面展示无法对应的入口。
+const fileUploadEntryPoint = "/api/upload"
+
 func (c *ControllerV1) FileUpload(ctx context.Context, req *v1.FileUploadReq) (*v1.FileUploadRes, error) {
 	const maxUploadBytes int64 = 50 << 20 // 最大上传大小为 50 MB
 	if err := policy.Authorize(ctx, policy.PermissionBusinessWrite, policy.Resource{}); err != nil {
@@ -72,7 +76,7 @@ func (c *ControllerV1) FileUpload(ctx context.Context, req *v1.FileUploadReq) (*
 	}
 
 	// 启动链路追踪（文件验证通过后再启动，避免记录无效请求）
-	ctx = trace.StartRun(ctx, "chat.file_upload", "/api/chat/v1/file_upload", "", 0,
+	ctx = trace.StartRun(ctx, "chat.file_upload", fileUploadEntryPoint, "", 0,
 		uploadFile.Filename, map[string]any{"file_size": uploadFile.Size})
 	var uploadErr error
 	defer func() { trace.FinishRun(ctx, uploadErr) }()
