@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 	"sync"
 	"time"
@@ -72,6 +73,17 @@ type Worker struct {
 	snapshotStarted       bool
 	cancelMu              sync.Mutex
 	activeCancel          *workflow.RecoveryOperationClaim
+	claimRetryMu          sync.Mutex
+	claimRetryStats       ClaimRetryStats
+}
+
+// ClaimRetryStats 记录当前 Worker 进程内可重试 Claim 事务冲突的累计观测，
+// 与业务 workflow attempt 完全无关：这里统计的是数据库事务级重试。
+type ClaimRetryStats struct {
+	Count       uint64
+	LastReason  string
+	LastBackoff time.Duration
+	LastRetryAt time.Time
 }
 
 // RunExecutionResult 是 Worker 交给唯一完成 primitive 的基础结果。
@@ -692,13 +704,27 @@ func (w *Worker) Run(ctx context.Context) error {
 		_ = w.refreshCurrentSnapshot(drainCtx, WorkerStatusDraining)
 	}()
 	empty := 0
+	var consecutiveClaimRetries uint64
 	for {
 		didWork, err := w.RunOnce(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
+			// Claim 事务死锁 / 锁等待超时只回滚事务本身，没有任何 Claim 事实提交。
+			// 它是数据库事务级可恢复错误：有界退避后重新进入 Claim，不能升级成
+			// Worker 生命周期 fatal error，否则高竞争下 Worker Pool 会自我减员。
+			if errors.Is(err, workflow.ErrClaimRetryableTransaction) {
+				consecutiveClaimRetries++
+				delay := w.claimRetryBackoff(consecutiveClaimRetries)
+				w.recordClaimRetry(ctx, err, consecutiveClaimRetries, delay)
+				if waitErr := sleepWithContext(ctx, delay); waitErr != nil {
+					return waitErr
+				}
+				continue
+			}
 			if errors.Is(err, workflow.ErrLeaseLost) || errors.Is(err, workflow.ErrRunCASConflict) || errors.Is(err, workflow.ErrOperationPrecondition) {
+				consecutiveClaimRetries = 0
 				w.reportClaimConflict(ctx, err)
 				timer := time.NewTimer(w.config.MinPollBackoff)
 				select {
@@ -711,6 +737,7 @@ func (w *Worker) Run(ctx context.Context) error {
 			}
 			return err
 		}
+		consecutiveClaimRetries = 0
 		if didWork {
 			empty = 0
 			continue
@@ -724,6 +751,68 @@ func (w *Worker) Run(ctx context.Context) error {
 			return ctx.Err()
 		case <-timer.C:
 		}
+	}
+}
+
+// claimRetryBackoff 返回第 retry 次可重试 Claim 冲突后的等待时间：
+// 指数增长、受 MaxPollBackoff 约束，并叠加 [50%,100%] 的 jitter，避免多个
+// Worker 在死锁风暴中同步重试形成 retry storm。
+func (w *Worker) claimRetryBackoff(retry uint64) time.Duration {
+	base := w.config.MinPollBackoff
+	for current := uint64(1); current < retry; current++ {
+		if base >= w.config.MaxPollBackoff/2 {
+			base = w.config.MaxPollBackoff
+			break
+		}
+		base *= 2
+	}
+	if base > w.config.MaxPollBackoff {
+		base = w.config.MaxPollBackoff
+	}
+	half := base / 2
+	if half <= 0 {
+		return base
+	}
+	return half + time.Duration(rand.Int64N(int64(half)+1))
+}
+
+// recordClaimRetry 把可重试 Claim 事务冲突写进 Worker Health 的 last_error，
+// 并保留进程内累计观测；两者都只描述数据库事务重试，不增改业务 attempt。
+func (w *Worker) recordClaimRetry(ctx context.Context, err error, retry uint64, backoff time.Duration) {
+	reason := workflow.ClaimRetryReason(err)
+	if reason == "" {
+		reason = "mysql_retryable_transaction"
+	}
+	message := fmt.Sprintf("claim retryable database error: worker=%s reason=%s db_retry=%d backoff=%s",
+		w.config.Owner, reason, retry, backoff.Round(time.Millisecond))
+	w.claimRetryMu.Lock()
+	w.claimRetryStats.Count++
+	w.claimRetryStats.LastReason = reason
+	w.claimRetryStats.LastBackoff = backoff
+	w.claimRetryStats.LastRetryAt = time.Now().UTC()
+	w.claimRetryMu.Unlock()
+	w.snapshotMu.Lock()
+	w.observation.LastError = message
+	w.snapshotMu.Unlock()
+	_ = w.heartbeatCurrentSnapshot(ctx)
+}
+
+// ClaimRetryStats 返回当前进程内可重试 Claim 事务冲突的累计观测。
+func (w *Worker) ClaimRetryStats() ClaimRetryStats {
+	w.claimRetryMu.Lock()
+	defer w.claimRetryMu.Unlock()
+	return w.claimRetryStats
+}
+
+// sleepWithContext 执行可被 context 取消的退避等待，保证 graceful shutdown 不被阻塞。
+func sleepWithContext(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 

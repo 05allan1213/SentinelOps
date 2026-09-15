@@ -15,6 +15,7 @@ import (
 	"SentinelOps/internal/ai/policy"
 	"SentinelOps/internal/dao/mysql"
 
+	driver "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -101,8 +102,14 @@ func beginAttemptTx(tx *gorm.DB, run *mysql.WorkflowRun, token LeaseToken, worke
 	// A duplicate attempt is only acceptable when all fenced identity facts
 	// match.  This keeps transaction retries idempotent without overwriting a
 	// newer generation.
+	//
+	// 这里必须用无锁读而不是 SELECT ... FOR UPDATE：对尚不存在的
+	// (run_id, attempt) 做锁定读会在 REPEATABLE READ 下取唯一索引的 gap lock，
+	// 随后 INSERT 需要的 insert intention 锁会与并发 Claim 事务持有的同一 gap
+	// 形成经典死锁环（1213）。同一 Run 的并发认领已经由 workflow_runs 行锁串行化，
+	// 真正的并发重复插入由 uidx_workflow_attempts_run_attempt 的 1062 兜底复核。
 	var existing mysql.WorkflowAttempt
-	lookup := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("run_id = ? AND attempt = ?", run.ID, run.Attempt).First(&existing)
+	lookup := tx.Where("run_id = ? AND attempt = ?", run.ID, run.Attempt).First(&existing)
 	if lookup.Error == nil {
 		if existing.LeaseGeneration == nil || *existing.LeaseGeneration != token.Generation {
 			return ErrLeaseLost
@@ -110,12 +117,40 @@ func beginAttemptTx(tx *gorm.DB, run *mysql.WorkflowRun, token LeaseToken, worke
 		return nil
 	}
 	if !errors.Is(lookup.Error, gorm.ErrRecordNotFound) {
-		return fmt.Errorf("lock workflow attempt: %w", lookup.Error)
+		return fmt.Errorf("read workflow attempt: %w", lookup.Error)
 	}
 	if err := tx.Create(&row).Error; err != nil {
-		return fmt.Errorf("begin workflow attempt: %w", err)
+		if !isDuplicateWorkflowAttemptError(err) {
+			return fmt.Errorf("begin workflow attempt: %w", err)
+		}
+		// 唯一索引兜底：另一事务已经写入同一 (run_id, attempt) 投影。
+		// 用当前读复核 fenced identity；匹配则视为幂等成功，不覆盖任何已有事实。
+		var concurrent mysql.WorkflowAttempt
+		reread := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("run_id = ? AND attempt = ?", run.ID, run.Attempt).
+			First(&concurrent)
+		if errors.Is(reread.Error, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("begin workflow attempt: %w", err)
+		}
+		if reread.Error != nil {
+			return fmt.Errorf("re-read workflow attempt after duplicate key: %w", reread.Error)
+		}
+		if concurrent.LeaseGeneration == nil || *concurrent.LeaseGeneration != token.Generation {
+			return ErrLeaseLost
+		}
+		return nil
 	}
 	return nil
+}
+
+// isDuplicateWorkflowAttemptError 只接受 Attempt 投影唯一索引上的 1062，
+// 避免把主键 UUID 碰撞等其它重复键错误误判成幂等重放。
+func isDuplicateWorkflowAttemptError(err error) bool {
+	var mysqlErr *driver.MySQLError
+	if !errors.As(err, &mysqlErr) || mysqlErr.Number != 1062 {
+		return false
+	}
+	return strings.Contains(mysqlErr.Message, "uidx_workflow_attempts_run_attempt")
 }
 
 // SetAttemptRecoveryModeTx updates mode and checkpoint fingerprint under the

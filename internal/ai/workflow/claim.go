@@ -15,6 +15,12 @@ import (
 
 const maxLeaseDuration = 24 * time.Hour
 
+// ErrClaimRetryableTransaction 表示 Claim 事务因 MySQL 瞬时锁冲突
+// （ER_LOCK_DEADLOCK 1213 / ER_LOCK_WAIT_TIMEOUT 1205）被整体回滚：
+// 该轮没有提交任何 Run / Event / Attempt 事实，调用方可以安全地重新认领。
+// 它是事务级可恢复错误，不是 Worker 生命周期错误。
+var ErrClaimRetryableTransaction = errors.New("claim transaction hit a retryable lock conflict")
+
 // ClaimInput 描述一次 Worker 原子认领请求；租约时间统一由 MySQL 计算。
 type ClaimInput struct {
 	Owner                      string
@@ -102,6 +108,12 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 			}
 			run.Status = RunStatusPending
 		}
+		// 接管过期租约前关闭上一轮 Attempt 投影，与显式回收保持同一查询口径。
+		if run.Status == RunStatusRunning && run.LeaseOwner != nil {
+			if err := closeExpiredAttemptForTakeoverTx(tx, &run); err != nil {
+				return err
+			}
+		}
 		updates := map[string]any{
 			"status":           RunStatusRunning,
 			"lease_owner":      input.Owner,
@@ -152,9 +164,21 @@ func (s *GORMStore) ClaimNextRun(ctx context.Context, input ClaimInput) (*Claime
 		return nil
 	})
 	if err != nil {
-		return nil, false, err
+		return nil, false, classifyClaimTransactionError(err)
 	}
 	return claimed, claimed != nil, nil
+}
+
+// classifyClaimTransactionError 只把结构化的 MySQL 瞬时事务冲突升级成
+// ErrClaimRetryableTransaction；其它错误原样返回，保持 fatal 语义。
+func classifyClaimTransactionError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if isMySQLRetryableTransactionError(err) {
+		return fmt.Errorf("%w: %w", ErrClaimRetryableTransaction, err)
+	}
+	return err
 }
 
 func validateClaimWorkerFingerprint(run *mysql.WorkflowRun, executingWorkerFingerprint string) error {

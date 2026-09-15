@@ -724,3 +724,20 @@ func isMySQLRetryableTransactionError(err error) bool {
 	var mysqlErr *driver.MySQLError
 	return errors.As(err, &mysqlErr) && (mysqlErr.Number == 1205 || mysqlErr.Number == 1213)
 }
+
+// ClaimRetryReason 返回可重试 Claim 事务错误的稳定短原因（用于 Worker Health 与证据），
+// 非可重试错误返回空串。这里只做结构化 MySQL 错误码判定，不依赖错误文本。
+func ClaimRetryReason(err error) string {
+	var mysqlErr *driver.MySQLError
+	if !errors.As(err, &mysqlErr) {
+		return ""
+	}
+	switch mysqlErr.Number {
+	case 1213:
+		return "mysql_deadlock_1213"
+	case 1205:
+		return "mysql_lock_wait_timeout_1205"
+	default:
+		return ""
+	}
+}
